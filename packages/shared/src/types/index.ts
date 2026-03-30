@@ -15,3 +15,5 @@ export type UpdateTask = z.infer<typeof UpdateTaskSchema>;
 export type CompletePhase = z.infer<typeof CompletePhaseSchema>;
 export type ConvertTask = z.infer<typeof ConvertTaskSchema>;
 export type TaskFilter = z.infer<typeof TaskFilterSchema>;
+
+export type { CreateComment, CommentFilter } from "../schemas/comment.js";

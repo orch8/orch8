@@ -14,3 +14,8 @@ export {
   ConvertTaskSchema,
   TaskFilterSchema,
 } from "./task.js";
+export {
+  CommentTypeSchema,
+  CreateCommentSchema,
+  CommentFilterSchema,
+} from "./comment.js";
