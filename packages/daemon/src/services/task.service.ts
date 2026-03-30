@@ -127,6 +127,26 @@ export class TaskService {
     return updated;
   }
 
+  async unblockResolved(projectId: string): Promise<Array<{ id: string; title: string }>> {
+    const result = await this.db.execute(sql`
+      WITH newly_unblockable AS (
+        SELECT td.task_id
+        FROM task_dependencies td
+        JOIN tasks blocker ON blocker.id = td.depends_on_id
+        JOIN tasks blocked ON blocked.id = td.task_id
+        WHERE blocked."column" = 'blocked'
+          AND blocked.project_id = ${projectId}
+        GROUP BY td.task_id
+        HAVING bool_and(blocker."column" = 'done')
+      )
+      UPDATE tasks
+      SET "column" = 'backlog', updated_at = now()
+      WHERE id IN (SELECT task_id FROM newly_unblockable)
+      RETURNING id, title
+    `);
+    return result as unknown as Array<{ id: string; title: string }>;
+  }
+
   private async wouldCreateCycle(newTaskId: string, newDepId: string): Promise<boolean> {
     const result = await this.db.execute(sql`
       WITH RECURSIVE dep_chain AS (

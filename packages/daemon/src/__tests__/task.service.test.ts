@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import { projects, tasks, taskDependencies } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { TaskService } from "../services/task.service.js";
@@ -209,6 +209,51 @@ describe("TaskService", () => {
       await expect(
         service.convertBrainstorm(task.id, "complex")
       ).rejects.toThrow("Only brainstorm tasks can be converted");
+    });
+  });
+
+  describe("unblockResolved", () => {
+    it("unblocks tasks when all dependencies are done", async () => {
+      const a = await service.create({ title: "Dep A", projectId, taskType: "quick" });
+      const b = await service.create({ title: "Blocked B", projectId, taskType: "quick" });
+
+      await service.addDependency(b.id, a.id);
+
+      // Manually set states: B is blocked, A is done
+      await testDb.db.update(tasks).set({ column: "blocked" }).where(eq(tasks.id, b.id));
+      await testDb.db.update(tasks).set({ column: "done" }).where(eq(tasks.id, a.id));
+
+      const unblocked = await service.unblockResolved(projectId);
+      expect(unblocked).toHaveLength(1);
+      expect(unblocked[0].id).toBe(b.id);
+
+      const refreshed = await service.getById(b.id);
+      expect(refreshed!.column).toBe("backlog");
+    });
+
+    it("does not unblock when some dependencies are not done", async () => {
+      const a = await service.create({ title: "Dep A2", projectId, taskType: "quick" });
+      const c = await service.create({ title: "Dep C", projectId, taskType: "quick" });
+      const b = await service.create({ title: "Blocked B2", projectId, taskType: "quick" });
+
+      await service.addDependency(b.id, a.id);
+      await service.addDependency(b.id, c.id);
+
+      // A is done but C is still in_progress
+      await testDb.db.update(tasks).set({ column: "blocked" }).where(eq(tasks.id, b.id));
+      await testDb.db.update(tasks).set({ column: "done" }).where(eq(tasks.id, a.id));
+      await testDb.db.update(tasks).set({ column: "in_progress" }).where(eq(tasks.id, c.id));
+
+      const unblocked = await service.unblockResolved(projectId);
+      expect(unblocked).toHaveLength(0);
+
+      const refreshed = await service.getById(b.id);
+      expect(refreshed!.column).toBe("blocked");
+    });
+
+    it("returns empty array when nothing to unblock", async () => {
+      const unblocked = await service.unblockResolved(projectId);
+      expect(unblocked).toHaveLength(0);
     });
   });
 });
