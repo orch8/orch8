@@ -1,2 +1,1 @@
-// Drizzle table definitions will be added by spec 03 (database schema)
-export {};
+export * from "./schema.js";
