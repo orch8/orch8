@@ -1,0 +1,55 @@
+import type { ClaudeLocalAdapterConfig, RunContext } from "./types.js";
+
+const NESTING_GUARD_VARS = [
+  "CLAUDECODE",
+  "CLAUDE_CODE_ENTRYPOINT",
+  "CLAUDE_CODE_SESSION",
+  "CLAUDE_CODE_PARENT_SESSION",
+] as const;
+
+export function buildEnv(
+  config: ClaudeLocalAdapterConfig,
+  ctx: RunContext,
+  baseEnv: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...baseEnv };
+
+  // Strip nesting guards (spec §2.3)
+  for (const key of NESTING_GUARD_VARS) {
+    delete env[key];
+  }
+
+  // Inject ORCH_* identity vars (spec §3.2)
+  env.ORCH_AGENT_ID = ctx.agentId;
+  env.ORCH_PROJECT_ID = ctx.projectId;
+  env.ORCH_RUN_ID = ctx.runId;
+  env.ORCH_API_URL = ctx.apiUrl;
+  env.ORCH_WAKE_REASON = ctx.wakeReason;
+  env.ORCH_WORKSPACE_CWD = ctx.cwd;
+
+  if (ctx.taskId) {
+    env.ORCH_TASK_ID = ctx.taskId;
+  }
+
+  // Subagent context (spec §3.2)
+  if (ctx.parentRunId) {
+    env.ORCH_PARENT_RUN_ID = ctx.parentRunId;
+  }
+  if (ctx.subtaskScope) {
+    env.ORCH_SUBTASK_SCOPE = ctx.subtaskScope;
+  }
+
+  // User-configured env vars (spec §3)
+  if (config.env) {
+    Object.assign(env, config.env);
+  }
+
+  return env;
+}
+
+export function resolveBillingType(
+  env: Record<string, string | undefined>,
+): "api" | "subscription" {
+  const key = env.ANTHROPIC_API_KEY;
+  return key && key.length > 0 ? "api" : "subscription";
+}
