@@ -26,3 +26,26 @@ export {
   UpdateAgentSchema,
   AgentFilterSchema,
 } from "./agent.js";
+export {
+  CreateProjectSchema,
+  UpdateProjectSchema,
+  ProjectFilterSchema,
+} from "./project.js";
+export {
+  FactCategorySchema,
+  EntityTypeSchema,
+  CreateFactSchema,
+  EntityFilterSchema,
+  KnowledgeSearchSchema,
+  WorklogEntrySchema,
+  LessonEntrySchema,
+} from "./memory.js";
+export {
+  CostSummaryQuerySchema,
+  CostTimeseriesQuerySchema,
+} from "./cost.js";
+export {
+  LogLevelSchema,
+  CreateLogEntrySchema,
+  LogFilterSchema,
+} from "./activity.js";
