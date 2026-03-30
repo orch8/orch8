@@ -333,3 +333,35 @@ export const taskSessions = pgTable("task_sessions", {
 }, (table) => [
   uniqueIndex("uniq_task_session").on(table.agentId, table.taskKey, table.adapterType),
 ]);
+
+// ─── Knowledge Graph Entities ─────────────────────────────
+
+export const knowledgeEntities = pgTable("knowledge_entities", {
+  id: text("id").primaryKey().$defaultFn(() => `ent_${randomUUID()}`),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  slug: text("slug").notNull(),
+  name: text("name").notNull(),
+  entityType: entityTypeEnum("entity_type").notNull().default("area"),
+  description: text("description").default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("uniq_entity_project_slug").on(table.projectId, table.slug),
+]);
+
+// ─── Knowledge Graph Facts ────────────────────────────────
+
+export const knowledgeFacts = pgTable("knowledge_facts", {
+  id: text("id").primaryKey().$defaultFn(() => `fact_${randomUUID()}`),
+  entityId: text("entity_id").notNull().references(() => knowledgeEntities.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  category: factCategoryEnum("category").notNull(),
+  sourceAgent: text("source_agent").notNull(),
+  sourceTask: text("source_task").references(() => tasks.id, { onDelete: "set null" }),
+
+  supersededBy: text("superseded_by"),
+  accessCount: integer("access_count").notNull().default(0),
+  lastAccessed: timestamp("last_accessed", { withTimezone: true }),
+
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
