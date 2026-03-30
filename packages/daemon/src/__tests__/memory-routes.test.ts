@@ -1,0 +1,165 @@
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import Fastify from "fastify";
+import { projects, agents, knowledgeEntities, knowledgeFacts } from "@orch/shared/db";
+import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { authPlugin } from "../api/middleware/auth.js";
+import { memoryRoutes } from "../api/routes/memory.js";
+import { MemoryService } from "../services/memory.service.js";
+import "../types.js";
+
+describe("Memory Routes — Knowledge", () => {
+  let testDb: TestDb;
+  let app: ReturnType<typeof Fastify>;
+  let projectId: string;
+
+  beforeAll(async () => {
+    testDb = await setupTestDb();
+
+    const [project] = await testDb.db.insert(projects).values({
+      name: "Memory Test",
+      slug: "memory-test",
+      homeDir: "/tmp/memory",
+      worktreeDir: "/tmp/memory-wt",
+    }).returning();
+    projectId = project.id;
+
+    await testDb.db.insert(agents).values({
+      id: "eng-1", projectId, name: "Engineer", role: "engineer",
+    });
+    await testDb.db.insert(agents).values({
+      id: "eng-2", projectId, name: "Engineer 2", role: "engineer",
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    await teardownTestDb(testDb);
+  });
+
+  beforeEach(async () => {
+    await testDb.db.delete(knowledgeFacts);
+    await testDb.db.delete(knowledgeEntities);
+
+    app = Fastify();
+    app.decorate("db", testDb.db);
+    const memoryService = new MemoryService(testDb.db);
+    app.decorate("memoryService", memoryService);
+    app.register(authPlugin);
+    app.register(memoryRoutes);
+    await app.ready();
+  });
+
+  describe("GET /api/memory/knowledge", () => {
+    it("lists entities for a project", async () => {
+      await testDb.db.insert(knowledgeEntities).values([
+        { projectId, slug: "auth-system", name: "Auth System", entityType: "area" },
+        { projectId, slug: "api-layer", name: "API Layer", entityType: "area" },
+      ]);
+
+      const res = await app.inject({
+        method: "GET",
+        url: `/api/memory/knowledge?projectId=${projectId}`,
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toHaveLength(2);
+    });
+  });
+
+  describe("GET /api/memory/knowledge/:id", () => {
+    it("returns entity summary", async () => {
+      const [entity] = await testDb.db.insert(knowledgeEntities).values({
+        projectId, slug: "auth", name: "Auth", entityType: "area",
+      }).returning();
+
+      const res = await app.inject({
+        method: "GET",
+        url: `/api/memory/knowledge/${entity.id}`,
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().slug).toBe("auth");
+    });
+  });
+
+  describe("GET /api/memory/knowledge/:id/facts", () => {
+    it("returns scored facts for an entity", async () => {
+      const [entity] = await testDb.db.insert(knowledgeEntities).values({
+        projectId, slug: "auth", name: "Auth", entityType: "area",
+      }).returning();
+
+      await testDb.db.insert(knowledgeFacts).values([
+        { entityId: entity.id, content: "Uses JWT", category: "decision", sourceAgent: "eng-1" },
+        { entityId: entity.id, content: "CSRF added", category: "status", sourceAgent: "eng-2" },
+      ]);
+
+      const res = await app.inject({
+        method: "GET",
+        url: `/api/memory/knowledge/${entity.id}/facts`,
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toHaveLength(2);
+    });
+  });
+
+  describe("POST /api/memory/knowledge/:id/facts — memory scoping", () => {
+    it("auto-tags sourceAgent from request agent", async () => {
+      const [entity] = await testDb.db.insert(knowledgeEntities).values({
+        projectId, slug: "auth", name: "Auth", entityType: "area",
+      }).returning();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/memory/knowledge/${entity.id}/facts`,
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        payload: { content: "New fact from eng-1", category: "observation" },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().sourceAgent).toBe("eng-1");
+    });
+
+    it("admin can write facts with any sourceAgent", async () => {
+      const [entity] = await testDb.db.insert(knowledgeEntities).values({
+        projectId, slug: "auth", name: "Auth", entityType: "area",
+      }).returning();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/memory/knowledge/${entity.id}/facts`,
+        headers: { "x-project-id": projectId },
+        payload: { content: "Admin fact", category: "decision" },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().sourceAgent).toBe("admin");
+    });
+  });
+
+  describe("GET /api/memory/knowledge/search", () => {
+    it("searches facts by text", async () => {
+      const [entity] = await testDb.db.insert(knowledgeEntities).values({
+        projectId, slug: "auth", name: "Auth", entityType: "area",
+      }).returning();
+
+      await testDb.db.insert(knowledgeFacts).values([
+        { entityId: entity.id, content: "Uses CSRF protection", category: "decision", sourceAgent: "eng-1" },
+        { entityId: entity.id, content: "Rate limiting added", category: "status", sourceAgent: "eng-1" },
+      ]);
+
+      const res = await app.inject({
+        method: "GET",
+        url: `/api/memory/knowledge/search?query=CSRF&projectId=${projectId}`,
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.length).toBeGreaterThanOrEqual(1);
+      expect(body[0].content).toContain("CSRF");
+    });
+  });
+});

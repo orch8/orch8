@@ -6,6 +6,7 @@ import type { AgentService } from "./services/agent.service.js";
 import type { HeartbeatService } from "./services/heartbeat.service.js";
 import type { SchedulerService } from "./services/scheduler.service.js";
 import type { ProjectService } from "./services/project.service.js";
+import type { MemoryService } from "./services/memory.service.js";
 
 export type SchemaDb = PostgresJsDatabase<typeof schema>;
 
@@ -17,6 +18,7 @@ declare module "fastify" {
     heartbeatService: HeartbeatService;
     schedulerService: SchedulerService;
     projectService: ProjectService;
+    memoryService: MemoryService;
   }
   interface FastifyRequest {
     agent?: typeof schema.agents.$inferSelect;
