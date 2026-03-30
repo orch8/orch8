@@ -266,11 +266,79 @@ export class HeartbeatService {
   }
 
   async startNextQueuedRunForAgent(
-    _agentId: string,
-    _projectId: string,
+    agentId: string,
+    projectId: string,
   ): Promise<HeartbeatRun[]> {
-    // Stub — implemented in Task 5
-    return [];
+    // 1. Acquire per-agent start lock
+    return this.withAgentLock(agentId, async () => {
+      // 2. Validate agent is still invokable
+      const agent = await this.loadAgent(agentId, projectId);
+      if (!agent || agent.status !== "active") return [];
+
+      // 3. Count currently running runs
+      const [{ count: runningCount }] = await this.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(heartbeatRuns)
+        .where(
+          and(
+            eq(heartbeatRuns.agentId, agentId),
+            eq(heartbeatRuns.projectId, projectId),
+            eq(heartbeatRuns.status, "running"),
+          ),
+        );
+
+      // 4. Calculate available slots
+      const availableSlots = agent.maxConcurrentRuns - runningCount;
+      if (availableSlots <= 0) return [];
+
+      // 5. Fetch queued runs in FIFO order
+      const queuedRuns = await this.db
+        .select()
+        .from(heartbeatRuns)
+        .where(
+          and(
+            eq(heartbeatRuns.agentId, agentId),
+            eq(heartbeatRuns.projectId, projectId),
+            eq(heartbeatRuns.status, "queued"),
+          ),
+        )
+        .orderBy(heartbeatRuns.createdAt)
+        .limit(availableSlots);
+
+      // 6. Claim each run
+      const claimed: HeartbeatRun[] = [];
+      for (const run of queuedRuns) {
+        const result = await this.claimQueuedRun(run.id);
+        if (result) {
+          claimed.push(result);
+        }
+      }
+
+      return claimed;
+    });
+  }
+
+  private async withAgentLock<T>(
+    agentId: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    // Wait for any existing lock on this agent
+    while (this.agentStartLocks.has(agentId)) {
+      await this.agentStartLocks.get(agentId);
+    }
+
+    let resolve!: () => void;
+    const promise = new Promise<void>((r) => {
+      resolve = r;
+    });
+    this.agentStartLocks.set(agentId, promise);
+
+    try {
+      return await fn();
+    } finally {
+      this.agentStartLocks.delete(agentId);
+      resolve();
+    }
   }
 
   private policyAllows(

@@ -301,4 +301,115 @@ describe("HeartbeatService", () => {
       expect(failed.errorCode).toBe("budget_blocked");
     });
   });
+
+  describe("startNextQueuedRunForAgent", () => {
+    it("promotes a queued run to running", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+        maxConcurrentRuns: 1,
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "queued",
+      }).returning();
+
+      const claimed = await service.startNextQueuedRunForAgent("eng-1", projectId);
+      expect(claimed).toHaveLength(1);
+      expect(claimed[0].id).toBe(run.id);
+      expect(claimed[0].status).toBe("running");
+    });
+
+    it("respects maxConcurrentRuns limit", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+        maxConcurrentRuns: 1,
+      });
+
+      // One already running
+      await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "running",
+        startedAt: new Date(),
+      });
+
+      // One queued
+      await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "queued",
+      });
+
+      const claimed = await service.startNextQueuedRunForAgent("eng-1", projectId);
+      expect(claimed).toHaveLength(0);
+    });
+
+    it("promotes multiple runs up to available slots", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+        maxConcurrentRuns: 3,
+      });
+
+      // Insert 3 queued runs
+      for (let i = 0; i < 3; i++) {
+        await testDb.db.insert(heartbeatRuns).values({
+          agentId: "eng-1",
+          projectId,
+          invocationSource: "on_demand",
+          status: "queued",
+        });
+      }
+
+      const claimed = await service.startNextQueuedRunForAgent("eng-1", projectId);
+      expect(claimed).toHaveLength(3);
+    });
+
+    it("skips if agent is no longer invokable", async () => {
+      await testDb.db.insert(agents).values({
+        id: "paused-1", projectId, name: "Paused", role: "engineer",
+        status: "paused",
+      });
+      await testDb.db.insert(heartbeatRuns).values({
+        agentId: "paused-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "queued",
+      });
+
+      const claimed = await service.startNextQueuedRunForAgent("paused-1", projectId);
+      expect(claimed).toHaveLength(0);
+    });
+
+    it("processes queued runs in FIFO order", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+        maxConcurrentRuns: 2,
+      });
+
+      const [first] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "queued",
+      }).returning();
+
+      // Small delay to ensure distinct timestamps
+      await new Promise((r) => setTimeout(r, 10));
+
+      const [second] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "queued",
+      }).returning();
+
+      const claimed = await service.startNextQueuedRunForAgent("eng-1", projectId);
+      expect(claimed[0].id).toBe(first.id);
+      expect(claimed[1].id).toBe(second.id);
+    });
+  });
 });
