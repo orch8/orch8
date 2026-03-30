@@ -207,6 +207,64 @@ export class HeartbeatService {
     }
   }
 
+  async claimQueuedRun(runId: string): Promise<HeartbeatRun | null> {
+    // 1. Fetch the run
+    const [run] = await this.db
+      .select()
+      .from(heartbeatRuns)
+      .where(eq(heartbeatRuns.id, runId));
+
+    if (!run) return null;
+
+    // 2. If already running, return it (idempotent)
+    if (run.status === "running") return run;
+
+    // 3. If not queued, another process won
+    if (run.status !== "queued") return null;
+
+    // 4. Re-check budget (spec §9 — budget may have changed since enqueue)
+    const budget = await checkBudget(this.db, run.agentId, run.projectId);
+    if (!budget.allowed) {
+      await this.db
+        .update(heartbeatRuns)
+        .set({
+          status: "failed",
+          error: budget.reason ?? "Budget blocked at claim time",
+          errorCode: "budget_blocked",
+          finishedAt: new Date(),
+        })
+        .where(eq(heartbeatRuns.id, runId));
+      return null;
+    }
+
+    // 5. Atomic claim: UPDATE WHERE status = 'queued'
+    const claimed = await this.db
+      .update(heartbeatRuns)
+      .set({
+        status: "running",
+        startedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(heartbeatRuns.id, runId),
+          eq(heartbeatRuns.status, "queued"),
+        ),
+      )
+      .returning();
+
+    if (claimed.length === 0) return null;
+
+    // 6. Broadcast run status change
+    this.broadcast(run.projectId, {
+      type: "run_status_changed",
+      runId,
+      status: "running",
+      agentId: run.agentId,
+    });
+
+    return claimed[0];
+  }
+
   async startNextQueuedRunForAgent(
     _agentId: string,
     _projectId: string,

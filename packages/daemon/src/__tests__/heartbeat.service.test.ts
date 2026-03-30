@@ -214,4 +214,91 @@ describe("HeartbeatService", () => {
       expect(second.status).toBe("coalesced");
     });
   });
+
+  describe("claimQueuedRun", () => {
+    it("atomically transitions queued run to running", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "queued",
+      }).returning();
+
+      const claimed = await service.claimQueuedRun(run.id);
+      expect(claimed).not.toBeNull();
+      expect(claimed!.status).toBe("running");
+      expect(claimed!.startedAt).toBeTruthy();
+    });
+
+    it("returns existing run if already running (idempotent)", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      const claimed = await service.claimQueuedRun(run.id);
+      expect(claimed).not.toBeNull();
+      expect(claimed!.id).toBe(run.id);
+      expect(claimed!.status).toBe("running");
+    });
+
+    it("returns null if run was already claimed by another process", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "queued",
+      }).returning();
+
+      // Simulate another process claiming it first
+      await testDb.db
+        .update(heartbeatRuns)
+        .set({ status: "succeeded", finishedAt: new Date() })
+        .where(eq(heartbeatRuns.id, run.id));
+
+      const claimed = await service.claimQueuedRun(run.id);
+      expect(claimed).toBeNull();
+    });
+
+    it("blocks claim when budget exhausted at claim time", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "queued",
+      }).returning();
+
+      // Budget changes between enqueue and claim
+      await testDb.db.update(projects).set({
+        budgetLimitUsd: 100,
+        budgetSpentUsd: 100,
+      });
+
+      const claimed = await service.claimQueuedRun(run.id);
+      expect(claimed).toBeNull();
+
+      // Run should be failed
+      const [failed] = await testDb.db
+        .select()
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.id, run.id));
+      expect(failed.status).toBe("failed");
+      expect(failed.errorCode).toBe("budget_blocked");
+    });
+  });
 });
