@@ -6,6 +6,7 @@ import type { SchemaDb } from "../db/client.js";
 import { checkBudget, autoPauseIfExhausted } from "./budget.service.js";
 import type { ClaudeLocalAdapter, RunAgentPrompts } from "../adapter/claude-local-adapter.js";
 import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "../adapter/types.js";
+import type { MemoryExtractionService } from "./memory-extraction.service.js";
 
 type Agent = typeof agents.$inferSelect;
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
@@ -47,6 +48,7 @@ export class HeartbeatService {
   private agentStartLocks = new Map<string, Promise<void>>();
 
   private adapter: ClaudeLocalAdapter | null = null;
+  private extractionService: MemoryExtractionService | null = null;
 
   constructor(
     private db: SchemaDb,
@@ -61,6 +63,10 @@ export class HeartbeatService {
 
   setAdapter(adapter: ClaudeLocalAdapter): void {
     this.adapter = adapter;
+  }
+
+  setExtractionService(service: MemoryExtractionService): void {
+    this.extractionService = service;
   }
 
   isRunActive(runId: string): boolean {
@@ -475,6 +481,13 @@ export class HeartbeatService {
         agentId: agent.id,
         costUsd: result.costUsd,
       });
+
+      // 10b. Trigger work log extraction (fire-and-forget)
+      if (this.extractionService && terminalStatus === "succeeded" && agent.workLogDir) {
+        this.triggerExtraction(agent, claimedRun.projectId).catch((err) => {
+          console.error(`[HeartbeatService] extraction error for ${agent.id}:`, err);
+        });
+      }
     } catch (err) {
       await this.failRun(
         runId,
@@ -505,6 +518,48 @@ export class HeartbeatService {
     if (result.errorCode === "timeout") return "timed_out";
     if (result.exitCode === 0 && !result.errorCode) return "succeeded";
     return "failed";
+  }
+
+  private async triggerExtraction(
+    agent: Agent,
+    projectId: string,
+  ): Promise<void> {
+    if (!this.extractionService || !agent.workLogDir) return;
+
+    // Read the most recent work log entry
+    const { readdir, readFile } = await import("node:fs/promises");
+    const path = await import("node:path");
+
+    let files: string[];
+    try {
+      files = await readdir(agent.workLogDir);
+    } catch {
+      return;
+    }
+
+    const mdFiles = files.filter(f => f.endsWith(".md")).sort().reverse();
+    if (mdFiles.length === 0) return;
+
+    const latestFile = mdFiles[0];
+    const content = await readFile(path.join(agent.workLogDir, latestFile), "utf-8");
+
+    // Find entities related to this project
+    const { knowledgeEntities: keTable } = await import("@orch/shared/db");
+    const { eq } = await import("drizzle-orm");
+
+    const entities = await this.db
+      .select()
+      .from(keTable)
+      .where(eq(keTable.projectId, projectId));
+
+    // Extract to the first entity (or skip if none exist)
+    if (entities.length > 0) {
+      await this.extractionService.extractFromWorklogContent(
+        content,
+        entities[0].id,
+        agent.id,
+      );
+    }
   }
 
   private async failRun(

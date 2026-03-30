@@ -87,6 +87,7 @@ export function buildServer(options: ServerOptions = {}) {
     const heartbeatService = new HeartbeatService(dbClient.db, broadcast);
     const adapter = new ClaudeLocalAdapter(dbClient.db, spawnFn);
     heartbeatService.setAdapter(adapter);
+
     app.decorate("heartbeatService", heartbeatService);
 
     // Scheduler service
@@ -116,6 +117,7 @@ export function buildServer(options: ServerOptions = {}) {
     // Memory extraction service
     const memoryExtractionService = new MemoryExtractionService(dbClient.db, memoryService);
     app.decorate("memoryExtractionService", memoryExtractionService);
+    heartbeatService.setExtractionService(memoryExtractionService);
 
     // Start scheduler (after summary service so regeneration timer can be set)
     schedulerService.setSummaryService(summaryService);
