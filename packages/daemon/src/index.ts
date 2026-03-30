@@ -1,7 +1,22 @@
 import { buildServer } from "./server.js";
+import { startEmbeddedPostgres, stopEmbeddedPostgres } from "./db/embedded.js";
 import { DEFAULT_PORT, DEFAULT_HOST } from "@orch/shared";
 
-const server = buildServer();
+const databaseUrl = await startEmbeddedPostgres({
+  port: Number(process.env.ORCH_PG_PORT ?? 5433),
+});
+
+const server = buildServer({ databaseUrl });
+
+// Graceful shutdown
+async function shutdown() {
+  await server.close();
+  await stopEmbeddedPostgres();
+  process.exit(0);
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 try {
   await server.listen({
@@ -10,5 +25,6 @@ try {
   });
 } catch (err) {
   server.log.error(err);
+  await stopEmbeddedPostgres();
   process.exit(1);
 }
