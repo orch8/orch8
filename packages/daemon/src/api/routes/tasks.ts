@@ -4,13 +4,16 @@ import { CreateTaskSchema, UpdateTaskSchema, CompletePhaseSchema, ConvertTaskSch
 import { TaskService } from "../../services/task.service.js";
 import { ComplexPhaseService } from "../../services/complex-phase.service.js";
 import type { TaskColumn } from "../../services/task-transitions.js";
+import { requirePermission } from "../middleware/permissions.js";
 
 export async function taskRoutes(app: FastifyInstance) {
   const taskService = new TaskService(app.db);
   const phaseService = new ComplexPhaseService(app.db);
 
   // POST /api/tasks — Create task
-  app.post("/api/tasks", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post("/api/tasks", {
+    preHandler: requirePermission("create_task"),
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = CreateTaskSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({
@@ -40,7 +43,9 @@ export async function taskRoutes(app: FastifyInstance) {
   });
 
   // PATCH /api/tasks/:id — Update task (non-state fields only)
-  app.patch("/api/tasks/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  app.patch("/api/tasks/:id", {
+    preHandler: requirePermission("assign_task"),
+  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const parsed = UpdateTaskSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({
@@ -87,6 +92,9 @@ export async function taskRoutes(app: FastifyInstance) {
   // POST /api/tasks/:id/transition — Explicit lifecycle transition
   app.post(
     "/api/tasks/:id/transition",
+    {
+      preHandler: requirePermission("move_task"),
+    },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const body = request.body as { column?: string; agentId?: string; runId?: string };
       if (!body.column) {
