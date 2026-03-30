@@ -19,3 +19,10 @@ export {
   CreateCommentSchema,
   CommentFilterSchema,
 } from "./comment.js";
+export {
+  AgentRoleSchema,
+  AgentStatusSchema,
+  CreateAgentSchema,
+  UpdateAgentSchema,
+  AgentFilterSchema,
+} from "./agent.js";

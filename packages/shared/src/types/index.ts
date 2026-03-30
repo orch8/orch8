@@ -6,6 +6,9 @@ import type {
   CompletePhaseSchema,
   ConvertTaskSchema,
   TaskFilterSchema,
+  CreateAgentSchema,
+  UpdateAgentSchema,
+  AgentFilterSchema,
 } from "../schemas/index.js";
 
 export type HealthStatus = z.infer<typeof HealthStatusSchema>;
@@ -17,3 +20,7 @@ export type ConvertTask = z.infer<typeof ConvertTaskSchema>;
 export type TaskFilter = z.infer<typeof TaskFilterSchema>;
 
 export type { CreateComment, CommentFilter } from "../schemas/comment.js";
+
+export type CreateAgent = z.infer<typeof CreateAgentSchema>;
+export type UpdateAgent = z.infer<typeof UpdateAgentSchema>;
+export type AgentFilter = z.infer<typeof AgentFilterSchema>;
