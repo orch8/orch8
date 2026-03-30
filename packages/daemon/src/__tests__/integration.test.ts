@@ -27,7 +27,7 @@ describe("Integration: Task Type Lifecycle", () => {
     testDb = await setupTestDb();
 
     app = buildServer({
-      databaseUrl: testDb.container.getConnectionUri(),
+      databaseUrl: testDb.connectionUri,
       spawnFn: vi.fn(() => createMockProcess()) as unknown as typeof import("node:child_process").spawn,
     });
     await app.ready();

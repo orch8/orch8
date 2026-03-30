@@ -17,6 +17,7 @@ const migrationsFolder = path.resolve(__dirname, "../../db/migrations");
 export type TestDb = {
   db: PostgresJsDatabase<typeof schema>;
   sql: postgres.Sql;
+  connectionUri: string;
 };
 
 export async function setupTestDb(): Promise<TestDb> {
@@ -38,7 +39,7 @@ export async function setupTestDb(): Promise<TestDb> {
   const sqlClient = postgres(connectionUri, { max: 5 });
   const db = drizzle(sqlClient, { schema });
 
-  return { db, sql: sqlClient };
+  return { db, sql: sqlClient, connectionUri };
 }
 
 export async function teardownTestDb(testDb: TestDb): Promise<void> {
