@@ -8,9 +8,11 @@ interface UseWebSocketOptions {
 
 export function useWebSocket({ url, onMessage, reconnectInterval = 3000 }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
+  const onMessageRef = useRef(onMessage);
+  onMessageRef.current = onMessage;
   const [connected, setConnected] = useState(false);
 
-  const connect = useCallback(() => {
+  const connect = useCallback((shouldReconnect: { current: boolean }) => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}${url}`;
     const ws = new WebSocket(wsUrl);
@@ -20,7 +22,7 @@ export function useWebSocket({ url, onMessage, reconnectInterval = 3000 }: UseWe
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        onMessage?.(data);
+        onMessageRef.current?.(data);
       } catch {
         // ignore non-JSON messages
       }
@@ -28,15 +30,19 @@ export function useWebSocket({ url, onMessage, reconnectInterval = 3000 }: UseWe
 
     ws.onclose = () => {
       setConnected(false);
-      setTimeout(connect, reconnectInterval);
+      if (shouldReconnect.current) {
+        setTimeout(() => connect(shouldReconnect), reconnectInterval);
+      }
     };
 
     wsRef.current = ws;
-  }, [url, onMessage, reconnectInterval]);
+  }, [url, reconnectInterval]);
 
   useEffect(() => {
-    connect();
+    const shouldReconnect = { current: true };
+    connect(shouldReconnect);
     return () => {
+      shouldReconnect.current = false;
       wsRef.current?.close();
     };
   }, [connect]);
