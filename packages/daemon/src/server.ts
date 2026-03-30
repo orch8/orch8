@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import { healthRoutes } from "./api/routes/health.js";
-import { createDbClient, type DbClient } from "./db/client.js";
+import { createDbClient } from "./db/client.js";
 
 export interface ServerOptions {
   databaseUrl?: string;
