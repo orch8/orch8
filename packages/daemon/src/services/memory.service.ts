@@ -1,5 +1,7 @@
 import { eq, and, ilike, isNull, sql } from "drizzle-orm";
 import { knowledgeEntities, knowledgeFacts } from "@orch/shared/db";
+import { mkdir, readdir, readFile, appendFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import type { SchemaDb } from "../db/client.js";
 import type { CreateFact, EntityFilter, KnowledgeSearch } from "@orch/shared";
 
@@ -94,5 +96,48 @@ export class MemoryService {
       .limit(50);
 
     return results;
+  }
+
+  // ─── Worklog (file-based) ───────────────────────
+
+  async appendWorklog(workLogDir: string, content: string): Promise<string> {
+    await mkdir(workLogDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `${timestamp}.md`;
+    const filePath = path.join(workLogDir, filename);
+    await writeFile(filePath, content, "utf-8");
+    return filename;
+  }
+
+  async readWorklog(workLogDir: string): Promise<Array<{ filename: string; content: string }>> {
+    try {
+      const files = await readdir(workLogDir);
+      const mdFiles = files.filter(f => f.endsWith(".md")).sort().reverse();
+      const entries = await Promise.all(
+        mdFiles.slice(0, 50).map(async (filename) => ({
+          filename,
+          content: await readFile(path.join(workLogDir, filename), "utf-8"),
+        })),
+      );
+      return entries;
+    } catch {
+      return [];
+    }
+  }
+
+  // ─── Lessons (file-based) ──────────────────────
+
+  async appendLesson(lessonsFile: string, content: string): Promise<void> {
+    await mkdir(path.dirname(lessonsFile), { recursive: true });
+    const entry = `\n---\n_${new Date().toISOString()}_\n\n${content}\n`;
+    await appendFile(lessonsFile, entry, "utf-8");
+  }
+
+  async readLessons(lessonsFile: string): Promise<string> {
+    try {
+      return await readFile(lessonsFile, "utf-8");
+    } catch {
+      return "";
+    }
   }
 }

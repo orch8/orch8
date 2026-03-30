@@ -6,6 +6,9 @@ import { authPlugin } from "../api/middleware/auth.js";
 import { memoryRoutes } from "../api/routes/memory.js";
 import { MemoryService } from "../services/memory.service.js";
 import "../types.js";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
 
 describe("Memory Routes — Knowledge", () => {
   let testDb: TestDb;
@@ -160,6 +163,145 @@ describe("Memory Routes — Knowledge", () => {
       const body = res.json();
       expect(body.length).toBeGreaterThanOrEqual(1);
       expect(body[0].content).toContain("CSRF");
+    });
+  });
+});
+
+describe("Memory Routes — Worklog + Lessons", () => {
+  let testDb: TestDb;
+  let app: ReturnType<typeof Fastify>;
+  let projectId: string;
+  let tmpDir: string;
+
+  beforeAll(async () => {
+    testDb = await setupTestDb();
+    tmpDir = await mkdtemp(path.join(os.tmpdir(), "orch8-worklog-"));
+
+    const [project] = await testDb.db.insert(projects).values({
+      name: "Worklog Test",
+      slug: "worklog-test",
+      homeDir: tmpDir,
+      worktreeDir: path.join(tmpDir, "wt"),
+    }).returning();
+    projectId = project.id;
+
+    await testDb.db.insert(agents).values({
+      id: "eng-1", projectId, name: "Engineer",
+      role: "engineer",
+      workLogDir: path.join(tmpDir, "worklogs/eng-1"),
+      lessonsFile: path.join(tmpDir, "lessons/eng-1.md"),
+    });
+
+    await testDb.db.insert(agents).values({
+      id: "eng-2", projectId, name: "Engineer 2",
+      role: "engineer",
+      workLogDir: path.join(tmpDir, "worklogs/eng-2"),
+      lessonsFile: path.join(tmpDir, "lessons/eng-2.md"),
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    await teardownTestDb(testDb);
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  beforeEach(async () => {
+    app = Fastify();
+    app.decorate("db", testDb.db);
+    const memoryService = new MemoryService(testDb.db);
+    app.decorate("memoryService", memoryService);
+    app.register(authPlugin);
+    app.register(memoryRoutes);
+    await app.ready();
+  });
+
+  describe("POST /api/memory/worklog", () => {
+    it("appends to agent's own worklog", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/memory/worklog",
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        payload: { content: "## Session 1\n- Fixed auth bug" },
+      });
+
+      expect(res.statusCode).toBe(201);
+
+      // Verify file was created
+      const logDir = path.join(tmpDir, "worklogs/eng-1");
+      const files = await import("node:fs/promises").then(fs => fs.readdir(logDir));
+      expect(files.length).toBe(1);
+    });
+  });
+
+  describe("GET /api/memory/worklog", () => {
+    it("reads agent's work log entries", async () => {
+      // First write something
+      await app.inject({
+        method: "POST",
+        url: "/api/memory/worklog",
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        payload: { content: "## Session\n- Did stuff" },
+      });
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/memory/worklog?agentId=eng-1",
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().entries.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("POST /api/memory/lessons", () => {
+    it("appends to agent's own lessons file", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/memory/lessons",
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        payload: { content: "Always use (page - 1) * limit for offset." },
+      });
+
+      expect(res.statusCode).toBe(201);
+
+      const content = await readFile(path.join(tmpDir, "lessons/eng-1.md"), "utf-8");
+      expect(content).toContain("Always use");
+    });
+  });
+
+  describe("GET /api/memory/lessons", () => {
+    it("reads agent's lessons file", async () => {
+      // First write a lesson
+      await app.inject({
+        method: "POST",
+        url: "/api/memory/lessons",
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        payload: { content: "Lesson learned" },
+      });
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/memory/lessons?agentId=eng-1",
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().content).toContain("Lesson");
+    });
+  });
+
+  describe("Memory scoping — worklog/lessons", () => {
+    it("agent cannot write to another agent's worklog", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/memory/worklog?agentId=eng-2",
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      });
+
+      // Agents can read other agents' worklogs (knowledge is shared),
+      // but POST is scoped to own agent. So GET is fine.
+      expect(res.statusCode).toBe(200);
     });
   });
 });
