@@ -74,6 +74,7 @@ export const TaskFilterSchema = z.object({
 });
 
 export type CreateTask = z.infer<typeof CreateTaskSchema>;
+export type CreateTaskInput = z.input<typeof CreateTaskSchema>;
 export type UpdateTask = z.infer<typeof UpdateTaskSchema>;
 export type CompletePhase = z.infer<typeof CompletePhaseSchema>;
 export type ConvertTask = z.infer<typeof ConvertTaskSchema>;
