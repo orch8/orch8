@@ -518,4 +518,173 @@ describe("HeartbeatService", () => {
       expect(service.isRunActive(run.id)).toBe(false);
     });
   });
+
+  describe("executeRun — error handling", () => {
+    it("records timeout error when adapter returns timeout", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+        adapterType: "claude_local",
+        adapterConfig: {},
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      // Use a mock adapter that returns timeout
+      const mockAdapter = {
+        runAgent: async () => ({
+          sessionId: null,
+          model: null,
+          result: null,
+          usage: null,
+          costUsd: null,
+          billingType: "api" as const,
+          exitCode: null,
+          signal: "SIGTERM",
+          error: "Process timed out after 300s",
+          errorCode: "timeout" as const,
+          events: [],
+        }),
+      };
+      service.setAdapter(mockAdapter as any);
+
+      await service.executeRun(run.id);
+
+      const [finished] = await testDb.db
+        .select()
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.id, run.id));
+      expect(finished.status).toBe("timed_out");
+      expect(finished.errorCode).toBe("timeout");
+    });
+
+    it("records success with cost and usage", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+        adapterType: "claude_local",
+        adapterConfig: {},
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      const mockAdapter = {
+        runAgent: async () => ({
+          sessionId: "sess_abc",
+          model: "claude-sonnet-4-20250514",
+          result: "Task completed successfully",
+          usage: { input_tokens: 1000, output_tokens: 500 },
+          costUsd: 0.05,
+          billingType: "api" as const,
+          exitCode: 0,
+          signal: null,
+          error: null,
+          errorCode: null,
+          events: [],
+        }),
+      };
+      service.setAdapter(mockAdapter as any);
+
+      await service.executeRun(run.id);
+
+      const [finished] = await testDb.db
+        .select()
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.id, run.id));
+
+      expect(finished.status).toBe("succeeded");
+      expect(finished.costUsd).toBe(0.05);
+      expect(finished.model).toBe("claude-sonnet-4-20250514");
+      expect(finished.sessionIdAfter).toBe("sess_abc");
+      expect(finished.usageJson).toEqual({ input_tokens: 1000, output_tokens: 500 });
+    });
+
+    it("records failed status for non-zero exit code", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+        adapterType: "claude_local",
+        adapterConfig: {},
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      const mockAdapter = {
+        runAgent: async () => ({
+          sessionId: null,
+          model: null,
+          result: null,
+          usage: null,
+          costUsd: null,
+          billingType: "api" as const,
+          exitCode: 1,
+          signal: null,
+          error: "Process error",
+          errorCode: "process_error" as const,
+          events: [],
+        }),
+      };
+      service.setAdapter(mockAdapter as any);
+
+      await service.executeRun(run.id);
+
+      const [finished] = await testDb.db
+        .select()
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.id, run.id));
+      expect(finished.status).toBe("failed");
+      expect(finished.errorCode).toBe("process_error");
+    });
+
+    it("updates agent and project budget after successful run with cost", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+        adapterType: "claude_local",
+        adapterConfig: {},
+        budgetSpentUsd: 1.0,
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      const mockAdapter = {
+        runAgent: async () => ({
+          sessionId: null, model: null, result: "done",
+          usage: null, costUsd: 0.25, billingType: "api" as const,
+          exitCode: 0, signal: null, error: null, errorCode: null, events: [],
+        }),
+      };
+      service.setAdapter(mockAdapter as any);
+
+      await service.executeRun(run.id);
+
+      const [agent] = await testDb.db
+        .select()
+        .from(agents)
+        .where(eq(agents.id, "eng-1"));
+      expect(agent.budgetSpentUsd).toBeCloseTo(1.25);
+
+      const [project] = await testDb.db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, projectId));
+      expect(project.budgetSpentUsd).toBeCloseTo(0.25);
+    });
+  });
 });
