@@ -1,5 +1,5 @@
 import { eq, and, ilike, isNull, inArray, sql } from "drizzle-orm";
-import { knowledgeEntities, knowledgeFacts } from "@orch/shared/db";
+import { knowledgeEntities, knowledgeFacts, sharedDecisions } from "@orch/shared/db";
 import { mkdir, readdir, readFile, appendFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { SchemaDb } from "../db/client.js";
@@ -135,6 +135,78 @@ export class MemoryService {
       .where(eq(knowledgeFacts.id, oldFactId));
 
     return { oldFact: updatedOld, newFact };
+  }
+
+  // ─── Conflict Resolution ─────────────────────────
+
+  async writeFactWithConflictResolution(
+    entityId: string,
+    input: { content: string; category: string; sourceTask?: string },
+    sourceAgent: string,
+  ): Promise<Fact> {
+    const category = input.category as Fact["category"];
+
+    // Check for existing active facts of the same category from a different agent
+    const existingFacts = await this.db
+      .select()
+      .from(knowledgeFacts)
+      .where(
+        and(
+          eq(knowledgeFacts.entityId, entityId),
+          eq(knowledgeFacts.category, category),
+          isNull(knowledgeFacts.supersededBy),
+        ),
+      );
+
+    const conflicting = existingFacts.filter(f => f.sourceAgent !== sourceAgent);
+
+    // Always create the new fact first
+    const [newFact] = await this.db.insert(knowledgeFacts).values({
+      entityId,
+      content: input.content,
+      category,
+      sourceAgent,
+      sourceTask: input.sourceTask ?? null,
+    }).returning();
+
+    if (conflicting.length === 0) return newFact;
+
+    // Apply resolution rules per category
+    switch (category) {
+      case "status":
+      case "relationship":
+      case "convention":
+        // Latest timestamp wins — supersede all conflicting
+        for (const old of conflicting) {
+          await this.db
+            .update(knowledgeFacts)
+            .set({ supersededBy: newFact.id })
+            .where(eq(knowledgeFacts.id, old.id));
+        }
+        break;
+
+      case "decision": {
+        // Escalate to shared_decisions table
+        const entity = await this.getEntity(entityId);
+        await this.db.insert(sharedDecisions).values({
+          projectId: entity!.projectId,
+          title: `Conflicting decision on ${entity!.name}`,
+          decision: `${conflicting[0].content} (by ${conflicting[0].sourceAgent}) vs ${input.content} (by ${sourceAgent})`,
+          madeBy: "system",
+          context: `Auto-escalated: multiple agents wrote conflicting decision facts to entity "${entity!.slug}"`,
+          binding: false,
+        });
+        break;
+      }
+
+      case "milestone":
+      case "issue":
+      case "observation":
+        // Append-only — both kept, no supersession
+        break;
+    }
+
+    return newFact;
   }
 
   // ─── Search ──────────────────────────────────────
