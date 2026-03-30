@@ -52,3 +52,65 @@ export async function checkBudget(
 
   return { allowed: true };
 }
+
+export interface AutoPauseResult {
+  agentPaused: boolean;
+  projectPaused: boolean;
+}
+
+export async function autoPauseIfExhausted(
+  db: SchemaDb,
+  agentId: string,
+  projectId: string,
+): Promise<AutoPauseResult> {
+  const result: AutoPauseResult = { agentPaused: false, projectPaused: false };
+
+  // Check project budget
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, projectId));
+
+  if (
+    project &&
+    project.budgetLimitUsd !== null &&
+    project.budgetSpentUsd >= project.budgetLimitUsd &&
+    !project.budgetPaused
+  ) {
+    await db
+      .update(projects)
+      .set({ budgetPaused: true, updatedAt: new Date() })
+      .where(eq(projects.id, projectId));
+    result.projectPaused = true;
+  } else if (project?.budgetPaused) {
+    result.projectPaused = true;
+  }
+
+  // Check agent budget
+  const [agent] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.projectId, projectId)));
+
+  if (
+    agent &&
+    agent.budgetLimitUsd !== null &&
+    agent.budgetSpentUsd >= agent.budgetLimitUsd &&
+    !agent.budgetPaused
+  ) {
+    await db
+      .update(agents)
+      .set({
+        budgetPaused: true,
+        pauseReason: "budget",
+        status: "paused",
+        updatedAt: new Date(),
+      })
+      .where(and(eq(agents.id, agentId), eq(agents.projectId, projectId)));
+    result.agentPaused = true;
+  } else if (agent?.budgetPaused) {
+    result.agentPaused = true;
+  }
+
+  return result;
+}
