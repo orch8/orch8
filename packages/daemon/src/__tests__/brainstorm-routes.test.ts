@@ -34,7 +34,7 @@ describe("Brainstorm API Routes", () => {
   beforeAll(async () => {
     testDb = await setupTestDb();
 
-    mockSpawn = vi.fn(() => createMockProcess() as unknown as ReturnType<SpawnFn>);
+    mockSpawn = vi.fn(() => createMockProcess()) as unknown as SpawnFn;
 
     const [project] = await testDb.db.insert(projects).values({
       name: "BS Routes",
