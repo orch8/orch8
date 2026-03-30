@@ -5,6 +5,7 @@ import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { agentRoutes } from "../api/routes/agents.js";
 import { AgentService } from "../services/agent.service.js";
+import { HeartbeatService } from "../services/heartbeat.service.js";
 import "../types.js";
 
 describe("Agent API Routes", () => {
@@ -37,6 +38,10 @@ describe("Agent API Routes", () => {
 
     const agentService = new AgentService(testDb.db);
     app.decorate("agentService", agentService);
+
+    const noop = () => {};
+    const heartbeatService = new HeartbeatService(testDb.db, noop);
+    app.decorate("heartbeatService", heartbeatService);
 
     app.register(authPlugin);
     app.register(agentRoutes);

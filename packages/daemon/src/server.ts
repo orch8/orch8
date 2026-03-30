@@ -14,6 +14,10 @@ import { TaskService } from "./services/task.service.js";
 import { WorktreeService } from "./services/worktree.service.js";
 import { TaskLifecycleService } from "./services/task-lifecycle.service.js";
 import { AgentService } from "./services/agent.service.js";
+import { HeartbeatService } from "./services/heartbeat.service.js";
+import { SchedulerService } from "./services/scheduler.service.js";
+import { ClaudeLocalAdapter } from "./adapter/claude-local-adapter.js";
+import { runRoutes } from "./api/routes/runs.js";
 import { createDbClient } from "./db/client.js";
 import "./types.js";
 
@@ -69,12 +73,33 @@ export function buildServer(options: ServerOptions = {}) {
     const agentService = new AgentService(dbClient.db);
     app.decorate("agentService", agentService);
 
+    // Heartbeat service
+    const heartbeatService = new HeartbeatService(dbClient.db, broadcast);
+    const adapter = new ClaudeLocalAdapter(dbClient.db, spawnFn);
+    heartbeatService.setAdapter(adapter);
+    app.decorate("heartbeatService", heartbeatService);
+
+    // Scheduler service
+    const schedulerService = new SchedulerService(dbClient.db, heartbeatService, {
+      intervalMs: Number(process.env.ORCH_SCHEDULER_INTERVAL_MS ?? 60_000),
+      stalenessThresholdMs: Number(process.env.ORCH_STALENESS_THRESHOLD_MS ?? 5 * 60 * 1000),
+    });
+    app.decorate("schedulerService", schedulerService);
+
+    // Start scheduler
+    schedulerService.start();
+    app.addHook("onClose", async () => {
+      schedulerService.stop();
+      heartbeatService.shutdown();
+    });
+
     // Auth middleware + routes that require DB
     app.register(authPlugin);
     app.register(taskRoutes);
     app.register(brainstormRoutes);
     app.register(commentRoutes);
     app.register(agentRoutes);
+    app.register(runRoutes);
   }
 
   app.register(websocketRoutes);

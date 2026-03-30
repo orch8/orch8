@@ -126,7 +126,7 @@ export async function agentRoutes(app: FastifyInstance) {
 
     const body = request.body as { taskId?: string; reason?: string } | null;
     try {
-      const wakeup = await app.agentService.enqueueWakeup(request.params.id, projectId, {
+      const wakeup = await app.heartbeatService.enqueueWakeup(request.params.id, projectId, {
         source: "on_demand",
         taskId: body?.taskId,
         reason: body?.reason,
