@@ -1,4 +1,4 @@
-import { eq, and, ilike, isNull, sql } from "drizzle-orm";
+import { eq, and, ilike, isNull, inArray, sql } from "drizzle-orm";
 import { knowledgeEntities, knowledgeFacts } from "@orch/shared/db";
 import { mkdir, readdir, readFile, appendFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -50,6 +50,17 @@ export class MemoryService {
 
   // ─── Facts ───────────────────────────────────────
 
+  async trackAccess(factIds: string[]): Promise<void> {
+    if (factIds.length === 0) return;
+    await this.db
+      .update(knowledgeFacts)
+      .set({
+        accessCount: sql`${knowledgeFacts.accessCount} + 1`,
+        lastAccessed: new Date(),
+      })
+      .where(inArray(knowledgeFacts.id, factIds));
+  }
+
   async listFacts(entityId: string): Promise<ScoredFact[]> {
     const result = await this.db.execute(sql`
       SELECT
@@ -67,7 +78,15 @@ export class MemoryService {
         AND superseded_by IS NULL
       ORDER BY "relevanceScore" DESC
     `);
-    return result as unknown as ScoredFact[];
+    const facts = result as unknown as ScoredFact[];
+
+    // Track access (fire-and-forget)
+    const ids = facts.map(f => f.id);
+    if (ids.length > 0) {
+      this.trackAccess(ids).catch(() => {});
+    }
+
+    return facts;
   }
 
   async writeFact(entityId: string, input: CreateFact, sourceAgent: string): Promise<Fact> {
