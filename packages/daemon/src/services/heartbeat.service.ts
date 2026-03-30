@@ -3,7 +3,7 @@ import {
   agents, heartbeatRuns, wakeupRequests, tasks, projects,
 } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
-import { checkBudget } from "./budget.service.js";
+import { checkBudget, autoPauseIfExhausted } from "./budget.service.js";
 import type { ClaudeLocalAdapter, RunAgentPrompts } from "../adapter/claude-local-adapter.js";
 import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "../adapter/types.js";
 
@@ -462,6 +462,9 @@ export class HeartbeatService {
             updatedAt: new Date(),
           })
           .where(eq(projects.id, claimedRun.projectId));
+
+        // Auto-pause if budget exhausted (spec §9.2.4)
+        await autoPauseIfExhausted(this.db, agent.id, claimedRun.projectId);
       }
 
       // 10. Broadcast completion
