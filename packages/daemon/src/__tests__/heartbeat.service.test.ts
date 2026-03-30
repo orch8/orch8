@@ -687,4 +687,49 @@ describe("HeartbeatService", () => {
       expect(project.budgetSpentUsd).toBeCloseTo(0.25);
     });
   });
+
+  describe("session compaction", () => {
+    it("skips compaction when policy is disabled", async () => {
+      const result = service.checkCompactionThresholds(
+        { enabled: false, maxSessionRuns: 100, maxRawInputTokens: 2_000_000, maxSessionAgeHours: 72 },
+        { runCount: 500, totalInputTokens: 5_000_000, sessionAgeHours: 100 },
+      );
+      expect(result.needsRotation).toBe(false);
+    });
+
+    it("triggers rotation when maxSessionRuns exceeded", () => {
+      const result = service.checkCompactionThresholds(
+        { enabled: true, maxSessionRuns: 200, maxRawInputTokens: 2_000_000, maxSessionAgeHours: 72 },
+        { runCount: 201, totalInputTokens: 0, sessionAgeHours: 1 },
+      );
+      expect(result.needsRotation).toBe(true);
+      expect(result.reason).toContain("maxSessionRuns");
+    });
+
+    it("triggers rotation when maxRawInputTokens exceeded", () => {
+      const result = service.checkCompactionThresholds(
+        { enabled: true, maxSessionRuns: 200, maxRawInputTokens: 2_000_000, maxSessionAgeHours: 72 },
+        { runCount: 10, totalInputTokens: 2_000_001, sessionAgeHours: 1 },
+      );
+      expect(result.needsRotation).toBe(true);
+      expect(result.reason).toContain("maxRawInputTokens");
+    });
+
+    it("triggers rotation when maxSessionAgeHours exceeded", () => {
+      const result = service.checkCompactionThresholds(
+        { enabled: true, maxSessionRuns: 200, maxRawInputTokens: 2_000_000, maxSessionAgeHours: 72 },
+        { runCount: 10, totalInputTokens: 0, sessionAgeHours: 73 },
+      );
+      expect(result.needsRotation).toBe(true);
+      expect(result.reason).toContain("maxSessionAgeHours");
+    });
+
+    it("does not trigger when all thresholds are within limits", () => {
+      const result = service.checkCompactionThresholds(
+        { enabled: true, maxSessionRuns: 200, maxRawInputTokens: 2_000_000, maxSessionAgeHours: 72 },
+        { runCount: 100, totalInputTokens: 1_000_000, sessionAgeHours: 36 },
+      );
+      expect(result.needsRotation).toBe(false);
+    });
+  });
 });

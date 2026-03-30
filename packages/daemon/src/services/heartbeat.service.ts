@@ -13,6 +13,24 @@ type WakeupRequest = typeof wakeupRequests.$inferSelect;
 
 export type BroadcastFn = (projectId: string, message: unknown) => void;
 
+export interface CompactionPolicy {
+  enabled: boolean;
+  maxSessionRuns: number;
+  maxRawInputTokens: number;
+  maxSessionAgeHours: number;
+}
+
+export interface SessionStats {
+  runCount: number;
+  totalInputTokens: number;
+  sessionAgeHours: number;
+}
+
+export interface CompactionResult {
+  needsRotation: boolean;
+  reason?: string;
+}
+
 export interface WakeupOpts {
   source: "timer" | "assignment" | "on_demand" | "automation";
   taskId?: string;
@@ -51,6 +69,38 @@ export class HeartbeatService {
 
   isProcessTracked(runId: string): boolean {
     return this.runningProcesses.has(runId);
+  }
+
+  checkCompactionThresholds(
+    policy: CompactionPolicy,
+    stats: SessionStats,
+  ): CompactionResult {
+    if (!policy.enabled) {
+      return { needsRotation: false };
+    }
+
+    if (policy.maxSessionRuns > 0 && stats.runCount > policy.maxSessionRuns) {
+      return {
+        needsRotation: true,
+        reason: `maxSessionRuns exceeded (${stats.runCount} > ${policy.maxSessionRuns})`,
+      };
+    }
+
+    if (policy.maxRawInputTokens > 0 && stats.totalInputTokens > policy.maxRawInputTokens) {
+      return {
+        needsRotation: true,
+        reason: `maxRawInputTokens exceeded (${stats.totalInputTokens} > ${policy.maxRawInputTokens})`,
+      };
+    }
+
+    if (policy.maxSessionAgeHours > 0 && stats.sessionAgeHours > policy.maxSessionAgeHours) {
+      return {
+        needsRotation: true,
+        reason: `maxSessionAgeHours exceeded (${stats.sessionAgeHours} > ${policy.maxSessionAgeHours})`,
+      };
+    }
+
+    return { needsRotation: false };
   }
 
   async enqueueWakeup(
