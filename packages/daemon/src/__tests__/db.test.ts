@@ -1,22 +1,27 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { createDbClient, type DbClient } from "../db/client.js";
+import { startEmbeddedPostgres, stopEmbeddedPostgres } from "../db/embedded.js";
+import path from "node:path";
+import os from "node:os";
+import { randomUUID } from "node:crypto";
 
 describe("Database Client", () => {
-  let container: StartedPostgreSqlContainer;
   let db: DbClient;
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer("postgres:17")
-      .withDatabase("orchestrator_test")
-      .start();
+    const dataDir = path.join(os.tmpdir(), `orch8-test-${randomUUID()}`);
+    const connectionUri = await startEmbeddedPostgres({
+      databaseDir: dataDir,
+      port: 0,
+      persistent: false,
+    });
 
-    db = createDbClient(container.getConnectionUri());
+    db = createDbClient(connectionUri);
   }, 60_000);
 
   afterAll(async () => {
     await db.close();
-    await container.stop();
+    await stopEmbeddedPostgres();
   });
 
   it("connects and runs a raw query", async () => {
