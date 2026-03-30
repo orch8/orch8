@@ -1,0 +1,158 @@
+// packages/daemon/src/adapter/claude-local-adapter.ts
+import { spawn as nodeSpawn } from "node:child_process";
+import type { SpawnFn } from "../services/brainstorm.service.js";
+import type { SchemaDb } from "../db/client.js";
+import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "./types.js";
+import { buildArgs } from "./args-builder.js";
+import { buildEnv } from "./env-builder.js";
+import { buildPrompt } from "./prompt-builder.js";
+import { dirname } from "node:path";
+import { createSkillsDir, createInstructionsFile, cleanupTempPath } from "./file-injector.js";
+import { SessionManager } from "./session-manager.js";
+import { runProcess } from "./process-runner.js";
+
+export interface RunAgentPrompts {
+  heartbeatTemplate: string;
+  bootstrapTemplate?: string;
+  sessionHandoff?: string;
+  skillPaths?: string[];
+}
+
+export class ClaudeLocalAdapter {
+  private sessionManager: SessionManager;
+
+  constructor(
+    private db: SchemaDb,
+    private spawnFn: SpawnFn = nodeSpawn,
+  ) {
+    this.sessionManager = new SessionManager(db);
+  }
+
+  async runAgent(
+    config: ClaudeLocalAdapterConfig,
+    ctx: RunContext,
+    prompts: RunAgentPrompts,
+  ): Promise<RunResult> {
+    const taskKey = ctx.taskId ?? ctx.runId;
+    const adapterType = "claude_local";
+    const cwd = config.cwd ?? ctx.cwd;
+
+    // 1. Look up existing session (spec §5)
+    const existingSession = await this.sessionManager.lookupSession({
+      agentId: ctx.agentId,
+      taskKey,
+      adapterType,
+      cwd,
+    });
+
+    const isFirstRun = !existingSession;
+    const sessionId = existingSession?.sessionId;
+
+    // 2. Inject files (spec §7, §8)
+    const tempPaths: string[] = [];
+    let skillsDir: string | null = null;
+    let instructionsFilePath: string | undefined;
+
+    try {
+      if (prompts.skillPaths && prompts.skillPaths.length > 0) {
+        skillsDir = await createSkillsDir(prompts.skillPaths);
+        if (skillsDir) tempPaths.push(skillsDir);
+      }
+
+      if (config.instructionsFilePath) {
+        instructionsFilePath = await createInstructionsFile(config.instructionsFilePath);
+        tempPaths.push(dirname(instructionsFilePath));
+      }
+
+      // 3. Build CLI args (spec §1)
+      const args = buildArgs(config, sessionId, {
+        instructionsFilePath,
+        skillsDir: skillsDir ?? undefined,
+      });
+
+      // 4. Build environment (spec §2.3, §3)
+      const env = buildEnv(config, { ...ctx, cwd }, process.env as Record<string, string | undefined>);
+
+      // 5. Build prompt (spec §6)
+      const prompt = buildPrompt({
+        heartbeatTemplate: prompts.heartbeatTemplate,
+        bootstrapTemplate: prompts.bootstrapTemplate,
+        sessionHandoff: prompts.sessionHandoff,
+        context: ctx,
+        isFirstRun,
+      });
+
+      // 6. Run the process (spec §2)
+      const command = config.command ?? "claude";
+      const result = await runProcess(
+        {
+          command,
+          args,
+          cwd,
+          env,
+          prompt,
+          timeoutSec: config.timeoutSec ?? 0,
+          graceSec: config.graceSec ?? 20,
+        },
+        this.spawnFn,
+      );
+
+      // 7. Handle session persistence (spec §5.1)
+      if (result.sessionId) {
+        if (result.errorCode === "unknown_session" && sessionId) {
+          // Unknown session recovery (spec §5.4):
+          // Clear the old session and retry without --resume
+          await this.sessionManager.clearSession({ agentId: ctx.agentId, taskKey, adapterType });
+
+          const retryArgs = buildArgs(config, undefined, {
+            instructionsFilePath,
+            skillsDir: skillsDir ?? undefined,
+          });
+
+          const retryResult = await runProcess(
+            {
+              command,
+              args: retryArgs,
+              cwd,
+              env,
+              prompt,
+              timeoutSec: config.timeoutSec ?? 0,
+              graceSec: config.graceSec ?? 20,
+            },
+            this.spawnFn,
+          );
+
+          if (retryResult.sessionId) {
+            await this.sessionManager.saveSession({
+              agentId: ctx.agentId,
+              projectId: ctx.projectId,
+              taskKey,
+              adapterType,
+              sessionId: retryResult.sessionId,
+              cwd,
+            });
+          }
+
+          return retryResult;
+        }
+
+        // Normal session persistence
+        await this.sessionManager.saveSession({
+          agentId: ctx.agentId,
+          projectId: ctx.projectId,
+          taskKey,
+          adapterType,
+          sessionId: result.sessionId,
+          cwd,
+        });
+      }
+
+      return result;
+    } finally {
+      // Cleanup temp files (spec §7)
+      for (const p of tempPaths) {
+        await cleanupTempPath(p);
+      }
+    }
+  }
+}
