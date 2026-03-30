@@ -12,11 +12,16 @@ export interface TransitionOpts {
   runId?: string;
 }
 
+export interface LifecycleHooks {
+  onReview?: (taskId: string, projectId: string) => Promise<void>;
+}
+
 export class TaskLifecycleService {
   constructor(
     private db: SchemaDb,
     private taskService: TaskService,
     private worktreeService: WorktreeService,
+    private hooks?: LifecycleHooks,
   ) {}
 
   async transition(
@@ -94,6 +99,14 @@ export class TaskLifecycleService {
       .set(updateValues)
       .where(eq(tasks.id, taskId))
       .returning();
+
+    // Post-transition: trigger verification pipeline on review
+    if (to === "review" && this.hooks?.onReview) {
+      const project = await this.loadProject(task.projectId);
+      if (project.verificationRequired) {
+        await this.hooks.onReview(taskId, task.projectId);
+      }
+    }
 
     // Post-transition: unblock dependents when task completes
     if (to === "done") {

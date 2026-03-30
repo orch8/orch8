@@ -73,11 +73,9 @@ export function buildServer(options: ServerOptions = {}) {
     const brainstormService = new BrainstormService(dbClient.db, broadcast, spawnFn);
     app.decorate("brainstormService", brainstormService);
 
-    // Lifecycle services
+    // Core services
     const taskService = new TaskService(dbClient.db);
     const worktreeService = new WorktreeService();
-    const lifecycleService = new TaskLifecycleService(dbClient.db, taskService, worktreeService);
-    app.decorate("lifecycleService", lifecycleService);
 
     // Agent service
     const agentService = new AgentService(dbClient.db);
@@ -127,6 +125,18 @@ export function buildServer(options: ServerOptions = {}) {
       },
     );
     app.decorate("verificationService", verificationService);
+
+    // Lifecycle service (must come after agentService and verificationService)
+    const lifecycleService = new TaskLifecycleService(dbClient.db, taskService, worktreeService, {
+      onReview: async (taskId: string, projectId: string) => {
+        const allAgents = await agentService.list({ projectId });
+        const verifier = allAgents.find((a) => a.role === "verifier");
+        if (verifier) {
+          await verificationService.spawnVerifier(taskId, verifier.id);
+        }
+      },
+    });
+    app.decorate("lifecycleService", lifecycleService);
 
     // Auth middleware + routes that require DB
     app.register(authPlugin);
