@@ -30,6 +30,7 @@ import { MemoryService } from "./services/memory.service.js";
 import { CommentService } from "./services/comment.service.js";
 import { VerificationService } from "./services/verification.service.js";
 import { SummaryService } from "./services/summary.service.js";
+import { MemoryExtractionService } from "./services/memory-extraction.service.js";
 import "./types.js";
 
 export interface ServerOptions {
@@ -111,6 +112,10 @@ export function buildServer(options: ServerOptions = {}) {
     // Summary service
     const summaryService = new SummaryService(dbClient.db, memoryService);
     app.decorate("summaryService", summaryService);
+
+    // Memory extraction service
+    const memoryExtractionService = new MemoryExtractionService(dbClient.db, memoryService);
+    app.decorate("memoryExtractionService", memoryExtractionService);
 
     // Start scheduler (after summary service so regeneration timer can be set)
     schedulerService.setSummaryService(summaryService);
