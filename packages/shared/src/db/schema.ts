@@ -365,3 +365,41 @@ export const knowledgeFacts = pgTable("knowledge_facts", {
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Shared Decisions ─────────────────────────────────────
+
+export const sharedDecisions = pgTable("shared_decisions", {
+  id: text("id").primaryKey().$defaultFn(() => `dec_${randomUUID()}`),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  decision: text("decision").notNull(),
+  madeBy: text("made_by").notNull(),
+  context: text("context").default(""),
+  binding: boolean("binding").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Activity Log ─────────────────────────────────────────
+
+export const activityLog = pgTable("activity_log", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  agentId: text("agent_id"),
+  taskId: text("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  runId: text("run_id").references(() => heartbeatRuns.id, { onDelete: "set null" }),
+  message: text("message").notNull(),
+  level: logLevelEnum("level").notNull().default("info"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── MCP Tool Registry (global) ───────────────────────────
+
+export const mcpTools = pgTable("mcp_tools", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").default(""),
+  serverCommand: text("server_command").notNull(),
+  serverArgs: text("server_args").array().default(sql`'{}'`),
+  envVars: jsonb("env_vars").default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
