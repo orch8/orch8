@@ -1,5 +1,7 @@
 import Fastify from "fastify";
+import websocket from "@fastify/websocket";
 import { healthRoutes } from "./api/routes/health.js";
+import { websocketRoutes } from "./api/websocket.js";
 import { createDbClient } from "./db/client.js";
 
 export interface ServerOptions {
@@ -13,6 +15,8 @@ export function buildServer(options: ServerOptions = {}) {
     },
   });
 
+  app.register(websocket);
+
   if (options.databaseUrl) {
     const dbClient = createDbClient(options.databaseUrl);
     app.decorate("db", dbClient);
@@ -22,6 +26,7 @@ export function buildServer(options: ServerOptions = {}) {
   }
 
   app.register(healthRoutes);
+  app.register(websocketRoutes);
 
   return app;
 }
