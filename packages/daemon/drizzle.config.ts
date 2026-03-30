@@ -5,6 +5,6 @@ export default defineConfig({
   out: "./src/db/migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgres://orchestrator:orchestrator@localhost:5432/orchestrator",
+    url: process.env.DATABASE_URL ?? "postgres://postgres:password@localhost:5433/orchestrator",
   },
 });
