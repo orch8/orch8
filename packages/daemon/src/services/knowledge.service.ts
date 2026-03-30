@@ -20,7 +20,7 @@ export class KnowledgeService {
       SELECT
         id, content, category, source_agent, created_at,
         access_count, last_accessed,
-        GREATEST(0, 1.0 - (EXTRACT(EPOCH FROM (now() - last_accessed)) / (90 * 86400))) * 0.6
+        GREATEST(0, 1.0 - (EXTRACT(EPOCH FROM (now() - COALESCE(last_accessed, created_at))) / (90 * 86400))) * 0.6
           + LEAST(1.0, access_count::float / 10.0) * 0.4
           AS relevance_score
       FROM knowledge_facts

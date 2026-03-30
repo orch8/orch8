@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { sql } from "drizzle-orm";
 import { projects, knowledgeEntities, knowledgeFacts } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { KnowledgeService } from "../services/knowledge.service.js";
