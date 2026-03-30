@@ -34,6 +34,7 @@ export {
 export {
   FactCategorySchema,
   EntityTypeSchema,
+  CreateEntitySchema,
   CreateFactSchema,
   EntityFilterSchema,
   KnowledgeSearchSchema,

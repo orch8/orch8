@@ -51,6 +51,50 @@ describe("Memory Routes — Knowledge", () => {
     await app.ready();
   });
 
+  describe("POST /api/memory/knowledge", () => {
+    it("creates a new entity", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/memory/knowledge",
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        payload: { slug: "auth-system", name: "Auth System", entityType: "area" },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const body = res.json();
+      expect(body.slug).toBe("auth-system");
+      expect(body.name).toBe("Auth System");
+      expect(body.entityType).toBe("area");
+      expect(body.projectId).toBe(projectId);
+    });
+
+    it("rejects duplicate slug within project", async () => {
+      await testDb.db.insert(knowledgeEntities).values({
+        projectId, slug: "existing", name: "Existing", entityType: "area",
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/memory/knowledge",
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        payload: { slug: "existing", name: "Duplicate", entityType: "area" },
+      });
+
+      expect(res.statusCode).toBe(409);
+    });
+
+    it("validates slug format", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/memory/knowledge",
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        payload: { slug: "INVALID SLUG!", name: "Bad", entityType: "area" },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+  });
+
   describe("GET /api/memory/knowledge", () => {
     it("lists entities for a project", async () => {
       await testDb.db.insert(knowledgeEntities).values([

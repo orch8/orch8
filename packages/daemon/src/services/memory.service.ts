@@ -26,6 +26,23 @@ export class MemoryService {
     return this.db.select().from(knowledgeEntities).where(and(...conditions));
   }
 
+  async createEntity(input: {
+    projectId: string;
+    slug: string;
+    name: string;
+    entityType: "project" | "area" | "archive";
+    description?: string;
+  }): Promise<Entity> {
+    const [entity] = await this.db.insert(knowledgeEntities).values({
+      projectId: input.projectId,
+      slug: input.slug,
+      name: input.name,
+      entityType: input.entityType,
+      description: input.description ?? "",
+    }).returning();
+    return entity;
+  }
+
   async getEntity(id: string): Promise<Entity | null> {
     const result = await this.db.select().from(knowledgeEntities).where(eq(knowledgeEntities.id, id));
     return result[0] ?? null;

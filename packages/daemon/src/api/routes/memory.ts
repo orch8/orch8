@@ -1,10 +1,35 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { EntityFilterSchema, KnowledgeSearchSchema, CreateFactSchema, WorklogEntrySchema, LessonEntrySchema } from "@orch/shared";
+import { EntityFilterSchema, KnowledgeSearchSchema, CreateFactSchema, CreateEntitySchema, WorklogEntrySchema, LessonEntrySchema } from "@orch/shared";
 import { eq, and } from "drizzle-orm";
 import { agents } from "@orch/shared/db";
 import "../../types.js";
 
 export async function memoryRoutes(app: FastifyInstance) {
+  // POST /api/memory/knowledge — Create entity
+  app.post("/api/memory/knowledge", async (request: FastifyRequest, reply: FastifyReply) => {
+    const parsed = CreateEntitySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
+    }
+
+    if (!request.projectId) {
+      return reply.code(400).send({ error: "bad_request", message: "projectId required" });
+    }
+
+    try {
+      const entity = await app.memoryService.createEntity({
+        ...parsed.data,
+        projectId: request.projectId,
+      });
+      return reply.code(201).send(entity);
+    } catch (err: unknown) {
+      if ((err as Error).message?.includes("uniq_entity_project_slug")) {
+        return reply.code(409).send({ error: "conflict", message: "Entity with this slug already exists in project" });
+      }
+      throw err;
+    }
+  });
+
   // GET /api/memory/knowledge — List entities
   app.get("/api/memory/knowledge", async (request: FastifyRequest) => {
     const parsed = EntityFilterSchema.safeParse(request.query);
