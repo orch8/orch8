@@ -95,8 +95,6 @@ export function buildServer(options: ServerOptions = {}) {
     });
     app.decorate("schedulerService", schedulerService);
 
-    // Start scheduler
-    schedulerService.start();
     app.addHook("onClose", async () => {
       schedulerService.stop();
       heartbeatService.shutdown();
@@ -113,6 +111,10 @@ export function buildServer(options: ServerOptions = {}) {
     // Summary service
     const summaryService = new SummaryService(dbClient.db, memoryService);
     app.decorate("summaryService", summaryService);
+
+    // Start scheduler (after summary service so regeneration timer can be set)
+    schedulerService.setSummaryService(summaryService);
+    schedulerService.start();
 
     // Comment service
     const commentService = new CommentService(dbClient.db);

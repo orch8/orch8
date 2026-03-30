@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
-import { heartbeatRuns } from "@orch/shared/db";
+import { heartbeatRuns, projects } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { HeartbeatService } from "./heartbeat.service.js";
+import type { SummaryService } from "./summary.service.js";
 
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
 
@@ -12,12 +13,18 @@ export interface SchedulerConfig {
 
 export class SchedulerService {
   private timer: ReturnType<typeof setInterval> | null = null;
+  private summaryTimer: ReturnType<typeof setInterval> | null = null;
+  private summaryService: SummaryService | null = null;
 
   constructor(
     private db: SchemaDb,
     private heartbeatService: HeartbeatService,
     private config: SchedulerConfig,
   ) {}
+
+  setSummaryService(summaryService: SummaryService): void {
+    this.summaryService = summaryService;
+  }
 
   start(): void {
     if (this.timer) return;
@@ -26,12 +33,26 @@ export class SchedulerService {
         console.error("[SchedulerService] orphan reap error:", err);
       });
     }, this.config.intervalMs);
+
+    // Summary regeneration — weekly (every 7 days)
+    if (this.summaryService) {
+      const weekMs = 7 * 24 * 60 * 60 * 1000;
+      this.summaryTimer = setInterval(() => {
+        this.regenerateAllProjectSummaries().catch((err) => {
+          console.error("[SchedulerService] summary regeneration error:", err);
+        });
+      }, weekMs);
+    }
   }
 
   stop(): void {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    if (this.summaryTimer) {
+      clearInterval(this.summaryTimer);
+      this.summaryTimer = null;
     }
   }
 
@@ -114,5 +135,19 @@ export class SchedulerService {
     }
 
     return reaped;
+  }
+
+  async regenerateAllProjectSummaries(): Promise<void> {
+    if (!this.summaryService) return;
+
+    const activeProjects = await this.db
+      .select()
+      .from(projects)
+      .where(eq(projects.active, true));
+
+    for (const project of activeProjects) {
+      const summaryDir = `${project.homeDir}/.orch/memory/summaries`;
+      await this.summaryService.regenerateAllSummaries(project.id, summaryDir);
+    }
   }
 }
