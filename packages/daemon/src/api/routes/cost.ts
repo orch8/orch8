@@ -95,4 +95,36 @@ export async function costRoutes(app: FastifyInstance) {
 
     return { total, runs };
   });
+
+  // GET /api/cost/task/:taskId/phases — Per-phase cost breakdown for complex tasks
+  app.get("/api/cost/task/:taskId/phases", async (request: FastifyRequest<{ Params: { taskId: string } }>, reply: FastifyReply) => {
+    const projectId = request.projectId;
+    if (!projectId) {
+      return reply.code(400).send({ error: "validation_error", message: "projectId is required" });
+    }
+
+    const rows = await app.db.execute(sql`
+      SELECT
+        COALESCE(
+          CASE WHEN trigger_detail LIKE 'phase:%'
+            THEN SUBSTRING(trigger_detail FROM 7)
+            ELSE 'unknown'
+          END,
+          'unknown'
+        ) AS phase,
+        COALESCE(SUM(cost_usd), 0)::float AS "totalCost",
+        COUNT(*)::int AS "runCount"
+      FROM heartbeat_runs
+      WHERE task_id = ${request.params.taskId}
+        AND project_id = ${projectId}
+        AND cost_usd IS NOT NULL
+      GROUP BY phase
+      ORDER BY phase
+    `);
+
+    const byPhase = rows as unknown as Array<{ phase: string; totalCost: number; runCount: number }>;
+    const total = byPhase.reduce((sum, row) => sum + Number(row.totalCost), 0);
+
+    return { total, byPhase };
+  });
 }
