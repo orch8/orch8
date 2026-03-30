@@ -6,12 +6,14 @@ import { healthRoutes } from "./api/routes/health.js";
 import { taskRoutes } from "./api/routes/tasks.js";
 import { brainstormRoutes } from "./api/routes/brainstorm.js";
 import { commentRoutes } from "./api/routes/comments.js";
+import { agentRoutes } from "./api/routes/agents.js";
 import { websocketRoutes } from "./api/websocket.js";
 import { authPlugin } from "./api/middleware/auth.js";
 import { BrainstormService } from "./services/brainstorm.service.js";
 import { TaskService } from "./services/task.service.js";
 import { WorktreeService } from "./services/worktree.service.js";
 import { TaskLifecycleService } from "./services/task-lifecycle.service.js";
+import { AgentService } from "./services/agent.service.js";
 import { createDbClient } from "./db/client.js";
 import "./types.js";
 
@@ -63,11 +65,16 @@ export function buildServer(options: ServerOptions = {}) {
     const lifecycleService = new TaskLifecycleService(dbClient.db, taskService, worktreeService);
     app.decorate("lifecycleService", lifecycleService);
 
+    // Agent service
+    const agentService = new AgentService(dbClient.db);
+    app.decorate("agentService", agentService);
+
     // Auth middleware + routes that require DB
     app.register(authPlugin);
     app.register(taskRoutes);
     app.register(brainstormRoutes);
     app.register(commentRoutes);
+    app.register(agentRoutes);
   }
 
   app.register(websocketRoutes);
