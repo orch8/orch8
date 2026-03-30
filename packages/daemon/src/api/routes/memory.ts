@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { EntityFilterSchema, KnowledgeSearchSchema, CreateFactSchema, CreateEntitySchema, SupersedeFactSchema, WorklogEntrySchema, LessonEntrySchema } from "@orch/shared";
 import { eq, and } from "drizzle-orm";
-import { agents } from "@orch/shared/db";
+import { agents, projects } from "@orch/shared/db";
 import "../../types.js";
 
 export async function memoryRoutes(app: FastifyInstance) {
@@ -119,6 +119,30 @@ export async function memoryRoutes(app: FastifyInstance) {
       }
       throw err;
     }
+  });
+
+  // POST /api/memory/knowledge/:id/summarize — Trigger summary regeneration for an entity
+  app.post("/api/memory/knowledge/:id/summarize", async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const entity = await app.memoryService.getEntity(request.params.id);
+    if (!entity || (request.projectId && entity.projectId !== request.projectId)) {
+      return reply.code(404).send({ error: "not_found", message: "Entity not found" });
+    }
+
+    // Resolve project homeDir for summary path
+    const [project] = await app.db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, entity.projectId));
+    if (!project) {
+      return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    }
+
+    const summaryDir = `${project.homeDir}/.orch/memory/summaries`;
+    const result = await app.summaryService.generateEntitySummary(entity.id, summaryDir);
+    return reply.code(200).send(result);
   });
 
   // ─── Worklog ────────────────────────────────────

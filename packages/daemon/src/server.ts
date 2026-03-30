@@ -29,6 +29,7 @@ import { ProjectService } from "./services/project.service.js";
 import { MemoryService } from "./services/memory.service.js";
 import { CommentService } from "./services/comment.service.js";
 import { VerificationService } from "./services/verification.service.js";
+import { SummaryService } from "./services/summary.service.js";
 import "./types.js";
 
 export interface ServerOptions {
@@ -108,6 +109,10 @@ export function buildServer(options: ServerOptions = {}) {
     // Memory service
     const memoryService = new MemoryService(dbClient.db);
     app.decorate("memoryService", memoryService);
+
+    // Summary service
+    const summaryService = new SummaryService(dbClient.db, memoryService);
+    app.decorate("summaryService", summaryService);
 
     // Comment service
     const commentService = new CommentService(dbClient.db);
