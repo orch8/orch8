@@ -2,6 +2,7 @@
 import type { ChildProcess } from "node:child_process";
 import type { SpawnFn } from "../services/brainstorm.service.js";
 import { parseOutputStream, detectError } from "./output-parser.js";
+import { resolveBillingType } from "./env-builder.js";
 import type { RunResult, RunErrorCode } from "./types.js";
 
 export interface ProcessRunInput {
@@ -89,11 +90,7 @@ export async function runProcess(
     }
   }
 
-  // Resolve billing type
-  const billingType =
-    input.env.ANTHROPIC_API_KEY && input.env.ANTHROPIC_API_KEY.length > 0
-      ? "api" as const
-      : "subscription" as const;
+  const billingType = resolveBillingType(input.env);
 
   return {
     sessionId: parsedOutput.sessionId,

@@ -4,7 +4,6 @@ import { Readable } from "node:stream";
 import {
   parseOutputStream,
   detectError,
-  type ParsedOutput,
 } from "../../adapter/output-parser.js";
 
 describe("parseOutputStream", () => {
