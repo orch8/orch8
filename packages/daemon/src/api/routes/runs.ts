@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { heartbeatRuns } from "@orch/shared/db";
 import "../../types.js";
 
@@ -61,8 +61,26 @@ export async function runRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "validation_error", message: "projectId is required" });
     }
 
-    const [run] = await app.db
-      .select()
+    // Atomic conditional update to avoid race with scheduler
+    const [updated] = await app.db
+      .update(heartbeatRuns)
+      .set({ status: "cancelled", finishedAt: new Date() })
+      .where(
+        and(
+          eq(heartbeatRuns.id, request.params.id),
+          eq(heartbeatRuns.projectId, projectId),
+          inArray(heartbeatRuns.status, ["queued", "running"]),
+        ),
+      )
+      .returning();
+
+    if (updated) {
+      return updated;
+    }
+
+    // Distinguish 404 vs 409
+    const [existing] = await app.db
+      .select({ status: heartbeatRuns.status })
       .from(heartbeatRuns)
       .where(
         and(
@@ -71,24 +89,14 @@ export async function runRoutes(app: FastifyInstance) {
         ),
       );
 
-    if (!run) {
+    if (!existing) {
       return reply.code(404).send({ error: "not_found", message: "Run not found" });
     }
 
-    if (run.status !== "queued" && run.status !== "running") {
-      return reply.code(409).send({
-        error: "conflict",
-        message: `Cannot cancel run with status '${run.status}'`,
-      });
-    }
-
-    const [updated] = await app.db
-      .update(heartbeatRuns)
-      .set({ status: "cancelled", finishedAt: new Date() })
-      .where(eq(heartbeatRuns.id, run.id))
-      .returning();
-
-    return updated;
+    return reply.code(409).send({
+      error: "conflict",
+      message: `Cannot cancel run with status '${existing.status}'`,
+    });
   });
 
   // GET /api/runs/:id/log — Get run log content

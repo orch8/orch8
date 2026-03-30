@@ -9,6 +9,8 @@ export async function memoryRoutes(app: FastifyInstance) {
   app.get("/api/memory/knowledge", async (request: FastifyRequest) => {
     const parsed = EntityFilterSchema.safeParse(request.query);
     const filter = parsed.success ? parsed.data : {};
+    // Always scope to authenticated project
+    if (request.projectId) filter.projectId = request.projectId;
     return app.memoryService.listEntities(filter);
   });
 
@@ -24,7 +26,7 @@ export async function memoryRoutes(app: FastifyInstance) {
   // GET /api/memory/knowledge/:id — Entity summary
   app.get("/api/memory/knowledge/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const entity = await app.memoryService.getEntity(request.params.id);
-    if (!entity) {
+    if (!entity || (request.projectId && entity.projectId !== request.projectId)) {
       return reply.code(404).send({ error: "not_found", message: "Entity not found" });
     }
     return entity;
@@ -33,7 +35,7 @@ export async function memoryRoutes(app: FastifyInstance) {
   // GET /api/memory/knowledge/:id/facts — Full fact store (scored)
   app.get("/api/memory/knowledge/:id/facts", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const entity = await app.memoryService.getEntity(request.params.id);
-    if (!entity) {
+    if (!entity || (request.projectId && entity.projectId !== request.projectId)) {
       return reply.code(404).send({ error: "not_found", message: "Entity not found" });
     }
     return app.memoryService.listFacts(entity.id);
@@ -47,7 +49,7 @@ export async function memoryRoutes(app: FastifyInstance) {
     }
 
     const entity = await app.memoryService.getEntity(request.params.id);
-    if (!entity) {
+    if (!entity || (request.projectId && entity.projectId !== request.projectId)) {
       return reply.code(404).send({ error: "not_found", message: "Entity not found" });
     }
 
@@ -90,6 +92,10 @@ export async function memoryRoutes(app: FastifyInstance) {
       return reply.code(401).send({ error: "unauthorized" });
     }
 
+    if (!agent && (!request.projectId || !(request.body as any)?.agentId)) {
+      return reply.code(400).send({ error: "bad_request", message: "agentId and projectId required for admin worklog write" });
+    }
+
     const targetAgent = agent ?? await getAgentWithPaths(app, (request.body as any)?.agentId, request.projectId!);
     if (!targetAgent?.workLogDir) {
       return reply.code(400).send({ error: "bad_request", message: "Agent has no workLogDir configured" });
@@ -129,6 +135,10 @@ export async function memoryRoutes(app: FastifyInstance) {
     const agent = request.agent;
     if (!agent && !request.isAdmin) {
       return reply.code(401).send({ error: "unauthorized" });
+    }
+
+    if (!agent && (!request.projectId || !(request.body as any)?.agentId)) {
+      return reply.code(400).send({ error: "bad_request", message: "agentId and projectId required for admin lesson write" });
     }
 
     const targetAgent = agent ?? await getAgentWithPaths(app, (request.body as any)?.agentId, request.projectId!);

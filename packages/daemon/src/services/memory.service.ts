@@ -67,8 +67,9 @@ export class MemoryService {
   // ─── Search ──────────────────────────────────────
 
   async searchFacts(search: KnowledgeSearch): Promise<Array<Fact & { entitySlug: string }>> {
+    const escaped = search.query.replace(/[%_\\]/g, "\\$&");
     const conditions = [
-      ilike(knowledgeFacts.content, `%${search.query}%`),
+      ilike(knowledgeFacts.content, `%${escaped}%`),
       isNull(knowledgeFacts.supersededBy),
     ];
 

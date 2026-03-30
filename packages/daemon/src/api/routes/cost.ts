@@ -41,6 +41,12 @@ export async function costRoutes(app: FastifyInstance) {
     }
 
     const { projectId, days } = parsed.data;
+
+    // Enforce project scoping for agent callers
+    if (request.agent && request.projectId && projectId !== request.projectId) {
+      return reply.code(403).send({ error: "forbidden", message: "Cannot query cost data for another project" });
+    }
+
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
     const series = await app.db.execute(sql`
