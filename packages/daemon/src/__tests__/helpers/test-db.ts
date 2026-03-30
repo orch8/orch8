@@ -1,10 +1,15 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import os from "node:os";
+import { randomUUID } from "node:crypto";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import * as schema from "@orch/shared/db";
+import {
+  startEmbeddedPostgres,
+  stopEmbeddedPostgres,
+} from "../../db/embedded.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = path.resolve(__dirname, "../../db/migrations");
@@ -12,15 +17,15 @@ const migrationsFolder = path.resolve(__dirname, "../../db/migrations");
 export type TestDb = {
   db: PostgresJsDatabase<typeof schema>;
   sql: postgres.Sql;
-  container: StartedPostgreSqlContainer;
 };
 
 export async function setupTestDb(): Promise<TestDb> {
-  const container = await new PostgreSqlContainer("postgres:17")
-    .withDatabase("orch_test")
-    .start();
-
-  const connectionUri = container.getConnectionUri();
+  const dataDir = path.join(os.tmpdir(), `orch8-test-${randomUUID()}`);
+  const connectionUri = await startEmbeddedPostgres({
+    databaseDir: dataDir,
+    port: 0,
+    persistent: false,
+  });
 
   // Apply migrations
   const migrationSql = postgres(connectionUri, { max: 1 });
@@ -33,10 +38,10 @@ export async function setupTestDb(): Promise<TestDb> {
   const sqlClient = postgres(connectionUri, { max: 5 });
   const db = drizzle(sqlClient, { schema });
 
-  return { db, sql: sqlClient, container };
+  return { db, sql: sqlClient };
 }
 
 export async function teardownTestDb(testDb: TestDb): Promise<void> {
   await testDb.sql.end();
-  await testDb.container.stop();
+  await stopEmbeddedPostgres();
 }
