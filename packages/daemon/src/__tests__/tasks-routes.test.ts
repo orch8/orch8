@@ -4,6 +4,9 @@ import { projects, tasks, agents, taskDependencies } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { taskRoutes } from "../api/routes/tasks.js";
+import { TaskService } from "../services/task.service.js";
+import { WorktreeService } from "../services/worktree.service.js";
+import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
 import "../types.js";
 
 describe("Task API Routes", () => {
@@ -41,6 +44,12 @@ describe("Task API Routes", () => {
 
     app = Fastify();
     app.decorate("db", testDb.db);
+
+    const taskService = new TaskService(testDb.db);
+    const worktreeService = new WorktreeService();
+    const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
+    app.decorate("lifecycleService", lifecycleService);
+
     app.register(authPlugin);
     app.register(taskRoutes);
     await app.ready();

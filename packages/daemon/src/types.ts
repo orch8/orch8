@@ -1,11 +1,14 @@
+// packages/daemon/src/types.ts
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "@orch/shared/db";
+import type { TaskLifecycleService } from "./services/task-lifecycle.service.js";
 
 export type SchemaDb = PostgresJsDatabase<typeof schema>;
 
 declare module "fastify" {
   interface FastifyInstance {
     db: SchemaDb;
+    lifecycleService: TaskLifecycleService;
   }
   interface FastifyRequest {
     agent?: typeof schema.agents.$inferSelect;

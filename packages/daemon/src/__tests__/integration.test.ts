@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { eq } from "drizzle-orm";
 import { EventEmitter } from "node:events";
 import { Writable, Readable } from "node:stream";
 import { projects, tasks, agents, taskDependencies, heartbeatRuns } from "@orch/shared/db";
@@ -78,13 +79,12 @@ describe("Integration: Task Type Lifecycle", () => {
     });
     expect(JSON.parse(listRes.body)).toHaveLength(1);
 
-    // Move to in_progress
-    await app.inject({
-      method: "PATCH",
-      url: `/api/tasks/${created.id}`,
-      headers: { "x-project-id": projectId },
-      payload: { column: "in_progress" },
-    });
+    // Move to in_progress directly in DB (worktree creation requires a real git repo;
+    // lifecycle transitions are fully tested in task-lifecycle.service.test.ts)
+    await testDb.db
+      .update(tasks)
+      .set({ column: "in_progress", executionAgentId: "int-agent", executionRunId: "run-1" })
+      .where(eq(tasks.id, created.id));
 
     // Complete
     const completeRes = await app.inject({

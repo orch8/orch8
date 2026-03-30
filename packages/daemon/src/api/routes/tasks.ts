@@ -1,7 +1,9 @@
+// packages/daemon/src/api/routes/tasks.ts
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { CreateTaskSchema, UpdateTaskSchema, CompletePhaseSchema, ConvertTaskSchema, TaskFilterSchema } from "@orch/shared";
 import { TaskService } from "../../services/task.service.js";
 import { ComplexPhaseService } from "../../services/complex-phase.service.js";
+import type { TaskColumn } from "../../services/task-transitions.js";
 
 export async function taskRoutes(app: FastifyInstance) {
   const taskService = new TaskService(app.db);
@@ -37,7 +39,7 @@ export async function taskRoutes(app: FastifyInstance) {
     return task;
   });
 
-  // PATCH /api/tasks/:id — Update task
+  // PATCH /api/tasks/:id — Update task (non-state fields only)
   app.patch("/api/tasks/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const parsed = UpdateTaskSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -45,6 +47,30 @@ export async function taskRoutes(app: FastifyInstance) {
         error: "validation_error",
         details: parsed.error.issues,
       });
+    }
+
+    // If column is being changed, redirect to lifecycle transition
+    if (parsed.data.column) {
+      try {
+        const task = await app.lifecycleService.transition(
+          request.params.id,
+          parsed.data.column as TaskColumn,
+          {
+            agentId: request.agent?.id,
+            runId: request.runId,
+          },
+        );
+        return task;
+      } catch (err) {
+        const message = (err as Error).message;
+        if (message.startsWith("Invalid transition")) {
+          return reply.code(400).send({ error: "invalid_transition", message });
+        }
+        if (message === "Task not found") {
+          return reply.code(404).send({ error: "not_found", message });
+        }
+        throw err;
+      }
     }
 
     try {
@@ -57,6 +83,41 @@ export async function taskRoutes(app: FastifyInstance) {
       throw err;
     }
   });
+
+  // POST /api/tasks/:id/transition — Explicit lifecycle transition
+  app.post(
+    "/api/tasks/:id/transition",
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const body = request.body as { column?: string; agentId?: string; runId?: string };
+      if (!body.column) {
+        return reply.code(400).send({ error: "validation_error", message: "column is required" });
+      }
+
+      try {
+        const task = await app.lifecycleService.transition(
+          request.params.id,
+          body.column as TaskColumn,
+          {
+            agentId: body.agentId ?? request.agent?.id,
+            runId: body.runId ?? request.runId,
+          },
+        );
+        return task;
+      } catch (err) {
+        const message = (err as Error).message;
+        if (message.startsWith("Invalid transition")) {
+          return reply.code(400).send({ error: "invalid_transition", message });
+        }
+        if (message === "Task not found") {
+          return reply.code(404).send({ error: "not_found", message });
+        }
+        if (message.includes("agentId and runId are required")) {
+          return reply.code(400).send({ error: "validation_error", message });
+        }
+        throw err;
+      }
+    },
+  );
 
   // POST /api/tasks/:id/complete — Signal task or phase completion
   app.post("/api/tasks/:id/complete", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -79,9 +140,17 @@ export async function taskRoutes(app: FastifyInstance) {
       return result;
     }
 
-    // Quick task completion — move to review
-    const updated = await taskService.update(task.id, { column: "review" });
-    return updated;
+    // Quick task completion — use lifecycle service
+    try {
+      const updated = await app.lifecycleService.transition(task.id, "review");
+      return updated;
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message.startsWith("Invalid transition")) {
+        return reply.code(400).send({ error: "invalid_transition", message });
+      }
+      throw err;
+    }
   });
 
   // POST /api/tasks/:id/dependencies — Add dependency
