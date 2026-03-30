@@ -30,10 +30,11 @@ describe("createSkillsDir", () => {
       join(srcDir, "skill-a.md"),
       join(srcDir, "skill-b.md"),
     ]);
-    tempPaths.push(result);
+    expect(result).not.toBeNull();
+    tempPaths.push(result!);
 
     // Verify directory structure
-    const skillsPath = join(result, ".claude", "skills");
+    const skillsPath = join(result!, ".claude", "skills");
     expect(existsSync(skillsPath)).toBe(true);
 
     // Verify symlinks
