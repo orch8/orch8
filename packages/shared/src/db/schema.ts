@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   pgTable, pgEnum, text, boolean, integer, timestamp, real,
-  jsonb, primaryKey, check, type AnyPgColumn,
+  jsonb, primaryKey, check, uniqueIndex, type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -289,3 +289,47 @@ export const heartbeatRuns = pgTable("heartbeat_runs", {
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Wakeup Requests ─────────────────────────────────────
+
+export const wakeupRequests = pgTable("wakeup_requests", {
+  id: text("id").primaryKey().$defaultFn(() => `wake_${randomUUID()}`),
+  agentId: text("agent_id").notNull(),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  taskId: text("task_id").references(() => tasks.id, { onDelete: "set null" }),
+
+  source: wakeupSourceEnum("source").notNull(),
+  triggerDetail: text("trigger_detail"),
+  reason: text("reason"),
+  payload: jsonb("payload"),
+
+  status: wakeupStatusEnum("status").notNull().default("queued"),
+  coalescedCount: integer("coalesced_count").notNull().default(0),
+  idempotencyKey: text("idempotency_key"),
+
+  requestedByActorType: text("requested_by_actor_type"),
+  requestedByActorId: text("requested_by_actor_id"),
+
+  runId: text("run_id").references(() => heartbeatRuns.id, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Task Sessions ───────────────────────────────────────
+
+export const taskSessions = pgTable("task_sessions", {
+  id: text("id").primaryKey().$defaultFn(() => `sess_${randomUUID()}`),
+  agentId: text("agent_id").notNull(),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  taskKey: text("task_key").notNull(),
+  adapterType: text("adapter_type").notNull(),
+
+  sessionParamsJson: jsonb("session_params_json"),
+  sessionDisplayId: text("session_display_id"),
+  lastRunId: text("last_run_id").references(() => heartbeatRuns.id, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("uniq_task_session").on(table.agentId, table.taskKey, table.adapterType),
+]);
