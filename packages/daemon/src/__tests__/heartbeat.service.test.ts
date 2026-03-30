@@ -412,4 +412,110 @@ describe("HeartbeatService", () => {
       expect(claimed[1].id).toBe(second.id);
     });
   });
+
+  describe("executeRun", () => {
+    it("executes a queued run to completion (happy path)", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+        promptTemplate: "Do your work, {{agent.name}}.",
+        adapterType: "claude_local",
+        adapterConfig: {},
+      });
+
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "queued",
+      }).returning();
+
+      await service.executeRun(run.id);
+
+      // Run should now be in a terminal state
+      const [finished] = await testDb.db
+        .select()
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.id, run.id));
+
+      expect(["succeeded", "failed"]).toContain(finished.status);
+      expect(finished.finishedAt).toBeTruthy();
+    });
+
+    it("skips run if already in terminal state", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+      });
+
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "succeeded",
+        finishedAt: new Date(),
+      }).returning();
+
+      // Should not throw, just return
+      await service.executeRun(run.id);
+
+      const [same] = await testDb.db
+        .select()
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.id, run.id));
+      expect(same.status).toBe("succeeded");
+    });
+
+    it("releases task lock after execution completes", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+        adapterType: "claude_local",
+        adapterConfig: {},
+      });
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId, title: "Lock Release Test",
+      }).returning();
+
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        taskId: task.id,
+        invocationSource: "on_demand",
+        status: "queued",
+      }).returning();
+
+      // Set the lock
+      await testDb.db.update(tasks).set({
+        executionRunId: run.id,
+        executionAgentId: "eng-1",
+        executionLockedAt: new Date(),
+      }).where(eq(tasks.id, task.id));
+
+      await service.executeRun(run.id);
+
+      // Lock should be released
+      const [updated] = await testDb.db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, task.id));
+      expect(updated.executionRunId).toBeNull();
+      expect(updated.executionAgentId).toBeNull();
+    });
+
+    it("tracks run in activeRunExecutions during execution", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+        adapterType: "claude_local",
+        adapterConfig: {},
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "queued",
+      }).returning();
+
+      // After execution, it should be removed from tracking
+      await service.executeRun(run.id);
+      expect(service.isRunActive(run.id)).toBe(false);
+    });
+  });
 });

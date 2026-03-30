@@ -1,9 +1,11 @@
 import { eq, and, sql } from "drizzle-orm";
 import {
-  agents, heartbeatRuns, wakeupRequests, tasks,
+  agents, heartbeatRuns, wakeupRequests, tasks, projects,
 } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import { checkBudget } from "./budget.service.js";
+import type { ClaudeLocalAdapter, RunAgentPrompts } from "../adapter/claude-local-adapter.js";
+import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "../adapter/types.js";
 
 type Agent = typeof agents.$inferSelect;
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
@@ -26,6 +28,8 @@ export class HeartbeatService {
   // Per-agent start locks to prevent race conditions
   private agentStartLocks = new Map<string, Promise<void>>();
 
+  private adapter: ClaudeLocalAdapter | null = null;
+
   constructor(
     private db: SchemaDb,
     private broadcast: BroadcastFn,
@@ -35,6 +39,18 @@ export class HeartbeatService {
     this.activeRunExecutions.clear();
     this.runningProcesses.clear();
     this.agentStartLocks.clear();
+  }
+
+  setAdapter(adapter: ClaudeLocalAdapter): void {
+    this.adapter = adapter;
+  }
+
+  isRunActive(runId: string): boolean {
+    return this.activeRunExecutions.has(runId);
+  }
+
+  isProcessTracked(runId: string): boolean {
+    return this.runningProcesses.has(runId);
   }
 
   async enqueueWakeup(
@@ -263,6 +279,195 @@ export class HeartbeatService {
     });
 
     return claimed[0];
+  }
+
+  async executeRun(runId: string): Promise<void> {
+    // 1. Fetch run
+    const [run] = await this.db
+      .select()
+      .from(heartbeatRuns)
+      .where(eq(heartbeatRuns.id, runId));
+
+    if (!run) return;
+
+    // Return if already in terminal state
+    if (!["queued", "running"].includes(run.status)) return;
+
+    // 2. If queued, attempt claim
+    let claimedRun = run;
+    if (run.status === "queued") {
+      const claimed = await this.claimQueuedRun(runId);
+      if (!claimed) return;
+      claimedRun = claimed;
+    }
+
+    // 3. Add to in-memory tracking
+    this.activeRunExecutions.add(runId);
+
+    try {
+      // 4. Fetch agent configuration
+      const agent = await this.loadAgent(claimedRun.agentId, claimedRun.projectId);
+      if (!agent) {
+        await this.failRun(runId, "Agent not found", "agent_not_found");
+        return;
+      }
+
+      // 5. Load project for cwd
+      const [project] = await this.db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, claimedRun.projectId));
+
+      if (!project) {
+        await this.failRun(runId, "Project not found", "project_not_found");
+        return;
+      }
+
+      // 6. Resolve working directory
+      let cwd = project.homeDir;
+      if (claimedRun.taskId) {
+        const [task] = await this.db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, claimedRun.taskId));
+        if (task?.worktreePath) {
+          cwd = task.worktreePath;
+        }
+      }
+
+      // 7. Invoke adapter
+      if (!this.adapter) {
+        await this.failRun(runId, "No adapter configured", "no_adapter");
+        return;
+      }
+
+      const adapterConfig: ClaudeLocalAdapterConfig = {
+        ...(agent.adapterConfig as ClaudeLocalAdapterConfig ?? {}),
+        model: agent.model,
+        effort: agent.effort as ClaudeLocalAdapterConfig["effort"],
+        maxTurnsPerRun: agent.maxTurns,
+        instructionsFilePath: agent.instructionsFilePath ?? undefined,
+        cwd,
+      };
+
+      const ctx: RunContext = {
+        agentId: agent.id,
+        agentName: agent.name,
+        projectId: claimedRun.projectId,
+        runId,
+        taskId: claimedRun.taskId ?? undefined,
+        wakeReason: claimedRun.invocationSource,
+        apiUrl: process.env.ORCH_API_URL ?? "http://localhost:3000",
+        cwd,
+      };
+
+      const prompts: RunAgentPrompts = {
+        heartbeatTemplate: agent.promptTemplate ?? "",
+        bootstrapTemplate: agent.bootstrapPromptTemplate ?? undefined,
+        skillPaths: agent.skillPaths ?? undefined,
+      };
+
+      const result = await this.adapter.runAgent(adapterConfig, ctx, prompts);
+
+      // 8. Record results
+      const terminalStatus = this.resolveTerminalStatus(result);
+      await this.db
+        .update(heartbeatRuns)
+        .set({
+          status: terminalStatus,
+          exitCode: result.exitCode,
+          signal: result.signal,
+          error: result.error,
+          errorCode: result.errorCode,
+          usageJson: result.usage,
+          resultJson: result.result ? { text: result.result } : null,
+          costUsd: result.costUsd,
+          billingType: result.billingType,
+          model: result.model,
+          sessionIdAfter: result.sessionId,
+          finishedAt: new Date(),
+        })
+        .where(eq(heartbeatRuns.id, runId));
+
+      // 9. Update agent budget spent
+      if (result.costUsd && result.costUsd > 0) {
+        await this.db
+          .update(agents)
+          .set({
+            budgetSpentUsd: sql`${agents.budgetSpentUsd} + ${result.costUsd}`,
+            lastHeartbeat: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(agents.id, agent.id),
+              eq(agents.projectId, claimedRun.projectId),
+            ),
+          );
+
+        await this.db
+          .update(projects)
+          .set({
+            budgetSpentUsd: sql`${projects.budgetSpentUsd} + ${result.costUsd}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(projects.id, claimedRun.projectId));
+      }
+
+      // 10. Broadcast completion
+      this.broadcast(claimedRun.projectId, {
+        type: "run_status_changed",
+        runId,
+        status: terminalStatus,
+        agentId: agent.id,
+        costUsd: result.costUsd,
+      });
+    } catch (err) {
+      await this.failRun(
+        runId,
+        (err as Error).message,
+        "execution_error",
+      );
+    } finally {
+      // 11. Release task execution lock
+      if (claimedRun.taskId) {
+        await this.releaseTaskLock(claimedRun.taskId);
+      }
+
+      // 12. Start next queued run
+      await this.startNextQueuedRunForAgent(
+        claimedRun.agentId,
+        claimedRun.projectId,
+      );
+
+      // 13. Remove from tracking
+      this.activeRunExecutions.delete(runId);
+      this.runningProcesses.delete(runId);
+    }
+  }
+
+  private resolveTerminalStatus(
+    result: RunResult,
+  ): "succeeded" | "failed" | "timed_out" {
+    if (result.errorCode === "timeout") return "timed_out";
+    if (result.exitCode === 0 && !result.errorCode) return "succeeded";
+    return "failed";
+  }
+
+  private async failRun(
+    runId: string,
+    error: string,
+    errorCode: string,
+  ): Promise<void> {
+    await this.db
+      .update(heartbeatRuns)
+      .set({
+        status: "failed",
+        error,
+        errorCode,
+        finishedAt: new Date(),
+      })
+      .where(eq(heartbeatRuns.id, runId));
   }
 
   async startNextQueuedRunForAgent(
