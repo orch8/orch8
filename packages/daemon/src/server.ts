@@ -23,9 +23,12 @@ import { projectRoutes } from "./api/routes/projects.js";
 import { memoryRoutes } from "./api/routes/memory.js";
 import { costRoutes } from "./api/routes/cost.js";
 import { activityRoutes } from "./api/routes/activity.js";
+import { verificationRoutes } from "./api/routes/verification.js";
 import { createDbClient } from "./db/client.js";
 import { ProjectService } from "./services/project.service.js";
 import { MemoryService } from "./services/memory.service.js";
+import { CommentService } from "./services/comment.service.js";
+import { VerificationService } from "./services/verification.service.js";
 import "./types.js";
 
 export interface ServerOptions {
@@ -108,6 +111,23 @@ export function buildServer(options: ServerOptions = {}) {
     const memoryService = new MemoryService(dbClient.db);
     app.decorate("memoryService", memoryService);
 
+    // Comment service
+    const commentService = new CommentService(dbClient.db);
+
+    // Verification service
+    const verificationService = new VerificationService(
+      dbClient.db,
+      commentService,
+      async (agentId, projectId, taskId, reason) => {
+        await heartbeatService.enqueueWakeup(agentId, projectId, {
+          source: "automation",
+          taskId,
+          reason,
+        });
+      },
+    );
+    app.decorate("verificationService", verificationService);
+
     // Auth middleware + routes that require DB
     app.register(authPlugin);
     app.register(taskRoutes);
@@ -120,6 +140,7 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(memoryRoutes);
     app.register(costRoutes);
     app.register(activityRoutes);
+    app.register(verificationRoutes);
   }
 
   app.register(websocketRoutes);
