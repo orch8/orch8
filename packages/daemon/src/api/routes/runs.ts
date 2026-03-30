@@ -53,4 +53,65 @@ export async function runRoutes(app: FastifyInstance) {
 
     return run;
   });
+
+  // POST /api/runs/:id/cancel — Cancel a queued or running run
+  app.post("/api/runs/:id/cancel", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const projectId = request.projectId;
+    if (!projectId) {
+      return reply.code(400).send({ error: "validation_error", message: "projectId is required" });
+    }
+
+    const [run] = await app.db
+      .select()
+      .from(heartbeatRuns)
+      .where(
+        and(
+          eq(heartbeatRuns.id, request.params.id),
+          eq(heartbeatRuns.projectId, projectId),
+        ),
+      );
+
+    if (!run) {
+      return reply.code(404).send({ error: "not_found", message: "Run not found" });
+    }
+
+    if (run.status !== "queued" && run.status !== "running") {
+      return reply.code(409).send({
+        error: "conflict",
+        message: `Cannot cancel run with status '${run.status}'`,
+      });
+    }
+
+    const [updated] = await app.db
+      .update(heartbeatRuns)
+      .set({ status: "cancelled", finishedAt: new Date() })
+      .where(eq(heartbeatRuns.id, run.id))
+      .returning();
+
+    return updated;
+  });
+
+  // GET /api/runs/:id/log — Get run log content
+  app.get("/api/runs/:id/log", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const projectId = request.projectId;
+    if (!projectId) {
+      return reply.code(400).send({ error: "validation_error", message: "projectId is required" });
+    }
+
+    const [run] = await app.db
+      .select({ logStore: heartbeatRuns.logStore, logRef: heartbeatRuns.logRef })
+      .from(heartbeatRuns)
+      .where(
+        and(
+          eq(heartbeatRuns.id, request.params.id),
+          eq(heartbeatRuns.projectId, projectId),
+        ),
+      );
+
+    if (!run || !run.logRef) {
+      return reply.code(404).send({ error: "not_found", message: "No log found for this run" });
+    }
+
+    return { log: run.logRef, store: run.logStore };
+  });
 }
