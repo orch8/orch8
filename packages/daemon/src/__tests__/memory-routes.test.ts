@@ -408,3 +408,87 @@ describe("Memory Routes — Worklog + Lessons", () => {
     });
   });
 });
+
+describe("Memory Routes — Full Integration", () => {
+  let testDb: TestDb;
+  let app: ReturnType<typeof Fastify>;
+  let projectId: string;
+
+  beforeAll(async () => {
+    testDb = await setupTestDb();
+
+    const [project] = await testDb.db.insert(projects).values({
+      name: "Integration Test",
+      slug: "integration-test",
+      homeDir: "/tmp/integration",
+      worktreeDir: "/tmp/integration-wt",
+    }).returning();
+    projectId = project.id;
+
+    await testDb.db.insert(agents).values({
+      id: "eng-1", projectId, name: "Engineer", role: "engineer",
+    });
+  }, 60_000);
+
+  afterAll(async () => { await teardownTestDb(testDb); });
+
+  beforeEach(async () => {
+    await testDb.db.delete(knowledgeFacts);
+    await testDb.db.delete(knowledgeEntities);
+
+    app = Fastify();
+    app.decorate("db", testDb.db);
+    const memoryService = new MemoryService(testDb.db);
+    app.decorate("memoryService", memoryService);
+
+    const { SummaryService } = await import("../services/summary.service.js");
+    const summaryService = new SummaryService(testDb.db, memoryService);
+    app.decorate("summaryService", summaryService);
+
+    app.register(authPlugin);
+    app.register(memoryRoutes);
+    await app.ready();
+  });
+
+  it("create entity → write fact → supersede fact → list facts shows only new fact", async () => {
+    // Create entity
+    const createRes = await app.inject({
+      method: "POST",
+      url: "/api/memory/knowledge",
+      headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      payload: { slug: "e2e-test", name: "E2E Test", entityType: "area" },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const entity = createRes.json();
+
+    // Write fact
+    const factRes = await app.inject({
+      method: "POST",
+      url: `/api/memory/knowledge/${entity.id}/facts`,
+      headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      payload: { content: "Original fact", category: "status" },
+    });
+    expect(factRes.statusCode).toBe(201);
+    const originalFact = factRes.json();
+
+    // Supersede fact
+    const supersedeRes = await app.inject({
+      method: "POST",
+      url: `/api/memory/knowledge/${entity.id}/facts/${originalFact.id}/supersede`,
+      headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      payload: { content: "Updated fact", category: "status" },
+    });
+    expect(supersedeRes.statusCode).toBe(201);
+
+    // List facts — should only show the new fact
+    const listRes = await app.inject({
+      method: "GET",
+      url: `/api/memory/knowledge/${entity.id}/facts`,
+      headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+    });
+    expect(listRes.statusCode).toBe(200);
+    const facts = listRes.json();
+    expect(facts).toHaveLength(1);
+    expect(facts[0].content).toBe("Updated fact");
+  });
+});
