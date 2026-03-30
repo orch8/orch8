@@ -18,7 +18,14 @@ import { HeartbeatService } from "./services/heartbeat.service.js";
 import { SchedulerService } from "./services/scheduler.service.js";
 import { ClaudeLocalAdapter } from "./adapter/claude-local-adapter.js";
 import { runRoutes } from "./api/routes/runs.js";
+import { identityRoutes } from "./api/routes/identity.js";
+import { projectRoutes } from "./api/routes/projects.js";
+import { memoryRoutes } from "./api/routes/memory.js";
+import { costRoutes } from "./api/routes/cost.js";
+import { activityRoutes } from "./api/routes/activity.js";
 import { createDbClient } from "./db/client.js";
+import { ProjectService } from "./services/project.service.js";
+import { MemoryService } from "./services/memory.service.js";
 import "./types.js";
 
 export interface ServerOptions {
@@ -93,6 +100,14 @@ export function buildServer(options: ServerOptions = {}) {
       heartbeatService.shutdown();
     });
 
+    // Project service
+    const projectService = new ProjectService(dbClient.db);
+    app.decorate("projectService", projectService);
+
+    // Memory service
+    const memoryService = new MemoryService(dbClient.db);
+    app.decorate("memoryService", memoryService);
+
     // Auth middleware + routes that require DB
     app.register(authPlugin);
     app.register(taskRoutes);
@@ -100,6 +115,11 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(commentRoutes);
     app.register(agentRoutes);
     app.register(runRoutes);
+    app.register(identityRoutes);
+    app.register(projectRoutes);
+    app.register(memoryRoutes);
+    app.register(costRoutes);
+    app.register(activityRoutes);
   }
 
   app.register(websocketRoutes);
