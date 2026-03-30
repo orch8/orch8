@@ -1,8 +1,12 @@
-import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import * as schema from "@orch/shared/db";
+import type { SchemaDb } from "../types.js";
+
+export type { SchemaDb };
 
 export interface DbClient {
-  db: PostgresJsDatabase;
+  db: SchemaDb;
   sql: postgres.Sql;
   close: () => Promise<void>;
 }
@@ -13,7 +17,7 @@ export function createDbClient(connectionString: string): DbClient {
     idle_timeout: 20,
   });
 
-  const db = drizzle(sql);
+  const db = drizzle(sql, { schema });
 
   return {
     db,

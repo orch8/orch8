@@ -19,7 +19,7 @@ export function buildServer(options: ServerOptions = {}) {
 
   if (options.databaseUrl) {
     const dbClient = createDbClient(options.databaseUrl);
-    app.decorate("db", dbClient);
+    app.decorate("db", dbClient.db);
     app.addHook("onClose", async () => {
       await dbClient.close();
     });
