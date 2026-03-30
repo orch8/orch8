@@ -20,6 +20,12 @@ export const CreateFactSchema = z.object({
   sourceTask: z.string().optional(),
 });
 
+export const SupersedeFactSchema = z.object({
+  content: z.string().min(1).max(10000),
+  category: FactCategorySchema,
+  sourceTask: z.string().optional(),
+});
+
 export const EntityFilterSchema = z.object({
   projectId: z.string().optional(),
   entityType: EntityTypeSchema.optional(),

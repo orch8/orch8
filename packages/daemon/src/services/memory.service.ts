@@ -81,6 +81,43 @@ export class MemoryService {
     return fact;
   }
 
+  async supersedeFact(
+    oldFactId: string,
+    input: { content: string; category: string; sourceTask?: string },
+    sourceAgent: string,
+  ): Promise<{ oldFact: Fact; newFact: Fact }> {
+    // 1. Load old fact
+    const [oldFact] = await this.db
+      .select()
+      .from(knowledgeFacts)
+      .where(eq(knowledgeFacts.id, oldFactId));
+
+    if (!oldFact) throw new Error("fact_not_found");
+    if (oldFact.supersededBy) throw new Error("already_superseded");
+
+    // 2. Create replacement fact
+    const [newFact] = await this.db.insert(knowledgeFacts).values({
+      entityId: oldFact.entityId,
+      content: input.content,
+      category: input.category as typeof oldFact.category,
+      sourceAgent,
+      sourceTask: input.sourceTask ?? null,
+    }).returning();
+
+    // 3. Mark old fact as superseded
+    await this.db
+      .update(knowledgeFacts)
+      .set({ supersededBy: newFact.id })
+      .where(eq(knowledgeFacts.id, oldFactId));
+
+    const [updatedOld] = await this.db
+      .select()
+      .from(knowledgeFacts)
+      .where(eq(knowledgeFacts.id, oldFactId));
+
+    return { oldFact: updatedOld, newFact };
+  }
+
   // ─── Search ──────────────────────────────────────
 
   async searchFacts(search: KnowledgeSearch): Promise<Array<Fact & { entitySlug: string }>> {

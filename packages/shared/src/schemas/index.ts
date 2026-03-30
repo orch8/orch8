@@ -36,6 +36,7 @@ export {
   EntityTypeSchema,
   CreateEntitySchema,
   CreateFactSchema,
+  SupersedeFactSchema,
   EntityFilterSchema,
   KnowledgeSearchSchema,
   WorklogEntrySchema,

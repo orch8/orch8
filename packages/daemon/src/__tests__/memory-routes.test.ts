@@ -186,6 +186,65 @@ describe("Memory Routes — Knowledge", () => {
     });
   });
 
+  describe("POST /api/memory/knowledge/:entityId/facts/:factId/supersede", () => {
+    it("supersedes a fact with a new one", async () => {
+      const [entity] = await testDb.db.insert(knowledgeEntities).values({
+        projectId, slug: "auth", name: "Auth", entityType: "area",
+      }).returning();
+
+      const [fact] = await testDb.db.insert(knowledgeFacts).values({
+        entityId: entity.id, content: "Uses JWT v1", category: "decision", sourceAgent: "eng-1",
+      }).returning();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/memory/knowledge/${entity.id}/facts/${fact.id}/supersede`,
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        payload: { content: "Migrated to JWT v2 with rotation", category: "decision" },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const body = res.json();
+      expect(body.oldFact.supersededBy).toBe(body.newFact.id);
+      expect(body.newFact.content).toBe("Migrated to JWT v2 with rotation");
+    });
+
+    it("rejects superseding an already-superseded fact", async () => {
+      const [entity] = await testDb.db.insert(knowledgeEntities).values({
+        projectId, slug: "api", name: "API", entityType: "area",
+      }).returning();
+
+      const [fact] = await testDb.db.insert(knowledgeFacts).values({
+        entityId: entity.id, content: "Old fact", category: "status", sourceAgent: "eng-1",
+        supersededBy: "some-other-fact",
+      }).returning();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/memory/knowledge/${entity.id}/facts/${fact.id}/supersede`,
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        payload: { content: "New fact", category: "status" },
+      });
+
+      expect(res.statusCode).toBe(409);
+    });
+
+    it("returns 404 for nonexistent fact", async () => {
+      const [entity] = await testDb.db.insert(knowledgeEntities).values({
+        projectId, slug: "db", name: "Database", entityType: "area",
+      }).returning();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/memory/knowledge/${entity.id}/facts/nonexistent/supersede`,
+        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        payload: { content: "New", category: "status" },
+      });
+
+      expect(res.statusCode).toBe(404);
+    });
+  });
+
   describe("GET /api/memory/knowledge/search", () => {
     it("searches facts by text", async () => {
       const [entity] = await testDb.db.insert(knowledgeEntities).values({

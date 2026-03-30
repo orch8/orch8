@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { EntityFilterSchema, KnowledgeSearchSchema, CreateFactSchema, CreateEntitySchema, WorklogEntrySchema, LessonEntrySchema } from "@orch/shared";
+import { EntityFilterSchema, KnowledgeSearchSchema, CreateFactSchema, CreateEntitySchema, SupersedeFactSchema, WorklogEntrySchema, LessonEntrySchema } from "@orch/shared";
 import { eq, and } from "drizzle-orm";
 import { agents } from "@orch/shared/db";
 import "../../types.js";
@@ -83,6 +83,42 @@ export async function memoryRoutes(app: FastifyInstance) {
 
     const fact = await app.memoryService.writeFact(entity.id, parsed.data, sourceAgent);
     return reply.code(201).send(fact);
+  });
+
+  // POST /api/memory/knowledge/:entityId/facts/:factId/supersede — Supersede a fact
+  app.post("/api/memory/knowledge/:entityId/facts/:factId/supersede", async (
+    request: FastifyRequest<{ Params: { entityId: string; factId: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const parsed = SupersedeFactSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
+    }
+
+    const entity = await app.memoryService.getEntity(request.params.entityId);
+    if (!entity || (request.projectId && entity.projectId !== request.projectId)) {
+      return reply.code(404).send({ error: "not_found", message: "Entity not found" });
+    }
+
+    const sourceAgent = request.agent?.id ?? "admin";
+
+    try {
+      const result = await app.memoryService.supersedeFact(
+        request.params.factId,
+        parsed.data,
+        sourceAgent,
+      );
+      return reply.code(201).send(result);
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      if (msg === "fact_not_found") {
+        return reply.code(404).send({ error: "not_found", message: "Fact not found" });
+      }
+      if (msg === "already_superseded") {
+        return reply.code(409).send({ error: "conflict", message: "Fact already superseded" });
+      }
+      throw err;
+    }
   });
 
   // ─── Worklog ────────────────────────────────────
