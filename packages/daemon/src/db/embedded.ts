@@ -41,6 +41,12 @@ export async function startEmbeddedPostgres(
     persistent = true,
   } = options;
 
+  if (instance) {
+    throw new Error(
+      "Embedded Postgres is already running. Call stopEmbeddedPostgres() first.",
+    );
+  }
+
   const port = requestedPort === 0 ? await findAvailablePort() : requestedPort;
 
   instance = new EmbeddedPostgres({
