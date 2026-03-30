@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process";
 import { tasks, agents } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
@@ -43,7 +43,7 @@ export class BrainstormService {
       const [agent] = await this.db
         .select()
         .from(agents)
-        .where(eq(agents.id, task.assignee));
+        .where(and(eq(agents.id, task.assignee), eq(agents.projectId, task.projectId)));
       if (agent) {
         model = agent.model;
         maxTurns = agent.maxTurns;

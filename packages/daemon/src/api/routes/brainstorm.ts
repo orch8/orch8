@@ -1,4 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { eq } from "drizzle-orm";
+import { tasks, projects } from "@orch/shared/db";
 
 // Augment FastifyInstance to include brainstormService
 declare module "fastify" {
@@ -101,9 +103,6 @@ export async function brainstormRoutes(app: FastifyInstance) {
 }
 
 async function getProjectForTask(app: FastifyInstance, taskId: string) {
-  const { tasks, projects } = await import("@orch/shared/db");
-  const { eq } = await import("drizzle-orm");
-
   const [task] = await app.db.select().from(tasks).where(eq(tasks.id, taskId));
   if (!task) return null;
 

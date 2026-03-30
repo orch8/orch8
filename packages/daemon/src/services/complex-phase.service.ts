@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { tasks, agents } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 
@@ -71,7 +71,7 @@ export class ComplexPhaseService {
     const result = await this.db
       .select()
       .from(agents)
-      .where(eq(agents.id, agentId));
+      .where(and(eq(agents.id, agentId), eq(agents.projectId, task.projectId)));
 
     return result[0] ?? null;
   }
