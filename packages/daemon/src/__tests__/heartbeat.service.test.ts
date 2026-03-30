@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
@@ -121,6 +122,96 @@ describe("HeartbeatService", () => {
       });
       expect(result.status).toBe("queued");
       expect(result.runId).toBeTruthy();
+    });
+  });
+
+  describe("enqueueWakeup — task execution locking", () => {
+    it("claims lock when no active execution on task", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+      });
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId, title: "Test Task",
+      }).returning();
+
+      const result = await service.enqueueWakeup("eng-1", projectId, {
+        source: "on_demand",
+        taskId: task.id,
+      });
+      expect(result.status).toBe("queued");
+
+      // Task should now have the execution lock
+      const [updated] = await testDb.db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, task.id));
+      expect(updated.executionAgentId).toBe("eng-1");
+      expect(updated.executionRunId).toBeTruthy();
+      expect(updated.executionLockedAt).toBeTruthy();
+    });
+
+    it("coalesces when same agent re-wakes same task", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+      });
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId, title: "Coalesce Task",
+      }).returning();
+
+      // First wakeup claims the lock
+      const first = await service.enqueueWakeup("eng-1", projectId, {
+        source: "on_demand",
+        taskId: task.id,
+      });
+      expect(first.status).toBe("queued");
+
+      // Second wakeup by same agent should coalesce
+      const second = await service.enqueueWakeup("eng-1", projectId, {
+        source: "on_demand",
+        taskId: task.id,
+      });
+      expect(second.status).toBe("coalesced");
+    });
+
+    it("defers when different agent wakes same task", async () => {
+      await testDb.db.insert(agents).values([
+        { id: "eng-1", projectId, name: "Eng 1", role: "engineer" },
+        { id: "eng-2", projectId, name: "Eng 2", role: "engineer" },
+      ]);
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId, title: "Defer Task",
+      }).returning();
+
+      // First agent claims
+      const first = await service.enqueueWakeup("eng-1", projectId, {
+        source: "on_demand",
+        taskId: task.id,
+      });
+      expect(first.status).toBe("queued");
+
+      // Second agent deferred
+      const second = await service.enqueueWakeup("eng-2", projectId, {
+        source: "on_demand",
+        taskId: task.id,
+      });
+      expect(second.status).toBe("deferred_issue_execution");
+    });
+
+    it("general wakeup (no taskId) coalesces into existing queued run", async () => {
+      await testDb.db.insert(agents).values({
+        id: "cto-1", projectId, name: "CTO", role: "cto",
+        heartbeatEnabled: true,
+      });
+
+      const first = await service.enqueueWakeup("cto-1", projectId, {
+        source: "timer",
+      });
+      expect(first.status).toBe("queued");
+
+      const second = await service.enqueueWakeup("cto-1", projectId, {
+        source: "timer",
+      });
+      expect(second.status).toBe("coalesced");
     });
   });
 });

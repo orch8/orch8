@@ -1,6 +1,6 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import {
-  agents, heartbeatRuns, wakeupRequests,
+  agents, heartbeatRuns, wakeupRequests, tasks,
 } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import { checkBudget } from "./budget.service.js";
@@ -62,13 +62,102 @@ export class HeartbeatService {
       return this.recordWakeup(agentId, projectId, opts, "budget_blocked");
     }
 
-    // 5. Create run and wakeup (task-scoped locking handled in Task 3)
+    // 5. Task-scoped wakeup — apply task execution lock
+    if (opts.taskId) {
+      return this.enqueueTaskScopedWakeup(agentId, projectId, opts);
+    }
+
+    // 6. General wakeup — coalesce if queued/running run exists
+    return this.enqueueGeneralWakeup(agentId, projectId, opts);
+  }
+
+  private async enqueueTaskScopedWakeup(
+    agentId: string,
+    projectId: string,
+    opts: WakeupOpts,
+  ): Promise<WakeupRequest> {
+    const taskId = opts.taskId!;
+
+    // Load task to check existing execution lock
+    const [task] = await this.db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, taskId));
+
+    if (!task) throw new Error("Task not found");
+
+    // Case A: Same agent already executing this task → COALESCE
+    if (task.executionAgentId === agentId && task.executionRunId) {
+      return this.recordWakeup(agentId, projectId, opts, "coalesced");
+    }
+
+    // Case B: Different agent executing this task → DEFER
+    if (task.executionAgentId && task.executionAgentId !== agentId) {
+      return this.recordWakeup(
+        agentId, projectId, opts, "deferred_issue_execution",
+      );
+    }
+
+    // Case C: No active execution → CLAIM lock, create run as queued
     const [run] = await this.db
       .insert(heartbeatRuns)
       .values({
         agentId,
         projectId,
-        taskId: opts.taskId ?? null,
+        taskId,
+        invocationSource: opts.source,
+        status: "queued",
+      })
+      .returning();
+
+    // Set execution lock on the task
+    await this.db
+      .update(tasks)
+      .set({
+        executionRunId: run.id,
+        executionAgentId: agentId,
+        executionLockedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(tasks.id, taskId));
+
+    const wakeup = await this.recordWakeup(
+      agentId, projectId, opts, "queued", run.id,
+    );
+
+    await this.startNextQueuedRunForAgent(agentId, projectId);
+    return wakeup;
+  }
+
+  private async enqueueGeneralWakeup(
+    agentId: string,
+    projectId: string,
+    opts: WakeupOpts,
+  ): Promise<WakeupRequest> {
+    // Check for existing queued or running run to coalesce into
+    const [existingRun] = await this.db
+      .select()
+      .from(heartbeatRuns)
+      .where(
+        and(
+          eq(heartbeatRuns.agentId, agentId),
+          eq(heartbeatRuns.projectId, projectId),
+          sql`${heartbeatRuns.taskId} IS NULL`,
+          sql`${heartbeatRuns.status} IN ('queued', 'running')`,
+        ),
+      );
+
+    if (existingRun) {
+      return this.recordWakeup(agentId, projectId, opts, "coalesced");
+    }
+
+    // No existing run — create new queued run
+    const [run] = await this.db
+      .insert(heartbeatRuns)
+      .values({
+        agentId,
+        projectId,
+        taskId: null,
         invocationSource: opts.source,
         status: "queued",
       })
@@ -78,10 +167,44 @@ export class HeartbeatService {
       agentId, projectId, opts, "queued", run.id,
     );
 
-    // 6. Attempt to start queued runs
     await this.startNextQueuedRunForAgent(agentId, projectId);
-
     return wakeup;
+  }
+
+  async releaseTaskLock(taskId: string): Promise<void> {
+    // Clear execution lock fields
+    await this.db
+      .update(tasks)
+      .set({
+        executionRunId: null,
+        executionAgentId: null,
+        executionLockedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(tasks.id, taskId));
+
+    // Promote oldest deferred wakeup for this task
+    const [deferred] = await this.db
+      .select()
+      .from(wakeupRequests)
+      .where(
+        and(
+          eq(wakeupRequests.taskId, taskId),
+          eq(wakeupRequests.status, "deferred_issue_execution"),
+        ),
+      )
+      .orderBy(wakeupRequests.createdAt)
+      .limit(1);
+
+    if (deferred) {
+      // Re-enqueue the deferred wakeup
+      await this.enqueueWakeup(deferred.agentId, deferred.projectId, {
+        source: deferred.source,
+        taskId: deferred.taskId ?? undefined,
+        reason: deferred.reason ?? undefined,
+        payload: deferred.payload ?? undefined,
+      });
+    }
   }
 
   async startNextQueuedRunForAgent(
