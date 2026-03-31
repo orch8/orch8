@@ -1,0 +1,3465 @@
+openapi: 3.0.3
+info:
+  title: orch8 API
+  description: |
+    REST + WebSocket API for the orch8 orchestration platform.
+
+    ## Authentication
+
+    Two authentication paths are supported on all endpoints (except `GET /api/health`):
+
+    **Agent Authentication** — Provide both `X-Agent-Id` and `X-Project-Id` headers. The agent is validated against the database.
+
+    **Admin Authentication** — Requests from localhost (`127.0.0.1`, `::1`) without agent headers are treated as admin. Admins bypass all permission checks.
+  version: 0.0.0
+  license:
+    name: Private
+
+servers:
+  - url: http://localhost:3847
+    description: Local daemon
+
+tags:
+  - name: Health
+    description: Daemon health check
+  - name: Identity
+    description: Caller identity and context
+  - name: Projects
+    description: Multi-project management
+  - name: Tasks
+    description: Task board CRUD and lifecycle
+  - name: Brainstorm
+    description: Interactive brainstorm sessions
+  - name: Comments
+    description: Task comments
+  - name: Agents
+    description: Agent management and control
+  - name: Runs
+    description: Heartbeat execution runs
+  - name: Verification
+    description: Task verification pipeline
+  - name: Memory
+    description: Knowledge graph, work logs, and lessons
+  - name: Cost
+    description: Cost tracking and analytics
+  - name: Activity Log
+    description: Structured activity logging
+  - name: Daemon
+    description: Daemon lifecycle and configuration
+  - name: Notifications
+    description: In-app notification system
+
+components:
+  securitySchemes:
+    AgentAuth:
+      type: apiKey
+      in: header
+      name: X-Agent-Id
+      description: Agent ID header (must be paired with X-Project-Id)
+    ProjectScope:
+      type: apiKey
+      in: header
+      name: X-Project-Id
+      description: Project ID scope header
+    RunContext:
+      type: apiKey
+      in: header
+      name: X-Run-Id
+      description: Optional run ID for correlation
+
+  schemas:
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          example: not_found
+        message:
+          type: string
+          example: Task not found
+
+    ValidationError:
+      type: object
+      required: [error, details]
+      properties:
+        error:
+          type: string
+          enum: [validation_error]
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              path:
+                type: array
+                items:
+                  type: string
+              message:
+                type: string
+
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+
+    # --- Project ---
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          example: proj_abc123
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        homeDir:
+          type: string
+        worktreeDir:
+          type: string
+        repoUrl:
+          type: string
+          nullable: true
+        defaultBranch:
+          type: string
+        defaultModel:
+          type: string
+          nullable: true
+        defaultMaxTurns:
+          type: integer
+          nullable: true
+        verificationRequired:
+          type: boolean
+        budgetLimitUsd:
+          type: number
+          nullable: true
+        budgetSpentUsd:
+          type: number
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateProject:
+      type: object
+      required: [name, slug, homeDir, worktreeDir]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: ^[a-z0-9-]+$
+        description:
+          type: string
+          maxLength: 5000
+          default: ""
+        homeDir:
+          type: string
+          minLength: 1
+        worktreeDir:
+          type: string
+          minLength: 1
+        repoUrl:
+          type: string
+        defaultBranch:
+          type: string
+          default: main
+        defaultModel:
+          type: string
+        defaultMaxTurns:
+          type: integer
+          minimum: 1
+        verificationRequired:
+          type: boolean
+          default: true
+        budgetLimitUsd:
+          type: number
+          minimum: 0
+
+    UpdateProject:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+        repoUrl:
+          type: string
+          nullable: true
+        defaultBranch:
+          type: string
+        defaultModel:
+          type: string
+          nullable: true
+        defaultMaxTurns:
+          type: integer
+          minimum: 1
+          nullable: true
+        verificationRequired:
+          type: boolean
+        budgetLimitUsd:
+          type: number
+          minimum: 0
+          nullable: true
+        active:
+          type: boolean
+
+    # --- Task ---
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+          example: task_abc123
+        title:
+          type: string
+        description:
+          type: string
+        projectId:
+          type: string
+        column:
+          $ref: "#/components/schemas/TaskColumn"
+        taskType:
+          $ref: "#/components/schemas/TaskType"
+        priority:
+          $ref: "#/components/schemas/TaskPriority"
+        assignee:
+          type: string
+          nullable: true
+        complexPhase:
+          $ref: "#/components/schemas/ComplexPhase"
+        researchAgentId:
+          type: string
+          nullable: true
+        planAgentId:
+          type: string
+          nullable: true
+        implementAgentId:
+          type: string
+          nullable: true
+        reviewAgentId:
+          type: string
+          nullable: true
+        researchOutput:
+          type: string
+          nullable: true
+        planOutput:
+          type: string
+          nullable: true
+        implementationOutput:
+          type: string
+          nullable: true
+        reviewOutput:
+          type: string
+          nullable: true
+        brainstormStatus:
+          $ref: "#/components/schemas/BrainstormStatus"
+        branch:
+          type: string
+          nullable: true
+        worktreePath:
+          type: string
+          nullable: true
+        verificationResult:
+          $ref: "#/components/schemas/VerificationResult"
+        verifierReport:
+          type: string
+          nullable: true
+        refereeVerdict:
+          type: string
+          nullable: true
+        executionRunId:
+          type: string
+          nullable: true
+        executionAgentId:
+          type: string
+          nullable: true
+        retryCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateQuickTask:
+      type: object
+      required: [title, projectId, taskType]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+          maxLength: 10000
+          default: ""
+        projectId:
+          type: string
+          minLength: 1
+        priority:
+          $ref: "#/components/schemas/TaskPriority"
+        assignee:
+          type: string
+        taskType:
+          type: string
+          enum: [quick]
+
+    CreateComplexTask:
+      type: object
+      required: [title, projectId, taskType]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+          maxLength: 10000
+          default: ""
+        projectId:
+          type: string
+          minLength: 1
+        priority:
+          $ref: "#/components/schemas/TaskPriority"
+        assignee:
+          type: string
+        taskType:
+          type: string
+          enum: [complex]
+        researchAgentId:
+          type: string
+        planAgentId:
+          type: string
+        implementAgentId:
+          type: string
+        reviewAgentId:
+          type: string
+        researchPromptOverride:
+          type: string
+        planPromptOverride:
+          type: string
+        implementPromptOverride:
+          type: string
+        reviewPromptOverride:
+          type: string
+
+    CreateBrainstormTask:
+      type: object
+      required: [title, projectId, taskType]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+          maxLength: 10000
+          default: ""
+        projectId:
+          type: string
+          minLength: 1
+        priority:
+          $ref: "#/components/schemas/TaskPriority"
+        assignee:
+          type: string
+        taskType:
+          type: string
+          enum: [brainstorm]
+
+    CreateTask:
+      oneOf:
+        - $ref: "#/components/schemas/CreateQuickTask"
+        - $ref: "#/components/schemas/CreateComplexTask"
+        - $ref: "#/components/schemas/CreateBrainstormTask"
+      discriminator:
+        propertyName: taskType
+        mapping:
+          quick: "#/components/schemas/CreateQuickTask"
+          complex: "#/components/schemas/CreateComplexTask"
+          brainstorm: "#/components/schemas/CreateBrainstormTask"
+
+    UpdateTask:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+          maxLength: 10000
+        column:
+          $ref: "#/components/schemas/TaskColumn"
+        priority:
+          $ref: "#/components/schemas/TaskPriority"
+        assignee:
+          type: string
+          nullable: true
+        researchAgentId:
+          type: string
+          nullable: true
+        planAgentId:
+          type: string
+          nullable: true
+        implementAgentId:
+          type: string
+          nullable: true
+        reviewAgentId:
+          type: string
+          nullable: true
+
+    # --- Agent ---
+    Agent:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/AgentRole"
+        status:
+          $ref: "#/components/schemas/AgentStatus"
+        icon:
+          type: string
+        color:
+          type: string
+        model:
+          type: string
+        effort:
+          type: string
+          nullable: true
+        maxTurns:
+          type: integer
+        allowedTools:
+          type: array
+          items:
+            type: string
+        heartbeatEnabled:
+          type: boolean
+        heartbeatIntervalSec:
+          type: integer
+        wakeOnAssignment:
+          type: boolean
+        wakeOnOnDemand:
+          type: boolean
+        wakeOnAutomation:
+          type: boolean
+        maxConcurrentRuns:
+          type: integer
+        canAssignTo:
+          type: array
+          items:
+            type: string
+        canCreateTasks:
+          type: boolean
+        canMoveTo:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskColumn"
+        systemPrompt:
+          type: string
+        promptTemplate:
+          type: string
+        bootstrapPromptTemplate:
+          type: string
+        instructionsFilePath:
+          type: string
+          nullable: true
+        budgetLimitUsd:
+          type: number
+          nullable: true
+        budgetSpentUsd:
+          type: number
+        adapterType:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateAgent:
+      type: object
+      required: [id, projectId, name, role]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 100
+        projectId:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        role:
+          $ref: "#/components/schemas/AgentRole"
+        icon:
+          type: string
+        color:
+          type: string
+        model:
+          type: string
+        effort:
+          type: string
+        maxTurns:
+          type: integer
+          minimum: 1
+        allowedTools:
+          type: array
+          items:
+            type: string
+        heartbeatEnabled:
+          type: boolean
+        heartbeatIntervalSec:
+          type: integer
+          minimum: 0
+        wakeOnAssignment:
+          type: boolean
+        wakeOnOnDemand:
+          type: boolean
+        wakeOnAutomation:
+          type: boolean
+        maxConcurrentRuns:
+          type: integer
+          minimum: 1
+        canAssignTo:
+          type: array
+          items:
+            type: string
+        canCreateTasks:
+          type: boolean
+        canMoveTo:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskColumn"
+        systemPrompt:
+          type: string
+        promptTemplate:
+          type: string
+        bootstrapPromptTemplate:
+          type: string
+        instructionsFilePath:
+          type: string
+        researchPrompt:
+          type: string
+        planPrompt:
+          type: string
+        implementPrompt:
+          type: string
+        reviewPrompt:
+          type: string
+        mcpTools:
+          type: array
+          items:
+            type: string
+        skillPaths:
+          type: array
+          items:
+            type: string
+        adapterType:
+          type: string
+        adapterConfig:
+          type: object
+          additionalProperties: true
+        envVars:
+          type: object
+          additionalProperties:
+            type: string
+        budgetLimitUsd:
+          type: number
+          minimum: 0
+
+    UpdateAgent:
+      type: object
+      description: Same fields as CreateAgent, all optional. id and projectId are not updatable. effort, instructionsFilePath, and budgetLimitUsd are nullable.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        role:
+          $ref: "#/components/schemas/AgentRole"
+        icon:
+          type: string
+        color:
+          type: string
+        model:
+          type: string
+        effort:
+          type: string
+          nullable: true
+        maxTurns:
+          type: integer
+          minimum: 1
+        allowedTools:
+          type: array
+          items:
+            type: string
+        heartbeatEnabled:
+          type: boolean
+        heartbeatIntervalSec:
+          type: integer
+          minimum: 0
+        wakeOnAssignment:
+          type: boolean
+        wakeOnOnDemand:
+          type: boolean
+        wakeOnAutomation:
+          type: boolean
+        maxConcurrentRuns:
+          type: integer
+          minimum: 1
+        canAssignTo:
+          type: array
+          items:
+            type: string
+        canCreateTasks:
+          type: boolean
+        canMoveTo:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskColumn"
+        systemPrompt:
+          type: string
+        promptTemplate:
+          type: string
+        bootstrapPromptTemplate:
+          type: string
+        instructionsFilePath:
+          type: string
+          nullable: true
+        researchPrompt:
+          type: string
+        planPrompt:
+          type: string
+        implementPrompt:
+          type: string
+        reviewPrompt:
+          type: string
+        mcpTools:
+          type: array
+          items:
+            type: string
+        skillPaths:
+          type: array
+          items:
+            type: string
+        adapterType:
+          type: string
+        adapterConfig:
+          type: object
+          additionalProperties: true
+        envVars:
+          type: object
+          additionalProperties:
+            type: string
+        budgetLimitUsd:
+          type: number
+          minimum: 0
+          nullable: true
+
+    CloneAgent:
+      type: object
+      required: [targetProjectId, newId]
+      properties:
+        targetProjectId:
+          type: string
+          minLength: 1
+        newId:
+          type: string
+          minLength: 1
+          maxLength: 100
+
+    # --- Comment ---
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          example: cmt_abc123
+        taskId:
+          type: string
+        author:
+          type: string
+        body:
+          type: string
+        type:
+          $ref: "#/components/schemas/CommentType"
+        lineRef:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateComment:
+      type: object
+      required: [author, body]
+      properties:
+        author:
+          type: string
+          minLength: 1
+        body:
+          type: string
+          minLength: 1
+          maxLength: 50000
+        type:
+          $ref: "#/components/schemas/CommentType"
+        lineRef:
+          type: string
+          maxLength: 500
+
+    # --- Run ---
+    Run:
+      type: object
+      properties:
+        id:
+          type: string
+          example: run_abc123
+        agentId:
+          type: string
+        projectId:
+          type: string
+        taskId:
+          type: string
+          nullable: true
+        invocationSource:
+          $ref: "#/components/schemas/WakeupSource"
+        triggerDetail:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/RunStatus"
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        processPid:
+          type: integer
+          nullable: true
+        exitCode:
+          type: integer
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        costUsd:
+          type: number
+          nullable: true
+        model:
+          type: string
+          nullable: true
+        sessionIdBefore:
+          type: string
+          nullable: true
+        sessionIdAfter:
+          type: string
+          nullable: true
+        logStore:
+          type: string
+          nullable: true
+        logRef:
+          type: string
+          nullable: true
+        parentRunId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # --- Knowledge ---
+    KnowledgeEntity:
+      type: object
+      properties:
+        id:
+          type: string
+          example: ent_abc123
+        projectId:
+          type: string
+        slug:
+          type: string
+        name:
+          type: string
+        entityType:
+          $ref: "#/components/schemas/EntityType"
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateEntity:
+      type: object
+      required: [slug, name]
+      properties:
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: ^[a-z0-9-]+$
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        entityType:
+          $ref: "#/components/schemas/EntityType"
+        description:
+          type: string
+          maxLength: 5000
+
+    KnowledgeFact:
+      type: object
+      properties:
+        id:
+          type: string
+          example: fact_abc123
+        entityId:
+          type: string
+        content:
+          type: string
+        category:
+          $ref: "#/components/schemas/FactCategory"
+        sourceAgent:
+          type: string
+          nullable: true
+        sourceTask:
+          type: string
+          nullable: true
+        supersededBy:
+          type: string
+          nullable: true
+        accessCount:
+          type: integer
+        lastAccessed:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateFact:
+      type: object
+      required: [content, category]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 10000
+        category:
+          $ref: "#/components/schemas/FactCategory"
+        sourceTask:
+          type: string
+
+    # --- Notification ---
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          example: ntf_abc123
+        projectId:
+          type: string
+        type:
+          $ref: "#/components/schemas/NotificationType"
+        title:
+          type: string
+        message:
+          type: string
+        link:
+          type: string
+          nullable: true
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    # --- Log ---
+    LogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: string
+        agentId:
+          type: string
+          nullable: true
+        taskId:
+          type: string
+          nullable: true
+        runId:
+          type: string
+          nullable: true
+        message:
+          type: string
+        level:
+          $ref: "#/components/schemas/LogLevel"
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateLogEntry:
+      type: object
+      required: [projectId, message]
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+        agentId:
+          type: string
+        taskId:
+          type: string
+        runId:
+          type: string
+        message:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        level:
+          $ref: "#/components/schemas/LogLevel"
+
+    # --- Enums ---
+    TaskType:
+      type: string
+      enum: [quick, complex, brainstorm]
+
+    TaskColumn:
+      type: string
+      enum: [backlog, blocked, in_progress, review, verification, done]
+
+    TaskPriority:
+      type: string
+      enum: [high, medium, low]
+      default: medium
+
+    ComplexPhase:
+      type: string
+      enum: [research, plan, implement, review]
+      nullable: true
+
+    BrainstormStatus:
+      type: string
+      enum: [active, idle, ready, expired]
+      nullable: true
+
+    AgentRole:
+      type: string
+      enum: [cto, engineer, qa, researcher, planner, implementer, reviewer, verifier, referee, custom]
+
+    AgentStatus:
+      type: string
+      enum: [active, paused, terminated]
+
+    CommentType:
+      type: string
+      enum: [inline, system, verification, brainstorm]
+      default: inline
+
+    RunStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, timed_out, cancelled]
+
+    WakeupSource:
+      type: string
+      enum: [timer, assignment, on_demand, automation]
+
+    VerificationResult:
+      type: string
+      enum: [pass, fail, partial]
+      nullable: true
+
+    EntityType:
+      type: string
+      enum: [project, area, archive]
+      default: area
+
+    FactCategory:
+      type: string
+      enum: [decision, status, milestone, issue, relationship, convention, observation]
+
+    LogLevel:
+      type: string
+      enum: [info, warn, error]
+      default: info
+
+    NotificationType:
+      type: string
+      enum:
+        - verification_failed
+        - verification_passed
+        - budget_warning
+        - budget_exceeded
+        - agent_failure
+        - brainstorm_ready
+        - task_completed
+        - stuck_task
+
+paths:
+  # ============================================================
+  # Health
+  # ============================================================
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns daemon health status. No authentication required.
+      security: []
+      responses:
+        "200":
+          description: Health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, degraded, error]
+                  version:
+                    type: string
+                    example: "0.0.0"
+                  uptime:
+                    type: number
+                    description: Seconds since daemon started
+
+  # ============================================================
+  # Identity
+  # ============================================================
+  /api/identity:
+    get:
+      tags: [Identity]
+      summary: Get caller identity
+      description: Returns agent config, permissions, current task, project info, and budget context. Response shape varies by caller type (admin vs agent).
+      responses:
+        "200":
+          description: Caller identity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isAdmin:
+                    type: boolean
+                  agent:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      role:
+                        type: string
+                      status:
+                        type: string
+                      model:
+                        type: string
+                      maxTurns:
+                        type: integer
+                  permissions:
+                    type: object
+                    nullable: true
+                    properties:
+                      canCreateTasks:
+                        type: boolean
+                      canMoveTo:
+                        type: array
+                        items:
+                          type: string
+                      canAssignTo:
+                        type: array
+                        items:
+                          type: string
+                  currentTask:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+                      title:
+                        type: string
+                      column:
+                        type: string
+                      taskType:
+                        type: string
+                      complexPhase:
+                        type: string
+                        nullable: true
+                  project:
+                    $ref: "#/components/schemas/Project"
+                  budget:
+                    type: object
+                    nullable: true
+                    properties:
+                      projectLimit:
+                        type: number
+                        nullable: true
+                      projectSpent:
+                        type: number
+                      agentLimit:
+                        type: number
+                        nullable: true
+                      agentSpent:
+                        type: number
+                        nullable: true
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Projects
+  # ============================================================
+  /api/projects:
+    post:
+      tags: [Projects]
+      summary: Create project
+      description: Admin only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProject"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "403":
+          description: Not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Slug already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      tags: [Projects]
+      summary: List projects
+      parameters:
+        - name: active
+          in: query
+          schema:
+            type: boolean
+          description: Filter by active status
+      responses:
+        "200":
+          description: Project list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+
+  /api/projects/{id}:
+    get:
+      tags: [Projects]
+      summary: Get project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags: [Projects]
+      summary: Update project
+      description: Admin only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProject"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "403":
+          description: Not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/projects/{id}/archive:
+    post:
+      tags: [Projects]
+      summary: Archive project
+      description: Admin only. Sets active to false.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Archived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "403":
+          description: Not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Tasks
+  # ============================================================
+  /api/tasks:
+    post:
+      tags: [Tasks]
+      summary: Create task
+      description: |
+        Creates a quick, complex, or brainstorm task. The request body is a discriminated union on `taskType`.
+        Requires `create_task` permission.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTask"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: No create_task permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      tags: [Tasks]
+      summary: List tasks
+      parameters:
+        - name: projectId
+          in: query
+          schema:
+            type: string
+        - name: column
+          in: query
+          schema:
+            $ref: "#/components/schemas/TaskColumn"
+        - name: taskType
+          in: query
+          schema:
+            $ref: "#/components/schemas/TaskType"
+        - name: assignee
+          in: query
+          schema:
+            type: string
+        - name: complexPhase
+          in: query
+          schema:
+            $ref: "#/components/schemas/ComplexPhase"
+      responses:
+        "200":
+          description: Task list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+
+  /api/tasks/{id}:
+    get:
+      tags: [Tasks]
+      summary: Get task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags: [Tasks]
+      summary: Update task
+      description: |
+        If `column` is present, the request is redirected to the lifecycle transition service.
+        Requires `assign_task` permission.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTask"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          description: Validation error or invalid transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: No assign_task permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/{id}/transition:
+    post:
+      tags: [Tasks]
+      summary: Explicit lifecycle transition
+      description: Requires `move_task` permission.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [column]
+              properties:
+                column:
+                  $ref: "#/components/schemas/TaskColumn"
+                agentId:
+                  type: string
+                  description: Defaults to caller's agent ID
+                runId:
+                  type: string
+                  description: Defaults to caller's run ID
+      responses:
+        "200":
+          description: Transitioned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          description: Invalid transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: No move_task permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/{id}/complete:
+    post:
+      tags: [Tasks]
+      summary: Signal task or phase completion
+      description: |
+        For complex tasks with an active phase, requires `{ "output": "..." }`.
+        For quick tasks, no body needed — transitions to review.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                output:
+                  type: string
+                  minLength: 1
+                  description: Required for complex task phase completion
+      responses:
+        "200":
+          description: Completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          description: Validation error or invalid transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/{id}/dependencies:
+    post:
+      tags: [Tasks]
+      summary: Add dependency
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dependsOnId]
+              properties:
+                dependsOnId:
+                  type: string
+      responses:
+        "201":
+          description: Dependency added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Missing dependsOnId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Cycle detected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/{id}/dependencies/{depId}:
+    delete:
+      tags: [Tasks]
+      summary: Remove dependency
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: depId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dependency removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /api/tasks/{id}/convert:
+    post:
+      tags: [Tasks]
+      summary: Convert brainstorm to work task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskType]
+              properties:
+                taskType:
+                  type: string
+                  enum: [quick, complex]
+      responses:
+        "200":
+          description: Converted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          description: Validation error or not a brainstorm task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Brainstorm
+  # ============================================================
+  /api/brainstorm/{taskId}/start:
+    post:
+      tags: [Brainstorm]
+      summary: Start brainstorm session
+      description: Spawns a live Claude process for interactive brainstorming.
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Session already active
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/brainstorm/{taskId}/message:
+    post:
+      tags: [Brainstorm]
+      summary: Send message to session
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+      responses:
+        "200":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Missing content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No active session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/brainstorm/{taskId}/ready:
+    post:
+      tags: [Brainstorm]
+      summary: Mark session as ready
+      description: Marks the brainstorm session as ready for conversion to a work task.
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Marked ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "404":
+          description: No active session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/brainstorm/{taskId}/kill:
+    post:
+      tags: [Brainstorm]
+      summary: Kill brainstorm session
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session killed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "404":
+          description: No active session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/brainstorm/{taskId}/transcript:
+    get:
+      tags: [Brainstorm]
+      summary: Get transcript
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Transcript
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transcript:
+                    type: array
+                    items:
+                      type: object
+        "404":
+          description: No transcript found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Comments
+  # ============================================================
+  /api/tasks/{taskId}/comments:
+    post:
+      tags: [Comments]
+      summary: Create comment
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateComment"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+    get:
+      tags: [Comments]
+      summary: List comments for task
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/CommentType"
+      responses:
+        "200":
+          description: Comment list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+
+  /api/comments/{id}:
+    delete:
+      tags: [Comments]
+      summary: Delete comment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Agents
+  # ============================================================
+  /api/agents:
+    post:
+      tags: [Agents]
+      summary: Create agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgent"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "409":
+          description: Agent ID already exists in project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      tags: [Agents]
+      summary: List agents
+      parameters:
+        - name: projectId
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            $ref: "#/components/schemas/AgentRole"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/AgentStatus"
+      responses:
+        "200":
+          description: Agent list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Agent"
+
+  /api/agents/{id}:
+    get:
+      tags: [Agents]
+      summary: Get agent
+      description: Requires X-Project-Id header (agents have composite PK).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Agent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags: [Agents]
+      summary: Update agent
+      description: Requires X-Project-Id header.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgent"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/agents/{id}/pause:
+    post:
+      tags: [Agents]
+      summary: Pause agent
+      description: Requires X-Project-Id header.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Paused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Already paused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/agents/{id}/resume:
+    post:
+      tags: [Agents]
+      summary: Resume agent
+      description: Requires X-Project-Id header.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Resumed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Not paused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/agents/{id}/wake:
+    post:
+      tags: [Agents]
+      summary: Manual on-demand wakeup
+      description: Enqueues an on_demand wakeup. Requires X-Project-Id header.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                taskId:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        "201":
+          description: Wakeup enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  agentId:
+                    type: string
+                  projectId:
+                    type: string
+                  source:
+                    type: string
+                  status:
+                    type: string
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Agent is paused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/agents/{id}/clone:
+    post:
+      tags: [Agents]
+      summary: Clone agent to another project
+      description: Requires X-Project-Id header (source project).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloneAgent"
+      responses:
+        "201":
+          description: Cloned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Source agent not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: ID already exists in target project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Runs
+  # ============================================================
+  /api/runs:
+    get:
+      tags: [Runs]
+      summary: List runs
+      description: Agent callers must have a projectId. Admins may omit for cross-project listing.
+      parameters:
+        - name: agentId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/RunStatus"
+        - name: taskId
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        "200":
+          description: Run list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Run"
+        "400":
+          description: Agent without projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/runs/{id}:
+    get:
+      tags: [Runs]
+      summary: Get run
+      description: Requires projectId.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/runs/{id}/cancel:
+    post:
+      tags: [Runs]
+      summary: Cancel run
+      description: Cancels a queued or running run. Requires projectId.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Run not in cancellable state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/runs/{id}/log:
+    get:
+      tags: [Runs]
+      summary: Get run log
+      description: Requires projectId.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Log content
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  log:
+                    type: string
+                    description: Log reference path
+                  store:
+                    type: string
+                    description: Log storage backend
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found or no log available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Verification
+  # ============================================================
+  /api/tasks/{id}/verify:
+    post:
+      tags: [Verification]
+      summary: Submit verifier verdict
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [result, report]
+              properties:
+                result:
+                  type: string
+                  enum: [pass, fail, partial]
+                report:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Verdict submitted
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/{id}/implementer-response:
+    post:
+      tags: [Verification]
+      summary: Implementer responds to verdict
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agrees]
+              properties:
+                agrees:
+                  type: boolean
+                response:
+                  type: string
+      responses:
+        "200":
+          description: Response submitted
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/{id}/referee-verdict:
+    post:
+      tags: [Verification]
+      summary: Referee final verdict
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [result, report]
+              properties:
+                result:
+                  type: string
+                  enum: [pass, fail, partial]
+                report:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Verdict submitted
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/{id}/spawn-verifier:
+    post:
+      tags: [Verification]
+      summary: Trigger verification run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [verifierAgentId]
+              properties:
+                verifierAgentId:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Verifier spawned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/{id}/spawn-referee:
+    post:
+      tags: [Verification]
+      summary: Trigger referee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refereeAgentId]
+              properties:
+                refereeAgentId:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Referee spawned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Memory
+  # ============================================================
+  /api/memory/knowledge:
+    post:
+      tags: [Memory]
+      summary: Create knowledge entity
+      description: Requires projectId.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEntity"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeEntity"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "409":
+          description: Duplicate slug in project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      tags: [Memory]
+      summary: List knowledge entities
+      parameters:
+        - name: projectId
+          in: query
+          schema:
+            type: string
+          description: Auto-scoped from auth if present
+        - name: entityType
+          in: query
+          schema:
+            $ref: "#/components/schemas/EntityType"
+      responses:
+        "200":
+          description: Entity list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KnowledgeEntity"
+
+  /api/memory/knowledge/search:
+    get:
+      tags: [Memory]
+      summary: Full-text search across facts
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: projectId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "400":
+          description: Missing query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/memory/knowledge/{id}:
+    get:
+      tags: [Memory]
+      summary: Get entity summary
+      description: Project-scoped when caller has a projectId.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Entity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeEntity"
+        "404":
+          description: Not found or project mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/memory/knowledge/{id}/facts:
+    get:
+      tags: [Memory]
+      summary: List entity facts
+      description: Returns scored facts. Project-scoped.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Fact list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KnowledgeFact"
+        "404":
+          description: Entity not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags: [Memory]
+      summary: Write fact
+      description: sourceAgent is auto-tagged from the caller's agent ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFact"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeFact"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Entity not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/memory/knowledge/{entityId}/facts/{factId}/supersede:
+    post:
+      tags: [Memory]
+      summary: Supersede a fact
+      description: Replaces an existing fact with an updated version.
+      parameters:
+        - name: entityId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: factId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFact"
+      responses:
+        "201":
+          description: New fact created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeFact"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Entity or fact not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Fact already superseded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/memory/knowledge/{id}/summarize:
+    post:
+      tags: [Memory]
+      summary: Trigger summary regeneration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Summary regenerated
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          description: Entity or project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/memory/worklog:
+    get:
+      tags: [Memory]
+      summary: Read work log entries
+      description: Requires both agentId and projectId.
+      parameters:
+        - name: agentId
+          in: query
+          schema:
+            type: string
+          description: Defaults to caller's agent ID
+      responses:
+        "200":
+          description: Work log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      type: object
+        "400":
+          description: Missing agentId or projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags: [Memory]
+      summary: Append to work log
+      description: Agents can only write their own log. Admins must provide agentId in body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 50000
+      responses:
+        "201":
+          description: Appended
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  filename:
+                    type: string
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/memory/lessons:
+    get:
+      tags: [Memory]
+      summary: Read lessons file
+      description: Requires both agentId and projectId.
+      parameters:
+        - name: agentId
+          in: query
+          schema:
+            type: string
+          description: Defaults to caller's agent ID
+      responses:
+        "200":
+          description: Lessons content
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: string
+        "400":
+          description: Missing agentId or projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags: [Memory]
+      summary: Append to lessons file
+      description: Agents can only write their own lessons. Admins must provide agentId in body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 10000
+      responses:
+        "201":
+          description: Appended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Cost
+  # ============================================================
+  /api/cost/summary:
+    get:
+      tags: [Cost]
+      summary: Aggregated cost by agent
+      description: Agent callers must have a projectId. Admins may omit for cross-project.
+      parameters:
+        - name: projectId
+          in: query
+          schema:
+            type: string
+        - name: agentId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cost summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: number
+                  byAgent:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        agentId:
+                          type: string
+                        totalCost:
+                          type: number
+                        runCount:
+                          type: integer
+        "400":
+          description: Agent without projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/cost/timeseries:
+    get:
+      tags: [Cost]
+      summary: Time-series cost data
+      description: Aggregated by day and agent. Agents cannot query another project's data.
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 90
+            default: 7
+      responses:
+        "200":
+          description: Time-series data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                    agentId:
+                      type: string
+                    totalCost:
+                      type: number
+                    runCount:
+                      type: integer
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "403":
+          description: Cross-project access by agent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/cost/task/{taskId}:
+    get:
+      tags: [Cost]
+      summary: Per-task cost breakdown
+      description: Requires projectId. Returns empty runs array if no runs match.
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Task cost breakdown
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: number
+                  runs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        agentId:
+                          type: string
+                        costUsd:
+                          type: number
+                          nullable: true
+                        status:
+                          $ref: "#/components/schemas/RunStatus"
+                        startedAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        finishedAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/cost/task/{taskId}/phases:
+    get:
+      tags: [Cost]
+      summary: Per-phase cost breakdown
+      description: For complex tasks. Requires projectId.
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Phase cost breakdown
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: number
+                  byPhase:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        phase:
+                          type: string
+                        totalCost:
+                          type: number
+                        runCount:
+                          type: integer
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Activity Log
+  # ============================================================
+  /api/log:
+    get:
+      tags: [Activity Log]
+      summary: Paginated activity log
+      description: Requires projectId.
+      parameters:
+        - name: projectId
+          in: query
+          schema:
+            type: string
+          description: Required (from query or auth context)
+        - name: agentId
+          in: query
+          schema:
+            type: string
+        - name: taskId
+          in: query
+          schema:
+            type: string
+        - name: level
+          in: query
+          schema:
+            $ref: "#/components/schemas/LogLevel"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogEntry"
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags: [Activity Log]
+      summary: Append log entry
+      description: agentId and runId are auto-enriched from auth context.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLogEntry"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogEntry"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  # ============================================================
+  # Daemon
+  # ============================================================
+  /api/daemon/status:
+    get:
+      tags: [Daemon]
+      summary: Daemon status
+      responses:
+        "200":
+          description: Daemon runtime status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: running
+                  pid:
+                    type: integer
+                  uptimeMs:
+                    type: number
+                  uptimeFormatted:
+                    type: string
+                    example: "1h 0m 0s"
+                  tickIntervalMs:
+                    type: integer
+                  processCount:
+                    type: integer
+                  queueDepth:
+                    type: integer
+
+  /api/daemon/logs:
+    get:
+      tags: [Daemon]
+      summary: Daemon logs (stub)
+      description: Always returns empty array. Use WebSocket `daemon:log` events for real-time logs.
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [trace, debug, info, warn, error, fatal]
+      responses:
+        "200":
+          description: Empty logs with redirect message
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items: {}
+                  message:
+                    type: string
+                    example: "Use WebSocket daemon:log events for real-time logs"
+
+  /api/daemon/config:
+    get:
+      tags: [Daemon]
+      summary: Get global config
+      responses:
+        "200":
+          description: Full daemon configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Global config from ~/.orchestrator/config.yaml
+    patch:
+      tags: [Daemon]
+      summary: Update daemon config
+      description: Values are deep-merged into existing config and written to disk.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                orchestrator:
+                  type: object
+                  properties:
+                    tick_interval_ms:
+                      type: integer
+                      minimum: 1
+                    log_level:
+                      type: string
+                      enum: [trace, debug, info, warn, error, fatal]
+                defaults:
+                  type: object
+                  properties:
+                    model:
+                      type: string
+                    max_turns:
+                      type: integer
+                      minimum: 1
+                    auto_commit:
+                      type: boolean
+                    auto_pr:
+                      type: boolean
+                    verification_required:
+                      type: boolean
+                    brainstorm_idle_timeout_min:
+                      type: integer
+                      minimum: 0
+                limits:
+                  type: object
+                  properties:
+                    max_concurrent_agents:
+                      type: integer
+                      minimum: 1
+                    max_concurrent_per_project:
+                      type: integer
+                      minimum: 1
+                    max_spawns_per_hour:
+                      type: integer
+                      minimum: 1
+                    cooldown_on_failure:
+                      type: integer
+                      minimum: 0
+                memory:
+                  type: object
+                  properties:
+                    extraction_on_session_end:
+                      type: boolean
+                    summary_rewrite_schedule:
+                      type: string
+                      enum: [daily, weekly, monthly]
+                    fact_decay_days:
+                      type: integer
+                      minimum: 1
+                restart:
+                  type: boolean
+                  description: If true, daemon restarts after applying config
+      responses:
+        "200":
+          description: Config updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  config:
+                    type: object
+                  restarting:
+                    type: boolean
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  /api/daemon/restart:
+    post:
+      tags: [Daemon]
+      summary: Restart daemon
+      description: Response is sent before the process terminates.
+      responses:
+        "200":
+          description: Restart initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  message:
+                    type: string
+                    example: Restart initiated
+
+  # ============================================================
+  # Notifications
+  # ============================================================
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      description: Requires projectId.
+      parameters:
+        - name: projectId
+          in: query
+          schema:
+            type: string
+          description: Falls back to auth projectId
+        - name: unread
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/notifications/read:
+    post:
+      tags: [Notifications]
+      summary: Mark notifications as read
+      description: "Requires projectId. Either provide specific IDs or set all to true."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [ids]
+                  properties:
+                    ids:
+                      type: array
+                      items:
+                        type: string
+                      minItems: 1
+                - type: object
+                  required: [all]
+                  properties:
+                    all:
+                      type: boolean
+                      enum: [true]
+      responses:
+        "200":
+          description: Marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Validation error or missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

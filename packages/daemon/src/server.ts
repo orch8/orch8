@@ -2,6 +2,7 @@
 import Fastify from "fastify";
 import websocket from "@fastify/websocket";
 import { spawn as nodeSpawn } from "node:child_process";
+import { registerSwagger } from "./api/swagger.js";
 import { healthRoutes } from "./api/routes/health.js";
 import { taskRoutes } from "./api/routes/tasks.js";
 import { brainstormRoutes } from "./api/routes/brainstorm.js";
@@ -56,6 +57,7 @@ export function buildServer(options: ServerOptions = {}) {
   });
 
   app.register(websocket);
+  registerSwagger(app);
 
   // Health check is always available (no auth required)
   app.register(healthRoutes);
