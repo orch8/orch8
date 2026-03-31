@@ -7,7 +7,7 @@ describe("CLI command registration", () => {
   it("registers projects list command", () => {
     const program = new Command();
     const client = new OrcherClient("http://localhost:0");
-    registerProjectCommands(program, client);
+    registerProjectCommands(program, () => client);
 
     const projects = program.commands.find((c) => c.name() === "projects");
     expect(projects).toBeDefined();
@@ -19,7 +19,7 @@ describe("CLI command registration", () => {
   it("registers projects create command", () => {
     const program = new Command();
     const client = new OrcherClient("http://localhost:0");
-    registerProjectCommands(program, client);
+    registerProjectCommands(program, () => client);
 
     const projects = program.commands.find((c) => c.name() === "projects");
     const create = projects!.commands.find((c) => c.name() === "create");
@@ -29,7 +29,7 @@ describe("CLI command registration", () => {
   it("registers project use command", () => {
     const program = new Command();
     const client = new OrcherClient("http://localhost:0");
-    registerProjectCommands(program, client);
+    registerProjectCommands(program, () => client);
 
     const project = program.commands.find((c) => c.name() === "project");
     expect(project).toBeDefined();
@@ -41,7 +41,7 @@ describe("CLI command registration", () => {
   it("registers project archive command", () => {
     const program = new Command();
     const client = new OrcherClient("http://localhost:0");
-    registerProjectCommands(program, client);
+    registerProjectCommands(program, () => client);
 
     const project = program.commands.find((c) => c.name() === "project");
     const archive = project!.commands.find((c) => c.name() === "archive");

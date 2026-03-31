@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { OrcherClient } from "../client.js";
+import type { OrcherClient } from "../client.js";
 
 interface Project {
   id: string;
@@ -13,7 +13,7 @@ interface Project {
 
 export function registerProjectCommands(
   program: Command,
-  client: OrcherClient,
+  getClient: () => OrcherClient,
 ) {
   // orch projects list
   const projects = program
@@ -26,6 +26,7 @@ export function registerProjectCommands(
     .option("--json", "Output as JSON")
     .option("--active", "Only active projects")
     .action(async (opts) => {
+      const client = getClient();
       const params = opts.active ? "?active=true" : "";
       const list = await client.get<Project[]>(`/projects${params}`);
 
@@ -62,6 +63,7 @@ export function registerProjectCommands(
     .option("--budget <usd>", "Budget limit in USD")
     .option("--json", "Output as JSON")
     .action(async (opts) => {
+      const client = getClient();
       const slug =
         opts.slug ??
         opts.name
@@ -96,6 +98,7 @@ export function registerProjectCommands(
     .description("Set active project context (prints project ID)")
     .option("--json", "Output as JSON")
     .action(async (slug, opts) => {
+      const client = getClient();
       const list = await client.get<Project[]>("/projects");
       const found = list.find(
         (p) => p.slug === slug || p.id === slug,
@@ -120,6 +123,7 @@ export function registerProjectCommands(
     .description("Archive a project (soft-delete, agents paused)")
     .option("--json", "Output as JSON")
     .action(async (slug, opts) => {
+      const client = getClient();
       const list = await client.get<Project[]>("/projects");
       const found = list.find(
         (p) => p.slug === slug || p.id === slug,

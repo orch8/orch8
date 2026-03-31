@@ -14,10 +14,7 @@ program
     "http://localhost:3847/api",
   );
 
-const client = new OrcherClient(
-  program.opts().api ?? "http://localhost:3847/api",
-);
-
-registerProjectCommands(program, client);
+// Client created lazily so --api flag is available after parse
+registerProjectCommands(program, () => new OrcherClient(program.opts().api));
 
 program.parse();
