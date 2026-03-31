@@ -124,6 +124,30 @@ export async function autoPauseIfExhausted(
       budgetLimitUsd: agent.budgetLimitUsd,
       budgetSpentUsd: agent.budgetSpentUsd,
     });
+  } else if (
+    agent &&
+    agent.autoPauseThreshold !== null &&
+    agent.budgetLimitUsd !== null &&
+    !agent.budgetPaused &&
+    (agent.budgetSpentUsd / agent.budgetLimitUsd) * 100 >= agent.autoPauseThreshold
+  ) {
+    await db
+      .update(agents)
+      .set({
+        budgetPaused: true,
+        pauseReason: "budget_threshold",
+        status: "paused",
+        updatedAt: new Date(),
+      })
+      .where(and(eq(agents.id, agentId), eq(agents.projectId, projectId)));
+    result.agentPaused = true;
+    broadcastService?.budgetAlert(projectId, {
+      level: "agent",
+      entityId: agentId,
+      message: `Agent auto-paused at ${agent.autoPauseThreshold}% threshold`,
+      budgetLimitUsd: agent.budgetLimitUsd,
+      budgetSpentUsd: agent.budgetSpentUsd,
+    });
   } else if (agent?.budgetPaused) {
     result.agentPaused = true;
   }
