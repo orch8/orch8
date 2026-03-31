@@ -3,7 +3,7 @@ import { api } from "../api/client.js";
 import type { Run, RunLog } from "../types.js";
 
 export function useRuns(
-  projectId: string | null,
+  projectId: string,
   filters?: {
     agentId?: string;
     status?: string;
@@ -13,27 +13,23 @@ export function useRuns(
 ) {
   return useQuery<Run[]>({
     queryKey: ["runs", projectId, filters],
-    queryFn: () =>
-      api.get("/runs", {
-        ...(projectId ? { projectId } : {}),
-        ...filters,
-      }),
+    queryFn: () => api.get("/runs", { projectId, ...filters }),
   });
 }
 
-export function useRun(runId: string | null, projectId: string | null) {
+export function useRun(runId: string | null, projectId: string) {
   return useQuery<Run>({
     queryKey: ["run", runId, projectId],
-    queryFn: () => api.get(`/runs/${runId}`, { projectId: projectId! }),
-    enabled: !!runId && !!projectId,
+    queryFn: () => api.get(`/runs/${runId}`, { projectId }),
+    enabled: !!runId,
   });
 }
 
-export function useRunLog(runId: string | null, projectId: string | null) {
+export function useRunLog(runId: string | null, projectId: string) {
   return useQuery<RunLog>({
     queryKey: ["runLog", runId],
-    queryFn: () => api.get(`/runs/${runId}/log`, { projectId: projectId! }),
-    enabled: !!runId && !!projectId,
+    queryFn: () => api.get(`/runs/${runId}/log`, { projectId }),
+    enabled: !!runId,
   });
 }
 

@@ -3,19 +3,17 @@ import { api } from "../api/client.js";
 import type { Agent } from "../types.js";
 import type { CreateAgent, UpdateAgent } from "@orch/shared";
 
-export function useAgents(projectId: string | null) {
+export function useAgents(projectId: string) {
   return useQuery<Agent[]>({
     queryKey: ["agents", projectId],
-    queryFn: () =>
-      api.get("/agents", projectId ? { projectId } : undefined),
+    queryFn: () => api.get("/agents", { projectId }),
   });
 }
 
-export function useAgent(agentId: string | null, projectId: string | null) {
+export function useAgent(agentId: string, projectId: string) {
   return useQuery<Agent>({
     queryKey: ["agent", agentId, projectId],
-    queryFn: () => api.get(`/agents/${agentId}`, { projectId: projectId! }),
-    enabled: !!agentId && !!projectId,
+    queryFn: () => api.get(`/agents/${agentId}`, { projectId }),
   });
 }
 

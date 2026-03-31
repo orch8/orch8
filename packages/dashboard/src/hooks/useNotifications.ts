@@ -2,15 +2,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
 import type { Notification } from "../types.js";
 
-export function useNotifications(projectId: string | null, opts?: { unread?: boolean }) {
+export function useNotifications(projectId: string, opts?: { unread?: boolean }) {
   return useQuery<Notification[]>({
     queryKey: ["notifications", projectId, opts?.unread],
     queryFn: () =>
       api.get("/notifications", {
-        projectId: projectId ?? undefined,
+        projectId,
         unread: opts?.unread,
       }),
-    enabled: !!projectId,
   });
 }
 

@@ -2,14 +2,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
 import type { Entity, Fact } from "../types.js";
 
-export function useEntities(projectId: string | null, entityType?: string) {
+export function useEntities(projectId: string, entityType?: string) {
   return useQuery<Entity[]>({
     queryKey: ["entities", projectId, entityType],
     queryFn: () =>
-      api.get("/memory/knowledge", {
-        ...(projectId ? { projectId } : {}),
-        entityType,
-      }),
+      api.get("/memory/knowledge", { projectId, entityType }),
   });
 }
 
