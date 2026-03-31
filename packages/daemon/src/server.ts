@@ -31,6 +31,7 @@ import { CommentService } from "./services/comment.service.js";
 import { VerificationService } from "./services/verification.service.js";
 import { SummaryService } from "./services/summary.service.js";
 import { MemoryExtractionService } from "./services/memory-extraction.service.js";
+import { BroadcastService } from "./services/broadcast.service.js";
 import type { GlobalConfig } from "./config/schema.js";
 import "./types.js";
 
@@ -63,18 +64,16 @@ export function buildServer(options: ServerOptions = {}) {
       await dbClient.close();
     });
 
-    // WebSocket broadcast helper
+    // WebSocket broadcast service
     const connectedSockets = new Set<import("ws").WebSocket>();
-    function broadcast(_projectId: string, message: unknown) {
-      const data = JSON.stringify(message);
-      for (const socket of connectedSockets) {
-        if (socket.readyState === 1) {
-          socket.send(data);
-        }
-      }
-    }
+    const broadcastService = new BroadcastService(connectedSockets);
     app.decorate("connectedSockets", connectedSockets);
-    app.decorate("broadcast", broadcast);
+    app.decorate("broadcastService", broadcastService);
+
+    // Backward-compat raw broadcast for services that still use it
+    function broadcast(projectId: string, message: unknown) {
+      broadcastService.raw(projectId, message);
+    }
 
     // Brainstorm service
     const spawnFn = options.spawnFn ?? nodeSpawn;
