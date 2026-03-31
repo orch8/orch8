@@ -17,7 +17,7 @@ describe("WelcomeWizard", () => {
 
   it("advances to Create Project step", async () => {
     renderWithProviders(<WelcomeWizard onComplete={(_projectId) => {}} />);
-    await userEvent.click(screen.getByText("Get Started"));
+    await userEvent.click(screen.getByText("Next"));
     expect(screen.getByText("Create Project")).toBeInTheDocument();
   });
 
