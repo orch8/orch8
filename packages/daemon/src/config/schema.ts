@@ -12,7 +12,7 @@ export const apiSectionSchema = z.object({
 
 export const databaseSectionSchema = z.object({
   host: z.string().default("localhost"),
-  port: z.number().int().positive().default(5432),
+  port: z.number().int().positive().default(5433),
   name: z.string().default("orchestrator"),
   user: z.string().default("orchestrator"),
   password_env: z.string().default("ORCH_DB_PASSWORD"),

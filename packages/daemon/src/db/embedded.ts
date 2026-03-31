@@ -1,5 +1,6 @@
 import EmbeddedPostgres from "embedded-postgres";
 import postgres from "postgres";
+import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import net from "node:net";
@@ -60,9 +61,22 @@ export async function startEmbeddedPostgres(
   } catch (err: unknown) {
     // initialise throws if already initialised — that's fine for persistent mode
     const message = err instanceof Error ? err.message : String(err);
-    if (!message.includes("already exists")) {
+    if (
+      !message.includes("already exists") &&
+      !message.includes("init script exited")
+    ) {
       throw err;
     }
+  }
+
+  // Ensure postgresql.conf uses the requested port, not the default 5432.
+  // The embedded-postgres library doesn't persist the port into the config,
+  // so an existing data dir will start on 5432 otherwise.
+  const pgConf = path.join(databaseDir, "postgresql.conf");
+  if (fs.existsSync(pgConf)) {
+    const conf = fs.readFileSync(pgConf, "utf-8");
+    const updated = conf.replace(/^#?port\s*=\s*\d+.*/gm, `port = ${port}`);
+    fs.writeFileSync(pgConf, updated);
   }
 
   try {
