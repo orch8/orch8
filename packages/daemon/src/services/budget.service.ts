@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { projects, agents } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
+import type { BroadcastService } from "./broadcast.service.js";
 
 export interface BudgetCheckResult {
   allowed: boolean;
@@ -62,6 +63,7 @@ export async function autoPauseIfExhausted(
   db: SchemaDb,
   agentId: string,
   projectId: string,
+  broadcastService?: BroadcastService,
 ): Promise<AutoPauseResult> {
   const result: AutoPauseResult = { agentPaused: false, projectPaused: false };
 
@@ -82,6 +84,13 @@ export async function autoPauseIfExhausted(
       .set({ budgetPaused: true, updatedAt: new Date() })
       .where(eq(projects.id, projectId));
     result.projectPaused = true;
+    broadcastService?.budgetAlert(projectId, {
+      level: "project",
+      entityId: projectId,
+      message: "Project budget exhausted — auto-paused",
+      budgetLimitUsd: project.budgetLimitUsd,
+      budgetSpentUsd: project.budgetSpentUsd,
+    });
   } else if (project?.budgetPaused) {
     result.projectPaused = true;
   }
@@ -108,6 +117,13 @@ export async function autoPauseIfExhausted(
       })
       .where(and(eq(agents.id, agentId), eq(agents.projectId, projectId)));
     result.agentPaused = true;
+    broadcastService?.budgetAlert(projectId, {
+      level: "agent",
+      entityId: agentId,
+      message: "Agent budget exhausted — auto-paused",
+      budgetLimitUsd: agent.budgetLimitUsd,
+      budgetSpentUsd: agent.budgetSpentUsd,
+    });
   } else if (agent?.budgetPaused) {
     result.agentPaused = true;
   }

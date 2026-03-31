@@ -505,7 +505,7 @@ export class HeartbeatService {
           .where(eq(projects.id, claimedRun.projectId));
 
         // Auto-pause if budget exhausted (spec §9.2.4)
-        await autoPauseIfExhausted(this.db, agent.id, claimedRun.projectId);
+        await autoPauseIfExhausted(this.db, agent.id, claimedRun.projectId, this.broadcastService);
       }
 
       // 10. Broadcast completion
