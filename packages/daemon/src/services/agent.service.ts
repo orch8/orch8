@@ -189,6 +189,41 @@ export class AgentService {
     return updated;
   }
 
+  async clone(
+    id: string,
+    projectId: string,
+    opts: { targetProjectId: string; newId: string },
+  ): Promise<Agent> {
+    const source = await this.getById(id, projectId);
+    if (!source) throw new Error("Agent not found");
+
+    // Copy definition fields, reset runtime state
+    const {
+      id: _id,
+      projectId: _pid,
+      status: _status,
+      pauseReason: _pr,
+      budgetSpentUsd: _spent,
+      createdAt: _ca,
+      updatedAt: _ua,
+      ...definition
+    } = source;
+
+    const [cloned] = await this.db
+      .insert(agents)
+      .values({
+        ...definition,
+        id: opts.newId,
+        projectId: opts.targetProjectId,
+        status: "active",
+        pauseReason: null,
+        budgetSpentUsd: 0,
+      })
+      .returning();
+
+    return cloned;
+  }
+
   async enqueueWakeup(
     agentId: string,
     projectId: string,

@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { CreateAgentSchema, UpdateAgentSchema, AgentFilterSchema } from "@orch/shared";
+import { CreateAgentSchema, UpdateAgentSchema, AgentFilterSchema, CloneAgentSchema } from "@orch/shared";
 import "../../types.js";
 
 export async function agentRoutes(app: FastifyInstance) {
@@ -139,6 +139,40 @@ export async function agentRoutes(app: FastifyInstance) {
       }
       if (message.includes("paused")) {
         return reply.code(409).send({ error: "conflict", message });
+      }
+      throw err;
+    }
+  });
+
+  // POST /api/agents/:id/clone — Clone agent definition to another project
+  app.post("/api/agents/:id/clone", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const parsed = CloneAgentSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: "validation_error",
+        details: parsed.error.issues,
+      });
+    }
+
+    const projectId = request.projectId;
+    if (!projectId) {
+      return reply.code(400).send({ error: "validation_error", message: "projectId is required" });
+    }
+
+    try {
+      const cloned = await app.agentService.clone(
+        request.params.id,
+        projectId,
+        parsed.data,
+      );
+      return reply.code(201).send(cloned);
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message === "Agent not found") {
+        return reply.code(404).send({ error: "not_found", message });
+      }
+      if (message.includes("duplicate") || message.includes("unique")) {
+        return reply.code(409).send({ error: "conflict", message: "Agent with this ID already exists in target project" });
       }
       throw err;
     }

@@ -25,6 +25,7 @@ export {
   CreateAgentSchema,
   UpdateAgentSchema,
   AgentFilterSchema,
+  CloneAgentSchema,
 } from "./agent.js";
 export {
   CreateProjectSchema,

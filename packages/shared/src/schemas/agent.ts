@@ -83,3 +83,8 @@ export const AgentFilterSchema = z.object({
   role: AgentRoleSchema.optional(),
   status: AgentStatusSchema.optional(),
 });
+
+export const CloneAgentSchema = z.object({
+  targetProjectId: z.string().min(1),
+  newId: z.string().min(1).max(100),
+});
