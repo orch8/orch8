@@ -170,6 +170,7 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
           title: taskTitle.trim(),
           taskType: "quick",
           priority: "medium",
+          assignee: selectedTemplate ?? undefined,
         } as any);
       } catch {
         // Task creation failure should not block wizard completion
