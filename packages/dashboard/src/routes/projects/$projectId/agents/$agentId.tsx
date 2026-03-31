@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAgent } from "../../../../hooks/useAgents.js";
-import { AgentForm } from "../../../../components/agent-editor/AgentForm.js";
+import { AgentSettingsPage } from "../../../../components/agent-settings/AgentSettingsPage.js";
 
 function AgentDetailPage() {
   const { projectId, agentId } = Route.useParams();
@@ -15,18 +15,17 @@ function AgentDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">{agent.name}</h2>
+    <div className="mx-auto max-w-4xl">
+      <div className="mb-4">
         <Link
           to="/projects/$projectId/agents"
           params={{ projectId }}
           className="text-sm text-zinc-500 hover:text-zinc-300"
         >
-          ← Back to list
+          ← Back to agents
         </Link>
       </div>
-      <AgentForm agent={agent} />
+      <AgentSettingsPage agent={agent} projectId={projectId} />
     </div>
   );
 }
