@@ -13,28 +13,27 @@ export async function runRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "validation_error", message: "projectId is required" });
     }
 
-    const query = request.query as { agentId?: string; status?: string; taskId?: string; limit?: string };
+    const params = request.query as { agentId?: string; status?: string; taskId?: string; limit?: string };
 
     const conditions = [];
     if (projectId) conditions.push(eq(heartbeatRuns.projectId, projectId));
-    if (query.agentId) conditions.push(eq(heartbeatRuns.agentId, query.agentId));
-    if (query.status) conditions.push(eq(heartbeatRuns.status, query.status as typeof heartbeatRuns.status.enumValues[number]));
-    if (query.taskId) conditions.push(eq(heartbeatRuns.taskId, query.taskId));
+    if (params.agentId) conditions.push(eq(heartbeatRuns.agentId, params.agentId));
+    if (params.status) conditions.push(eq(heartbeatRuns.status, params.status as typeof heartbeatRuns.status.enumValues[number]));
+    if (params.taskId) conditions.push(eq(heartbeatRuns.taskId, params.taskId));
 
-    const limit = Math.min(parseInt(query.limit ?? "100", 10), 500);
+    const limit = Math.min(parseInt(params.limit ?? "100", 10), 500);
 
-    const runs = conditions.length > 0
-      ? await app.db
-          .select()
-          .from(heartbeatRuns)
-          .where(and(...conditions))
-          .orderBy(desc(heartbeatRuns.createdAt))
-          .limit(limit)
-      : await app.db
-          .select()
-          .from(heartbeatRuns)
-          .orderBy(desc(heartbeatRuns.createdAt))
-          .limit(limit);
+    let query = app.db
+      .select()
+      .from(heartbeatRuns);
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as typeof query;
+    }
+
+    const runs = await query
+      .orderBy(desc(heartbeatRuns.createdAt))
+      .limit(limit);
 
     return runs;
   });

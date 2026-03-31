@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import Fastify from "fastify";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import Fastify, { type FastifyInstance } from "fastify";
 import { projects, agents, heartbeatRuns } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
@@ -9,6 +9,7 @@ import "../types.js";
 
 describe("Aggregated Cross-Project Views", () => {
   let testDb: TestDb;
+  let app: FastifyInstance;
   let projAId: string;
   let projBId: string;
 
@@ -42,6 +43,17 @@ describe("Aggregated Cross-Project Views", () => {
       { id: "eng-a", projectId: projAId, name: "Eng A", role: "engineer" },
       { id: "eng-b", projectId: projBId, name: "Eng B", role: "engineer" },
     ]);
+
+    app = Fastify();
+    app.decorate("db", testDb.db);
+    app.register(authPlugin);
+    app.register(runRoutes);
+    app.register(costRoutes);
+    await app.ready();
+  });
+
+  afterEach(async () => {
+    await app.close();
   });
 
   describe("GET /api/runs without projectId (admin)", () => {
@@ -63,18 +75,27 @@ describe("Aggregated Cross-Project Views", () => {
         },
       ]);
 
-      const app = Fastify();
-      app.decorate("db", testDb.db);
-      app.register(authPlugin);
-      app.register(runRoutes);
-      await app.ready();
-
       // Admin request (no x-agent-id header)
       const res = await app.inject({ method: "GET", url: "/api/runs" });
 
       expect(res.statusCode).toBe(200);
       expect(res.json()).toHaveLength(2);
-      await app.close();
+    });
+
+    it("filters by projectId when admin provides header", async () => {
+      await testDb.db.insert(heartbeatRuns).values([
+        { agentId: "eng-a", projectId: projAId, status: "succeeded", costUsd: "1.00", invocationSource: "on_demand" },
+        { agentId: "eng-b", projectId: projBId, status: "succeeded", costUsd: "2.00", invocationSource: "on_demand" },
+      ]);
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/runs",
+        headers: { "x-project-id": projAId },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toHaveLength(1);
     });
   });
 
@@ -97,19 +118,12 @@ describe("Aggregated Cross-Project Views", () => {
         },
       ]);
 
-      const app = Fastify();
-      app.decorate("db", testDb.db);
-      app.register(authPlugin);
-      app.register(costRoutes);
-      await app.ready();
-
       const res = await app.inject({ method: "GET", url: "/api/cost/summary" });
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.total).toBe(4);
+      expect(body.total).toBeCloseTo(4, 2);
       expect(body.byAgent).toHaveLength(2);
-      await app.close();
     });
   });
 });

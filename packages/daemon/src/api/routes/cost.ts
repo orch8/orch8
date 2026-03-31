@@ -20,24 +20,19 @@ export async function costRoutes(app: FastifyInstance) {
     if (projectId) conditions.push(eq(heartbeatRuns.projectId, projectId));
     if (filter.agentId) conditions.push(eq(heartbeatRuns.agentId, filter.agentId));
 
-    const byAgent = conditions.length > 0
-      ? await app.db
-          .select({
-            agentId: heartbeatRuns.agentId,
-            totalCost: sql<number>`COALESCE(SUM(${heartbeatRuns.costUsd}), 0)`.as("totalCost"),
-            runCount: sql<number>`COUNT(*)`.as("runCount"),
-          })
-          .from(heartbeatRuns)
-          .where(and(...conditions))
-          .groupBy(heartbeatRuns.agentId)
-      : await app.db
-          .select({
-            agentId: heartbeatRuns.agentId,
-            totalCost: sql<number>`COALESCE(SUM(${heartbeatRuns.costUsd}), 0)`.as("totalCost"),
-            runCount: sql<number>`COUNT(*)`.as("runCount"),
-          })
-          .from(heartbeatRuns)
-          .groupBy(heartbeatRuns.agentId);
+    let query = app.db
+      .select({
+        agentId: heartbeatRuns.agentId,
+        totalCost: sql<number>`COALESCE(SUM(${heartbeatRuns.costUsd}), 0)`.as("totalCost"),
+        runCount: sql<number>`COUNT(*)`.as("runCount"),
+      })
+      .from(heartbeatRuns);
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as typeof query;
+    }
+
+    const byAgent = await query.groupBy(heartbeatRuns.agentId);
 
     const total = byAgent.reduce((sum, row) => sum + Number(row.totalCost), 0);
 
