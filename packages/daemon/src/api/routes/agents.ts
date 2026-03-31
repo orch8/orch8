@@ -104,6 +104,21 @@ export async function agentRoutes(app: FastifyInstance) {
 
     try {
       const agent = await app.agentService.resume(request.params.id, projectId);
+
+      // Wake agent for any tasks assigned to it in backlog
+      const backlogTasks = await app.taskService.list({
+        projectId,
+        assignee: agent.id,
+        column: "backlog",
+      });
+      for (const task of backlogTasks) {
+        await app.heartbeatService.enqueueWakeup(agent.id, projectId, {
+          source: "automation",
+          taskId: task.id,
+          reason: "agent_resumed",
+        });
+      }
+
       return agent;
     } catch (err) {
       const message = (err as Error).message;

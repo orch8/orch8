@@ -8,6 +8,8 @@ import { BroadcastService } from "../services/broadcast.service.js";
 import { WorktreeService } from "../services/worktree.service.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { taskRoutes } from "../api/routes/tasks.js";
+import { agentRoutes } from "../api/routes/agents.js";
+import { AgentService } from "../services/agent.service.js";
 import { TaskService } from "../services/task.service.js";
 import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
 import { ComplexPhaseService } from "../services/complex-phase.service.js";
@@ -561,6 +563,64 @@ describe("Wiring: Dispatch", () => {
         taskId: task.id,
         reason: "phase_plan_ready",
       }));
+
+      await app.close();
+    });
+  });
+
+  describe("P1 #7: agent resume picks up backlog tasks", () => {
+    it("enqueues wakeups for tasks assigned to resumed agent", async () => {
+      await testDb.db.insert(agents).values({
+        id: "agent-1",
+        projectId,
+        name: "Worker",
+        role: "engineer",
+        status: "paused",
+        pauseReason: "manual",
+        wakeOnAutomation: true,
+        maxConcurrentRuns: 2,
+      });
+
+      // Two tasks in backlog assigned to this agent
+      await testDb.db.insert(tasks).values([
+        { projectId, title: "Task A", taskType: "quick", column: "backlog", assignee: "agent-1" },
+        { projectId, title: "Task B", taskType: "quick", column: "backlog", assignee: "agent-1" },
+        { projectId, title: "Task C", taskType: "quick", column: "in_progress", assignee: "agent-1" },
+      ]);
+
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const heartbeatService = new HeartbeatService(testDb.db, broadcastService);
+      vi.spyOn(heartbeatService, "executeRun").mockResolvedValue();
+      const enqueueSpy = vi.spyOn(heartbeatService, "enqueueWakeup");
+
+      const agentService = new AgentService(testDb.db, broadcastService);
+      const taskService = new TaskService(testDb.db);
+
+      const app = Fastify();
+      app.decorate("db", testDb.db);
+      app.decorate("agentService", agentService);
+      app.decorate("heartbeatService", heartbeatService);
+      app.decorate("taskService", taskService);
+      app.decorate("broadcastService", broadcastService);
+
+      app.register(authPlugin);
+      app.register(agentRoutes);
+      await app.ready();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/agents/agent-1/resume",
+        headers: { "x-project-id": projectId },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      // Should have enqueued wakeups for the 2 backlog tasks, not the in_progress one
+      const wakeupCalls = enqueueSpy.mock.calls.filter(
+        (call) => call[2]?.reason === "agent_resumed",
+      );
+      expect(wakeupCalls).toHaveLength(2);
 
       await app.close();
     });
