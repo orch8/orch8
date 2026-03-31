@@ -72,6 +72,29 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
           qc.invalidateQueries({ queryKey: ["costSummary"] });
           qc.invalidateQueries({ queryKey: ["agents"] });
           break;
+        case "notification:new":
+          qc.invalidateQueries({ queryKey: ["notifications"] });
+          break;
+        case "verification:verdict":
+        case "verification:response":
+        case "verification:referee":
+          qc.invalidateQueries({ queryKey: ["tasks"] });
+          if (event.taskId) {
+            qc.invalidateQueries({ queryKey: ["task", event.taskId] });
+            qc.invalidateQueries({ queryKey: ["comments", event.taskId] });
+          }
+          break;
+        case "daemon:stats":
+          qc.invalidateQueries({ queryKey: ["daemonStatus"] });
+          break;
+        case "activity:new":
+          qc.invalidateQueries({ queryKey: ["activity"] });
+          break;
+        case "comment:new":
+          if (event.taskId) {
+            qc.invalidateQueries({ queryKey: ["comments", event.taskId] });
+          }
+          break;
       }
     },
     [qc],
