@@ -28,8 +28,8 @@ export class RunLogger {
 
   async finalize(handle: LogHandle): Promise<LogResult> {
     await new Promise<void>((resolve, reject) => {
-      handle.stream.end(() => resolve());
       handle.stream.on("error", reject);
+      handle.stream.end(() => resolve());
     });
 
     let logBytes = 0;

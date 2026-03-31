@@ -402,6 +402,9 @@ export class HeartbeatService {
     // 3. Add to in-memory tracking
     this.activeRunExecutions.add(runId);
 
+    let logHandle: LogHandle | undefined;
+    let runLogger: RunLogger | undefined;
+
     try {
       // 4. Fetch agent configuration
       const agent = await this.loadAgent(claimedRun.agentId, claimedRun.projectId);
@@ -433,17 +436,17 @@ export class HeartbeatService {
         }
       }
 
-      // 6b. Setup run log capture (spec §14 §2.2)
-      const logDir = this.getLogDir(cwd);
-      await mkdir(logDir, { recursive: true });
-      const runLogger = new RunLogger(logDir);
-      const logHandle = runLogger.create(runId);
-
       // 7. Invoke adapter
       if (!this.adapter) {
         await this.failRun(runId, "No adapter configured", "no_adapter");
         return;
       }
+
+      // 7b. Setup run log capture (spec §14 §2.2) — after adapter check
+      const logDir = this.getLogDir(cwd);
+      await mkdir(logDir, { recursive: true });
+      runLogger = new RunLogger(logDir);
+      logHandle = runLogger.create(runId);
 
       const adapterConfig: ClaudeLocalAdapterConfig = {
         ...(agent.adapterConfig as ClaudeLocalAdapterConfig ?? {}),
@@ -496,6 +499,7 @@ export class HeartbeatService {
 
       // 8b. Finalize run log (spec §14 §2.2)
       const logResult = await runLogger.finalize(logHandle);
+      logHandle = undefined; // Prevent double-finalize in finally
       await this.db
         .update(heartbeatRuns)
         .set({
@@ -563,6 +567,14 @@ export class HeartbeatService {
         "execution_error",
       );
     } finally {
+      // Clean up log stream if it was opened but not finalized
+      if (logHandle && runLogger) {
+        try {
+          await runLogger.finalize(logHandle);
+        } catch {
+          // Best-effort cleanup — don't let log finalization crash the run cleanup
+        }
+      }
       // 11. Release task execution lock
       if (claimedRun.taskId) {
         await this.releaseTaskLock(claimedRun.taskId);
