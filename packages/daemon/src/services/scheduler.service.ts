@@ -3,6 +3,7 @@ import { heartbeatRuns, projects, agents, tasks } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { HeartbeatService } from "./heartbeat.service.js";
 import type { SummaryService } from "./summary.service.js";
+import type { TaskService } from "./task.service.js";
 
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
 
@@ -26,11 +27,17 @@ export class SchedulerService {
     this.summaryService = summaryService;
   }
 
+  private taskService: TaskService | null = null;
+
+  setTaskService(taskService: TaskService): void {
+    this.taskService = taskService;
+  }
+
   start(): void {
     if (this.timer) return;
     this.timer = setInterval(() => {
-      this.reapOrphanedRuns().catch((err) => {
-        console.error("[SchedulerService] orphan reap error:", err);
+      this.tick().catch((err) => {
+        console.error("[SchedulerService] tick error:", err);
       });
     }, this.config.intervalMs);
 
@@ -53,6 +60,30 @@ export class SchedulerService {
     if (this.summaryTimer) {
       clearInterval(this.summaryTimer);
       this.summaryTimer = null;
+    }
+  }
+
+  async tick(): Promise<void> {
+    // 1. Timer-based wakeups
+    await this.tickTimers();
+
+    // 2. Orphan detection
+    await this.reapOrphanedRuns();
+
+    // 3. Per-project maintenance
+    const activeProjects = await this.db
+      .select()
+      .from(projects)
+      .where(eq(projects.active, true));
+
+    for (const project of activeProjects) {
+      // Unblock tasks whose dependencies are now met
+      if (this.taskService) {
+        await this.taskService.unblockResolved(project.id);
+      }
+
+      // Process stuck verification queue
+      await this.processVerificationQueue(project.id);
     }
   }
 

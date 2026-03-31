@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import { projects, agents, heartbeatRuns } from "@orch/shared/db";
+import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { SchedulerService } from "../services/scheduler.service.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
@@ -173,6 +173,37 @@ describe("SchedulerService", () => {
         .from(heartbeatRuns)
         .where(eq(heartbeatRuns.agentId, "eng-1"));
       expect(allRuns).toHaveLength(1); // Only the original
+    });
+  });
+
+  describe("enhanced tick loop", () => {
+    it("tick runs tickTimers, reapOrphanedRuns, unblockResolved, and processVerificationQueue", async () => {
+      // Setup: agent with heartbeat due
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+      await testDb.db.insert(agents).values({
+        id: "eng-loop",
+        projectId,
+        name: "Loop Eng",
+        role: "engineer",
+        heartbeatEnabled: true,
+        heartbeatIntervalSec: 60,
+        lastHeartbeat: fiveMinAgo,
+      });
+
+      // Provide a TaskService for unblockResolved
+      const { TaskService } = await import("../services/task.service.js");
+      const taskService = new TaskService(testDb.db);
+      scheduler.setTaskService(taskService);
+
+      // Run one full tick
+      await scheduler.tick();
+
+      // Verify timer wakeup was created
+      const wakeups = await testDb.db
+        .select()
+        .from(wakeupRequests)
+        .where(eq(wakeupRequests.agentId, "eng-loop"));
+      expect(wakeups.length).toBeGreaterThanOrEqual(1);
     });
   });
 });
