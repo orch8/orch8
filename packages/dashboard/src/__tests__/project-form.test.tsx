@@ -52,3 +52,50 @@ describe("ProjectForm", () => {
     // Fill required fields and submit — detailed interaction tested in e2e
   });
 });
+
+describe("ProjectForm — edit mode new fields", () => {
+  const mockProject = {
+    id: "proj_1",
+    name: "Test",
+    slug: "test",
+    description: "A project",
+    homeDir: "/home/test",
+    worktreeDir: "/wt/test",
+    repoUrl: "https://github.com/org/repo",
+    defaultBranch: "main",
+    defaultModel: "claude-opus-4-6",
+    defaultMaxTurns: 25,
+    verificationRequired: true,
+    budgetLimitUsd: 500,
+    budgetSpentUsd: 123.45,
+    budgetPaused: false,
+    active: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  } as any;
+
+  it("renders repoUrl field in edit mode", () => {
+    renderWithProviders(<ProjectForm project={mockProject} />);
+    expect(screen.getByLabelText(/repo url/i)).toBeInTheDocument();
+  });
+
+  it("renders defaultModel field in edit mode", () => {
+    renderWithProviders(<ProjectForm project={mockProject} />);
+    expect(screen.getByLabelText(/default model/i)).toBeInTheDocument();
+  });
+
+  it("renders defaultMaxTurns field in edit mode", () => {
+    renderWithProviders(<ProjectForm project={mockProject} />);
+    expect(screen.getByLabelText(/default max turns/i)).toBeInTheDocument();
+  });
+
+  it("renders verificationRequired toggle in edit mode", () => {
+    renderWithProviders(<ProjectForm project={mockProject} />);
+    expect(screen.getByLabelText(/verification required/i)).toBeInTheDocument();
+  });
+
+  it("displays budget spent as read-only", () => {
+    renderWithProviders(<ProjectForm project={mockProject} />);
+    expect(screen.getByText(/123\.45/)).toBeInTheDocument();
+  });
+});

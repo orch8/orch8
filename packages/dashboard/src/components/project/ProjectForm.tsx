@@ -9,6 +9,12 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
+const MODEL_OPTIONS = [
+  "claude-opus-4-6",
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5-20251001",
+];
+
 interface ProjectFormProps {
   project?: Project;
   onSuccess?: (project: Project) => void;
@@ -26,8 +32,16 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
   const [defaultBranch, setDefaultBranch] = useState(
     project?.defaultBranch ?? "main",
   );
+  const [repoUrl, setRepoUrl] = useState(project?.repoUrl ?? "");
+  const [defaultModel, setDefaultModel] = useState(project?.defaultModel ?? "");
+  const [defaultMaxTurns, setDefaultMaxTurns] = useState(
+    project?.defaultMaxTurns?.toString() ?? "",
+  );
+  const [verificationRequired, setVerificationRequired] = useState(
+    project?.verificationRequired ?? true,
+  );
   const [budgetLimitUsd, setBudgetLimitUsd] = useState(
-    project?.budgetLimitUsd ?? "",
+    project?.budgetLimitUsd?.toString() ?? "",
   );
 
   const createProject = useCreateProject();
@@ -55,6 +69,10 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
         name,
         description,
         defaultBranch,
+        repoUrl: repoUrl || null,
+        defaultModel: defaultModel || null,
+        defaultMaxTurns: defaultMaxTurns ? parseInt(defaultMaxTurns, 10) : null,
+        verificationRequired,
         budgetLimitUsd: budget ?? null,
       });
       onSuccess?.(result);
@@ -66,7 +84,10 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
         homeDir,
         worktreeDir,
         defaultBranch,
-        verificationRequired: true,
+        repoUrl: repoUrl || undefined,
+        defaultModel: defaultModel || undefined,
+        defaultMaxTurns: defaultMaxTurns ? parseInt(defaultMaxTurns, 10) : undefined,
+        verificationRequired,
         budgetLimitUsd: budget,
       });
       onSuccess?.(result);
@@ -74,6 +95,8 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
   };
 
   const isPending = createProject.isPending || updateProject.isPending;
+  const inputClass =
+    "rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100";
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -87,7 +110,7 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
           value={name}
           onChange={(e) => handleNameChange(e.target.value)}
           required
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+          className={inputClass}
         />
       </div>
 
@@ -106,7 +129,7 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
           required
           disabled={isEdit}
           pattern="[a-z0-9-]+"
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"
+          className={`${inputClass} disabled:opacity-50`}
         />
       </div>
 
@@ -119,7 +142,7 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+          className={inputClass}
         />
       </div>
 
@@ -136,7 +159,7 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
               onChange={(e) => setHomeDir(e.target.value)}
               required
               placeholder="/path/to/git/repo"
-              className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+              className={inputClass}
             />
           </div>
 
@@ -151,7 +174,7 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
               onChange={(e) => setWorktreeDir(e.target.value)}
               required
               placeholder="/path/to/worktrees"
-              className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+              className={inputClass}
             />
           </div>
         </>
@@ -166,8 +189,67 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
           type="text"
           value={defaultBranch}
           onChange={(e) => setDefaultBranch(e.target.value)}
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+          className={inputClass}
         />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="project-repo-url" className="text-sm font-medium text-zinc-300">
+          Repo URL
+        </label>
+        <input
+          id="project-repo-url"
+          type="text"
+          value={repoUrl}
+          onChange={(e) => setRepoUrl(e.target.value)}
+          placeholder="https://github.com/org/repo"
+          className={inputClass}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="project-default-model" className="text-sm font-medium text-zinc-300">
+          Default Model
+        </label>
+        <select
+          id="project-default-model"
+          value={defaultModel}
+          onChange={(e) => setDefaultModel(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">None (use agent default)</option>
+          {MODEL_OPTIONS.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="project-max-turns" className="text-sm font-medium text-zinc-300">
+          Default Max Turns
+        </label>
+        <input
+          id="project-max-turns"
+          type="number"
+          min="1"
+          value={defaultMaxTurns}
+          onChange={(e) => setDefaultMaxTurns(e.target.value)}
+          placeholder="25"
+          className={inputClass}
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          id="project-verification"
+          type="checkbox"
+          checked={verificationRequired}
+          onChange={(e) => setVerificationRequired(e.target.checked)}
+          className="rounded border-zinc-700"
+        />
+        <label htmlFor="project-verification" className="text-sm font-medium text-zinc-300">
+          Verification Required
+        </label>
       </div>
 
       <div className="flex flex-col gap-1">
@@ -182,9 +264,29 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
           value={budgetLimitUsd}
           onChange={(e) => setBudgetLimitUsd(e.target.value)}
           placeholder="No limit"
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+          className={inputClass}
         />
       </div>
+
+      {isEdit && project.budgetSpentUsd != null && (
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-zinc-300">Budget Spent (USD)</span>
+          <p className="text-sm text-zinc-400">${project.budgetSpentUsd.toFixed(2)}</p>
+        </div>
+      )}
+
+      {isEdit && (
+        <div className="grid grid-cols-2 gap-3 text-sm text-zinc-500">
+          <div>
+            <span className="text-xs text-zinc-600">Home Directory</span>
+            <p className="font-mono text-xs">{project.homeDir}</p>
+          </div>
+          <div>
+            <span className="text-xs text-zinc-600">Worktree Directory</span>
+            <p className="font-mono text-xs">{project.worktreeDir}</p>
+          </div>
+        </div>
+      )}
 
       <button
         type="submit"
