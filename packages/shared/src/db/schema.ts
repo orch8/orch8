@@ -163,6 +163,8 @@ export const agents = pgTable("agents", {
   maxConcurrentSubagents: integer("max_concurrent_subagents").default(3),
   workingHours: text("working_hours"),
 
+  autoPauseThreshold: integer("auto_pause_threshold"),
+
   budgetLimitUsd: real("budget_limit_usd"),
   budgetSpentUsd: real("budget_spent_usd").notNull().default(0),
   budgetPaused: boolean("budget_paused").notNull().default(false),
