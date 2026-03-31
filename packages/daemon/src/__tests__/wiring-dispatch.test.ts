@@ -1,10 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
+import Fastify from "fastify";
 import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
 import { WorktreeService } from "../services/worktree.service.js";
+import { authPlugin } from "../api/middleware/auth.js";
+import { taskRoutes } from "../api/routes/tasks.js";
+import { TaskService } from "../services/task.service.js";
+import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
+import "../types.js";
 
 describe("Wiring: Dispatch", () => {
   let testDb: TestDb;
@@ -219,6 +225,172 @@ describe("Wiring: Dispatch", () => {
       expect(claimed).toHaveLength(1);
       expect(claimed[0].id).toBe(run.id);
       expect(executeRunSpy).toHaveBeenCalledWith(run.id);
+    });
+  });
+
+  describe("P0 #3: POST /api/tasks with assignee triggers dispatch", () => {
+    it("enqueues wakeup when task created with assignee", async () => {
+      await testDb.db.insert(agents).values({
+        id: "agent-1",
+        projectId,
+        name: "Worker",
+        role: "engineer",
+        status: "active",
+        wakeOnAssignment: true,
+        maxConcurrentRuns: 2,
+      });
+
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const heartbeatService = new HeartbeatService(testDb.db, broadcastService);
+      vi.spyOn(heartbeatService, "executeRun").mockResolvedValue();
+
+      const enqueueSpy = vi.spyOn(heartbeatService, "enqueueWakeup");
+
+      const app = Fastify();
+      app.decorate("db", testDb.db);
+      app.decorate("heartbeatService", heartbeatService);
+
+      const taskService = new TaskService(testDb.db);
+      app.decorate("taskService", taskService);
+
+      const worktreeService = new WorktreeService();
+      const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
+      app.decorate("lifecycleService", lifecycleService);
+
+      app.register(authPlugin);
+      app.register(taskRoutes);
+      await app.ready();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/tasks",
+        headers: { "x-project-id": projectId },
+        payload: {
+          projectId,
+          title: "Build feature",
+          taskType: "quick",
+          assignee: "agent-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(enqueueSpy).toHaveBeenCalledWith("agent-1", projectId, expect.objectContaining({
+        source: "assignment",
+        reason: "task_created_with_assignee",
+      }));
+
+      await app.close();
+    });
+  });
+
+  describe("P0 #2: PATCH /api/tasks/:id with assignee triggers dispatch", () => {
+    it("enqueues wakeup when assignee set on backlog task", async () => {
+      await testDb.db.insert(agents).values({
+        id: "agent-1",
+        projectId,
+        name: "Worker",
+        role: "engineer",
+        status: "active",
+        wakeOnAssignment: true,
+        maxConcurrentRuns: 2,
+      });
+
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Existing task",
+        taskType: "quick",
+        column: "backlog",
+      }).returning();
+
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const heartbeatService = new HeartbeatService(testDb.db, broadcastService);
+      vi.spyOn(heartbeatService, "executeRun").mockResolvedValue();
+
+      const enqueueSpy = vi.spyOn(heartbeatService, "enqueueWakeup");
+
+      const app = Fastify();
+      app.decorate("db", testDb.db);
+      app.decorate("heartbeatService", heartbeatService);
+
+      const taskService = new TaskService(testDb.db);
+      app.decorate("taskService", taskService);
+
+      const worktreeService = new WorktreeService();
+      const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
+      app.decorate("lifecycleService", lifecycleService);
+
+      app.register(authPlugin);
+      app.register(taskRoutes);
+      await app.ready();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/tasks/${task.id}`,
+        headers: { "x-project-id": projectId },
+        payload: { assignee: "agent-1" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(enqueueSpy).toHaveBeenCalledWith("agent-1", projectId, expect.objectContaining({
+        source: "assignment",
+        taskId: task.id,
+        reason: "task_assigned",
+      }));
+
+      await app.close();
+    });
+
+    it("does NOT enqueue when task is not in backlog", async () => {
+      await testDb.db.insert(agents).values({
+        id: "agent-1",
+        projectId,
+        name: "Worker",
+        role: "engineer",
+        status: "active",
+        wakeOnAssignment: true,
+        maxConcurrentRuns: 2,
+      });
+
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "In-progress task",
+        taskType: "quick",
+        column: "in_progress",
+      }).returning();
+
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const heartbeatService = new HeartbeatService(testDb.db, broadcastService);
+
+      const enqueueSpy = vi.spyOn(heartbeatService, "enqueueWakeup");
+
+      const app = Fastify();
+      app.decorate("db", testDb.db);
+      app.decorate("heartbeatService", heartbeatService);
+
+      const taskService = new TaskService(testDb.db);
+      app.decorate("taskService", taskService);
+
+      const worktreeService = new WorktreeService();
+      const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
+      app.decorate("lifecycleService", lifecycleService);
+
+      app.register(authPlugin);
+      app.register(taskRoutes);
+      await app.ready();
+
+      await app.inject({
+        method: "PATCH",
+        url: `/api/tasks/${task.id}`,
+        headers: { "x-project-id": projectId },
+        payload: { assignee: "agent-1" },
+      });
+
+      expect(enqueueSpy).not.toHaveBeenCalled();
+
+      await app.close();
     });
   });
 });

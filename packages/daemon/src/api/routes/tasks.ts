@@ -23,6 +23,16 @@ export async function taskRoutes(app: FastifyInstance) {
     }
 
     const task = await taskService.create(parsed.data);
+
+    // Dispatch agent if task created with assignee
+    if (task.assignee) {
+      await app.heartbeatService.enqueueWakeup(task.assignee, task.projectId, {
+        source: "assignment",
+        taskId: task.id,
+        reason: "task_created_with_assignee",
+      });
+    }
+
     return reply.code(201).send(task);
   });
 
@@ -80,6 +90,16 @@ export async function taskRoutes(app: FastifyInstance) {
 
     try {
       const task = await taskService.update(request.params.id, parsed.data);
+
+      // Dispatch agent if assignee was set and task is in backlog
+      if (parsed.data.assignee && task.column === "backlog") {
+        await app.heartbeatService.enqueueWakeup(parsed.data.assignee, task.projectId, {
+          source: "assignment",
+          taskId: task.id,
+          reason: "task_assigned",
+        });
+      }
+
       return task;
     } catch (err) {
       if ((err as Error).message === "Task not found") {
