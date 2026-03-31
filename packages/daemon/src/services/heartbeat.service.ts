@@ -743,6 +743,16 @@ export class HeartbeatService {
         }
       }
 
+      // 7. Execute claimed runs (fire-and-forget)
+      for (const run of claimed) {
+        this.executeRun(run.id).catch((err) => {
+          this.logger?.error(
+            { err, runId: run.id, agentId, projectId },
+            "Unhandled error in executeRun",
+          );
+        });
+      }
+
       return claimed;
     });
   }
