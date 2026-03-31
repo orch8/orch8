@@ -18,7 +18,23 @@ describe("Structured logging", () => {
       },
     });
 
-    // Add a test route that logs
+    // Register the same onRequest hook used in server.ts
+    app.addHook("onRequest", async (request) => {
+      const childBindings: Record<string, string> = {};
+      if (request.headers["x-agent-id"]) {
+        childBindings.agentId = request.headers["x-agent-id"] as string;
+      }
+      if (request.headers["x-project-id"]) {
+        childBindings.projectId = request.headers["x-project-id"] as string;
+      }
+      if (request.headers["x-run-id"]) {
+        childBindings.runId = request.headers["x-run-id"] as string;
+      }
+      if (Object.keys(childBindings).length > 0) {
+        request.log = request.log.child(childBindings);
+      }
+    });
+
     app.get("/api/test-log", async (request, reply) => {
       request.log.info("test log message");
       return { ok: true };
@@ -36,9 +52,14 @@ describe("Structured logging", () => {
       },
     });
 
-    // Fastify's pino logger serializes request info
-    // We need the onRequest hook to enrich the logger
-    // This test verifies the hook is wired correctly
+    const testLogEntry = logEntries.find(
+      (e: any) => e.msg === "test log message",
+    );
+    expect(testLogEntry).toBeDefined();
+    expect((testLogEntry as any).agentId).toBe("test-agent");
+    expect((testLogEntry as any).projectId).toBe("test-project");
+    expect((testLogEntry as any).runId).toBe("test-run");
+
     await app.close();
   });
 });

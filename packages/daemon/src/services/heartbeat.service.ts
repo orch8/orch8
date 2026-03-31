@@ -564,7 +564,7 @@ export class HeartbeatService {
       if (this.extractionService && terminalStatus === "succeeded" && agent.workLogDir) {
         this.triggerExtraction(agent, claimedRun.projectId).catch((err) => {
           this.logger?.error(
-            { agentId: agent.id, projectId: claimedRun.projectId, runId },
+            { err, agentId: agent.id, projectId: claimedRun.projectId, runId },
             "extraction error",
           );
         });
