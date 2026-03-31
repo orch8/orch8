@@ -31,6 +31,45 @@ describe("Wiring: Dispatch", () => {
     await testDb.db.delete(agents);
   });
 
+  describe("P0 #2: enqueueTaskScopedWakeup sets column to in_progress", () => {
+    it("transitions task from backlog to in_progress when claiming", async () => {
+      await testDb.db.insert(agents).values({
+        id: "agent-1",
+        projectId,
+        name: "Worker",
+        role: "engineer",
+        status: "active",
+        wakeOnAssignment: true,
+        maxConcurrentRuns: 2,
+      });
+
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Test task",
+        taskType: "quick",
+        column: "backlog",
+      }).returning();
+
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const service = new HeartbeatService(testDb.db, broadcastService);
+      vi.spyOn(service, "executeRun").mockResolvedValue();
+
+      await service.enqueueWakeup("agent-1", projectId, {
+        source: "assignment",
+        taskId: task.id,
+        reason: "task_assigned",
+      });
+
+      // Task should now be in_progress
+      const [updated] = await testDb.db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, task.id));
+      expect(updated.column).toBe("in_progress");
+    });
+  });
+
   describe("P0 #1: startNextQueuedRunForAgent calls executeRun", () => {
     it("fires executeRun for each claimed run", async () => {
       await testDb.db.insert(agents).values({
