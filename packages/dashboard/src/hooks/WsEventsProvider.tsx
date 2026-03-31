@@ -2,6 +2,7 @@ import { createContext, useContext, useCallback, useRef, useMemo } from "react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWebSocket } from "./useWebSocket.js";
+import { useToastStore } from "../stores/toast.js";
 
 export interface WsEvent {
   type: string;
@@ -22,7 +23,13 @@ interface WsEventsContextValue {
 
 const WsEventsContext = createContext<WsEventsContextValue | null>(null);
 
+const TOAST_TYPES = new Set([
+  "verification_failed", "verification_passed",
+  "agent_failure", "budget_exceeded", "stuck_task",
+]);
+
 export function WsEventsProvider({ children }: { children: ReactNode }) {
+  const addToast = useToastStore((s) => s.add);
   const qc = useQueryClient();
   const handlersRef = useRef<Map<string, Set<EventHandler>>>(new Map());
 
@@ -72,9 +79,19 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
           qc.invalidateQueries({ queryKey: ["costSummary"] });
           qc.invalidateQueries({ queryKey: ["agents"] });
           break;
-        case "notification:new":
+        case "notification:new": {
           qc.invalidateQueries({ queryKey: ["notifications"] });
+          if (TOAST_TYPES.has(event.type as string)) {
+            addToast({
+              id: (event as any).id ?? String(Date.now()),
+              type: (event as any).type ?? "info",
+              title: (event as any).title ?? "Notification",
+              message: (event as any).message ?? "",
+              link: (event as any).link,
+            });
+          }
           break;
+        }
         case "verification:verdict":
         case "verification:response":
         case "verification:referee":
@@ -97,7 +114,7 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
           break;
       }
     },
-    [qc],
+    [qc, addToast],
   );
 
   const { connected, send } = useWebSocket({
