@@ -5,7 +5,7 @@ interface NotificationBellProps {
   projectId: string | null;
 }
 
-function relativeTime(dateStr: string): string {
+function relativeTime(dateStr: string | Date): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60000);
   if (minutes < 1) return "just now";
