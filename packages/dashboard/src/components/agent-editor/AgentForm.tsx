@@ -29,8 +29,8 @@ export function AgentForm({ agent }: AgentFormProps) {
     updateAgent.mutate({
       agentId: agent.id,
       projectId: agent.projectId,
-      systemPrompt: systemPrompt || null,
-      model: model || null,
+      systemPrompt: systemPrompt || undefined,
+      model: model || undefined,
       effort: effort || null,
       budgetLimitUsd: budgetLimit ? parseFloat(budgetLimit) : null,
     });
@@ -199,7 +199,7 @@ export function AgentForm({ agent }: AgentFormProps) {
       )}
 
       {/* Env vars (masked) */}
-      {agent.envVars && Object.keys(agent.envVars as Record<string, string>).length > 0 && (
+      {!!agent.envVars && Object.keys(agent.envVars as Record<string, string>).length > 0 && (
         <div>
           <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">Environment Variables</h4>
           <div className="space-y-1">
