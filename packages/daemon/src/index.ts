@@ -1,12 +1,20 @@
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { buildServer } from "./server.js";
 import { startEmbeddedPostgres, stopEmbeddedPostgres } from "./db/embedded.js";
-import { DEFAULT_PORT, DEFAULT_HOST } from "@orch/shared";
+import { loadGlobalConfig } from "./config/loader.js";
 
+// 1. Load global config
+const configPath = join(homedir(), ".orchestrator", "config.yaml");
+const config = loadGlobalConfig(configPath);
+
+// 2. Connect to Postgres
 const databaseUrl = await startEmbeddedPostgres({
-  port: Number(process.env.ORCH_PG_PORT ?? 5433),
+  port: Number(process.env.ORCH_PG_PORT ?? config.database.port),
 });
 
-const server = buildServer({ databaseUrl });
+// 3–7. Build and start server (migrations, services, scheduler all inside)
+const server = buildServer({ databaseUrl, config });
 
 // Graceful shutdown
 async function shutdown() {
@@ -20,8 +28,8 @@ process.on("SIGTERM", shutdown);
 
 try {
   await server.listen({
-    port: Number(process.env.ORCH_PORT ?? DEFAULT_PORT),
-    host: process.env.ORCH_HOST ?? DEFAULT_HOST,
+    port: Number(process.env.ORCH_PORT ?? config.api.port),
+    host: process.env.ORCH_HOST ?? config.api.host,
   });
 } catch (err) {
   server.log.error(err);

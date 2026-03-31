@@ -31,17 +31,23 @@ import { CommentService } from "./services/comment.service.js";
 import { VerificationService } from "./services/verification.service.js";
 import { SummaryService } from "./services/summary.service.js";
 import { MemoryExtractionService } from "./services/memory-extraction.service.js";
+import type { GlobalConfig } from "./config/schema.js";
 import "./types.js";
 
 export interface ServerOptions {
   databaseUrl?: string;
   spawnFn?: typeof nodeSpawn;
+  config?: GlobalConfig;
 }
 
 export function buildServer(options: ServerOptions = {}) {
+  const logLevel = options.config?.orchestrator.log_level
+    ?? process.env.LOG_LEVEL
+    ?? "info";
+
   const app = Fastify({
     logger: {
-      level: process.env.LOG_LEVEL ?? "info",
+      level: logLevel,
     },
   });
 
@@ -92,8 +98,9 @@ export function buildServer(options: ServerOptions = {}) {
 
     // Scheduler service
     const schedulerService = new SchedulerService(dbClient.db, heartbeatService, {
-      intervalMs: Number(process.env.ORCH_SCHEDULER_INTERVAL_MS ?? 60_000),
-      stalenessThresholdMs: Number(process.env.ORCH_STALENESS_THRESHOLD_MS ?? 5 * 60 * 1000),
+      intervalMs: options.config?.orchestrator.tick_interval_ms
+        ?? Number(process.env.ORCH_SCHEDULER_INTERVAL_MS ?? 60_000),
+      stalenessThresholdMs: (options.config?.orphan_detection.staleness_threshold_sec ?? 300) * 1000,
     });
     app.decorate("schedulerService", schedulerService);
 
@@ -121,6 +128,10 @@ export function buildServer(options: ServerOptions = {}) {
 
     // Start scheduler (after summary service so regeneration timer can be set)
     schedulerService.setSummaryService(summaryService);
+
+    // Wire TaskService into scheduler for unblockResolved
+    schedulerService.setTaskService(taskService);
+
     schedulerService.start();
 
     // Comment service
