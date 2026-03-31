@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAgents } from "../hooks/useAgents.js";
 import { useUiStore } from "../stores/ui.js";
 
@@ -16,12 +16,12 @@ function AgentsListPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Agents</h2>
-        <a
-          href="/agents/new"
+        <Link
+          to="/agents/new"
           className="rounded-md bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600"
         >
           + New Agent
-        </a>
+        </Link>
       </div>
 
       {!activeProjectId && (
@@ -32,9 +32,10 @@ function AgentsListPage() {
 
       <div className="flex flex-col gap-2">
         {agents?.map((agent) => (
-          <a
+          <Link
             key={agent.id}
-            href={`/agents/${agent.id}`}
+            to="/agents/$id"
+            params={{ id: agent.id }}
             className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-4 transition-colors hover:border-zinc-700"
           >
             <div>
@@ -51,7 +52,7 @@ function AgentsListPage() {
                 {agent.status}
               </span>
             </div>
-          </a>
+          </Link>
         ))}
 
         {agents?.length === 0 && (
