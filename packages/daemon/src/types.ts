@@ -18,6 +18,7 @@ export type SchemaDb = PostgresJsDatabase<typeof schema>;
 declare module "fastify" {
   interface FastifyInstance {
     db: SchemaDb;
+    taskService: import("./services/task.service.js").TaskService;
     lifecycleService: TaskLifecycleService;
     agentService: AgentService;
     heartbeatService: HeartbeatService;

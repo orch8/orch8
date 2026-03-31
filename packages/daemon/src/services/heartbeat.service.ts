@@ -8,6 +8,7 @@ import type { ClaudeLocalAdapter, RunAgentPrompts } from "../adapter/claude-loca
 import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "../adapter/types.js";
 import type { MemoryExtractionService } from "./memory-extraction.service.js";
 import type { BroadcastService } from "./broadcast.service.js";
+import type { WorktreeService } from "./worktree.service.js";
 import type { FastifyBaseLogger } from "fastify";
 import { RunLogger, type LogHandle } from "./run-logger.js";
 import { mkdir } from "node:fs/promises";
@@ -56,6 +57,8 @@ export class HeartbeatService {
   private adapter: ClaudeLocalAdapter | null = null;
   private extractionService: MemoryExtractionService | null = null;
   private logger: FastifyBaseLogger | null = null;
+  private onRunCompleted?: (taskId: string, status: string) => Promise<void>;
+  private worktreeService?: WorktreeService;
 
   setLogger(logger: FastifyBaseLogger): void {
     this.logger = logger;
@@ -82,6 +85,14 @@ export class HeartbeatService {
 
   setExtractionService(service: MemoryExtractionService): void {
     this.extractionService = service;
+  }
+
+  setOnRunCompleted(fn: (taskId: string, status: string) => Promise<void>): void {
+    this.onRunCompleted = fn;
+  }
+
+  setWorktreeService(worktreeService: WorktreeService): void {
+    this.worktreeService = worktreeService;
   }
 
   get activeCount(): number {

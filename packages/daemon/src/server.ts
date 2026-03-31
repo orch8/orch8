@@ -86,6 +86,7 @@ export function buildServer(options: ServerOptions = {}) {
 
     // Core services
     const taskService = new TaskService(dbClient.db);
+    app.decorate("taskService", taskService);
     const worktreeService = new WorktreeService();
 
     // Agent service
@@ -98,6 +99,7 @@ export function buildServer(options: ServerOptions = {}) {
     heartbeatService.setAdapter(adapter);
 
     heartbeatService.setLogger(app.log);
+    heartbeatService.setWorktreeService(worktreeService);
     app.decorate("heartbeatService", heartbeatService);
 
     // Scheduler service
@@ -176,6 +178,17 @@ export function buildServer(options: ServerOptions = {}) {
       },
     }, broadcastService);
     app.decorate("lifecycleService", lifecycleService);
+
+    // Wire run completion → lifecycle transition
+    heartbeatService.setOnRunCompleted(async (taskId, status) => {
+      if (status === "succeeded") {
+        try {
+          await lifecycleService.transition(taskId, "review");
+        } catch (err) {
+          app.log.error({ err, taskId, status }, "Failed to transition task after run completion");
+        }
+      }
+    });
 
     // Auth middleware + routes that require DB
     app.register(authPlugin);
