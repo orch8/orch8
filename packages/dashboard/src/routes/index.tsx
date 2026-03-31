@@ -1,5 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useUiStore } from "../stores/ui.js";
+import { useProjects } from "../hooks/useProjects.js";
 import { useAgents } from "../hooks/useAgents.js";
 import { useTasks } from "../hooks/useTasks.js";
 import { useCostSummary } from "../hooks/useCost.js";
@@ -9,6 +11,14 @@ import { AlertsPanel } from "../components/home/AlertsPanel.js";
 import { ActivityTimeline } from "../components/shared/ActivityTimeline.js";
 
 export function HomePage() {
+  const { data: projects, isLoading: projectsLoading } = useProjects();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!projectsLoading && projects && projects.length === 0) {
+      navigate({ to: "/welcome" });
+    }
+  }, [projects, projectsLoading, navigate]);
   const activeProjectId = useUiStore((s) => s.activeProjectId);
   const { data: agents } = useAgents(activeProjectId);
   const { data: tasks } = useTasks(activeProjectId);
