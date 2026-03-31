@@ -8,6 +8,7 @@ import {
 import { useWsEvents, type WsEvent } from "../../hooks/useWsEvents.js";
 import { api } from "../../api/client.js";
 import type { Task } from "../../types.js";
+import { ConfirmDialog } from "../shared/ConfirmDialog.js";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -29,6 +30,7 @@ export function BrainstormChat({ taskId }: BrainstormChatProps) {
   const [streamBuffer, setStreamBuffer] = useState("");
   const [input, setInput] = useState("");
   const [started, setStarted] = useState(false);
+  const [showKillConfirm, setShowKillConfirm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to brainstorm output chunks
@@ -119,6 +121,12 @@ export function BrainstormChat({ taskId }: BrainstormChatProps) {
           >
             Convert to Complex
           </button>
+          <button
+            onClick={() => setShowKillConfirm(true)}
+            className="rounded bg-red-900/30 px-3 py-1 text-xs font-medium text-red-300 hover:bg-red-900/50"
+          >
+            Kill
+          </button>
         </div>
       </div>
 
@@ -178,6 +186,18 @@ export function BrainstormChat({ taskId }: BrainstormChatProps) {
           Send
         </button>
       </form>
+
+      <ConfirmDialog
+        open={showKillConfirm}
+        title="Kill Brainstorm Session?"
+        description="This will terminate the brainstorm process."
+        confirmLabel="Kill"
+        onConfirm={async () => {
+          await api.post(`/brainstorm/${taskId}/kill`, {});
+          setShowKillConfirm(false);
+        }}
+        onCancel={() => setShowKillConfirm(false)}
+      />
     </div>
   );
 }
