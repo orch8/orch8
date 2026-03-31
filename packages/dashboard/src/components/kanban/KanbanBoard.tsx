@@ -1,0 +1,86 @@
+import { useMemo, useState } from "react";
+import {
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  pointerWithin,
+} from "@dnd-kit/core";
+import { useTasks, useTransitionTask } from "../../hooks/useTasks.js";
+import { useUiStore } from "../../stores/ui.js";
+import { KANBAN_COLUMNS, COLUMN_LABELS, type Task } from "../../types.js";
+import { KanbanColumn } from "./KanbanColumn.js";
+import { TaskCard } from "./TaskCard.js";
+
+interface KanbanBoardProps {
+  projectId: string | null;
+}
+
+export function KanbanBoard({ projectId }: KanbanBoardProps) {
+  const { data: tasks } = useTasks(projectId);
+  const transition = useTransitionTask();
+  const selectTask = useUiStore((s) => s.selectTask);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
+
+  const tasksByColumn = useMemo(() => {
+    const grouped: Record<string, Task[]> = {};
+    for (const col of KANBAN_COLUMNS) {
+      grouped[col] = [];
+    }
+    if (tasks) {
+      for (const task of tasks) {
+        if (grouped[task.column]) {
+          grouped[task.column].push(task);
+        }
+      }
+    }
+    return grouped;
+  }, [tasks]);
+
+  function handleDragStart(event: { active: { id: string | number } }) {
+    const task = tasks?.find((t) => t.id === event.active.id);
+    setActiveTask(task ?? null);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    setActiveTask(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const taskId = active.id as string;
+    const targetColumn = over.id as string;
+
+    // Only transition if dropping into a different column
+    const task = tasks?.find((t) => t.id === taskId);
+    if (
+      task &&
+      task.column !== targetColumn &&
+      KANBAN_COLUMNS.includes(targetColumn as any)
+    ) {
+      transition.mutate({ taskId, column: targetColumn });
+    }
+  }
+
+  return (
+    <DndContext
+      collisionDetection={pointerWithin}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="flex gap-4 overflow-x-auto pb-4">
+        {KANBAN_COLUMNS.map((col) => (
+          <KanbanColumn
+            key={col}
+            column={col}
+            label={COLUMN_LABELS[col]}
+            tasks={tasksByColumn[col] ?? []}
+            onTaskClick={selectTask}
+          />
+        ))}
+      </div>
+
+      <DragOverlay>
+        {activeTask && <TaskCard task={activeTask} onClick={() => {}} />}
+      </DragOverlay>
+    </DndContext>
+  );
+}
