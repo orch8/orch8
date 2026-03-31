@@ -127,7 +127,7 @@ export class TaskService {
     return updated;
   }
 
-  async unblockResolved(projectId: string): Promise<Array<{ id: string; title: string }>> {
+  async unblockResolved(projectId: string): Promise<Array<{ id: string; title: string; assignee: string | null }>> {
     const result = await this.db.execute(sql`
       WITH newly_unblockable AS (
         SELECT td.task_id
@@ -142,9 +142,9 @@ export class TaskService {
       UPDATE tasks
       SET "column" = 'backlog', updated_at = now()
       WHERE id IN (SELECT task_id FROM newly_unblockable)
-      RETURNING id, title
+      RETURNING id, title, assignee
     `);
-    return result as unknown as Array<{ id: string; title: string }>;
+    return result as unknown as Array<{ id: string; title: string; assignee: string | null }>;
   }
 
   private async wouldCreateCycle(newTaskId: string, newDepId: string): Promise<boolean> {

@@ -97,7 +97,20 @@ export class SchedulerService {
     for (const project of activeProjects) {
       // Unblock tasks whose dependencies are now met
       if (this.taskService) {
-        await this.taskService.unblockResolved(project.id);
+        const unblocked = await this.taskService.unblockResolved(project.id);
+        for (const task of unblocked) {
+          if (task.assignee) {
+            try {
+              await this.heartbeatService.enqueueWakeup(task.assignee, project.id, {
+                source: "automation",
+                taskId: task.id,
+                reason: "task_unblocked",
+              });
+            } catch {
+              // Skip tasks that fail to enqueue (agent may be paused/terminated)
+            }
+          }
+        }
       }
 
       // Process stuck verification queue
