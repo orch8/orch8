@@ -11,22 +11,33 @@ export async function costRoutes(app: FastifyInstance) {
     const filter = parsed.success ? parsed.data : {};
     const projectId = filter.projectId ?? request.projectId;
 
-    if (!projectId) {
+    // Agents must have a projectId; admins can omit for cross-project view
+    if (request.agent && !projectId) {
       return reply.code(400).send({ error: "validation_error", message: "projectId is required" });
     }
 
-    const conditions = [eq(heartbeatRuns.projectId, projectId)];
+    const conditions = [];
+    if (projectId) conditions.push(eq(heartbeatRuns.projectId, projectId));
     if (filter.agentId) conditions.push(eq(heartbeatRuns.agentId, filter.agentId));
 
-    const byAgent = await app.db
-      .select({
-        agentId: heartbeatRuns.agentId,
-        totalCost: sql<number>`COALESCE(SUM(${heartbeatRuns.costUsd}), 0)`.as("totalCost"),
-        runCount: sql<number>`COUNT(*)`.as("runCount"),
-      })
-      .from(heartbeatRuns)
-      .where(and(...conditions))
-      .groupBy(heartbeatRuns.agentId);
+    const byAgent = conditions.length > 0
+      ? await app.db
+          .select({
+            agentId: heartbeatRuns.agentId,
+            totalCost: sql<number>`COALESCE(SUM(${heartbeatRuns.costUsd}), 0)`.as("totalCost"),
+            runCount: sql<number>`COUNT(*)`.as("runCount"),
+          })
+          .from(heartbeatRuns)
+          .where(and(...conditions))
+          .groupBy(heartbeatRuns.agentId)
+      : await app.db
+          .select({
+            agentId: heartbeatRuns.agentId,
+            totalCost: sql<number>`COALESCE(SUM(${heartbeatRuns.costUsd}), 0)`.as("totalCost"),
+            runCount: sql<number>`COUNT(*)`.as("runCount"),
+          })
+          .from(heartbeatRuns)
+          .groupBy(heartbeatRuns.agentId);
 
     const total = byAgent.reduce((sum, row) => sum + Number(row.totalCost), 0);
 

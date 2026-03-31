@@ -7,25 +7,34 @@ export async function runRoutes(app: FastifyInstance) {
   // GET /api/runs — List runs
   app.get("/api/runs", async (request: FastifyRequest, reply: FastifyReply) => {
     const projectId = request.projectId;
-    if (!projectId) {
+
+    // Agents must have a projectId; admins can omit it for cross-project view
+    if (request.agent && !projectId) {
       return reply.code(400).send({ error: "validation_error", message: "projectId is required" });
     }
 
     const query = request.query as { agentId?: string; status?: string; taskId?: string; limit?: string };
 
-    const conditions = [eq(heartbeatRuns.projectId, projectId)];
+    const conditions = [];
+    if (projectId) conditions.push(eq(heartbeatRuns.projectId, projectId));
     if (query.agentId) conditions.push(eq(heartbeatRuns.agentId, query.agentId));
     if (query.status) conditions.push(eq(heartbeatRuns.status, query.status as typeof heartbeatRuns.status.enumValues[number]));
     if (query.taskId) conditions.push(eq(heartbeatRuns.taskId, query.taskId));
 
     const limit = Math.min(parseInt(query.limit ?? "100", 10), 500);
 
-    const runs = await app.db
-      .select()
-      .from(heartbeatRuns)
-      .where(and(...conditions))
-      .orderBy(desc(heartbeatRuns.createdAt))
-      .limit(limit);
+    const runs = conditions.length > 0
+      ? await app.db
+          .select()
+          .from(heartbeatRuns)
+          .where(and(...conditions))
+          .orderBy(desc(heartbeatRuns.createdAt))
+          .limit(limit)
+      : await app.db
+          .select()
+          .from(heartbeatRuns)
+          .orderBy(desc(heartbeatRuns.createdAt))
+          .limit(limit);
 
     return runs;
   });
