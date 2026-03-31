@@ -24,6 +24,8 @@ import { memoryRoutes } from "./api/routes/memory.js";
 import { costRoutes } from "./api/routes/cost.js";
 import { activityRoutes } from "./api/routes/activity.js";
 import { verificationRoutes } from "./api/routes/verification.js";
+import { daemonRoutes } from "./api/routes/daemon.js";
+import { notificationRoutes } from "./api/routes/notifications.js";
 import { createDbClient } from "./db/client.js";
 import { ProjectService } from "./services/project.service.js";
 import { MemoryService } from "./services/memory.service.js";
@@ -32,6 +34,7 @@ import { VerificationService } from "./services/verification.service.js";
 import { SummaryService } from "./services/summary.service.js";
 import { MemoryExtractionService } from "./services/memory-extraction.service.js";
 import { BroadcastService } from "./services/broadcast.service.js";
+import { NotificationService } from "./services/notification.service.js";
 import type { GlobalConfig } from "./config/schema.js";
 import "./types.js";
 
@@ -143,6 +146,10 @@ export function buildServer(options: ServerOptions = {}) {
     // Comment service
     const commentService = new CommentService(dbClient.db);
 
+    // Notification service
+    const notificationService = new NotificationService(dbClient.db);
+    app.decorate("notificationService", notificationService);
+
     // Verification service
     const verificationService = new VerificationService(
       dbClient.db,
@@ -200,6 +207,8 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(costRoutes);
     app.register(activityRoutes);
     app.register(verificationRoutes);
+    app.register(daemonRoutes);
+    app.register(notificationRoutes);
   }
 
   app.register(websocketRoutes);
