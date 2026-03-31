@@ -85,7 +85,7 @@ export function buildServer(options: ServerOptions = {}) {
     const worktreeService = new WorktreeService();
 
     // Agent service
-    const agentService = new AgentService(dbClient.db);
+    const agentService = new AgentService(dbClient.db, broadcastService);
     app.decorate("agentService", agentService);
 
     // Heartbeat service

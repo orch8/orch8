@@ -2,6 +2,7 @@ import { eq, and } from "drizzle-orm";
 import { agents, wakeupRequests } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { CreateAgent, UpdateAgent, AgentFilter } from "@orch/shared";
+import type { BroadcastService } from "./broadcast.service.js";
 
 type Agent = typeof agents.$inferSelect;
 type WakeupRequest = typeof wakeupRequests.$inferSelect;
@@ -97,7 +98,10 @@ const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
 };
 
 export class AgentService {
-  constructor(private db: SchemaDb) {}
+  constructor(
+    private db: SchemaDb,
+    private broadcastService?: BroadcastService,
+  ) {}
 
   static getRoleDefaults(role: string): Partial<typeof agents.$inferInsert> {
     return ROLE_DEFAULTS[role] ?? ROLE_DEFAULTS.custom;
@@ -168,6 +172,11 @@ export class AgentService {
       .where(and(eq(agents.id, id), eq(agents.projectId, projectId)))
       .returning();
 
+    this.broadcastService?.agentPaused(projectId, {
+      agentId: id,
+      reason: reason ?? null,
+    });
+
     return updated;
   }
 
@@ -185,6 +194,8 @@ export class AgentService {
       })
       .where(and(eq(agents.id, id), eq(agents.projectId, projectId)))
       .returning();
+
+    this.broadcastService?.agentResumed(projectId, { agentId: id });
 
     return updated;
   }
