@@ -1,87 +1,27 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { useUiStore } from "../stores/ui.js";
-import { useProjects } from "../hooks/useProjects.js";
-import { useAgents } from "../hooks/useAgents.js";
-import { useTasks } from "../hooks/useTasks.js";
-import { useCostSummary } from "../hooks/useCost.js";
-import { useDaemonStatus } from "../hooks/useDaemon.js";
-import { StatCard } from "../components/home/StatCard.js";
-import { AlertsPanel } from "../components/home/AlertsPanel.js";
-import { ActivityTimeline } from "../components/shared/ActivityTimeline.js";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { api } from "../api/client.js";
 
-export function HomePage() {
-  const { data: projects, isLoading: projectsLoading } = useProjects();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!projectsLoading && projects && projects.length === 0) {
-      navigate({ to: "/welcome" });
-    }
-  }, [projects, projectsLoading, navigate]);
-  const activeProjectId = useUiStore((s) => s.activeProjectId);
-  const { data: agents } = useAgents(activeProjectId);
-  const { data: tasks } = useTasks(activeProjectId);
-  const { data: costSummary } = useCostSummary(activeProjectId);
-  const { data: daemon } = useDaemonStatus();
-
-  const activeAgents = agents?.filter((a) => a.status === "active") ?? [];
-  const inProgressTasks = tasks?.filter((t) => t.column === "in_progress") ?? [];
-  const reviewTasks = tasks?.filter((t) => t.column === "review") ?? [];
-  const budgetWarning = costSummary ? costSummary.total > 0 : false;
-
-  return (
-    <div className="flex flex-col gap-6">
-      {/* Top Stats Row */}
-      <div className="grid grid-cols-4 gap-4">
-        <StatCard
-          label="Active Agents"
-          value={activeAgents.length}
-          subtitle={`${agents?.length ?? 0} total`}
-          indicator={activeAgents.length > 0 ? "green" : "none"}
-        />
-        <StatCard
-          label="Tasks In Progress"
-          value={inProgressTasks.length}
-          subtitle={`${reviewTasks.length} in review`}
-        />
-        <StatCard
-          label="Today's Spend"
-          value={`$${(costSummary?.total ?? 0).toFixed(2)}`}
-        />
-        <StatCard
-          label="Daemon"
-          value={daemon?.status === "running" ? "Healthy" : "Unknown"}
-          subtitle={daemon?.uptimeFormatted ? `Uptime: ${daemon.uptimeFormatted}` : undefined}
-          indicator={daemon?.status === "running" ? "green" : "red"}
-        />
-      </div>
-
-      {/* Main Content — 2 columns */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Left — Recent Activity */}
-        <div>
-          <h3 className="mb-3 text-sm font-semibold text-zinc-300">Recent Activity</h3>
-          {activeProjectId ? (
-            <ActivityTimeline projectId={activeProjectId} compact limit={10} />
-          ) : (
-            <p className="text-xs text-zinc-600">Select a project to see activity</p>
-          )}
-        </div>
-
-        {/* Right — Alerts + Agent Status */}
-        <div>
-          <AlertsPanel
-            agents={agents ?? []}
-            tasks={tasks ?? []}
-            budgetWarning={budgetWarning}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
+const STORAGE_KEY = "orch8:lastProjectId";
 
 export const Route = createFileRoute("/")({
-  component: HomePage,
+  beforeLoad: async () => {
+    const lastProjectId = localStorage.getItem(STORAGE_KEY);
+
+    if (lastProjectId) {
+      throw redirect({ to: "/projects/$projectId", params: { projectId: lastProjectId } });
+    }
+
+    // No last project — check if any projects exist
+    try {
+      const projects = await api.get<Array<{ id: string }>>("/projects");
+      if (projects.length > 0) {
+        throw redirect({ to: "/projects/$projectId", params: { projectId: projects[0].id } });
+      }
+    } catch (e) {
+      if ((e as any)?.isRedirect) throw e;
+      // API error — fall through to welcome
+    }
+
+    throw redirect({ to: "/welcome" });
+  },
 });

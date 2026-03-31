@@ -10,19 +10,19 @@ beforeEach(() => mockFetch.mockReset());
 
 describe("WelcomeWizard", () => {
   it("renders welcome step first", () => {
-    renderWithProviders(<WelcomeWizard onComplete={() => {}} />);
+    renderWithProviders(<WelcomeWizard onComplete={(_projectId) => {}} />);
     expect(screen.getByText("Welcome to orch8")).toBeInTheDocument();
     expect(screen.getByText("Get Started")).toBeInTheDocument();
   });
 
   it("advances to Create Project step", async () => {
-    renderWithProviders(<WelcomeWizard onComplete={() => {}} />);
+    renderWithProviders(<WelcomeWizard onComplete={(_projectId) => {}} />);
     await userEvent.click(screen.getByText("Get Started"));
     expect(screen.getByText("Create Project")).toBeInTheDocument();
   });
 
   it("shows all 5 step labels", () => {
-    renderWithProviders(<WelcomeWizard onComplete={() => {}} />);
+    renderWithProviders(<WelcomeWizard onComplete={(_projectId) => {}} />);
     expect(screen.getByText("Welcome")).toBeInTheDocument();
     expect(screen.getByText("Project")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
