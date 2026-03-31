@@ -1,8 +1,12 @@
-import { useTask } from "../../hooks/useTasks.js";
+import { useTask, useTasks } from "../../hooks/useTasks.js";
 import { useUiStore } from "../../stores/ui.js";
 import { useTaskCost, usePhaseCost } from "../../hooks/useCost.js";
 import { PhaseProgress } from "./PhaseProgress.js";
 import { CommentThread } from "./CommentThread.js";
+import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
+import { ActivityTimeline } from "../shared/ActivityTimeline.js";
+import { DependenciesSection } from "./DependenciesSection.js";
+import { TaskActions } from "./TaskActions.js";
 
 interface TaskDetailPanelProps {
   taskId: string;
@@ -17,6 +21,7 @@ export function TaskDetailPanel({ taskId }: TaskDetailPanelProps) {
     task?.taskType === "complex" ? taskId : null,
     task?.projectId ?? activeProjectId,
   );
+  const { data: allTasks } = useTasks(task?.projectId ?? activeProjectId);
 
   if (isLoading) {
     return (
@@ -51,9 +56,7 @@ export function TaskDetailPanel({ taskId }: TaskDetailPanelProps) {
 
       {/* Description */}
       {task.description && (
-        <p className="whitespace-pre-wrap text-sm text-zinc-400">
-          {task.description}
-        </p>
+        <MarkdownRenderer content={task.description} />
       )}
 
       {/* Metadata */}
@@ -184,6 +187,27 @@ export function TaskDetailPanel({ taskId }: TaskDetailPanelProps) {
             Git
           </h4>
           <p className="font-mono text-xs text-zinc-400">{task.branch}</p>
+        </div>
+      )}
+
+      {/* Dependencies */}
+      <DependenciesSection task={task} allTasks={allTasks ?? []} />
+
+      {/* Actions */}
+      <TaskActions
+        taskId={task.id}
+        column={task.column}
+        taskType={task.taskType}
+        brainstormStatus={task.brainstormStatus}
+      />
+
+      {/* Activity Timeline */}
+      {activeProjectId && (
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            Activity
+          </h4>
+          <ActivityTimeline projectId={activeProjectId} taskId={taskId} compact limit={5} />
         </div>
       )}
 
