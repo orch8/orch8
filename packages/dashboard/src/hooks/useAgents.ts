@@ -1,0 +1,90 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../api/client.js";
+import type { Agent } from "../types.js";
+import type { CreateAgent, UpdateAgent } from "@orch/shared";
+
+export function useAgents(projectId: string | null) {
+  return useQuery<Agent[]>({
+    queryKey: ["agents", projectId],
+    queryFn: () => api.get("/agents", { projectId: projectId! }),
+    enabled: !!projectId,
+  });
+}
+
+export function useAgent(agentId: string | null, projectId: string | null) {
+  return useQuery<Agent>({
+    queryKey: ["agent", agentId, projectId],
+    queryFn: () => api.get(`/agents/${agentId}`, { projectId: projectId! }),
+    enabled: !!agentId && !!projectId,
+  });
+}
+
+export function useCreateAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateAgent) => api.post<Agent>("/agents", input),
+    onSuccess: (agent) => {
+      qc.invalidateQueries({ queryKey: ["agents", agent.projectId] });
+    },
+  });
+}
+
+export function useUpdateAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      agentId,
+      projectId,
+      ...input
+    }: UpdateAgent & { agentId: string; projectId: string }) =>
+      api.patch<Agent>(`/agents/${agentId}`, { ...input, projectId }),
+    onSuccess: (agent) => {
+      qc.invalidateQueries({ queryKey: ["agents", agent.projectId] });
+      qc.invalidateQueries({
+        queryKey: ["agent", agent.id, agent.projectId],
+      });
+    },
+  });
+}
+
+export function usePauseAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      agentId,
+      reason,
+    }: {
+      agentId: string;
+      projectId: string;
+      reason?: string;
+    }) => api.post<Agent>(`/agents/${agentId}/pause`, { reason }),
+    onSuccess: (agent) => {
+      qc.invalidateQueries({ queryKey: ["agents", agent.projectId] });
+    },
+  });
+}
+
+export function useResumeAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId }: { agentId: string; projectId: string }) =>
+      api.post<Agent>(`/agents/${agentId}/resume`, {}),
+    onSuccess: (agent) => {
+      qc.invalidateQueries({ queryKey: ["agents", agent.projectId] });
+    },
+  });
+}
+
+export function useWakeAgent() {
+  return useMutation({
+    mutationFn: ({
+      agentId,
+      taskId,
+      reason,
+    }: {
+      agentId: string;
+      taskId?: string;
+      reason?: string;
+    }) => api.post(`/agents/${agentId}/wake`, { taskId, reason }),
+  });
+}
