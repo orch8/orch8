@@ -1,0 +1,54 @@
+import { describe, it, expect } from "vitest";
+import { buildEnv } from "../adapter/env-builder.js";
+import type { ClaudeLocalAdapterConfig, RunContext } from "../adapter/types.js";
+
+describe("Agent envVars injection", () => {
+  it("includes agent-configured env vars in the process environment", () => {
+    const config: ClaudeLocalAdapterConfig = {
+      model: "claude-sonnet-4-20250514",
+      env: {
+        CUSTOM_API_KEY: "sk-test-123",
+        FEATURE_FLAG: "true",
+      },
+    };
+
+    const ctx: RunContext = {
+      agentId: "eng",
+      agentName: "Engineer",
+      projectId: "proj_1",
+      runId: "run_1",
+      wakeReason: "assignment",
+      apiUrl: "http://localhost:3000",
+      cwd: "/tmp",
+    };
+
+    const env = buildEnv(config, ctx, {});
+
+    expect(env.CUSTOM_API_KEY).toBe("sk-test-123");
+    expect(env.FEATURE_FLAG).toBe("true");
+    expect(env.ORCH_AGENT_ID).toBe("eng");
+  });
+
+  it("agent env vars do not override ORCH_* identity vars", () => {
+    const config: ClaudeLocalAdapterConfig = {
+      env: {
+        ORCH_AGENT_ID: "malicious-override",
+      },
+    };
+
+    const ctx: RunContext = {
+      agentId: "eng",
+      agentName: "Engineer",
+      projectId: "proj_1",
+      runId: "run_1",
+      wakeReason: "assignment",
+      apiUrl: "http://localhost:3000",
+      cwd: "/tmp",
+    };
+
+    const env = buildEnv(config, ctx, {});
+
+    // ORCH_* vars must be set AFTER config.env, so identity is authoritative
+    expect(env.ORCH_AGENT_ID).toBe("eng");
+  });
+});

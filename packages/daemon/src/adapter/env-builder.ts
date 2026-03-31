@@ -19,7 +19,13 @@ export function buildEnv(
     delete env[key];
   }
 
-  // Inject ORCH_* identity vars (spec §3.2)
+  // User-configured env vars (spec §3) — applied BEFORE identity
+  // so agent-configured vars cannot override ORCH_* identity
+  if (config.env) {
+    Object.assign(env, config.env);
+  }
+
+  // Inject ORCH_* identity vars (spec §3.2) — authoritative, cannot be overridden
   env.ORCH_AGENT_ID = ctx.agentId;
   env.ORCH_PROJECT_ID = ctx.projectId;
   env.ORCH_RUN_ID = ctx.runId;
@@ -37,11 +43,6 @@ export function buildEnv(
   }
   if (ctx.subtaskScope) {
     env.ORCH_SUBTASK_SCOPE = ctx.subtaskScope;
-  }
-
-  // User-configured env vars (spec §3)
-  if (config.env) {
-    Object.assign(env, config.env);
   }
 
   return env;

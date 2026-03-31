@@ -461,6 +461,10 @@ export class HeartbeatService {
         maxTurnsPerRun: agent.maxTurns,
         instructionsFilePath: agent.instructionsFilePath ?? undefined,
         cwd,
+        env: {
+          ...(agent.adapterConfig as ClaudeLocalAdapterConfig ?? {}).env,
+          ...(agent.envVars as Record<string, string> ?? {}),
+        },
       };
 
       const ctx: RunContext = {
