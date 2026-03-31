@@ -164,7 +164,7 @@ export function buildServer(options: ServerOptions = {}) {
           await verificationService.spawnVerifier(taskId, verifier.id);
         }
       },
-    });
+    }, broadcastService);
     app.decorate("lifecycleService", lifecycleService);
 
     // Auth middleware + routes that require DB

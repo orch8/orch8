@@ -4,6 +4,7 @@ import type { SchemaDb } from "../db/client.js";
 import { isValidTransition, type TaskColumn } from "./task-transitions.js";
 import { TaskService } from "./task.service.js";
 import { WorktreeService } from "./worktree.service.js";
+import type { BroadcastService } from "./broadcast.service.js";
 
 type Task = typeof tasks.$inferSelect;
 
@@ -22,6 +23,7 @@ export class TaskLifecycleService {
     private taskService: TaskService,
     private worktreeService: WorktreeService,
     private hooks?: LifecycleHooks,
+    private broadcastService?: BroadcastService,
   ) {}
 
   async transition(
@@ -99,6 +101,14 @@ export class TaskLifecycleService {
       .set(updateValues)
       .where(eq(tasks.id, taskId))
       .returning();
+
+    // Broadcast task_transitioned event (spec §14 §2.1)
+    this.broadcastService?.taskTransitioned(task.projectId, {
+      taskId,
+      from,
+      to,
+      agentId: opts?.agentId,
+    });
 
     // Post-transition: trigger verification pipeline on review
     if (to === "review" && this.hooks?.onReview) {
