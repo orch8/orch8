@@ -12,12 +12,12 @@ describe("WelcomeWizard", () => {
   it("renders welcome step first", () => {
     renderWithProviders(<WelcomeWizard onComplete={() => {}} />);
     expect(screen.getByText("Welcome to orch8")).toBeInTheDocument();
-    expect(screen.getByText("Get Started")).toBeInTheDocument();
+    expect(screen.getByText("Next")).toBeInTheDocument();
   });
 
   it("advances to Create Project step", async () => {
     renderWithProviders(<WelcomeWizard onComplete={() => {}} />);
-    await userEvent.click(screen.getByText("Get Started"));
+    await userEvent.click(screen.getByText("Next"));
     expect(screen.getByText("Create Project")).toBeInTheDocument();
   });
 

@@ -3,7 +3,10 @@ import {
   DndContext,
   type DragEndEvent,
   DragOverlay,
+  PointerSensor,
   pointerWithin,
+  useSensor,
+  useSensors,
 } from "@dnd-kit/core";
 import { useTasks, useTransitionTask } from "../../hooks/useTasks.js";
 import { useUiStore } from "../../stores/ui.js";
@@ -22,6 +25,9 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
   const selectTask = useUiStore((s) => s.selectTask);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [filters, setFilters] = useState<BoardFilters>({});
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
 
   const tasksByColumn = useMemo(() => {
     const grouped: Record<string, Task[]> = {};
@@ -69,6 +75,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
     <>
     <BoardToolbar projectId={projectId} onFilterChange={setFilters} />
     <DndContext
+      sensors={sensors}
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}

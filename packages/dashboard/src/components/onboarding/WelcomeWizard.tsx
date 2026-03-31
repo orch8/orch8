@@ -30,10 +30,6 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
   // First task
   const [taskTitle, setTaskTitle] = useState("");
 
-  function handleGetStarted() {
-    setStep(1);
-  }
-
   const steps = [
     {
       label: "Welcome",
@@ -44,12 +40,6 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
             orch8 orchestrates AI agents to work on your codebase. Create a project,
             configure agents, and let them handle tasks autonomously.
           </p>
-          <button
-            onClick={handleGetStarted}
-            className="mt-4 rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-500"
-          >
-            Get Started
-          </button>
         </div>
       ),
     },
@@ -160,27 +150,35 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
     if (selectedTemplate) {
       const tmpl = AGENT_TEMPLATES.find((t) => t.key === selectedTemplate);
       if (tmpl) {
-        await createAgent.mutateAsync({
-          id: tmpl.key,
-          projectId: project.id,
-          name: tmpl.label,
-          role: tmpl.defaults.role as any,
-          model: tmpl.defaults.model,
-          systemPrompt: tmpl.defaults.systemPrompt,
-          canCreateTasks: tmpl.defaults.canCreateTasks,
-          canMoveTo: tmpl.defaults.canMoveTo as any,
-        });
+        try {
+          await createAgent.mutateAsync({
+            id: tmpl.key,
+            projectId: project.id,
+            name: tmpl.label,
+            role: tmpl.defaults.role as any,
+            model: tmpl.defaults.model,
+            systemPrompt: tmpl.defaults.systemPrompt,
+            canCreateTasks: tmpl.defaults.canCreateTasks,
+            canMoveTo: tmpl.defaults.canMoveTo as any,
+          });
+        } catch {
+          // Agent creation failure should not block wizard completion
+        }
       }
     }
 
     // Create task if title given
     if (taskTitle.trim()) {
-      await createTask.mutateAsync({
-        projectId: project.id,
-        title: taskTitle.trim(),
-        taskType: "quick",
-        priority: "medium",
-      } as any);
+      try {
+        await createTask.mutateAsync({
+          projectId: project.id,
+          title: taskTitle.trim(),
+          taskType: "quick",
+          priority: "medium",
+        } as any);
+      } catch {
+        // Task creation failure should not block wizard completion
+      }
     }
 
     onComplete();
