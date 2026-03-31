@@ -134,6 +134,11 @@ export class VerificationService {
         })
         .where(eq(tasks.id, taskId));
 
+      // Re-dispatch implementer to fix issues
+      if (task.assignee) {
+        await this.enqueueWakeup(task.assignee, task.projectId, taskId, "verification_fix_needed");
+      }
+
       return { action: "in_progress" };
     }
 
@@ -164,7 +169,7 @@ export class VerificationService {
     taskId: string,
     verdict: RefereeVerdict,
   ): Promise<{ action: "done" | "in_progress" | "done_with_caveats" }> {
-    await this.loadTask(taskId);
+    const task = await this.loadTask(taskId);
 
     await this.db
       .update(tasks)
@@ -207,6 +212,12 @@ export class VerificationService {
           updatedAt: new Date(),
         })
         .where(eq(tasks.id, taskId));
+
+      // Re-dispatch implementer to fix issues
+      if (task.assignee) {
+        await this.enqueueWakeup(task.assignee, task.projectId, taskId, "referee_ordered_fix");
+      }
+
       return { action: "in_progress" };
     }
 

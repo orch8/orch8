@@ -59,6 +59,19 @@ export async function verificationRoutes(app: FastifyInstance) {
           request.params.id,
           parsed.data,
         );
+
+        // Auto-spawn referee if implementer disagrees
+        if (result.action === "referee_needed") {
+          const task = await app.taskService.getById(request.params.id);
+          if (task) {
+            const allAgents = await app.agentService.list({ projectId: task.projectId });
+            const referee = allAgents.find((a) => a.role === "referee");
+            if (referee) {
+              await app.verificationService.spawnReferee(task.id, referee.id);
+            }
+          }
+        }
+
         return result;
       } catch (err) {
         if ((err as Error).message === "Task not found") {
