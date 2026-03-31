@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useEntities, useSearchFacts, useWorklog, useLessons } from "../../hooks/useMemory.js";
+import { useCreateEntity } from "../../hooks/useMemoryMutations.js";
+import { FormField } from "../shared/FormField.js";
 import { EntityDetail } from "./EntityDetail.js";
 
 const TYPE_FILTERS = [
@@ -19,6 +21,12 @@ export function MemoryBrowser({ projectId }: MemoryBrowserProps) {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"entities" | "worklog" | "lessons">("entities");
   const [worklogAgentId, setWorklogAgentId] = useState("");
+
+  const createEntity = useCreateEntity();
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newEntityName, setNewEntityName] = useState("");
+  const [newEntityType, setNewEntityType] = useState("area");
+  const [newEntityDesc, setNewEntityDesc] = useState("");
 
   const { data: entities, isLoading } = useEntities(projectId, typeFilter);
   const { data: searchResults } = useSearchFacts(searchQuery);
@@ -53,6 +61,66 @@ export function MemoryBrowser({ projectId }: MemoryBrowserProps) {
             </button>
           ))}
         </div>
+
+        {/* New Entity Button + Form */}
+        <button
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          className="rounded-md bg-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-600"
+        >
+          + New Entity
+        </button>
+
+        {showCreateForm && projectId && (
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              await createEntity.mutateAsync({
+                projectId,
+                name: newEntityName,
+                entityType: newEntityType,
+                description: newEntityDesc || undefined,
+              });
+              setNewEntityName("");
+              setNewEntityDesc("");
+              setShowCreateForm(false);
+            }}
+            className="flex flex-col gap-2 rounded border border-zinc-800 bg-zinc-900/50 p-3"
+          >
+            <FormField label="Name">
+              <input
+                value={newEntityName}
+                onChange={(e) => setNewEntityName(e.target.value)}
+                required
+                className="rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-sm text-zinc-200"
+              />
+            </FormField>
+            <FormField label="Type">
+              <select
+                value={newEntityType}
+                onChange={(e) => setNewEntityType(e.target.value)}
+                className="rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-sm text-zinc-200"
+              >
+                <option value="project">Project</option>
+                <option value="area">Area</option>
+                <option value="archive">Archive</option>
+              </select>
+            </FormField>
+            <FormField label="Description">
+              <input
+                value={newEntityDesc}
+                onChange={(e) => setNewEntityDesc(e.target.value)}
+                className="rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-sm text-zinc-200"
+              />
+            </FormField>
+            <button
+              type="submit"
+              disabled={!newEntityName.trim() || createEntity.isPending}
+              className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+            >
+              Create
+            </button>
+          </form>
+        )}
 
         {isLoading && <p className="text-xs text-zinc-600">Loading entities...</p>}
 
