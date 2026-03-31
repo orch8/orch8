@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import Fastify from "fastify";
+import { eq } from "drizzle-orm";
 import { projects, agents } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
@@ -79,12 +80,10 @@ describe("Project Archive", () => {
       });
 
       // Manually set an agent to terminated
-      const { eq: eqOp } = await import("drizzle-orm");
-      const { agents: agentsTable } = await import("@orch/shared/db");
       await testDb.db
-        .update(agentsTable)
+        .update(agents)
         .set({ status: "terminated" })
-        .where(eqOp(agentsTable.id, "eng-active"));
+        .where(eq(agents.id, "eng-active"));
 
       await agentService.create({
         id: "eng-active2",
@@ -123,6 +122,10 @@ describe("Project Archive", () => {
       app.register(authPlugin);
       app.register(projectRoutes);
       await app.ready();
+    });
+
+    afterEach(async () => {
+      await app.close();
     });
 
     it("archives a project (admin)", async () => {

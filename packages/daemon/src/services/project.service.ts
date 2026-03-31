@@ -40,23 +40,23 @@ export class ProjectService {
     const existing = await this.getById(id);
     if (!existing) throw new Error("Project not found");
 
-    // Pause all active agents in this project
-    await this.db
-      .update(agents)
-      .set({
-        status: "paused",
-        pauseReason: "project archived",
-        updatedAt: new Date(),
-      })
-      .where(and(eq(agents.projectId, id), eq(agents.status, "active")));
+    return this.db.transaction(async (tx) => {
+      await tx
+        .update(agents)
+        .set({
+          status: "paused",
+          pauseReason: "project archived",
+          updatedAt: new Date(),
+        })
+        .where(and(eq(agents.projectId, id), eq(agents.status, "active")));
 
-    // Set project inactive
-    const [archived] = await this.db
-      .update(projects)
-      .set({ active: false, updatedAt: new Date() })
-      .where(eq(projects.id, id))
-      .returning();
+      const [archived] = await tx
+        .update(projects)
+        .set({ active: false, updatedAt: new Date() })
+        .where(eq(projects.id, id))
+        .returning();
 
-    return archived;
+      return archived;
+    });
   }
 }
