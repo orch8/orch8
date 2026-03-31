@@ -84,6 +84,14 @@ export class HeartbeatService {
     this.extractionService = service;
   }
 
+  get activeCount(): number {
+    return this.activeRunExecutions.size;
+  }
+
+  get queueDepth(): number {
+    return this.activeRunExecutions.size;
+  }
+
   isRunActive(runId: string): boolean {
     return this.activeRunExecutions.has(runId);
   }

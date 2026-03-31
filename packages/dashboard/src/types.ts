@@ -7,6 +7,7 @@ import type {
   knowledgeEntities,
   knowledgeFacts,
   activityLog,
+  notifications,
 } from "@orch/shared";
 
 // Row types inferred from Drizzle schema
@@ -18,6 +19,7 @@ export type Run = typeof heartbeatRuns.$inferSelect;
 export type Entity = typeof knowledgeEntities.$inferSelect;
 export type Fact = typeof knowledgeFacts.$inferSelect;
 export type LogEntry = typeof activityLog.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
 
 // API-specific response types
 export interface CostSummary {
@@ -83,3 +85,13 @@ export const COLUMN_LABELS: Record<KanbanColumn, string> = {
   verification: "Verification",
   done: "Done",
 };
+
+export interface DaemonStatus {
+  status: string;
+  pid: number;
+  uptimeMs: number;
+  uptimeFormatted: string;
+  tickIntervalMs: number;
+  processCount: number;
+  queueDepth: number;
+}

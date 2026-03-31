@@ -74,6 +74,17 @@ export const brainstormStatusEnum = pgEnum("brainstorm_status", [
   "active", "idle", "ready", "expired",
 ]);
 
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "verification_failed",
+  "verification_passed",
+  "budget_warning",
+  "budget_exceeded",
+  "agent_failure",
+  "brainstorm_ready",
+  "task_completed",
+  "stuck_task",
+]);
+
 // ─── Projects ─────────────────────────────────────────────
 
 export const projects = pgTable("projects", {
@@ -401,5 +412,18 @@ export const mcpTools = pgTable("mcp_tools", {
   serverCommand: text("server_command").notNull(),
   serverArgs: text("server_args").array().default(sql`'{}'`),
   envVars: jsonb("env_vars").default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Notifications ───────────────────────────────────────
+
+export const notifications = pgTable("notifications", {
+  id: text("id").primaryKey().$defaultFn(() => `ntf_${randomUUID()}`),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  type: notificationTypeEnum("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"),
+  read: boolean("read").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

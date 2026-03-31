@@ -45,6 +45,63 @@ export interface BudgetAlertPayload {
   budgetSpentUsd?: number;
 }
 
+export interface NotificationNewPayload {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  link: string | null;
+}
+
+export interface VerificationVerdictPayload {
+  taskId: string;
+  verdict: string;
+  agentId: string;
+  commentId: string;
+}
+
+export interface VerificationResponsePayload {
+  taskId: string;
+  agentId: string;
+  commentId: string;
+}
+
+export interface VerificationRefereePayload {
+  taskId: string;
+  verdict: string;
+  agentId: string;
+  commentId: string;
+}
+
+export interface DaemonLogPayload {
+  level: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface DaemonStatsPayload {
+  uptimeMs: number;
+  processCount: number;
+  queueDepth: number;
+  tickIntervalMs: number;
+}
+
+export interface ActivityNewPayload {
+  id: number;
+  level: string;
+  agentId: string | null;
+  taskId: string | null;
+  message: string;
+  timestamp: string;
+}
+
+export interface CommentNewPayload {
+  taskId: string;
+  commentId: string;
+  type: string;
+  authorId: string;
+}
+
 export class BroadcastService {
   constructor(private sockets: Set<WebSocket>) {}
 
@@ -74,6 +131,38 @@ export class BroadcastService {
 
   budgetAlert(projectId: string, payload: BudgetAlertPayload): void {
     this.send(projectId, { type: "budget_alert", ...payload });
+  }
+
+  notificationNew(projectId: string, payload: NotificationNewPayload): void {
+    this.send(projectId, { ...payload, type: "notification:new" });
+  }
+
+  verificationVerdict(projectId: string, payload: VerificationVerdictPayload): void {
+    this.send(projectId, { type: "verification:verdict", ...payload });
+  }
+
+  verificationResponse(projectId: string, payload: VerificationResponsePayload): void {
+    this.send(projectId, { type: "verification:response", ...payload });
+  }
+
+  verificationReferee(projectId: string, payload: VerificationRefereePayload): void {
+    this.send(projectId, { type: "verification:referee", ...payload });
+  }
+
+  daemonLog(payload: DaemonLogPayload): void {
+    this.send("__system__", { type: "daemon:log", ...payload });
+  }
+
+  daemonStats(payload: DaemonStatsPayload): void {
+    this.send("__system__", { type: "daemon:stats", ...payload });
+  }
+
+  activityNew(projectId: string, payload: ActivityNewPayload): void {
+    this.send(projectId, { type: "activity:new", ...payload });
+  }
+
+  commentNew(projectId: string, payload: CommentNewPayload): void {
+    this.send(projectId, { ...payload, type: "comment:new" });
   }
 
   /** Raw send for backward compat (brainstorm_output, etc.) */
