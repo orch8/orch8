@@ -62,7 +62,7 @@ describe("TaskCard", () => {
 
 describe("KanbanBoard", () => {
   it("renders all six columns", async () => {
-    mockFetch.mockResolvedValueOnce({
+    mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve([]),
     });
@@ -78,13 +78,22 @@ describe("KanbanBoard", () => {
   });
 
   it("places tasks in correct columns", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () =>
-        Promise.resolve([
-          { ...mockTask, id: "t1", column: "backlog" },
-          { ...mockTask, id: "t2", title: "Review PR", column: "review" },
-        ]),
+    mockFetch.mockImplementation((...args: any[]) => {
+      const url = String(args[0] ?? "");
+      if (url.includes("/tasks")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve([
+              { ...mockTask, id: "t1", column: "backlog" },
+              { ...mockTask, id: "t2", title: "Review PR", column: "review" },
+            ]),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([]),
+      });
     });
 
     renderWithProviders(<KanbanBoard projectId="proj_1" />);
