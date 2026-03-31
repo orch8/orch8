@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { useUiStore } from "../../stores/ui.js";
 import { ProjectSwitcher } from "./ProjectSwitcher.js";
 import { NotificationBell } from "./NotificationBell.js";
+import { useParams } from "@tanstack/react-router";
 
 interface NavItem {
   to: string;
@@ -13,46 +14,52 @@ interface NavSection {
   items: NavItem[];
 }
 
-const SECTIONS: NavSection[] = [
-  {
-    title: "SETUP",
-    items: [
-      { to: "/projects", label: "Projects" },
-      { to: "/agents", label: "Agents" },
-      { to: "/settings", label: "Settings" },
-    ],
-  },
-  {
-    title: "WORK",
-    items: [
-      { to: "/board", label: "Board" },
-      { to: "/brainstorm", label: "Brainstorm" },
-      { to: "/review", label: "Review Queue" },
-    ],
-  },
-  {
-    title: "MONITOR",
-    items: [
-      { to: "/runs", label: "Runs" },
-      { to: "/cost", label: "Cost" },
-      { to: "/memory", label: "Memory" },
-      { to: "/activity", label: "Activity" },
-    ],
-  },
-  {
-    title: "SYSTEM",
-    items: [
-      { to: "/daemon", label: "Daemon" },
-    ],
-  },
-];
+function useProjectSections(): NavSection[] {
+  const params = useParams({ strict: false }) as { projectId?: string };
+  const projectId = params.projectId;
+  const prefix = projectId ? `/projects/${projectId}` : "";
+
+  return [
+    {
+      title: "WORK",
+      items: [
+        { to: `${prefix}/board`, label: "Board" },
+        { to: `${prefix}/brainstorm`, label: "Brainstorm" },
+        { to: `${prefix}/review`, label: "Review Queue" },
+      ],
+    },
+    {
+      title: "SETUP",
+      items: [
+        { to: `${prefix}/agents`, label: "Agents" },
+        { to: `${prefix}/settings`, label: "Settings" },
+      ],
+    },
+    {
+      title: "MONITOR",
+      items: [
+        { to: `${prefix}/runs`, label: "Runs" },
+        { to: `${prefix}/cost`, label: "Cost" },
+        { to: `${prefix}/memory`, label: "Memory" },
+        { to: `${prefix}/activity`, label: "Activity" },
+      ],
+    },
+    {
+      title: "SYSTEM",
+      items: [
+        { to: "/daemon", label: "Daemon" },
+      ],
+    },
+  ];
+}
 
 export function Sidebar() {
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
-  const activeProjectId = useUiStore((s) => s.activeProjectId);
+  const params = useParams({ strict: false }) as { projectId?: string };
   const pathname = useRouterState({
     select: (s) => s.location.pathname,
   });
+  const sections = useProjectSections();
 
   if (!sidebarOpen) return null;
 
@@ -72,9 +79,9 @@ export function Sidebar() {
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
         {/* Home */}
         <Link
-          to="/"
+          to={params.projectId ? `/projects/${params.projectId}` : "/"}
           className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-            isActive("/")
+            pathname === "/" || pathname === `/projects/${params.projectId}`
               ? "bg-zinc-800 text-zinc-100"
               : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
           }`}
@@ -83,7 +90,7 @@ export function Sidebar() {
         </Link>
 
         {/* Sections */}
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <div key={section.title} className="mt-3">
             <span className="px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
               {section.title}
@@ -110,7 +117,11 @@ export function Sidebar() {
       {/* Footer */}
       <div className="border-t border-zinc-800 p-3">
         <div className="flex items-center justify-between">
-          <NotificationBell projectId={activeProjectId} />
+          {params.projectId ? (
+            <NotificationBell projectId={params.projectId} />
+          ) : (
+            <span />
+          )}
           <span className="text-[10px] text-zinc-600">orch8</span>
         </div>
       </div>
