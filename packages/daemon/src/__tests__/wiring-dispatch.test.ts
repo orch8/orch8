@@ -10,6 +10,7 @@ import { authPlugin } from "../api/middleware/auth.js";
 import { taskRoutes } from "../api/routes/tasks.js";
 import { TaskService } from "../services/task.service.js";
 import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
+import { ComplexPhaseService } from "../services/complex-phase.service.js";
 import "../types.js";
 
 describe("Wiring: Dispatch", () => {
@@ -485,6 +486,83 @@ describe("Wiring: Dispatch", () => {
       await service.executeRun(run.id);
 
       expect(onRunCompleted).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("P1 #5: complex phase completion wakes next agent", () => {
+    it("enqueues wakeup for next phase agent after completePhase", async () => {
+      // Create research and plan agents
+      await testDb.db.insert(agents).values([
+        {
+          id: "researcher-1",
+          projectId,
+          name: "Researcher",
+          role: "researcher",
+          status: "active",
+          wakeOnAutomation: true,
+          maxConcurrentRuns: 1,
+        },
+        {
+          id: "planner-1",
+          projectId,
+          name: "Planner",
+          role: "planner",
+          status: "active",
+          wakeOnAutomation: true,
+          maxConcurrentRuns: 1,
+        },
+      ]);
+
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Complex feature",
+        taskType: "complex",
+        complexPhase: "research",
+        column: "in_progress",
+        researchAgentId: "researcher-1",
+        planAgentId: "planner-1",
+      }).returning();
+
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const heartbeatService = new HeartbeatService(testDb.db, broadcastService);
+      vi.spyOn(heartbeatService, "executeRun").mockResolvedValue();
+      const enqueueSpy = vi.spyOn(heartbeatService, "enqueueWakeup");
+
+      const app = Fastify();
+      app.decorate("db", testDb.db);
+      app.decorate("heartbeatService", heartbeatService);
+
+      const taskService = new TaskService(testDb.db);
+      app.decorate("taskService", taskService);
+
+      const worktreeService = new WorktreeService();
+      const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
+      app.decorate("lifecycleService", lifecycleService);
+
+      app.register(authPlugin);
+      app.register(taskRoutes);
+      await app.ready();
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/tasks/${task.id}/complete`,
+        headers: { "x-project-id": projectId },
+        payload: { output: "Research findings..." },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.nextPhase).toBe("plan");
+
+      // Should have enqueued wakeup for planner agent
+      expect(enqueueSpy).toHaveBeenCalledWith("planner-1", projectId, expect.objectContaining({
+        source: "automation",
+        taskId: task.id,
+        reason: "phase_plan_ready",
+      }));
+
+      await app.close();
     });
   });
 });

@@ -165,6 +165,26 @@ export async function taskRoutes(app: FastifyInstance) {
       }
 
       const result = await phaseService.completePhase(task.id, parsed.data.output);
+
+      // Wake the next phase agent if there is one
+      if (result.nextPhase) {
+        const nextAgent = await phaseService.getPhaseAgent(result.task, result.nextPhase);
+        if (nextAgent) {
+          await app.heartbeatService.enqueueWakeup(nextAgent.id, task.projectId, {
+            source: "automation",
+            taskId: task.id,
+            reason: `phase_${result.nextPhase}_ready`,
+          });
+        }
+      } else {
+        // Final phase — use lifecycle transition for review so onReview hook fires
+        try {
+          await app.lifecycleService.transition(task.id, "review");
+        } catch {
+          // completePhase already set column to "review" directly, so this is best-effort
+        }
+      }
+
       return result;
     }
 
