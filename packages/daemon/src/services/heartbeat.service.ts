@@ -37,6 +37,7 @@ export interface WakeupOpts {
   taskId?: string;
   reason?: string;
   payload?: unknown;
+  idempotencyKey?: string;
 }
 
 export class HeartbeatService {
@@ -114,6 +115,25 @@ export class HeartbeatService {
     projectId: string,
     opts: WakeupOpts,
   ): Promise<WakeupRequest> {
+    // 0. Idempotency key deduplication
+    if (opts.idempotencyKey) {
+      const [existing] = await this.db
+        .select()
+        .from(wakeupRequests)
+        .where(
+          and(
+            eq(wakeupRequests.agentId, agentId),
+            eq(wakeupRequests.projectId, projectId),
+            eq(wakeupRequests.idempotencyKey, opts.idempotencyKey),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        return this.recordWakeup(agentId, projectId, opts, "coalesced");
+      }
+    }
+
     // 1. Validate agent exists
     const agent = await this.loadAgent(agentId, projectId);
     if (!agent) throw new Error("Agent not found");
@@ -699,6 +719,7 @@ export class HeartbeatService {
         source: opts.source,
         reason: opts.reason ?? null,
         payload: opts.payload ?? null,
+        idempotencyKey: opts.idempotencyKey ?? null,
         status,
         runId: runId ?? null,
       })
