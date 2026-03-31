@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, type RenderOptions } from "@testing-library/react";
+import { type RenderResult, render, type RenderOptions } from "@testing-library/react";
 
 function createTestQueryClient() {
   return new QueryClient({
@@ -15,7 +15,7 @@ function createTestQueryClient() {
 export function renderWithProviders(
   ui: ReactNode,
   options?: Omit<RenderOptions, "wrapper">,
-) {
+): RenderResult & { queryClient: QueryClient } {
   const queryClient = createTestQueryClient();
   function Wrapper({ children }: { children: ReactNode }) {
     return (

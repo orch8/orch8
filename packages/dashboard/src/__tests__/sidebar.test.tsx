@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithProviders, screen } from "../test-utils.js";
 import { Sidebar } from "../components/layout/Sidebar.js";
 

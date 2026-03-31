@@ -14,7 +14,7 @@ const LEVEL_COLORS: Record<string, string> = {
   error: "bg-red-500",
 };
 
-function relativeTime(dateStr: string): string {
+function relativeTime(dateStr: string | Date): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const seconds = Math.floor(diff / 1000);
   if (seconds < 60) return `${seconds}s ago`;
