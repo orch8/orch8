@@ -25,6 +25,18 @@ export class SchedulerService {
     private config: SchedulerConfig,
   ) {}
 
+  get intervalMs(): number {
+    return this.config.intervalMs;
+  }
+
+  get activeProcessCount(): number {
+    return this.heartbeatService.activeCount;
+  }
+
+  get queueDepth(): number {
+    return this.heartbeatService.queueDepth;
+  }
+
   setLogger(logger: FastifyBaseLogger): void {
     this.logger = logger;
   }
