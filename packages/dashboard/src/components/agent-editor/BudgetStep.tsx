@@ -1,7 +1,6 @@
 import { FormField } from "../shared/FormField.js";
 
 export interface BudgetData {
-  dailyBudgetLimit: string;
   totalBudgetLimit: string;
   autoPauseThreshold: string;
 }
@@ -18,18 +17,6 @@ export function BudgetStep({ data, onChange }: BudgetStepProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <FormField label="Daily Budget Limit ($)" description="Maximum spend per day">
-        <input
-          type="number"
-          min={0}
-          step={0.01}
-          value={data.dailyBudgetLimit}
-          onChange={(e) => update({ dailyBudgetLimit: e.target.value })}
-          placeholder="No limit"
-          className="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none"
-        />
-      </FormField>
-
       <FormField label="Total Budget Limit ($)" description="Lifetime cap on agent spend">
         <input
           type="number"
@@ -44,7 +31,7 @@ export function BudgetStep({ data, onChange }: BudgetStepProps) {
 
       <FormField
         label="Auto-Pause Threshold (%)"
-        description="Pause agent when reaching this percentage of daily limit"
+        description="Pause agent when reaching this percentage of total budget"
       >
         <input
           type="number"

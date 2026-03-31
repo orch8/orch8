@@ -4,8 +4,6 @@ export interface PermissionsData {
   canCreateTasks: boolean;
   canMoveTo: string[];
   canAssignTo: string[];
-  canComment: boolean;
-  canAccessMemory: boolean;
 }
 
 interface PermissionsStepProps {
@@ -45,24 +43,6 @@ export function PermissionsStep({ data, agentIds, onChange }: PermissionsStepPro
             className="rounded border-zinc-700"
           />
           Can create tasks
-        </label>
-        <label className="flex items-center gap-2 text-sm text-zinc-300">
-          <input
-            type="checkbox"
-            checked={data.canComment}
-            onChange={(e) => update({ canComment: e.target.checked })}
-            className="rounded border-zinc-700"
-          />
-          Can leave comments
-        </label>
-        <label className="flex items-center gap-2 text-sm text-zinc-300">
-          <input
-            type="checkbox"
-            checked={data.canAccessMemory}
-            onChange={(e) => update({ canAccessMemory: e.target.checked })}
-            className="rounded border-zinc-700"
-          />
-          Can access memory (knowledge graph)
         </label>
       </div>
 

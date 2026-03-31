@@ -37,11 +37,8 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
     canCreateTasks: false,
     canMoveTo: [],
     canAssignTo: [],
-    canComment: true,
-    canAccessMemory: true,
   });
   const [budget, setBudget] = useState<BudgetData>({
-    dailyBudgetLimit: "",
     totalBudgetLimit: "",
     autoPauseThreshold: "90",
   });
@@ -84,6 +81,7 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
       canMoveTo: permissions.canMoveTo as any,
       canAssignTo: permissions.canAssignTo,
       budgetLimitUsd: budget.totalBudgetLimit ? parseFloat(budget.totalBudgetLimit) : undefined,
+      autoPauseThreshold: budget.autoPauseThreshold ? parseInt(budget.autoPauseThreshold, 10) : undefined,
     });
 
     onCreated(identity.slug);
