@@ -42,6 +42,6 @@ export const authPlugin = fp(async function authPlugin(app: FastifyInstance) {
     }
 
     request.isAdmin = true;
-    request.projectId = projectId ?? (request.query as Record<string, string>)?.project ?? undefined;
+    request.projectId = projectId ?? (request.query as Record<string, string>)?.projectId ?? undefined;
   });
 });
