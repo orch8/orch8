@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { api } from "../../api/client.js";
 import { useRuns } from "../../hooks/useRuns.js";
 import { RunDetail } from "./RunDetail.js";
 
@@ -21,6 +22,8 @@ export function RunInspector({ projectId }: RunInspectorProps) {
   const [statusFilter, setStatusFilter] = useState("");
   const [agentFilter, setAgentFilter] = useState("");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const { data: runs, isLoading } = useRuns(projectId, {
     status: statusFilter || undefined,
@@ -49,6 +52,20 @@ export function RunInspector({ projectId }: RunInspectorProps) {
             placeholder="Filter by agent..."
             className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-300 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none"
           />
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-300 focus:border-zinc-600 focus:outline-none"
+            aria-label="Start date"
+          />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-300 focus:border-zinc-600 focus:outline-none"
+            aria-label="End date"
+          />
         </div>
 
         {isLoading && <p className="text-sm text-zinc-600">Loading runs...</p>}
@@ -64,6 +81,7 @@ export function RunInspector({ projectId }: RunInspectorProps) {
                 <th className="px-3 py-2">Source</th>
                 <th className="px-3 py-2 text-right">Cost</th>
                 <th className="px-3 py-2">Started</th>
+                <th className="px-3 py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -89,6 +107,32 @@ export function RunInspector({ projectId }: RunInspectorProps) {
                   </td>
                   <td className="px-3 py-2 text-zinc-500">
                     {run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex gap-1">
+                      {(run.status === "running" || run.status === "queued") && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            api.post(`/runs/${run.id}/cancel`, { projectId }).catch(() => {});
+                          }}
+                          className="rounded bg-red-900/30 px-2 py-0.5 text-xs text-red-300 hover:bg-red-900/50"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      {(run.status === "failed" || run.status === "cancelled") && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            api.post(`/runs/${run.id}/retry`, { projectId }).catch(() => {});
+                          }}
+                          className="rounded bg-blue-900/30 px-2 py-0.5 text-xs text-blue-300 hover:bg-blue-900/50"
+                        >
+                          Retry
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
