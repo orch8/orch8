@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import { projects, agents, heartbeatRuns, wakeupRequests } from "@orch/shared/db";
+import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { SchedulerService } from "../services/scheduler.service.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
@@ -117,5 +117,94 @@ describe("SchedulerService tickTimers", () => {
 
     const woken = await scheduler.tickTimers();
     expect(woken).toHaveLength(1);
+  });
+});
+
+describe("SchedulerService processVerificationQueue", () => {
+  let testDb: TestDb;
+  let heartbeatService: HeartbeatService;
+  let scheduler: SchedulerService;
+  let projectId: string;
+
+  beforeAll(async () => {
+    testDb = await setupTestDb();
+
+    const [project] = await testDb.db.insert(projects).values({
+      name: "Verify Queue",
+      slug: "verify-queue",
+      homeDir: "/tmp/verify-queue",
+      worktreeDir: "/tmp/verify-queue-wt",
+    }).returning();
+    projectId = project.id;
+  }, 60_000);
+
+  afterAll(async () => {
+    scheduler?.stop();
+    heartbeatService?.shutdown();
+    await teardownTestDb(testDb);
+  });
+
+  beforeEach(async () => {
+    await testDb.db.delete(wakeupRequests);
+    await testDb.db.delete(heartbeatRuns);
+    await testDb.db.delete(tasks);
+    await testDb.db.delete(agents);
+
+    heartbeatService = new HeartbeatService(testDb.db, () => {});
+    scheduler = new SchedulerService(testDb.db, heartbeatService, {
+      intervalMs: 60_000,
+      stalenessThresholdMs: 5 * 60 * 1000,
+    });
+  });
+
+  it("wakes verifier for tasks in verification column with no active run", async () => {
+    await testDb.db.insert(agents).values({
+      id: "verifier-1",
+      projectId,
+      name: "Verifier",
+      role: "verifier",
+    });
+
+    await testDb.db.insert(tasks).values({
+      projectId,
+      title: "Stuck in verification",
+      column: "verification",
+      executionAgentId: null,
+      executionRunId: null,
+    });
+
+    const processed = await scheduler.processVerificationQueue(projectId);
+    expect(processed).toBe(1);
+  });
+
+  it("skips tasks that already have an active execution", async () => {
+    await testDb.db.insert(agents).values({
+      id: "verifier-1",
+      projectId,
+      name: "Verifier",
+      role: "verifier",
+    });
+
+    await testDb.db.insert(tasks).values({
+      projectId,
+      title: "Already running",
+      column: "verification",
+      executionAgentId: "verifier-1",
+      executionRunId: "run_existing",
+    });
+
+    const processed = await scheduler.processVerificationQueue(projectId);
+    expect(processed).toBe(0);
+  });
+
+  it("returns 0 when no verifier agent exists", async () => {
+    await testDb.db.insert(tasks).values({
+      projectId,
+      title: "No verifier",
+      column: "verification",
+    });
+
+    const processed = await scheduler.processVerificationQueue(projectId);
+    expect(processed).toBe(0);
   });
 });
