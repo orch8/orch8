@@ -393,4 +393,98 @@ describe("Wiring: Dispatch", () => {
       await app.close();
     });
   });
+
+  describe("P0 #4: executeRun transitions task on completion", () => {
+    it("calls onRunCompleted with taskId and succeeded status", async () => {
+      await testDb.db.insert(agents).values({
+        id: "agent-1",
+        projectId,
+        name: "Worker",
+        role: "engineer",
+        status: "active",
+        maxConcurrentRuns: 1,
+      });
+
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Test task",
+        taskType: "quick",
+        column: "in_progress",
+      }).returning();
+
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "agent-1",
+        projectId,
+        taskId: task.id,
+        invocationSource: "assignment",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const service = new HeartbeatService(testDb.db, broadcastService);
+
+      service.setAdapter({
+        runAgent: vi.fn().mockResolvedValue({
+          exitCode: 0,
+          result: "done",
+          costUsd: 0,
+        }),
+      } as any);
+
+      const onRunCompleted = vi.fn().mockResolvedValue(undefined);
+      service.setOnRunCompleted(onRunCompleted);
+
+      await service.executeRun(run.id);
+
+      expect(onRunCompleted).toHaveBeenCalledWith(task.id, "succeeded");
+    });
+
+    it("does NOT call onRunCompleted when run fails", async () => {
+      await testDb.db.insert(agents).values({
+        id: "agent-1",
+        projectId,
+        name: "Worker",
+        role: "engineer",
+        status: "active",
+        maxConcurrentRuns: 1,
+      });
+
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Test task",
+        taskType: "quick",
+        column: "in_progress",
+      }).returning();
+
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "agent-1",
+        projectId,
+        taskId: task.id,
+        invocationSource: "assignment",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const service = new HeartbeatService(testDb.db, broadcastService);
+
+      service.setAdapter({
+        runAgent: vi.fn().mockResolvedValue({
+          exitCode: 1,
+          error: "something failed",
+          costUsd: 0,
+        }),
+      } as any);
+
+      const onRunCompleted = vi.fn();
+      service.setOnRunCompleted(onRunCompleted);
+
+      await service.executeRun(run.id);
+
+      expect(onRunCompleted).not.toHaveBeenCalled();
+    });
+  });
 });

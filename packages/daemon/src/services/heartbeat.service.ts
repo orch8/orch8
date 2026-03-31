@@ -619,6 +619,18 @@ export class HeartbeatService {
           );
         });
       }
+
+      // 10c. Notify lifecycle of run completion
+      if (claimedRun.taskId && terminalStatus === "succeeded" && this.onRunCompleted) {
+        try {
+          await this.onRunCompleted(claimedRun.taskId, terminalStatus);
+        } catch (err) {
+          this.logger?.error(
+            { err, taskId: claimedRun.taskId, runId, status: terminalStatus },
+            "onRunCompleted callback failed",
+          );
+        }
+      }
     } catch (err) {
       await this.failRun(
         runId,
