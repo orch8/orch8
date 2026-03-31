@@ -55,6 +55,15 @@ export const UpdateTaskSchema = z.object({
   planAgentId: z.string().nullable().optional(),
   implementAgentId: z.string().nullable().optional(),
   reviewAgentId: z.string().nullable().optional(),
+  autoCommit: z.boolean().optional(),
+  autoPr: z.boolean().optional(),
+  branch: z.string().nullable().optional(),
+  worktreePath: z.string().nullable().optional(),
+  mcpTools: z.array(z.string()).optional(),
+  researchPromptOverride: z.string().nullable().optional(),
+  planPromptOverride: z.string().nullable().optional(),
+  implementPromptOverride: z.string().nullable().optional(),
+  reviewPromptOverride: z.string().nullable().optional(),
 });
 
 export const CompletePhaseSchema = z.object({

@@ -42,6 +42,10 @@ export const CreateAgentSchema = z.object({
   adapterConfig: z.record(z.unknown()).optional(),
   envVars: z.record(z.string()).optional(),
   budgetLimitUsd: z.number().min(0).optional(),
+  autoPauseThreshold: z.number().int().min(0).max(100).optional(),
+  maxConcurrentTasks: z.number().int().min(1).optional(),
+  maxConcurrentSubagents: z.number().int().min(0).optional(),
+  workingHours: z.string().optional(),
 });
 
 export const UpdateAgentSchema = z.object({
@@ -76,6 +80,10 @@ export const UpdateAgentSchema = z.object({
   adapterConfig: z.record(z.unknown()).optional(),
   envVars: z.record(z.string()).optional(),
   budgetLimitUsd: z.number().min(0).nullable().optional(),
+  autoPauseThreshold: z.number().int().min(0).max(100).nullable().optional(),
+  maxConcurrentTasks: z.number().int().min(1).optional(),
+  maxConcurrentSubagents: z.number().int().min(0).optional(),
+  workingHours: z.string().nullable().optional(),
 });
 
 export const AgentFilterSchema = z.object({
