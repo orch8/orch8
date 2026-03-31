@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { heartbeatRuns } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 
@@ -9,6 +9,7 @@ export interface SubagentConfig {
   projectId: string;
   scope: string;
   taskId?: string;
+  maxConcurrentSubagents?: number;
 }
 
 export interface SubagentResult {
@@ -23,6 +24,25 @@ export class SubagentService {
   constructor(private db: SchemaDb) {}
 
   async registerChild(parentRunId: string, config: SubagentConfig): Promise<HeartbeatRun> {
+    // Enforce maxConcurrentSubagents if specified
+    if (config.maxConcurrentSubagents != null) {
+      const [{ count }] = await this.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(heartbeatRuns)
+        .where(
+          and(
+            eq(heartbeatRuns.parentRunId, parentRunId),
+            sql`${heartbeatRuns.status} IN ('queued', 'running')`,
+          ),
+        );
+
+      if (count >= config.maxConcurrentSubagents) {
+        throw new Error(
+          `maxConcurrentSubagents limit reached (${count}/${config.maxConcurrentSubagents})`,
+        );
+      }
+    }
+
     const [child] = await this.db.insert(heartbeatRuns).values({
       agentId: config.agentId,
       projectId: config.projectId,
