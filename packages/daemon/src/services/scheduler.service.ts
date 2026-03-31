@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
-import { heartbeatRuns, projects } from "@orch/shared/db";
+import { eq, and, sql } from "drizzle-orm";
+import { heartbeatRuns, projects, agents } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { HeartbeatService } from "./heartbeat.service.js";
 import type { SummaryService } from "./summary.service.js";
@@ -135,6 +135,46 @@ export class SchedulerService {
     }
 
     return reaped;
+  }
+
+  async tickTimers(): Promise<Array<{ agentId: string; projectId: string }>> {
+    const now = new Date();
+    const woken: Array<{ agentId: string; projectId: string }> = [];
+
+    // Find all active agents with heartbeat enabled
+    const timerAgents = await this.db
+      .select()
+      .from(agents)
+      .where(
+        and(
+          eq(agents.heartbeatEnabled, true),
+          eq(agents.status, "active"),
+          sql`${agents.heartbeatIntervalSec} > 0`,
+        ),
+      );
+
+    for (const agent of timerAgents) {
+      // Check if interval has elapsed since last heartbeat
+      if (agent.lastHeartbeat) {
+        const nextDue = new Date(
+          agent.lastHeartbeat.getTime() + agent.heartbeatIntervalSec * 1000,
+        );
+        if (nextDue > now) continue;
+      }
+
+      // Enqueue a timer wakeup
+      try {
+        await this.heartbeatService.enqueueWakeup(agent.id, agent.projectId, {
+          source: "timer",
+          reason: "heartbeat_interval",
+        });
+        woken.push({ agentId: agent.id, projectId: agent.projectId });
+      } catch {
+        // Skip agents that fail to enqueue (e.g., budget blocked)
+      }
+    }
+
+    return woken;
   }
 
   async regenerateAllProjectSummaries(): Promise<void> {
