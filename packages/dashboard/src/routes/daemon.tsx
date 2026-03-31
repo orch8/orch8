@@ -1,14 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { DaemonPageComponent } from "../components/daemon/DaemonPage.js";
 
-function DaemonPage() {
+function DaemonRoute() {
   return (
     <div className="h-full">
       <h2 className="mb-4 text-lg font-semibold">Daemon</h2>
-      <p className="text-sm text-zinc-500">Coming soon — see Plan 6: System & Onboarding.</p>
+      <DaemonPageComponent />
     </div>
   );
 }
 
 export const Route = createFileRoute("/daemon")({
-  component: DaemonPage,
+  component: DaemonRoute,
 });
