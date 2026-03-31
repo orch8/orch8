@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { Link } from "@tanstack/react-router";
 import { useNotifications, useMarkNotificationsRead } from "../../hooks/useNotifications.js";
 
 interface NotificationBellProps {
@@ -101,9 +102,9 @@ export function NotificationBell({ projectId }: NotificationBellProps) {
               </p>
             )}
             {notifications?.map((ntf) => (
-              <a
+              <Link
                 key={ntf.id}
-                href={ntf.link ?? "#"}
+                to={ntf.link ?? "/"}
                 className={`flex gap-2 px-3 py-2 text-sm hover:bg-zinc-800 ${
                   !ntf.read ? "bg-zinc-800/40" : ""
                 }`}
@@ -117,7 +118,7 @@ export function NotificationBell({ projectId }: NotificationBellProps) {
                   <p className="truncate text-xs text-zinc-500">{ntf.message}</p>
                   <p className="mt-0.5 text-xs text-zinc-600">{relativeTime(ntf.createdAt)}</p>
                 </div>
-              </a>
+              </Link>
             ))}
           </div>
         </div>

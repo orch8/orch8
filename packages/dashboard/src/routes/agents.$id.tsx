@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAgent } from "../hooks/useAgents.js";
 import { useUiStore } from "../stores/ui.js";
 import { AgentForm } from "../components/agent-editor/AgentForm.js";
@@ -24,12 +24,12 @@ function AgentDetailPage() {
     <div className="mx-auto max-w-2xl">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold">{agent.name}</h2>
-        <a
-          href="/agents"
+        <Link
+          to="/agents"
           className="text-sm text-zinc-500 hover:text-zinc-300"
         >
           ← Back to list
-        </a>
+        </Link>
       </div>
       <AgentForm agent={agent} />
     </div>

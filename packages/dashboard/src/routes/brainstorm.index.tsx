@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTasks, useCreateTask } from "../hooks/useTasks.js";
 import { useUiStore } from "../stores/ui.js";
@@ -57,12 +57,13 @@ function BrainstormListPage() {
               </p>
             </div>
             <div className="flex gap-2">
-              <a
-                href={`/brainstorm/${task.id}`}
+              <Link
+                to="/brainstorm/$taskId"
+                params={{ taskId: task.id }}
                 className="rounded bg-zinc-700 px-3 py-1 text-xs font-medium text-zinc-200 hover:bg-zinc-600"
               >
                 {task.brainstormStatus === "active" ? "Open Chat" : "Resume"}
-              </a>
+              </Link>
               {task.brainstormStatus === "ready" && (
                 <>
                   <button

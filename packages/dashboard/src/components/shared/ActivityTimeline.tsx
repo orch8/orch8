@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useActivity } from "../../hooks/useActivity.js";
 
 interface ActivityTimelineProps {
@@ -75,12 +76,12 @@ export function ActivityTimeline({
       ))}
 
       {compact && (
-        <a
-          href="/activity"
+        <Link
+          to="/activity"
           className="mt-1 block text-xs text-blue-400 hover:text-blue-300"
         >
           View all activity →
-        </a>
+        </Link>
       )}
     </div>
   );
