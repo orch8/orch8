@@ -10,7 +10,10 @@ function BoardPage() {
   return (
     <div className="flex h-full gap-4">
       <div className="flex-1 overflow-auto">
-        <KanbanBoard projectId={projectId} />
+        <KanbanBoard
+          projectId={projectId}
+          onTaskSelect={(taskId) => navigate({ search: { task: taskId } } as any)}
+        />
       </div>
       {selectedTaskId && (
         <TaskDetailPanel
