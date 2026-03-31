@@ -4,6 +4,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { loadGlobalConfig } from "../config/loader.js";
+import { buildServer } from "../server.js";
+import { startEmbeddedPostgres, stopEmbeddedPostgres } from "../db/embedded.js";
+import { globalConfigSchema } from "../config/schema.js";
 
 describe("startup config integration", () => {
   it("loads config and applies it to server options", () => {
@@ -47,4 +50,25 @@ orphan_detection:
     expect(config.database.auto_migrate).toBe(true);
     expect(config.orphan_detection.staleness_threshold_sec).toBe(300);
   });
+});
+
+describe("full startup integration", () => {
+  it("builds server with config and starts scheduler", async () => {
+    const dataDir = join(tmpdir(), `orch-startup-integ-${randomUUID()}`);
+    const databaseUrl = await startEmbeddedPostgres({ databaseDir: dataDir, port: 0, persistent: false });
+    const config = globalConfigSchema.parse({
+      orchestrator: { tick_interval_ms: 60000 },
+    });
+
+    const server = buildServer({ databaseUrl, config });
+
+    // Server should have all decorated services
+    expect(server.heartbeatService).toBeDefined();
+    expect(server.schedulerService).toBeDefined();
+    expect(server.agentService).toBeDefined();
+    expect(server.projectService).toBeDefined();
+
+    await server.close();
+    await stopEmbeddedPostgres();
+  }, 60_000);
 });
