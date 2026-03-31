@@ -6,6 +6,7 @@ import { authPlugin } from "../api/middleware/auth.js";
 import { agentRoutes } from "../api/routes/agents.js";
 import { AgentService } from "../services/agent.service.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
+import { BroadcastService } from "../services/broadcast.service.js";
 import "../types.js";
 
 describe("Agent API Routes", () => {
@@ -39,8 +40,9 @@ describe("Agent API Routes", () => {
     const agentService = new AgentService(testDb.db);
     app.decorate("agentService", agentService);
 
-    const noop = () => {};
-    const heartbeatService = new HeartbeatService(testDb.db, noop);
+    const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+    const broadcastService = new BroadcastService(sockets);
+    const heartbeatService = new HeartbeatService(testDb.db, broadcastService);
     app.decorate("heartbeatService", heartbeatService);
 
     app.register(authPlugin);

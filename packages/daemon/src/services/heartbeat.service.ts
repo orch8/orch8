@@ -7,6 +7,7 @@ import { checkBudget, autoPauseIfExhausted } from "./budget.service.js";
 import type { ClaudeLocalAdapter, RunAgentPrompts } from "../adapter/claude-local-adapter.js";
 import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "../adapter/types.js";
 import type { MemoryExtractionService } from "./memory-extraction.service.js";
+import type { BroadcastService } from "./broadcast.service.js";
 
 type Agent = typeof agents.$inferSelect;
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
@@ -53,7 +54,7 @@ export class HeartbeatService {
 
   constructor(
     private db: SchemaDb,
-    private broadcast: BroadcastFn,
+    private broadcastService: BroadcastService,
   ) {}
 
   shutdown(): void {
@@ -213,6 +214,14 @@ export class HeartbeatService {
       })
       .where(eq(tasks.id, taskId));
 
+    // Broadcast run_created (spec §14 §2.1)
+    this.broadcastService.runCreated(projectId, {
+      runId: run.id,
+      agentId,
+      status: "queued",
+      taskId,
+    });
+
     const wakeup = await this.recordWakeup(
       agentId, projectId, opts, "queued", run.id,
     );
@@ -254,6 +263,13 @@ export class HeartbeatService {
         status: "queued",
       })
       .returning();
+
+    // Broadcast run_created (spec §14 §2.1)
+    this.broadcastService.runCreated(projectId, {
+      runId: run.id,
+      agentId,
+      status: "queued",
+    });
 
     const wakeup = await this.recordWakeup(
       agentId, projectId, opts, "queued", run.id,
@@ -347,11 +363,10 @@ export class HeartbeatService {
     if (claimed.length === 0) return null;
 
     // 6. Broadcast run status change
-    this.broadcast(run.projectId, {
-      type: "run_status_changed",
+    this.broadcastService.runCreated(run.projectId, {
       runId,
-      status: "running",
       agentId: run.agentId,
+      status: "running",
     });
 
     return claimed[0];
@@ -494,13 +509,21 @@ export class HeartbeatService {
       }
 
       // 10. Broadcast completion
-      this.broadcast(claimedRun.projectId, {
-        type: "run_status_changed",
-        runId,
-        status: terminalStatus,
-        agentId: agent.id,
-        costUsd: result.costUsd,
-      });
+      if (terminalStatus === "succeeded") {
+        this.broadcastService.runCompleted(claimedRun.projectId, {
+          runId,
+          agentId: agent.id,
+          status: terminalStatus,
+          costUsd: result.costUsd,
+        });
+      } else {
+        this.broadcastService.runFailed(claimedRun.projectId, {
+          runId,
+          agentId: agent.id,
+          status: terminalStatus,
+          error: result.error,
+        });
+      }
 
       // 10b. Trigger work log extraction (fire-and-forget)
       if (this.extractionService && terminalStatus === "succeeded" && agent.workLogDir) {
@@ -587,6 +610,12 @@ export class HeartbeatService {
     error: string,
     errorCode: string,
   ): Promise<void> {
+    // Fetch run to get projectId and agentId for broadcast
+    const [run] = await this.db
+      .select()
+      .from(heartbeatRuns)
+      .where(eq(heartbeatRuns.id, runId));
+
     await this.db
       .update(heartbeatRuns)
       .set({
@@ -596,6 +625,15 @@ export class HeartbeatService {
         finishedAt: new Date(),
       })
       .where(eq(heartbeatRuns.id, runId));
+
+    if (run) {
+      this.broadcastService.runFailed(run.projectId, {
+        runId,
+        agentId: run.agentId,
+        status: "failed",
+        error,
+      });
+    }
   }
 
   async startNextQueuedRunForAgent(

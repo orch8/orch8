@@ -4,6 +4,7 @@ import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/sh
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { SchedulerService } from "../services/scheduler.service.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
+import { BroadcastService } from "../services/broadcast.service.js";
 
 describe("SchedulerService", () => {
   let testDb: TestDb;
@@ -33,8 +34,9 @@ describe("SchedulerService", () => {
     await testDb.db.delete(heartbeatRuns);
     await testDb.db.delete(agents);
 
-    const broadcast = () => {};
-    heartbeatService = new HeartbeatService(testDb.db, broadcast);
+    const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+    const broadcastService = new BroadcastService(sockets);
+    heartbeatService = new HeartbeatService(testDb.db, broadcastService);
     scheduler = new SchedulerService(testDb.db, heartbeatService, {
       intervalMs: 60_000,
       stalenessThresholdMs: 5 * 60 * 1000,

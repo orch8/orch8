@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { projects, agents, heartbeatRuns, wakeupRequests } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
+import { BroadcastService } from "../services/broadcast.service.js";
 
 describe("HeartbeatService idempotency", () => {
   let testDb: TestDb;
@@ -37,7 +38,9 @@ describe("HeartbeatService idempotency", () => {
       role: "engineer",
     });
 
-    heartbeat = new HeartbeatService(testDb.db, () => {});
+    const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+    const broadcastService = new BroadcastService(sockets);
+    heartbeat = new HeartbeatService(testDb.db, broadcastService);
   });
 
   it("deduplicates wakeups with the same idempotencyKey", async () => {

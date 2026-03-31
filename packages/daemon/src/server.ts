@@ -89,7 +89,7 @@ export function buildServer(options: ServerOptions = {}) {
     app.decorate("agentService", agentService);
 
     // Heartbeat service
-    const heartbeatService = new HeartbeatService(dbClient.db, broadcast);
+    const heartbeatService = new HeartbeatService(dbClient.db, broadcastService);
     const adapter = new ClaudeLocalAdapter(dbClient.db, spawnFn);
     heartbeatService.setAdapter(adapter);
 

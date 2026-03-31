@@ -5,6 +5,7 @@ import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { runRoutes } from "../api/routes/runs.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
+import { BroadcastService } from "../services/broadcast.service.js";
 
 describe("Run Cancel + Log Routes", () => {
   let testDb: TestDb;
@@ -34,8 +35,9 @@ describe("Run Cancel + Log Routes", () => {
     app = Fastify();
     app.decorate("db", testDb.db);
 
-    const noop = () => {};
-    const heartbeatService = new HeartbeatService(testDb.db, noop);
+    const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+    const broadcastService = new BroadcastService(sockets);
+    const heartbeatService = new HeartbeatService(testDb.db, broadcastService);
     app.decorate("heartbeatService", heartbeatService);
 
     app.register(authPlugin);

@@ -1,16 +1,17 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import {
   projects, agents, heartbeatRuns, wakeupRequests, tasks,
 } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
+import { BroadcastService } from "../services/broadcast.service.js";
 
 describe("Heartbeat Pipeline Integration", () => {
   let testDb: TestDb;
   let service: HeartbeatService;
   let projectId: string;
-  const broadcasts: unknown[] = [];
+  let mockSocket: { readyState: number; send: ReturnType<typeof vi.fn> };
 
   beforeAll(async () => {
     testDb = await setupTestDb();
@@ -30,7 +31,7 @@ describe("Heartbeat Pipeline Integration", () => {
   });
 
   beforeEach(async () => {
-    broadcasts.length = 0;
+    mockSocket = { readyState: 1, send: vi.fn() };
     await testDb.db.delete(wakeupRequests);
     await testDb.db.delete(heartbeatRuns);
     await testDb.db.delete(tasks);
@@ -41,9 +42,9 @@ describe("Heartbeat Pipeline Integration", () => {
       budgetSpentUsd: 0,
     });
 
-    service = new HeartbeatService(testDb.db, (_pid, msg) => {
-      broadcasts.push(msg);
-    });
+    const sockets = new Set([mockSocket]) as unknown as Set<import("ws").WebSocket>;
+    const broadcastService = new BroadcastService(sockets);
+    service = new HeartbeatService(testDb.db, broadcastService);
   });
 
   it("full pipeline: enqueue → promote → claim → execute (with mock adapter)", async () => {
@@ -107,7 +108,7 @@ describe("Heartbeat Pipeline Integration", () => {
     expect(agent.budgetSpentUsd).toBeCloseTo(0.02);
 
     // Broadcasts should include status changes
-    expect(broadcasts.length).toBeGreaterThan(0);
+    expect(mockSocket.send).toHaveBeenCalled();
   });
 
   it("task-scoped pipeline: lock → execute → release → promote deferred", async () => {

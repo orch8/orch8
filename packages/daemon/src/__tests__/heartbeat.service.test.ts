@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
+import { BroadcastService } from "../services/broadcast.service.js";
 
 describe("HeartbeatService", () => {
   let testDb: TestDb;
@@ -37,8 +38,9 @@ describe("HeartbeatService", () => {
       budgetSpentUsd: 0,
     });
 
-    const broadcast = () => {};
-    service = new HeartbeatService(testDb.db, broadcast);
+    const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+    const broadcastService = new BroadcastService(sockets);
+    service = new HeartbeatService(testDb.db, broadcastService);
   });
 
   describe("enqueueWakeup — validation", () => {

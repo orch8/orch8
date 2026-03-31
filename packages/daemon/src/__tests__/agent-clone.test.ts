@@ -6,6 +6,7 @@ import { authPlugin } from "../api/middleware/auth.js";
 import { agentRoutes } from "../api/routes/agents.js";
 import { AgentService } from "../services/agent.service.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
+import { BroadcastService } from "../services/broadcast.service.js";
 import "../types.js";
 
 describe("Agent Clone", () => {
@@ -142,8 +143,9 @@ describe("Agent Clone", () => {
       app.decorate("agentService", as);
 
       // HeartbeatService stub for wake route
-      const broadcast = () => {};
-      const hs = new HeartbeatService(testDb.db, broadcast);
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const hs = new HeartbeatService(testDb.db, broadcastService);
       app.decorate("heartbeatService", hs);
 
       app.register(authPlugin);
