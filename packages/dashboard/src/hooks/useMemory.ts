@@ -39,6 +39,7 @@ export function useWorklog(agentId?: string) {
   return useQuery<{ entries: Array<{ content: string }> }>({
     queryKey: ["worklog", agentId],
     queryFn: () => api.get("/memory/worklog", { agentId }),
+    enabled: !!agentId,
   });
 }
 
@@ -46,6 +47,7 @@ export function useLessons(agentId?: string) {
   return useQuery<{ content: string }>({
     queryKey: ["lessons", agentId],
     queryFn: () => api.get("/memory/lessons", { agentId }),
+    enabled: !!agentId,
   });
 }
 
