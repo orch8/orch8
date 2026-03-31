@@ -63,4 +63,21 @@ export async function projectRoutes(app: FastifyInstance) {
       throw err;
     }
   });
+
+  // POST /api/projects/:id/archive — Archive project (admin only)
+  app.post("/api/projects/:id/archive", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    if (!request.isAdmin) {
+      return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+    }
+
+    try {
+      const project = await app.projectService.archive(request.params.id);
+      return project;
+    } catch (err) {
+      if ((err as Error).message === "Project not found") {
+        return reply.code(404).send({ error: "not_found", message: "Project not found" });
+      }
+      throw err;
+    }
+  });
 }
