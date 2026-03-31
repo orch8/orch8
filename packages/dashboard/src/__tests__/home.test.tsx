@@ -1,6 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithProviders, screen, waitFor } from "../test-utils.js";
-import { HomePage } from "../routes/index.js";
+
+// Mock router — createFileRoute returns a function that returns an object with useParams
+vi.mock("@tanstack/react-router", () => ({
+  createFileRoute: (_path: string) => (opts: any) => ({
+    ...opts,
+    useParams: () => ({ projectId: "proj_1" }),
+    useSearch: () => ({}),
+  }),
+  Link: ({ children, to, ...props }: any) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
+  useNavigate: () => vi.fn(),
+  useRouterState: ({ select }: any) =>
+    select
+      ? select({ location: { pathname: "/projects/proj_1" } })
+      : "/projects/proj_1",
+}));
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
@@ -36,17 +54,22 @@ function mockApiResponses() {
     json: () =>
       Promise.resolve({ status: "running", pid: 123, uptimeMs: 60000, uptimeFormatted: "1m 0s", processCount: 1, queueDepth: 0, tickIntervalMs: 5000 }),
   });
-  // activity log
+  // activity log (ActivityTimeline)
   mockFetch.mockResolvedValueOnce({
     ok: true,
     json: () => Promise.resolve([]),
   });
 }
 
-describe("HomePage", () => {
+// Import the route module after mocks are set up (vi.mock is hoisted)
+import { Route as HomeRoute } from "../routes/projects/$projectId/index.js";
+
+const ProjectHomePage = (HomeRoute as any).component;
+
+describe("ProjectHomePage", () => {
   it("renders stat cards", async () => {
     mockApiResponses();
-    renderWithProviders(<HomePage />);
+    renderWithProviders(<ProjectHomePage />);
 
     await waitFor(() => {
       expect(screen.getByText("Active Agents")).toBeInTheDocument();
@@ -58,7 +81,7 @@ describe("HomePage", () => {
 
   it("renders recent activity section", async () => {
     mockApiResponses();
-    renderWithProviders(<HomePage />);
+    renderWithProviders(<ProjectHomePage />);
 
     await waitFor(() => {
       expect(screen.getByText("Recent Activity")).toBeInTheDocument();
@@ -67,7 +90,7 @@ describe("HomePage", () => {
 
   it("renders alerts and agent status section", async () => {
     mockApiResponses();
-    renderWithProviders(<HomePage />);
+    renderWithProviders(<ProjectHomePage />);
 
     await waitFor(() => {
       expect(screen.getByText("Alerts")).toBeInTheDocument();

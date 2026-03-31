@@ -3,6 +3,20 @@ import { renderWithProviders, screen, waitFor } from "../test-utils.js";
 import { TaskDetailPanel } from "../components/task-detail/TaskDetailPanel.js";
 import { PhaseProgress } from "../components/task-detail/PhaseProgress.js";
 
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to, ...props }: any) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
+  useNavigate: () => vi.fn(),
+  useParams: () => ({ projectId: "proj_1" }),
+  useRouterState: ({ select }: any) =>
+    select
+      ? select({ location: { pathname: "/projects/proj_1/board" } })
+      : "/projects/proj_1/board",
+}));
+
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 
@@ -21,19 +35,52 @@ const mockTask = {
   createdAt: "2026-03-30T00:00:00Z",
 };
 
+function mockTaskDetailResponses() {
+  // The hooks fire in parallel via react-query, so provide enough
+  // resolved values for all concurrent requests.
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: () => Promise.resolve([]),
+  });
+  // useTask — GET /api/tasks/task_1
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockTask),
+  });
+  // useTaskCost — GET /api/cost/task/task_1?projectId=proj_1
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve({ total: 0.05 }),
+  });
+  // usePhaseCost — GET /api/cost/task/task_1/phases?projectId=proj_1
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve({ byPhase: [] }),
+  });
+  // useTasks — GET /api/tasks?projectId=proj_1
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve([mockTask]),
+  });
+  // useActivity — GET /api/log?projectId=proj_1&taskId=task_1&...
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve([]),
+  });
+  // useComments — GET /api/tasks/task_1/comments
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve([]),
+  });
+}
+
 describe("TaskDetailPanel", () => {
   it("renders task title and description", async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockTask),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve([]),
-      });
+    mockTaskDetailResponses();
 
-    renderWithProviders(<TaskDetailPanel taskId="task_1" />);
+    renderWithProviders(
+      <TaskDetailPanel taskId="task_1" projectId="proj_1" onClose={() => {}} />,
+    );
 
     await waitFor(() => {
       expect(screen.getByText("Build auth")).toBeInTheDocument();
@@ -42,17 +89,11 @@ describe("TaskDetailPanel", () => {
   });
 
   it("shows close button", async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockTask),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve([]),
-      });
+    mockTaskDetailResponses();
 
-    renderWithProviders(<TaskDetailPanel taskId="task_1" />);
+    renderWithProviders(
+      <TaskDetailPanel taskId="task_1" projectId="proj_1" onClose={() => {}} />,
+    );
 
     await waitFor(() => {
       expect(screen.getByLabelText("Close panel")).toBeInTheDocument();

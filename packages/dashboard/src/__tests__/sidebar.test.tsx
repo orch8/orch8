@@ -13,6 +13,7 @@ vi.mock("@tanstack/react-router", () => ({
       ? select({ location: { pathname: "/projects/proj_1/board" } })
       : { location: { pathname: "/projects/proj_1/board" } },
   useParams: () => ({ projectId: "proj_1" }),
+  useNavigate: () => vi.fn(),
 }));
 
 const mockFetch = vi.fn();
