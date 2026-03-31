@@ -8,6 +8,7 @@ import type { ClaudeLocalAdapter, RunAgentPrompts } from "../adapter/claude-loca
 import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "../adapter/types.js";
 import type { MemoryExtractionService } from "./memory-extraction.service.js";
 import type { BroadcastService } from "./broadcast.service.js";
+import type { FastifyBaseLogger } from "fastify";
 import { RunLogger, type LogHandle } from "./run-logger.js";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -54,6 +55,11 @@ export class HeartbeatService {
 
   private adapter: ClaudeLocalAdapter | null = null;
   private extractionService: MemoryExtractionService | null = null;
+  private logger: FastifyBaseLogger | null = null;
+
+  setLogger(logger: FastifyBaseLogger): void {
+    this.logger = logger;
+  }
 
   constructor(
     private db: SchemaDb,
@@ -557,7 +563,10 @@ export class HeartbeatService {
       // 10b. Trigger work log extraction (fire-and-forget)
       if (this.extractionService && terminalStatus === "succeeded" && agent.workLogDir) {
         this.triggerExtraction(agent, claimedRun.projectId).catch((err) => {
-          console.error(`[HeartbeatService] extraction error for ${agent.id}:`, err);
+          this.logger?.error(
+            { agentId: agent.id, projectId: claimedRun.projectId, runId },
+            "extraction error",
+          );
         });
       }
     } catch (err) {

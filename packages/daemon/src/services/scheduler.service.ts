@@ -4,6 +4,7 @@ import type { SchemaDb } from "../db/client.js";
 import type { HeartbeatService } from "./heartbeat.service.js";
 import type { SummaryService } from "./summary.service.js";
 import type { TaskService } from "./task.service.js";
+import type { FastifyBaseLogger } from "fastify";
 
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
 
@@ -16,12 +17,17 @@ export class SchedulerService {
   private timer: ReturnType<typeof setInterval> | null = null;
   private summaryTimer: ReturnType<typeof setInterval> | null = null;
   private summaryService: SummaryService | null = null;
+  private logger: FastifyBaseLogger | null = null;
 
   constructor(
     private db: SchemaDb,
     private heartbeatService: HeartbeatService,
     private config: SchedulerConfig,
   ) {}
+
+  setLogger(logger: FastifyBaseLogger): void {
+    this.logger = logger;
+  }
 
   setSummaryService(summaryService: SummaryService): void {
     this.summaryService = summaryService;
@@ -37,7 +43,7 @@ export class SchedulerService {
     if (this.timer) return;
     this.timer = setInterval(() => {
       this.tick().catch((err) => {
-        console.error("[SchedulerService] tick error:", err);
+        this.logger?.error({ err }, "tick error");
       });
     }, this.config.intervalMs);
 
@@ -46,7 +52,7 @@ export class SchedulerService {
       const weekMs = 7 * 24 * 60 * 60 * 1000;
       this.summaryTimer = setInterval(() => {
         this.regenerateAllProjectSummaries().catch((err) => {
-          console.error("[SchedulerService] summary regeneration error:", err);
+          this.logger?.error({ err }, "summary regeneration error");
         });
       }, weekMs);
     }

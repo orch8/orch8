@@ -93,6 +93,7 @@ export function buildServer(options: ServerOptions = {}) {
     const adapter = new ClaudeLocalAdapter(dbClient.db, spawnFn);
     heartbeatService.setAdapter(adapter);
 
+    heartbeatService.setLogger(app.log);
     app.decorate("heartbeatService", heartbeatService);
 
     // Scheduler service
@@ -101,6 +102,7 @@ export function buildServer(options: ServerOptions = {}) {
         ?? Number(process.env.ORCH_SCHEDULER_INTERVAL_MS ?? 60_000),
       stalenessThresholdMs: (options.config?.orphan_detection.staleness_threshold_sec ?? 300) * 1000,
     });
+    schedulerService.setLogger(app.log);
     app.decorate("schedulerService", schedulerService);
 
     app.addHook("onClose", async () => {
@@ -169,6 +171,24 @@ export function buildServer(options: ServerOptions = {}) {
 
     // Auth middleware + routes that require DB
     app.register(authPlugin);
+
+    // Enrich request-scoped logger with correlation IDs (spec §14 §2.2)
+    app.addHook("onRequest", async (request) => {
+      const childBindings: Record<string, string> = {};
+      if (request.headers["x-agent-id"]) {
+        childBindings.agentId = request.headers["x-agent-id"] as string;
+      }
+      if (request.headers["x-project-id"]) {
+        childBindings.projectId = request.headers["x-project-id"] as string;
+      }
+      if (request.headers["x-run-id"]) {
+        childBindings.runId = request.headers["x-run-id"] as string;
+      }
+      if (Object.keys(childBindings).length > 0) {
+        request.log = request.log.child(childBindings);
+      }
+    });
+
     app.register(taskRoutes);
     app.register(brainstormRoutes);
     app.register(commentRoutes);
