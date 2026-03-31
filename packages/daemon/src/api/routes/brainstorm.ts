@@ -17,12 +17,17 @@ export async function brainstormRoutes(app: FastifyInstance) {
     request: FastifyRequest<{ Params: { taskId: string } }>,
     reply: FastifyReply,
   ) => {
+    const { taskId } = request.params;
+    request.log.info({ taskId }, "brainstorm route: start request");
     try {
-      const project = await getProjectForTask(app, request.params.taskId);
-      await bs.startSession(request.params.taskId, project?.homeDir ?? process.cwd());
+      const project = await getProjectForTask(app, taskId);
+      request.log.info({ taskId, homeDir: project?.homeDir }, "brainstorm route: resolved project");
+      await bs.startSession(taskId, project?.homeDir ?? process.cwd());
+      request.log.info({ taskId }, "brainstorm route: session started");
       return { ok: true };
     } catch (err) {
       const msg = (err as Error).message;
+      request.log.error({ taskId, err: msg }, "brainstorm route: start failed");
       if (msg.includes("already has an active session")) {
         return reply.code(409).send({ error: "conflict", message: msg });
       }
@@ -38,16 +43,21 @@ export async function brainstormRoutes(app: FastifyInstance) {
     request: FastifyRequest<{ Params: { taskId: string } }>,
     reply: FastifyReply,
   ) => {
+    const { taskId } = request.params;
     const body = request.body as { content?: string };
     if (!body.content) {
+      request.log.warn({ taskId }, "brainstorm route: message missing content");
       return reply.code(400).send({ error: "validation_error", message: "content is required" });
     }
 
+    request.log.info({ taskId, contentLength: body.content.length }, "brainstorm route: message request");
     try {
-      await bs.sendMessage(request.params.taskId, body.content);
+      await bs.sendMessage(taskId, body.content);
+      request.log.info({ taskId }, "brainstorm route: message sent");
       return { ok: true };
     } catch (err) {
       const msg = (err as Error).message;
+      request.log.error({ taskId, err: msg }, "brainstorm route: message failed");
       if (msg.includes("No active")) {
         return reply.code(404).send({ error: "not_found", message: msg });
       }

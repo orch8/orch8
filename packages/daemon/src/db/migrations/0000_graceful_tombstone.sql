@@ -22,7 +22,7 @@ CREATE TABLE "agents" (
 	"status" "agent_status" DEFAULT 'active' NOT NULL,
 	"icon" text DEFAULT '🤖',
 	"color" text DEFAULT '#888780',
-	"model" text DEFAULT 'claude-sonnet-4-20250514' NOT NULL,
+	"model" text DEFAULT 'claude-opus-4-6' NOT NULL,
 	"effort" text,
 	"max_turns" integer DEFAULT 25 NOT NULL,
 	"allowed_tools" text[] DEFAULT '{}',

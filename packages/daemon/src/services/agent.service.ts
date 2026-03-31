@@ -27,7 +27,7 @@ const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
     maxConcurrentRuns: 1,
   },
   engineer: {
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-6",
     maxTurns: 25,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
@@ -35,7 +35,7 @@ const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
     maxConcurrentRuns: 1,
   },
   qa: {
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-6",
     maxTurns: 25,
     heartbeatEnabled: true,
     heartbeatIntervalSec: 60,
@@ -45,21 +45,21 @@ const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
     maxConcurrentRuns: 1,
   },
   researcher: {
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-6",
     maxTurns: 40,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
     maxConcurrentRuns: 1,
   },
   planner: {
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-6",
     maxTurns: 30,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
     maxConcurrentRuns: 1,
   },
   implementer: {
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-6",
     maxTurns: 40,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
@@ -67,14 +67,14 @@ const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
     maxConcurrentSubagents: 3,
   },
   reviewer: {
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-6",
     maxTurns: 20,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
     maxConcurrentRuns: 1,
   },
   verifier: {
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-6",
     maxTurns: 20,
     heartbeatEnabled: false,
     wakeOnAutomation: true,
@@ -88,7 +88,7 @@ const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
     maxConcurrentRuns: 1,
   },
   custom: {
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-6",
     maxTurns: 25,
     heartbeatEnabled: false,
     wakeOnAssignment: true,

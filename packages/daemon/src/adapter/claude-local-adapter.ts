@@ -10,6 +10,7 @@ import { dirname } from "node:path";
 import { createSkillsDir, createInstructionsFile, cleanupTempPath } from "./file-injector.js";
 import { SessionManager } from "./session-manager.js";
 import { runProcess } from "./process-runner.js";
+import { resolveClaudePath } from "./resolve-claude-path.js";
 
 export interface RunAgentPrompts {
   heartbeatTemplate: string;
@@ -83,7 +84,7 @@ export class ClaudeLocalAdapter {
       });
 
       // 6. Run the process (spec §2)
-      const command = config.command ?? "claude";
+      const command = config.command ?? resolveClaudePath();
       const result = await runProcess(
         {
           command,

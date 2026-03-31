@@ -81,6 +81,7 @@ export function buildServer(options: ServerOptions = {}) {
     // Brainstorm service
     const spawnFn = options.spawnFn ?? nodeSpawn;
     const brainstormService = new BrainstormService(dbClient.db, broadcast, spawnFn);
+    brainstormService.setLogger(app.log);
     app.decorate("brainstormService", brainstormService);
 
     // Core services
