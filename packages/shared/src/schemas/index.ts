@@ -59,3 +59,14 @@ export {
   SpawnVerifierSchema,
   SpawnRefereeSchema,
 } from "./verification.js";
+export {
+  NotificationTypeSchema,
+  NotificationFilterSchema,
+  MarkNotificationsReadSchema,
+} from "./notification.js";
+export type { NotificationType, NotificationFilter, MarkNotificationsRead } from "./notification.js";
+export {
+  DaemonLogFilterSchema,
+  DaemonConfigPatchSchema,
+} from "./daemon.js";
+export type { DaemonLogFilter, DaemonConfigPatch } from "./daemon.js";
