@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "happy-dom",
-    setupFiles: ["./src/test-utils.tsx"],
+    setupFiles: ["./src/test-setup-mocks.ts", "./src/test-utils.tsx"],
     globals: true,
   },
 });

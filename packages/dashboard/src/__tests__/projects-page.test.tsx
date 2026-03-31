@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithProviders, screen, waitFor } from "../test-utils.js";
-import { ProjectsPage } from "../routes/projects.js";
+import { ProjectsPage } from "../routes/projects.index.js";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;

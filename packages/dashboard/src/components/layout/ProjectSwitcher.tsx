@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useProjects } from "../../hooks/useProjects.js";
 import { useUiStore } from "../../stores/ui.js";
 
@@ -12,15 +13,15 @@ export function ProjectSwitcher() {
         <span className="text-xs font-medium uppercase tracking-wider text-zinc-500">
           Projects
         </span>
-        <a
-          href="/projects/new"
+        <Link
+          to="/projects/new"
           className="rounded p-0.5 text-zinc-600 hover:bg-zinc-800 hover:text-zinc-400"
           title="Create project"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-        </a>
+        </Link>
       </div>
 
       <button
@@ -58,8 +59,9 @@ export function ProjectSwitcher() {
               <span className="text-xs text-zinc-600">archived</span>
             )}
             {activeProjectId === project.id && (
-              <a
-                href={`/projects/${project.id}/settings`}
+              <Link
+                to="/projects/$id/settings"
+                params={{ id: project.id }}
                 className="rounded p-0.5 text-zinc-600 hover:text-zinc-400"
                 title="Project settings"
               >
@@ -67,7 +69,7 @@ export function ProjectSwitcher() {
                   <circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2" />
                   <path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.17 2.17l1.06 1.06M8.77 8.77l1.06 1.06M9.83 2.17l-1.06 1.06M3.23 8.77l-1.06 1.06" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
                 </svg>
-              </a>
+              </Link>
             )}
           </div>
         </div>
