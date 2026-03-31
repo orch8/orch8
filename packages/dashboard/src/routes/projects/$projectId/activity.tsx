@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useActivity } from "../hooks/useActivity.js";
-import { useUiStore } from "../stores/ui.js";
+import { useActivity } from "../../../hooks/useActivity.js";
 
 const LEVEL_COLORS: Record<string, string> = {
   info: "bg-blue-500",
@@ -11,13 +10,13 @@ const LEVEL_COLORS: Record<string, string> = {
 
 const PAGE_SIZE = 50;
 
-export function ActivityPage() {
-  const activeProjectId = useUiStore((s) => s.activeProjectId);
+function ActivityPage() {
+  const { projectId } = Route.useParams();
   const [levelFilter, setLevelFilter] = useState("");
   const [agentFilter, setAgentFilter] = useState("");
   const [offset, setOffset] = useState(0);
 
-  const { data: entries, isLoading } = useActivity(activeProjectId, {
+  const { data: entries, isLoading } = useActivity(projectId, {
     level: levelFilter || undefined,
     agentId: agentFilter || undefined,
     limit: PAGE_SIZE,
@@ -32,7 +31,10 @@ export function ActivityPage() {
       <div className="flex gap-2">
         <select
           value={levelFilter}
-          onChange={(e) => { setLevelFilter(e.target.value); setOffset(0); }}
+          onChange={(e) => {
+            setLevelFilter(e.target.value);
+            setOffset(0);
+          }}
           aria-label="Filter by level"
           className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-300"
         >
@@ -44,14 +46,19 @@ export function ActivityPage() {
 
         <input
           value={agentFilter}
-          onChange={(e) => { setAgentFilter(e.target.value); setOffset(0); }}
+          onChange={(e) => {
+            setAgentFilter(e.target.value);
+            setOffset(0);
+          }}
           placeholder="Filter by agent..."
           aria-label="Filter by agent"
           className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-300 placeholder-zinc-600"
         />
       </div>
 
-      {isLoading && <p className="text-sm text-zinc-600">Loading activity...</p>}
+      {isLoading && (
+        <p className="text-sm text-zinc-600">Loading activity...</p>
+      )}
 
       {/* Table */}
       <div className="overflow-auto rounded-lg border border-zinc-800">
@@ -68,7 +75,9 @@ export function ActivityPage() {
             {entries?.map((entry) => (
               <tr key={entry.id} className="border-b border-zinc-800/50">
                 <td className="px-3 py-2">
-                  <span className={`inline-block h-2 w-2 rounded-full ${LEVEL_COLORS[entry.level] ?? "bg-zinc-500"}`} />
+                  <span
+                    className={`inline-block h-2 w-2 rounded-full ${LEVEL_COLORS[entry.level] ?? "bg-zinc-500"}`}
+                  />
                 </td>
                 <td className="px-3 py-2 text-xs text-zinc-500">
                   {new Date(entry.createdAt).toLocaleString()}
@@ -83,7 +92,9 @@ export function ActivityPage() {
         </table>
 
         {entries?.length === 0 && !isLoading && (
-          <p className="py-8 text-center text-sm text-zinc-600">No activity found</p>
+          <p className="py-8 text-center text-sm text-zinc-600">
+            No activity found
+          </p>
         )}
       </div>
 
@@ -108,6 +119,6 @@ export function ActivityPage() {
   );
 }
 
-export const Route = createFileRoute("/activity")({
+export const Route = createFileRoute("/projects/$projectId/activity")({
   component: ActivityPage,
 });

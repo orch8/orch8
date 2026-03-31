@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useAgents } from "../hooks/useAgents.js";
-import { useUiStore } from "../stores/ui.js";
+import { useAgents } from "../../../hooks/useAgents.js";
 
 const STATUS_COLORS: Record<string, string> = {
   active: "bg-emerald-900/50 text-emerald-300",
@@ -9,24 +8,21 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function AgentsListPage() {
-  const activeProjectId = useUiStore((s) => s.activeProjectId);
-  const { data: agents, isLoading } = useAgents(activeProjectId);
+  const { projectId } = Route.useParams();
+  const { data: agents, isLoading } = useAgents(projectId);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Agents</h2>
         <Link
-          to="/agents/new"
+          to="/projects/$projectId/agents/new"
+          params={{ projectId }}
           className="rounded-md bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600"
         >
           + New Agent
         </Link>
       </div>
-
-      {!activeProjectId && (
-        <p className="text-sm text-zinc-500">Select a project to see agents.</p>
-      )}
 
       {isLoading && <p className="text-sm text-zinc-600">Loading agents...</p>}
 
@@ -34,8 +30,8 @@ function AgentsListPage() {
         {agents?.map((agent) => (
           <Link
             key={agent.id}
-            to="/agents/$id"
-            params={{ id: agent.id }}
+            to="/projects/$projectId/agents/$agentId"
+            params={{ projectId, agentId: agent.id }}
             className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-4 transition-colors hover:border-zinc-700"
           >
             <div>
@@ -63,6 +59,6 @@ function AgentsListPage() {
   );
 }
 
-export const Route = createFileRoute("/agents/")({
+export const Route = createFileRoute("/projects/$projectId/agents")({
   component: AgentsListPage,
 });

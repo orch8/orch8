@@ -22,7 +22,7 @@ function getVerificationStatus(task: Task): FilterTab {
 }
 
 interface ReviewQueueProps {
-  projectId: string | null;
+  projectId: string;
 }
 
 export function ReviewQueue({ projectId }: ReviewQueueProps) {

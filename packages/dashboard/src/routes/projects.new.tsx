@@ -9,8 +9,8 @@ export const Route = createFileRoute("/projects/new")({
 function NewProjectPage() {
   const navigate = useNavigate();
 
-  const handleSuccess = (_project: Project) => {
-    navigate({ to: "/" });
+  const handleSuccess = (project: Project) => {
+    navigate({ to: "/projects/$projectId", params: { projectId: project.id } });
   };
 
   return (

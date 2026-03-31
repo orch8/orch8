@@ -12,7 +12,7 @@ const TYPE_FILTERS = [
 ] as const;
 
 interface MemoryBrowserProps {
-  projectId: string | null;
+  projectId: string;
 }
 
 export function MemoryBrowser({ projectId }: MemoryBrowserProps) {
@@ -70,7 +70,7 @@ export function MemoryBrowser({ projectId }: MemoryBrowserProps) {
           + New Entity
         </button>
 
-        {showCreateForm && projectId && (
+        {showCreateForm && (
           <form
             onSubmit={async (e) => {
               e.preventDefault();

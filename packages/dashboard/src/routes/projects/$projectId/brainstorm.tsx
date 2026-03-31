@@ -1,22 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useTasks, useCreateTask } from "../hooks/useTasks.js";
-import { useUiStore } from "../stores/ui.js";
-import { ConfirmDialog } from "../components/shared/ConfirmDialog.js";
-import { api } from "../api/client.js";
+import { useTasks, useCreateTask } from "../../../hooks/useTasks.js";
+import { ConfirmDialog } from "../../../components/shared/ConfirmDialog.js";
+import { api } from "../../../api/client.js";
 
 function BrainstormListPage() {
-  const activeProjectId = useUiStore((s) => s.activeProjectId);
-  const { data: allTasks } = useTasks(activeProjectId);
+  const { projectId } = Route.useParams();
+  const { data: allTasks } = useTasks(projectId);
   const createTask = useCreateTask();
   const [killTarget, setKillTarget] = useState<string | null>(null);
 
   const brainstormTasks = allTasks?.filter((t) => t.taskType === "brainstorm") ?? [];
 
   async function handleNewSession() {
-    if (!activeProjectId) return;
     await createTask.mutateAsync({
-      projectId: activeProjectId,
+      projectId,
       title: "New Brainstorm Session",
       taskType: "brainstorm",
       priority: "medium",
@@ -34,7 +32,7 @@ function BrainstormListPage() {
         <h2 className="text-lg font-semibold">Brainstorm Sessions</h2>
         <button
           onClick={handleNewSession}
-          disabled={!activeProjectId || createTask.isPending}
+          disabled={createTask.isPending}
           className="rounded-md bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600 disabled:opacity-40"
         >
           + New Session
@@ -58,8 +56,8 @@ function BrainstormListPage() {
             </div>
             <div className="flex gap-2">
               <Link
-                to="/brainstorm/$taskId"
-                params={{ taskId: task.id }}
+                to="/projects/$projectId/brainstorm/$taskId"
+                params={{ projectId, taskId: task.id }}
                 className="rounded bg-zinc-700 px-3 py-1 text-xs font-medium text-zinc-200 hover:bg-zinc-600"
               >
                 {task.brainstormStatus === "active" ? "Open Chat" : "Resume"}
@@ -107,6 +105,6 @@ function BrainstormListPage() {
   );
 }
 
-export const Route = createFileRoute("/brainstorm/")({
+export const Route = createFileRoute("/projects/$projectId/brainstorm")({
   component: BrainstormListPage,
 });

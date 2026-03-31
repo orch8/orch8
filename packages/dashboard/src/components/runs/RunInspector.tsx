@@ -15,7 +15,7 @@ const STATUS_COLORS: Record<string, string> = {
 const STATUS_OPTIONS = ["", "queued", "running", "succeeded", "failed", "timed_out", "cancelled"];
 
 interface RunInspectorProps {
-  projectId: string | null;
+  projectId: string;
 }
 
 export function RunInspector({ projectId }: RunInspectorProps) {
@@ -145,7 +145,7 @@ export function RunInspector({ projectId }: RunInspectorProps) {
         </div>
       </div>
 
-      {selectedRunId && projectId && (
+      {selectedRunId && (
         <div className="w-96 shrink-0">
           <RunDetail
             runId={selectedRunId}

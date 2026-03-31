@@ -5,10 +5,9 @@ import { TemplateStep, AGENT_TEMPLATES } from "../agent-editor/TemplateStep.js";
 import { useCreateProject } from "../../hooks/useProjects.js";
 import { useCreateAgent } from "../../hooks/useAgents.js";
 import { useCreateTask } from "../../hooks/useTasks.js";
-import { useUiStore } from "../../stores/ui.js";
 
 interface WelcomeWizardProps {
-  onComplete: () => void;
+  onComplete: (projectId: string) => void;
 }
 
 export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
@@ -16,8 +15,6 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
   const createProject = useCreateProject();
   const createAgent = useCreateAgent();
   const createTask = useCreateTask();
-  const setActiveProject = useUiStore((s) => s.setActiveProject);
-
   // Project fields
   const [projectName, setProjectName] = useState("");
   const [repoPath, setRepoPath] = useState("");
@@ -144,8 +141,6 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
       budgetLimitUsd: dailyBudget ? parseFloat(dailyBudget) : undefined,
     });
 
-    setActiveProject(project.id);
-
     // Create agent if template selected
     if (selectedTemplate) {
       const tmpl = AGENT_TEMPLATES.find((t) => t.key === selectedTemplate);
@@ -181,7 +176,7 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
       }
     }
 
-    onComplete();
+    onComplete(project.id);
   }
 
   return (

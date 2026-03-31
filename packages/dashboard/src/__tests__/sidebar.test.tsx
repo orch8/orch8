@@ -10,8 +10,10 @@ vi.mock("@tanstack/react-router", () => ({
   ),
   useRouterState: ({ select }: any) =>
     select
-      ? select({ location: { pathname: "/" } })
-      : { location: { pathname: "/" } },
+      ? select({ location: { pathname: "/projects/proj_1/board" } })
+      : { location: { pathname: "/projects/proj_1/board" } },
+  useParams: () => ({ projectId: "proj_1" }),
+  useNavigate: () => vi.fn(),
 }));
 
 const mockFetch = vi.fn();
@@ -20,28 +22,13 @@ globalThis.fetch = mockFetch;
 describe("Sidebar", () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    // notifications query
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve([]),
     });
   });
 
-  it("renders Home link", () => {
-    renderWithProviders(<Sidebar />);
-    expect(screen.getByText("Home")).toBeInTheDocument();
-  });
-
-  it("renders Setup section with links", () => {
-    renderWithProviders(<Sidebar />);
-    expect(screen.getByText("SETUP")).toBeInTheDocument();
-    // "Projects" appears in both ProjectSwitcher header and nav link
-    expect(screen.getByRole("link", { name: "Projects" })).toBeInTheDocument();
-    expect(screen.getByText("Agents")).toBeInTheDocument();
-    expect(screen.getByText("Settings")).toBeInTheDocument();
-  });
-
-  it("renders Work section with links", () => {
+  it("renders WORK section first with Board, Brainstorm, Review Queue", () => {
     renderWithProviders(<Sidebar />);
     expect(screen.getByText("WORK")).toBeInTheDocument();
     expect(screen.getByText("Board")).toBeInTheDocument();
@@ -49,7 +36,23 @@ describe("Sidebar", () => {
     expect(screen.getByText("Review Queue")).toBeInTheDocument();
   });
 
-  it("renders Monitor section with links", () => {
+  it("renders SETUP section with Agents and Settings", () => {
+    renderWithProviders(<Sidebar />);
+    expect(screen.getByText("SETUP")).toBeInTheDocument();
+    expect(screen.getByText("Agents")).toBeInTheDocument();
+    expect(screen.getByText("Settings")).toBeInTheDocument();
+  });
+
+  it("does NOT render Projects nav item (replaced by switcher)", () => {
+    renderWithProviders(<Sidebar />);
+    const allLinks = screen.getAllByRole("link");
+    const projectsNavLink = allLinks.find(
+      (link) => link.getAttribute("href") === "/projects"
+    );
+    expect(projectsNavLink).toBeUndefined();
+  });
+
+  it("renders MONITOR section with Runs, Cost, Memory, Activity", () => {
     renderWithProviders(<Sidebar />);
     expect(screen.getByText("MONITOR")).toBeInTheDocument();
     expect(screen.getByText("Runs")).toBeInTheDocument();
@@ -58,14 +61,21 @@ describe("Sidebar", () => {
     expect(screen.getByText("Activity")).toBeInTheDocument();
   });
 
-  it("renders System section with Daemon link", () => {
+  it("renders SYSTEM section with Daemon link", () => {
     renderWithProviders(<Sidebar />);
     expect(screen.getByText("SYSTEM")).toBeInTheDocument();
     expect(screen.getByText("Daemon")).toBeInTheDocument();
   });
 
-  it("renders notification bell", () => {
+  it("generates project-scoped links for project pages", () => {
     renderWithProviders(<Sidebar />);
-    expect(screen.getByLabelText("Notifications")).toBeInTheDocument();
+    const boardLink = screen.getByText("Board").closest("a");
+    expect(boardLink?.getAttribute("href")).toBe("/projects/proj_1/board");
+  });
+
+  it("generates global links for system pages", () => {
+    renderWithProviders(<Sidebar />);
+    const daemonLink = screen.getByText("Daemon").closest("a");
+    expect(daemonLink?.getAttribute("href")).toBe("/daemon");
   });
 });

@@ -5,7 +5,11 @@ function WelcomePage() {
   const navigate = useNavigate();
   return (
     <div className="mx-auto max-w-2xl py-12">
-      <WelcomeWizard onComplete={() => navigate({ to: "/" })} />
+      <WelcomeWizard
+        onComplete={(projectId) =>
+          navigate({ to: "/projects/$projectId", params: { projectId } })
+        }
+      />
     </div>
   );
 }

@@ -15,7 +15,7 @@ import { useProject } from "../../hooks/useProjects.js";
 import { BudgetGauge } from "./BudgetGauge.js";
 
 interface CostDashboardProps {
-  projectId: string | null;
+  projectId: string;
 }
 
 export function CostDashboard({ projectId }: CostDashboardProps) {

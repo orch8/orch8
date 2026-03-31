@@ -10,7 +10,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 interface AgentEditorProps {
-  projectId: string | null;
+  projectId: string;
 }
 
 export function AgentEditor({ projectId }: AgentEditorProps) {

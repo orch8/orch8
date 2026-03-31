@@ -1,5 +1,4 @@
 import { useTask, useTasks } from "../../hooks/useTasks.js";
-import { useUiStore } from "../../stores/ui.js";
 import { useTaskCost, usePhaseCost } from "../../hooks/useCost.js";
 import { PhaseProgress } from "./PhaseProgress.js";
 import { CommentThread } from "./CommentThread.js";
@@ -10,18 +9,18 @@ import { TaskActions } from "./TaskActions.js";
 
 interface TaskDetailPanelProps {
   taskId: string;
+  projectId: string;
+  onClose?: () => void;
 }
 
-export function TaskDetailPanel({ taskId }: TaskDetailPanelProps) {
+export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelProps) {
   const { data: task, isLoading } = useTask(taskId);
-  const selectTask = useUiStore((s) => s.selectTask);
-  const activeProjectId = useUiStore((s) => s.activeProjectId);
-  const { data: taskCost } = useTaskCost(taskId, task?.projectId ?? activeProjectId);
+  const { data: taskCost } = useTaskCost(taskId, projectId);
   const { data: phaseCost } = usePhaseCost(
     task?.taskType === "complex" ? taskId : null,
-    task?.projectId ?? activeProjectId,
+    projectId,
   );
-  const { data: allTasks } = useTasks(task?.projectId ?? activeProjectId);
+  const { data: allTasks } = useTasks(projectId);
 
   if (isLoading) {
     return (
@@ -39,7 +38,7 @@ export function TaskDetailPanel({ taskId }: TaskDetailPanelProps) {
       <div className="flex items-start justify-between">
         <h2 className="text-base font-semibold text-zinc-100">{task.title}</h2>
         <button
-          onClick={() => selectTask(null)}
+          onClick={() => onClose?.()}
           aria-label="Close panel"
           className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
         >
@@ -202,14 +201,12 @@ export function TaskDetailPanel({ taskId }: TaskDetailPanelProps) {
       />
 
       {/* Activity Timeline */}
-      {activeProjectId && (
-        <div>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Activity
-          </h4>
-          <ActivityTimeline projectId={activeProjectId} taskId={taskId} compact limit={5} />
-        </div>
-      )}
+      <div>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+          Activity
+        </h4>
+        <ActivityTimeline projectId={projectId} taskId={taskId} compact limit={5} />
+      </div>
 
       {/* Comments */}
       <CommentThread taskId={taskId} />

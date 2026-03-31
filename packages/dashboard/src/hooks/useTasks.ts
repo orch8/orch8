@@ -3,11 +3,10 @@ import { api } from "../api/client.js";
 import type { Task } from "../types.js";
 import type { CreateTask, UpdateTask } from "@orch/shared";
 
-export function useTasks(projectId: string | null) {
+export function useTasks(projectId: string) {
   return useQuery<Task[]>({
     queryKey: ["tasks", projectId],
-    queryFn: () =>
-      api.get("/tasks", projectId ? { projectId } : undefined),
+    queryFn: () => api.get("/tasks", { projectId }),
   });
 }
 

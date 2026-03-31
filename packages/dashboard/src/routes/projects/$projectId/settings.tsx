@@ -1,41 +1,34 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useProject, useArchiveProject } from "../hooks/useProjects.js";
-import { ProjectForm } from "../components/project/ProjectForm.js";
-import { useUiStore } from "../stores/ui.js";
-import type { Project } from "../types.js";
-
-export const Route = createFileRoute("/projects/$id/settings")({
-  component: ProjectSettingsPage,
-});
+import { useProject, useArchiveProject } from "../../../hooks/useProjects.js";
+import { ProjectForm } from "../../../components/project/ProjectForm.js";
+import type { Project } from "../../../types.js";
 
 function ProjectSettingsPage() {
-  const { id } = Route.useParams();
-  const { data: project, isLoading } = useProject(id);
+  const { projectId } = Route.useParams();
+  const { data: project, isLoading } = useProject(projectId);
   const archiveProject = useArchiveProject();
   const navigate = useNavigate();
-  const setActiveProject = useUiStore((s) => s.setActiveProject);
 
   const handleSuccess = (_project: Project) => {
-    navigate({ to: "/" });
+    navigate({ to: "/projects/$projectId", params: { projectId } });
   };
 
   const handleArchive = async () => {
     if (!project) return;
     await archiveProject.mutateAsync(project.id);
-    setActiveProject(null);
+    // Clear localStorage if this was the last-used project
+    if (localStorage.getItem("orch8:lastProjectId") === projectId) {
+      localStorage.removeItem("orch8:lastProjectId");
+    }
     navigate({ to: "/" });
   };
 
   if (isLoading) {
-    return (
-      <div className="p-8 text-zinc-500">Loading...</div>
-    );
+    return <div className="p-8 text-zinc-500">Loading...</div>;
   }
 
   if (!project) {
-    return (
-      <div className="p-8 text-zinc-500">Project not found</div>
-    );
+    return <div className="p-8 text-zinc-500">Project not found</div>;
   }
 
   return (
@@ -67,3 +60,7 @@ function ProjectSettingsPage() {
     </div>
   );
 }
+
+export const Route = createFileRoute("/projects/$projectId/settings")({
+  component: ProjectSettingsPage,
+});
