@@ -1,4 +1,5 @@
-import { useTask, useTasks } from "../../hooks/useTasks.js";
+import { useTask, useTasks, useUpdateTask } from "../../hooks/useTasks.js";
+import { useAgents } from "../../hooks/useAgents.js";
 import { useTaskCost, usePhaseCost } from "../../hooks/useCost.js";
 import { PhaseProgress } from "./PhaseProgress.js";
 import { CommentThread } from "./CommentThread.js";
@@ -21,6 +22,8 @@ export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelP
     projectId,
   );
   const { data: allTasks } = useTasks(projectId);
+  const { data: agents } = useAgents(projectId);
+  const updateTask = useUpdateTask();
 
   if (isLoading) {
     return (
@@ -74,7 +77,23 @@ export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelP
         </div>
         <div>
           <span className="text-zinc-600">Assignee</span>
-          <p className="text-zinc-300">{task.assignee ?? "Unassigned"}</p>
+          <select
+            value={task.assignee ?? ""}
+            onChange={(e) => {
+              updateTask.mutate({
+                taskId: task.id,
+                assignee: e.target.value || null,
+              });
+            }}
+            className="mt-0.5 w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-300"
+          >
+            <option value="">Unassigned</option>
+            {agents?.map((agent) => (
+              <option key={agent.id} value={agent.id}>
+                {agent.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
