@@ -36,9 +36,17 @@ describe("useTasks", () => {
     );
   });
 
-  it("does not fetch when projectId is null", () => {
+  it("fetches all tasks when projectId is null (aggregated view)", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve([{ id: "t1" }, { id: "t2" }]),
+    });
+
     const { result } = renderHook(() => useTasks(null), { wrapper });
-    expect(result.current.isFetching).toBe(false);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toHaveLength(2);
+    expect(mockFetch).toHaveBeenCalledWith("/api/tasks", expect.any(Object));
   });
 });
 

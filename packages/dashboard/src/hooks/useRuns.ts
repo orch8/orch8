@@ -14,8 +14,10 @@ export function useRuns(
   return useQuery<Run[]>({
     queryKey: ["runs", projectId, filters],
     queryFn: () =>
-      api.get("/runs", { projectId: projectId!, ...filters }),
-    enabled: !!projectId,
+      api.get("/runs", {
+        ...(projectId ? { projectId } : {}),
+        ...filters,
+      }),
   });
 }
 

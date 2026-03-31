@@ -6,8 +6,8 @@ import type { CreateTask, UpdateTask } from "@orch/shared";
 export function useTasks(projectId: string | null) {
   return useQuery<Task[]>({
     queryKey: ["tasks", projectId],
-    queryFn: () => api.get("/tasks", { projectId: projectId! }),
-    enabled: !!projectId,
+    queryFn: () =>
+      api.get("/tasks", projectId ? { projectId } : undefined),
   });
 }
 

@@ -11,8 +11,10 @@ export function useCostSummary(projectId: string | null, agentId?: string) {
   return useQuery<CostSummary>({
     queryKey: ["costSummary", projectId, agentId],
     queryFn: () =>
-      api.get("/cost/summary", { projectId: projectId!, agentId }),
-    enabled: !!projectId,
+      api.get("/cost/summary", {
+        ...(projectId ? { projectId } : {}),
+        agentId,
+      }),
   });
 }
 

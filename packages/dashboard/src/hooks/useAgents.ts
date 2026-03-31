@@ -6,8 +6,8 @@ import type { CreateAgent, UpdateAgent } from "@orch/shared";
 export function useAgents(projectId: string | null) {
   return useQuery<Agent[]>({
     queryKey: ["agents", projectId],
-    queryFn: () => api.get("/agents", { projectId: projectId! }),
-    enabled: !!projectId,
+    queryFn: () =>
+      api.get("/agents", projectId ? { projectId } : undefined),
   });
 }
 

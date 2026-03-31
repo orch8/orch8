@@ -6,8 +6,10 @@ export function useEntities(projectId: string | null, entityType?: string) {
   return useQuery<Entity[]>({
     queryKey: ["entities", projectId, entityType],
     queryFn: () =>
-      api.get("/memory/knowledge", { projectId: projectId!, entityType }),
-    enabled: !!projectId,
+      api.get("/memory/knowledge", {
+        ...(projectId ? { projectId } : {}),
+        entityType,
+      }),
   });
 }
 
