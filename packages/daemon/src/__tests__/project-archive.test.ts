@@ -63,6 +63,45 @@ describe("Project Archive", () => {
       expect(agentAfter!.pauseReason).toBe("project archived");
     });
 
+    it("does not modify terminated agents", async () => {
+      const project = await projectService.create({
+        name: "Mixed",
+        slug: "mixed",
+        homeDir: "/tmp/mix",
+        worktreeDir: "/tmp/mix-wt",
+      });
+
+      await agentService.create({
+        id: "eng-active",
+        projectId: project.id,
+        name: "Active",
+        role: "engineer",
+      });
+
+      // Manually set an agent to terminated
+      const { eq: eqOp } = await import("drizzle-orm");
+      const { agents: agentsTable } = await import("@orch/shared/db");
+      await testDb.db
+        .update(agentsTable)
+        .set({ status: "terminated" })
+        .where(eqOp(agentsTable.id, "eng-active"));
+
+      await agentService.create({
+        id: "eng-active2",
+        projectId: project.id,
+        name: "Active2",
+        role: "engineer",
+      });
+
+      await projectService.archive(project.id);
+
+      const terminated = await agentService.getById("eng-active", project.id);
+      expect(terminated!.status).toBe("terminated");
+
+      const paused = await agentService.getById("eng-active2", project.id);
+      expect(paused!.status).toBe("paused");
+    });
+
     it("throws if project not found", async () => {
       await expect(projectService.archive("proj_nonexistent")).rejects.toThrow(
         "Project not found",

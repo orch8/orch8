@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { projects, agents } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { CreateProject, UpdateProject, ProjectFilter } from "@orch/shared";
@@ -48,7 +48,7 @@ export class ProjectService {
         pauseReason: "project archived",
         updatedAt: new Date(),
       })
-      .where(eq(agents.projectId, id));
+      .where(and(eq(agents.projectId, id), eq(agents.status, "active")));
 
     // Set project inactive
     const [archived] = await this.db
