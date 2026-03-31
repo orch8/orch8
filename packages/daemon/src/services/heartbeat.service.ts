@@ -8,7 +8,7 @@ import type { ClaudeLocalAdapter, RunAgentPrompts } from "../adapter/claude-loca
 import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "../adapter/types.js";
 import type { MemoryExtractionService } from "./memory-extraction.service.js";
 import type { BroadcastService } from "./broadcast.service.js";
-import type { WorktreeService } from "./worktree.service.js";
+import { WorktreeService } from "./worktree.service.js";
 import type { FastifyBaseLogger } from "fastify";
 import { RunLogger, type LogHandle } from "./run-logger.js";
 import { mkdir } from "node:fs/promises";
@@ -467,6 +467,24 @@ export class HeartbeatService {
           .where(eq(tasks.id, claimedRun.taskId));
         if (task?.worktreePath) {
           cwd = task.worktreePath;
+        } else if (task && task.taskType !== "brainstorm" && this.worktreeService) {
+          // Lazy worktree creation for tasks without one
+          const slug = WorktreeService.slugify(task.title);
+          cwd = await this.worktreeService.create({
+            homeDir: project.homeDir,
+            worktreeDir: project.worktreeDir,
+            taskId: task.id,
+            slug,
+            defaultBranch: project.defaultBranch,
+          });
+          await this.db
+            .update(tasks)
+            .set({
+              worktreePath: cwd,
+              branch: `task/${task.id}/${slug}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(tasks.id, task.id));
         }
       }
 

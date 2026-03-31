@@ -4,6 +4,7 @@ import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/sh
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
+import { WorktreeService } from "../services/worktree.service.js";
 
 describe("Wiring: Dispatch", () => {
   let testDb: TestDb;
@@ -67,6 +68,122 @@ describe("Wiring: Dispatch", () => {
         .from(tasks)
         .where(eq(tasks.id, task.id));
       expect(updated.column).toBe("in_progress");
+    });
+  });
+
+  describe("P0 #2: lazy worktree creation in executeRun", () => {
+    it("creates worktree when task has no worktreePath", async () => {
+      await testDb.db.insert(agents).values({
+        id: "agent-1",
+        projectId,
+        name: "Worker",
+        role: "engineer",
+        status: "active",
+        wakeOnAssignment: true,
+        maxConcurrentRuns: 1,
+      });
+
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Build login form",
+        taskType: "quick",
+        column: "in_progress",
+      }).returning();
+
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "agent-1",
+        projectId,
+        taskId: task.id,
+        invocationSource: "assignment",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const service = new HeartbeatService(testDb.db, broadcastService);
+
+      const mockWorktreeService = {
+        create: vi.fn().mockResolvedValue("/tmp/wiring-wt/task-" + task.id),
+        remove: vi.fn().mockResolvedValue(undefined),
+      } as unknown as WorktreeService;
+      service.setWorktreeService(mockWorktreeService);
+
+      // Mock adapter to avoid real execution
+      service.setAdapter({
+        runAgent: vi.fn().mockResolvedValue({
+          exitCode: 0,
+          result: "done",
+          costUsd: 0,
+        }),
+      } as any);
+
+      await service.executeRun(run.id);
+
+      expect(mockWorktreeService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          homeDir: "/tmp/wiring-test",
+          worktreeDir: "/tmp/wiring-wt",
+          taskId: task.id,
+        }),
+      );
+
+      // Task should have worktreePath set
+      const [updated] = await testDb.db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, task.id));
+      expect(updated.worktreePath).toBe("/tmp/wiring-wt/task-" + task.id);
+      expect(updated.branch).toMatch(/^task\//);
+    });
+
+    it("skips worktree creation for brainstorm tasks", async () => {
+      await testDb.db.insert(agents).values({
+        id: "agent-1",
+        projectId,
+        name: "Worker",
+        role: "researcher",
+        status: "active",
+        maxConcurrentRuns: 1,
+      });
+
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Explore options",
+        taskType: "brainstorm",
+        column: "in_progress",
+      }).returning();
+
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "agent-1",
+        projectId,
+        taskId: task.id,
+        invocationSource: "assignment",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const service = new HeartbeatService(testDb.db, broadcastService);
+
+      const mockWorktreeService = {
+        create: vi.fn(),
+        remove: vi.fn(),
+      } as unknown as WorktreeService;
+      service.setWorktreeService(mockWorktreeService);
+
+      service.setAdapter({
+        runAgent: vi.fn().mockResolvedValue({
+          exitCode: 0,
+          result: "done",
+          costUsd: 0,
+        }),
+      } as any);
+
+      await service.executeRun(run.id);
+
+      expect(mockWorktreeService.create).not.toHaveBeenCalled();
     });
   });
 
