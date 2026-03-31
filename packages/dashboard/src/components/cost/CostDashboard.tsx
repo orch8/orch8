@@ -102,6 +102,22 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
               </button>
             ))}
           </div>
+          <div className="flex items-center gap-2 text-xs text-zinc-500">
+            <span>or</span>
+            <input
+              type="date"
+              onChange={(e) => {
+                const d = e.target.value;
+                if (d) {
+                  const diff = Math.ceil((Date.now() - new Date(d).getTime()) / (1000 * 60 * 60 * 24));
+                  setDays(Math.max(1, diff));
+                }
+              }}
+              className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-sm text-zinc-300"
+              aria-label="Start date for cost"
+            />
+            <span>to today</span>
+          </div>
         </div>
 
         <div className="h-64">
