@@ -93,6 +93,7 @@ export class ClaudeLocalAdapter {
           prompt,
           timeoutSec: config.timeoutSec ?? 0,
           graceSec: config.graceSec ?? 20,
+          logStream: ctx.logStream,
         },
         this.spawnFn,
       );
@@ -118,6 +119,7 @@ export class ClaudeLocalAdapter {
               prompt,
               timeoutSec: config.timeoutSec ?? 0,
               graceSec: config.graceSec ?? 20,
+              logStream: ctx.logStream,
             },
             this.spawnFn,
           );

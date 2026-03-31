@@ -90,6 +90,9 @@ export interface RunContext {
   // Session
   sessionId?: string;
 
+  // Log capture
+  logStream?: import("node:fs").WriteStream;
+
   // Subagent context
   parentRunId?: string;
   subtaskScope?: string;

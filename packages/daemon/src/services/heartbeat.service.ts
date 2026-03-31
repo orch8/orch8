@@ -8,6 +8,9 @@ import type { ClaudeLocalAdapter, RunAgentPrompts } from "../adapter/claude-loca
 import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "../adapter/types.js";
 import type { MemoryExtractionService } from "./memory-extraction.service.js";
 import type { BroadcastService } from "./broadcast.service.js";
+import { RunLogger, type LogHandle } from "./run-logger.js";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 
 type Agent = typeof agents.$inferSelect;
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
@@ -61,6 +64,10 @@ export class HeartbeatService {
     this.activeRunExecutions.clear();
     this.runningProcesses.clear();
     this.agentStartLocks.clear();
+  }
+
+  private getLogDir(projectHomeDir: string): string {
+    return path.join(projectHomeDir, ".orch8", "logs");
   }
 
   setAdapter(adapter: ClaudeLocalAdapter): void {
@@ -426,6 +433,12 @@ export class HeartbeatService {
         }
       }
 
+      // 6b. Setup run log capture (spec §14 §2.2)
+      const logDir = this.getLogDir(cwd);
+      await mkdir(logDir, { recursive: true });
+      const runLogger = new RunLogger(logDir);
+      const logHandle = runLogger.create(runId);
+
       // 7. Invoke adapter
       if (!this.adapter) {
         await this.failRun(runId, "No adapter configured", "no_adapter");
@@ -450,6 +463,7 @@ export class HeartbeatService {
         wakeReason: claimedRun.invocationSource,
         apiUrl: process.env.ORCH_API_URL ?? "http://localhost:3000",
         cwd,
+        logStream: logHandle.stream,
       };
 
       const prompts: RunAgentPrompts = {
@@ -477,6 +491,17 @@ export class HeartbeatService {
           model: result.model,
           sessionIdAfter: result.sessionId,
           finishedAt: new Date(),
+        })
+        .where(eq(heartbeatRuns.id, runId));
+
+      // 8b. Finalize run log (spec §14 §2.2)
+      const logResult = await runLogger.finalize(logHandle);
+      await this.db
+        .update(heartbeatRuns)
+        .set({
+          logStore: logResult.logStore,
+          logRef: logResult.logRef,
+          logBytes: logResult.logBytes,
         })
         .where(eq(heartbeatRuns.id, runId));
 

@@ -13,6 +13,7 @@ export interface ProcessRunInput {
   prompt: string;
   timeoutSec: number;
   graceSec: number;
+  logStream?: import("node:fs").WriteStream;
 }
 
 export async function runProcess(
@@ -35,6 +36,16 @@ export async function runProcess(
   proc.stderr!.on("data", (chunk: Buffer) => {
     stderrChunks.push(chunk);
   });
+
+  // Tee stdout and stderr to log stream if provided (spec §14 §2.2)
+  if (input.logStream) {
+    proc.stdout!.on("data", (chunk: Buffer) => {
+      input.logStream!.write(chunk);
+    });
+    proc.stderr!.on("data", (chunk: Buffer) => {
+      input.logStream!.write(chunk);
+    });
+  }
 
   // Parse stdout
   const parsedOutputPromise = parseOutputStream(proc.stdout!);
