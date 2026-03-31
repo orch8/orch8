@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { globalConfigSchema, projectConfigSchema, mergeConfigs } from "../config/schema.js";
+import { loadGlobalConfig, loadProjectConfig } from "../config/loader.js";
+import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 
 describe("globalConfigSchema", () => {
   it("accepts a full valid config", () => {
@@ -96,5 +101,64 @@ describe("mergeConfigs", () => {
     const global = globalConfigSchema.parse({});
     const merged = mergeConfigs(global, null);
     expect(merged).toEqual(global);
+  });
+});
+
+describe("loadGlobalConfig", () => {
+  it("loads and parses a YAML config file", () => {
+    const dir = join(tmpdir(), `orch-test-${randomUUID()}`);
+    mkdirSync(dir, { recursive: true });
+    const configPath = join(dir, "config.yaml");
+    writeFileSync(configPath, `
+orchestrator:
+  tick_interval_ms: 10000
+  log_level: debug
+api:
+  port: 4000
+`);
+
+    const config = loadGlobalConfig(configPath);
+    expect(config.orchestrator.tick_interval_ms).toBe(10000);
+    expect(config.orchestrator.log_level).toBe("debug");
+    expect(config.api.port).toBe(4000);
+    // Defaults still applied
+    expect(config.api.host).toBe("localhost");
+    expect(config.defaults.model).toBe("claude-opus-4-6");
+
+    rmSync(dir, { recursive: true });
+  });
+
+  it("returns defaults when file does not exist", () => {
+    const config = loadGlobalConfig("/nonexistent/path/config.yaml");
+    expect(config.orchestrator.tick_interval_ms).toBe(5000);
+    expect(config.api.port).toBe(3847);
+  });
+});
+
+describe("loadProjectConfig", () => {
+  it("loads project-level config from .orchestrator/config.yaml", () => {
+    const dir = join(tmpdir(), `orch-proj-${randomUUID()}`);
+    const orchDir = join(dir, ".orchestrator");
+    mkdirSync(orchDir, { recursive: true });
+    writeFileSync(join(orchDir, "config.yaml"), `
+project:
+  name: "Test Project"
+defaults:
+  model: claude-sonnet-4-6
+budget:
+  limit_usd: 100.0
+`);
+
+    const config = loadProjectConfig(dir);
+    expect(config!.project?.name).toBe("Test Project");
+    expect(config!.defaults?.model).toBe("claude-sonnet-4-6");
+    expect(config!.budget?.limit_usd).toBe(100.0);
+
+    rmSync(dir, { recursive: true });
+  });
+
+  it("returns null when no project config exists", () => {
+    const config = loadProjectConfig("/nonexistent/project");
+    expect(config).toBeNull();
   });
 });
