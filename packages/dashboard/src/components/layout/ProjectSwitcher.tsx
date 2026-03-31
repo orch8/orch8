@@ -39,20 +39,38 @@ export function ProjectSwitcher() {
       )}
 
       {projects?.map((project) => (
-        <button
+        <div
           key={project.id}
-          onClick={() => setActiveProject(project.id)}
-          className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
+          className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm transition-colors ${
             activeProjectId === project.id
               ? "bg-zinc-800 text-zinc-100"
               : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
           }`}
         >
-          <span>{project.name}</span>
-          {!project.active && (
-            <span className="text-xs text-zinc-600">archived</span>
-          )}
-        </button>
+          <button
+            onClick={() => setActiveProject(project.id)}
+            className="flex-1 text-left"
+          >
+            {project.name}
+          </button>
+          <div className="flex items-center gap-1">
+            {!project.active && (
+              <span className="text-xs text-zinc-600">archived</span>
+            )}
+            {activeProjectId === project.id && (
+              <a
+                href={`/projects/${project.id}/settings`}
+                className="rounded p-0.5 text-zinc-600 hover:text-zinc-400"
+                title="Project settings"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2" />
+                  <path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.17 2.17l1.06 1.06M8.77 8.77l1.06 1.06M9.83 2.17l-1.06 1.06M3.23 8.77l-1.06 1.06" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+              </a>
+            )}
+          </div>
+        </div>
       ))}
     </div>
   );
