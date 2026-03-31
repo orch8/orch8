@@ -10,6 +10,7 @@ import { useUiStore } from "../../stores/ui.js";
 import { KANBAN_COLUMNS, COLUMN_LABELS, type Task } from "../../types.js";
 import { KanbanColumn } from "./KanbanColumn.js";
 import { TaskCard } from "./TaskCard.js";
+import { BoardToolbar, type BoardFilters } from "./BoardToolbar.js";
 
 interface KanbanBoardProps {
   projectId: string | null;
@@ -20,6 +21,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
   const transition = useTransitionTask();
   const selectTask = useUiStore((s) => s.selectTask);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [filters, setFilters] = useState<BoardFilters>({});
 
   const tasksByColumn = useMemo(() => {
     const grouped: Record<string, Task[]> = {};
@@ -28,13 +30,16 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
     }
     if (tasks) {
       for (const task of tasks) {
+        if (filters.assignee && task.assignee !== filters.assignee) continue;
+        if (filters.priority && task.priority !== filters.priority) continue;
+        if (filters.taskType && task.taskType !== filters.taskType) continue;
         if (grouped[task.column]) {
           grouped[task.column].push(task);
         }
       }
     }
     return grouped;
-  }, [tasks]);
+  }, [tasks, filters]);
 
   function handleDragStart(event: { active: { id: string | number } }) {
     const task = tasks?.find((t) => t.id === event.active.id);
@@ -61,6 +66,8 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
   }
 
   return (
+    <>
+    <BoardToolbar projectId={projectId} onFilterChange={setFilters} />
     <DndContext
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
@@ -82,5 +89,6 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
         {activeTask && <TaskCard task={activeTask} onClick={() => {}} />}
       </DragOverlay>
     </DndContext>
+    </>
   );
 }
