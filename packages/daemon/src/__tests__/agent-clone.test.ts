@@ -192,6 +192,34 @@ describe("Agent Clone", () => {
       expect(res.statusCode).toBe(404);
     });
 
+    it("returns 409 for duplicate agent ID in target", async () => {
+      await testDb.db.insert(agents).values([
+        {
+          id: "eng-dup",
+          projectId: sourceProjectId,
+          name: "Source",
+          role: "engineer",
+        },
+        {
+          id: "eng-existing",
+          projectId: targetProjectId,
+          name: "Existing",
+          role: "engineer",
+        },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/agents/eng-dup/clone`,
+        headers: { "x-project-id": sourceProjectId },
+        payload: {
+          targetProjectId,
+          newId: "eng-existing",
+        },
+      });
+      expect(res.statusCode).toBe(409);
+    });
+
     it("returns 400 for missing fields", async () => {
       const res = await app.inject({
         method: "POST",

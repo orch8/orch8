@@ -197,13 +197,16 @@ export class AgentService {
     const source = await this.getById(id, projectId);
     if (!source) throw new Error("Agent not found");
 
-    // Copy definition fields, reset runtime state
+    // IMPORTANT: When adding new columns to agents table,
+    // decide if they belong in definition (copied) or runtime (reset below).
     const {
       id: _id,
       projectId: _pid,
       status: _status,
       pauseReason: _pr,
       budgetSpentUsd: _spent,
+      budgetPaused: _bp,
+      lastHeartbeat: _lh,
       createdAt: _ca,
       updatedAt: _ua,
       ...definition
@@ -218,6 +221,8 @@ export class AgentService {
         status: "active",
         pauseReason: null,
         budgetSpentUsd: 0,
+        budgetPaused: false,
+        lastHeartbeat: null,
       })
       .returning();
 
