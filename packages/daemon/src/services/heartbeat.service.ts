@@ -235,25 +235,28 @@ export class HeartbeatService {
       })
       .returning();
 
-    // Set execution lock on the task and transition column
+    // Set execution lock on the task; only transition column when in backlog
+    const shouldTransition = task.column === "backlog";
     await this.db
       .update(tasks)
       .set({
         executionRunId: run.id,
         executionAgentId: agentId,
         executionLockedAt: new Date(),
-        column: "in_progress",
+        ...(shouldTransition ? { column: "in_progress" } : {}),
         updatedAt: new Date(),
       })
       .where(eq(tasks.id, taskId));
 
-    // Broadcast column transition
-    this.broadcastService.taskTransitioned(projectId, {
-      taskId,
-      from: task.column,
-      to: "in_progress",
-      agentId,
-    });
+    if (shouldTransition) {
+      // Broadcast column transition
+      this.broadcastService.taskTransitioned(projectId, {
+        taskId,
+        from: task.column,
+        to: "in_progress",
+        agentId,
+      });
+    }
 
     // Broadcast run_created (spec §14 §2.1)
     this.broadcastService.runCreated(projectId, {

@@ -4,6 +4,7 @@ import { projects, agents, wakeupRequests } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { agentRoutes } from "../api/routes/agents.js";
+import { vi } from "vitest";
 import { AgentService } from "../services/agent.service.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
@@ -44,6 +45,7 @@ describe("Agent API Routes", () => {
     const broadcastService = new BroadcastService(sockets);
     const heartbeatService = new HeartbeatService(testDb.db, broadcastService);
     app.decorate("heartbeatService", heartbeatService);
+    app.decorate("taskService", { list: vi.fn().mockResolvedValue([]) });
 
     app.register(authPlugin);
     app.register(agentRoutes);

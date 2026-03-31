@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import Fastify from "fastify";
 import { projects, agents, tasks, taskDependencies } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
@@ -64,6 +64,7 @@ describe("Task Routes Permission Enforcement", () => {
     const worktreeService = new WorktreeService();
     const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
     app.decorate("lifecycleService", lifecycleService);
+    app.decorate("heartbeatService", { enqueueWakeup: vi.fn().mockResolvedValue(undefined) });
 
     app.register(authPlugin);
     app.register(taskRoutes);
