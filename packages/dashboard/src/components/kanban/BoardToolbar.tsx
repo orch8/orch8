@@ -9,7 +9,7 @@ export interface BoardFilters {
 }
 
 interface BoardToolbarProps {
-  projectId: string | null;
+  projectId: string;
   onFilterChange: (filters: BoardFilters) => void;
 }
 
@@ -71,13 +71,11 @@ export function BoardToolbar({ projectId, onFilterChange }: BoardToolbarProps) {
         </select>
       </div>
 
-      {projectId && (
-        <TaskCreateModal
-          projectId={projectId}
-          open={showCreate}
-          onClose={() => setShowCreate(false)}
-        />
-      )}
+      <TaskCreateModal
+        projectId={projectId}
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+      />
     </>
   );
 }

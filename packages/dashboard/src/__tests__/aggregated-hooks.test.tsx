@@ -26,7 +26,7 @@ describe("Hooks with null projectId (aggregated view)", () => {
       json: () => Promise.resolve([{ id: "t1" }, { id: "t2" }]),
     });
 
-    const { result } = renderHook(() => useTasks(null), { wrapper });
+    const { result } = renderHook(() => useTasks(null as any), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toHaveLength(2);
@@ -42,7 +42,7 @@ describe("Hooks with null projectId (aggregated view)", () => {
       json: () => Promise.resolve([{ id: "a1" }]),
     });
 
-    const { result } = renderHook(() => useAgents(null), { wrapper });
+    const { result } = renderHook(() => useAgents(null as any), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toHaveLength(1);
@@ -54,7 +54,7 @@ describe("Hooks with null projectId (aggregated view)", () => {
       json: () => Promise.resolve([{ id: "r1" }]),
     });
 
-    const { result } = renderHook(() => useRuns(null), { wrapper });
+    const { result } = renderHook(() => useRuns(null as any), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toHaveLength(1);
@@ -66,7 +66,7 @@ describe("Hooks with null projectId (aggregated view)", () => {
       json: () => Promise.resolve({ total: 10, byAgent: [] }),
     });
 
-    const { result } = renderHook(() => useCostSummary(null), { wrapper });
+    const { result } = renderHook(() => useCostSummary(null as any), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.total).toBe(10);

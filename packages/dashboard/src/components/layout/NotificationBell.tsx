@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useNotifications, useMarkNotificationsRead } from "../../hooks/useNotifications.js";
 
 interface NotificationBellProps {
-  projectId: string | null;
+  projectId: string;
 }
 
 function relativeTime(dateStr: string | Date): string {
@@ -104,7 +104,7 @@ export function NotificationBell({ projectId }: NotificationBellProps) {
             {notifications?.map((ntf) => (
               <Link
                 key={ntf.id}
-                to={ntf.link ?? "/"}
+                to={(ntf.link ?? "/") as any}
                 className={`flex gap-2 px-3 py-2 text-sm hover:bg-zinc-800 ${
                   !ntf.read ? "bg-zinc-800/40" : ""
                 }`}

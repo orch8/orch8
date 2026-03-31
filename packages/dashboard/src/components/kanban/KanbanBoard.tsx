@@ -6,20 +6,19 @@ import {
   pointerWithin,
 } from "@dnd-kit/core";
 import { useTasks, useTransitionTask } from "../../hooks/useTasks.js";
-import { useUiStore } from "../../stores/ui.js";
 import { KANBAN_COLUMNS, COLUMN_LABELS, type Task } from "../../types.js";
 import { KanbanColumn } from "./KanbanColumn.js";
 import { TaskCard } from "./TaskCard.js";
 import { BoardToolbar, type BoardFilters } from "./BoardToolbar.js";
 
 interface KanbanBoardProps {
-  projectId: string | null;
+  projectId: string;
+  onTaskSelect?: (taskId: string) => void;
 }
 
-export function KanbanBoard({ projectId }: KanbanBoardProps) {
+export function KanbanBoard({ projectId, onTaskSelect }: KanbanBoardProps) {
   const { data: tasks } = useTasks(projectId);
   const transition = useTransitionTask();
-  const selectTask = useUiStore((s) => s.selectTask);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [filters, setFilters] = useState<BoardFilters>({});
 
@@ -80,7 +79,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             column={col}
             label={COLUMN_LABELS[col]}
             tasks={tasksByColumn[col] ?? []}
-            onTaskClick={selectTask}
+            onTaskClick={onTaskSelect ?? (() => {})}
           />
         ))}
       </div>

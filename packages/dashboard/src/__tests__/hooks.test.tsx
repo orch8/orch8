@@ -42,7 +42,7 @@ describe("useTasks", () => {
       json: () => Promise.resolve([{ id: "t1" }, { id: "t2" }]),
     });
 
-    const { result } = renderHook(() => useTasks(null), { wrapper });
+    const { result } = renderHook(() => useTasks(null as any), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data).toHaveLength(2);

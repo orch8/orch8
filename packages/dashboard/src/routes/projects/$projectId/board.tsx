@@ -16,7 +16,7 @@ function BoardPage() {
         <TaskDetailPanel
           taskId={selectedTaskId}
           projectId={projectId}
-          onClose={() => navigate({ search: { task: undefined } })}
+          onClose={() => navigate({ search: {} } as any)}
         />
       )}
     </div>

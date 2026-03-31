@@ -18,27 +18,27 @@ describe("useUiStore (slimmed)", () => {
   });
 
   it("does NOT have activeProjectId", () => {
-    const state = useUiStore.getState() as Record<string, unknown>;
+    const state = useUiStore.getState() as unknown as Record<string, unknown>;
     expect(state).not.toHaveProperty("activeProjectId");
   });
 
   it("does NOT have selectedTaskId", () => {
-    const state = useUiStore.getState() as Record<string, unknown>;
+    const state = useUiStore.getState() as unknown as Record<string, unknown>;
     expect(state).not.toHaveProperty("selectedTaskId");
   });
 
   it("does NOT have selectedAgentId", () => {
-    const state = useUiStore.getState() as Record<string, unknown>;
+    const state = useUiStore.getState() as unknown as Record<string, unknown>;
     expect(state).not.toHaveProperty("selectedAgentId");
   });
 
   it("does NOT have selectedRunId", () => {
-    const state = useUiStore.getState() as Record<string, unknown>;
+    const state = useUiStore.getState() as unknown as Record<string, unknown>;
     expect(state).not.toHaveProperty("selectedRunId");
   });
 
   it("does NOT have selectedEntityId", () => {
-    const state = useUiStore.getState() as Record<string, unknown>;
+    const state = useUiStore.getState() as unknown as Record<string, unknown>;
     expect(state).not.toHaveProperty("selectedEntityId");
   });
 });

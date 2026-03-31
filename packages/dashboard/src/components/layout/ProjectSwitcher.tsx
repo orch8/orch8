@@ -30,7 +30,7 @@ export function ProjectSwitcher() {
       ? pathname.replace(`/projects/${currentProjectId}`, "")
       : "";
     const target = `/projects/${newProjectId}${currentSuffix || ""}`;
-    navigate({ to: target });
+    navigate({ to: target as any });
     setOpen(false);
   }
 
@@ -79,7 +79,7 @@ export function ProjectSwitcher() {
                 )}
                 {project.id === currentProjectId && (
                   <Link
-                    to={`/projects/${project.id}/settings`}
+                    to={`/projects/${project.id}/settings` as any}
                     onClick={() => setOpen(false)}
                     className="rounded p-0.5 text-zinc-600 hover:text-zinc-400"
                     title="Project settings"

@@ -77,7 +77,7 @@ export function ActivityTimeline({
 
       {compact && (
         <Link
-          to="/activity"
+          to={"/activity" as any}
           className="mt-1 block text-xs text-blue-400 hover:text-blue-300"
         >
           View all activity →
