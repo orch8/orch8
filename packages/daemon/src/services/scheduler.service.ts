@@ -87,6 +87,13 @@ export class SchedulerService {
     }
   }
 
+  async resumeInterruptedRuns(): Promise<{ reaped: number }> {
+    // On startup, no runs should be tracked in-memory.
+    // Any runs still in "running" status are orphaned from a prior daemon instance.
+    const reaped = await this.reapOrphanedRuns();
+    return { reaped: reaped.length };
+  }
+
   async reapOrphanedRuns(): Promise<HeartbeatRun[]> {
     const stalenessThreshold = new Date(
       Date.now() - this.config.stalenessThresholdMs,

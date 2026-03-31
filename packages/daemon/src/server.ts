@@ -134,6 +134,11 @@ export function buildServer(options: ServerOptions = {}) {
 
     schedulerService.start();
 
+    // 7. Resume interrupted tasks from prior daemon instance
+    schedulerService.resumeInterruptedRuns().catch((err) => {
+      app.log.error({ err }, "Failed to resume interrupted runs on startup");
+    });
+
     // Comment service
     const commentService = new CommentService(dbClient.db);
 

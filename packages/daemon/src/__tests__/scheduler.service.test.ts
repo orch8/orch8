@@ -176,6 +176,31 @@ describe("SchedulerService", () => {
     });
   });
 
+  describe("resumeInterruptedRuns", () => {
+    it("reaps orphaned runs that were running before restart", async () => {
+      const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
+      await testDb.db.insert(agents).values({
+        id: "eng-resume",
+        projectId,
+        name: "Resume Eng",
+        role: "engineer",
+      });
+
+      // Simulate a run that was running when the daemon crashed
+      await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-resume",
+        projectId,
+        invocationSource: "on_demand",
+        status: "running",
+        startedAt: tenMinAgo,
+      });
+
+      const result = await scheduler.resumeInterruptedRuns();
+      // All previously-running runs should be cleaned up
+      expect(result.reaped).toBeGreaterThanOrEqual(1);
+    });
+  });
+
   describe("enhanced tick loop", () => {
     it("tick runs tickTimers, reapOrphanedRuns, unblockResolved, and processVerificationQueue", async () => {
       // Setup: agent with heartbeat due
