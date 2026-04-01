@@ -23,10 +23,13 @@ export interface ParsedAgentWithPaths extends ParsedAgentsMd {
 export class SeedingService {
   /**
    * Copies bundled skill and agent defaults into the project's
-   * .orchestrator/ directory. Creates the directory if needed.
+   * .orch8/ directory. Creates the directory if needed.
+   *
+   * @param agentIds — which agent templates to copy (e.g. ["implementer","reviewer"]).
+   *                    When omitted or empty, no agents are copied — only skills.
    */
-  async copyDefaults(projectHomeDir: string): Promise<void> {
-    const orchDir = join(projectHomeDir, ".orchestrator");
+  async copyDefaults(projectHomeDir: string, agentIds?: string[]): Promise<void> {
+    const orchDir = join(projectHomeDir, ".orch8");
     const destSkills = join(orchDir, "skills");
     const destAgents = join(orchDir, "agents");
 
@@ -34,17 +37,26 @@ export class SeedingService {
     await mkdir(destAgents, { recursive: true });
 
     await copyDirRecursive(DEFAULT_SKILLS_DIR, destSkills);
-    await copyDirRecursive(DEFAULT_AGENTS_DIR, destAgents);
+
+    if (agentIds && agentIds.length > 0) {
+      for (const id of agentIds) {
+        const srcAgent = join(DEFAULT_AGENTS_DIR, id);
+        if (!existsSync(srcAgent)) continue;
+        const destAgent = join(destAgents, id);
+        await mkdir(destAgent, { recursive: true });
+        await copyDirRecursive(srcAgent, destAgent);
+      }
+    }
   }
 
   /**
-   * Parses all AGENTS.md files in the project's .orchestrator/agents/
+   * Parses all AGENTS.md files in the project's .orch8/agents/
    * directory and returns structured data ready for DB insertion.
    */
   async parseAgentDefinitions(
     projectHomeDir: string,
   ): Promise<ParsedAgentWithPaths[]> {
-    const agentsDir = join(projectHomeDir, ".orchestrator", "agents");
+    const agentsDir = join(projectHomeDir, ".orch8", "agents");
     const entries = await readdir(agentsDir);
     const results: ParsedAgentWithPaths[] = [];
 
@@ -56,7 +68,7 @@ export class SeedingService {
       const parsed = parseAgentsMd(content);
 
       // Resolve skill names to absolute paths
-      const skillsDir = join(projectHomeDir, ".orchestrator", "skills");
+      const skillsDir = join(projectHomeDir, ".orch8", "skills");
       const resolvedSkillPaths = parsed.skills.map((skillName) =>
         join(skillsDir, skillName, "SKILL.md"),
       );
@@ -72,7 +84,7 @@ export class SeedingService {
   }
 
   /**
-   * Ensures .orchestrator/ is in the project's .gitignore.
+   * Ensures .orch8/ is in the project's .gitignore.
    * Creates .gitignore if it doesn't exist.
    * Only appends — never modifies existing entries.
    */
@@ -82,20 +94,20 @@ export class SeedingService {
     if (!existsSync(gitignorePath)) {
       await writeFile(
         gitignorePath,
-        "# orch8 orchestrator data\n.orchestrator/\n",
+        "# orch8 orchestrator data\n.orch8/\n",
       );
       return;
     }
 
     const content = await readFile(gitignorePath, "utf-8");
 
-    // Check if .orchestrator/ is already covered
-    if (content.includes(".orchestrator/")) return;
+    // Check if .orch8/ is already covered
+    if (content.includes(".orch8/")) return;
 
     const suffix = content.endsWith("\n") ? "" : "\n";
     await appendFile(
       gitignorePath,
-      `${suffix}\n# orch8 orchestrator data\n.orchestrator/\n`,
+      `${suffix}\n# orch8 orchestrator data\n.orch8/\n`,
     );
   }
 }

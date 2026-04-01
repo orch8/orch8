@@ -121,7 +121,7 @@ export class ProjectSkillService {
   }
 
   async syncFromDisk(projectId: string, projectHomeDir: string): Promise<void> {
-    const skillsDir = join(projectHomeDir, ".orchestrator", "skills");
+    const skillsDir = join(projectHomeDir, ".orch8", "skills");
     if (!existsSync(skillsDir)) return;
 
     const entries = await readdir(skillsDir, { withFileTypes: true });

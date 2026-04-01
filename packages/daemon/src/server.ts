@@ -120,6 +120,9 @@ export function buildServer(options: ServerOptions = {}) {
     const sessionMgr = new SessionManager(dbClient.db);
     heartbeatService.setSessionManager(sessionMgr);
 
+    const apiHost = process.env.ORCH_HOST ?? options.config?.api.host ?? "localhost";
+    const apiPort = Number(process.env.ORCH_PORT ?? options.config?.api.port ?? 3847);
+    heartbeatService.setApiUrl(`http://${apiHost}:${apiPort}`);
     heartbeatService.setLogger(app.log);
     heartbeatService.setWorktreeService(worktreeService);
     app.decorate("heartbeatService", heartbeatService);

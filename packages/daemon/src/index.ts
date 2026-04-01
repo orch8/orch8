@@ -12,7 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = join(__dirname, "db", "migrations");
 
 // 1. Load global config
-const configPath = join(homedir(), ".orchestrator", "config.yaml");
+const configPath = join(homedir(), ".orch8", "config.yaml");
 const config = loadGlobalConfig(configPath);
 
 // 2. Connect to Postgres

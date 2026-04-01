@@ -15,17 +15,19 @@ afterEach(async () => {
   await rm(tempDir, { recursive: true, force: true });
 });
 
+const ALL_AGENTS = ["cto", "implementer", "planner", "qa", "researcher", "reviewer"];
+
 describe("Project seeding integration", () => {
-  it("seeds a project directory with defaults and parses agents", async () => {
+  it("seeds a project directory with selected agents and parses them", async () => {
     const service = new SeedingService();
 
-    // Step 1: Copy defaults
-    await service.copyDefaults(tempDir);
+    // Step 1: Copy defaults for all agents
+    await service.copyDefaults(tempDir, ALL_AGENTS);
 
     // Step 2: Parse agent definitions
     const agents = await service.parseAgentDefinitions(tempDir);
 
-    // Should have all 6 default agents
+    // Should have all 6 selected agents
     expect(agents).toHaveLength(6);
 
     const names = agents.map((a) => a.name).sort();
@@ -58,7 +60,7 @@ describe("Project seeding integration", () => {
 
   it("produces agent records compatible with the agents DB schema", async () => {
     const service = new SeedingService();
-    await service.copyDefaults(tempDir);
+    await service.copyDefaults(tempDir, ALL_AGENTS);
     const agents = await service.parseAgentDefinitions(tempDir);
 
     for (const agent of agents) {
@@ -74,7 +76,7 @@ describe("Project seeding integration", () => {
       expect(typeof agent.heartbeat.enabled).toBe("boolean");
 
       // Instructions file path points to the copied AGENTS.md
-      expect(agent.instructionsFilePath).toContain(".orchestrator/agents/");
+      expect(agent.instructionsFilePath).toContain(".orch8/agents/");
       expect(agent.instructionsFilePath).toMatch(/AGENTS\.md$/);
     }
 

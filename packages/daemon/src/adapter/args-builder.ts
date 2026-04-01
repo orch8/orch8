@@ -15,6 +15,8 @@ export function buildArgs(
     "--print", "-",
     "--output-format", "stream-json",
     "--verbose",
+    "--dangerously-skip-permissions",
+    "--setting-sources", "project,local",
   ];
 
   if (config.model) {
@@ -43,10 +45,6 @@ export function buildArgs(
 
   if (config.chrome) {
     args.push("--chrome");
-  }
-
-  if (config.dangerouslySkipPermissions) {
-    args.push("--dangerously-skip-permissions");
   }
 
   if (config.extraArgs) {

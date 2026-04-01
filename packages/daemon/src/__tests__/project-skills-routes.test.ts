@@ -28,7 +28,7 @@ describe("project-skills routes", () => {
     await testDb.db.delete(projects);
 
     projectHomeDir = await mkdtemp(join(tmpdir(), "orch-route-test-"));
-    const skillsDir = join(projectHomeDir, ".orchestrator", "skills");
+    const skillsDir = join(projectHomeDir, ".orch8", "skills");
     await mkdir(skillsDir, { recursive: true });
 
     const [proj] = await testDb.db.insert(projects).values({
@@ -62,7 +62,7 @@ describe("project-skills routes", () => {
   });
 
   it("POST /api/projects/:projectId/skills creates a skill", async () => {
-    const skillDir = join(projectHomeDir, ".orchestrator", "skills", "test-skill");
+    const skillDir = join(projectHomeDir, ".orch8", "skills", "test-skill");
     await mkdir(skillDir, { recursive: true });
     await writeFile(join(skillDir, "SKILL.md"), "---\nname: Test Skill\ndescription: A test\n---\n# Test\nContent");
 
@@ -79,7 +79,7 @@ describe("project-skills routes", () => {
   });
 
   it("GET /api/projects/:projectId/skills/:slug returns a skill", async () => {
-    const skillDir = join(projectHomeDir, ".orchestrator", "skills", "fetch-me");
+    const skillDir = join(projectHomeDir, ".orch8", "skills", "fetch-me");
     await mkdir(skillDir, { recursive: true });
     await writeFile(join(skillDir, "SKILL.md"), "---\nname: Fetch Me\n---\n# F\nBody");
 
@@ -99,7 +99,7 @@ describe("project-skills routes", () => {
   });
 
   it("DELETE /api/projects/:projectId/skills/:slug removes the skill", async () => {
-    const skillDir = join(projectHomeDir, ".orchestrator", "skills", "doomed");
+    const skillDir = join(projectHomeDir, ".orch8", "skills", "doomed");
     await mkdir(skillDir, { recursive: true });
     await writeFile(join(skillDir, "SKILL.md"), "---\nname: Doomed\n---\n# D\nBody");
 
@@ -124,7 +124,7 @@ describe("project-skills routes", () => {
   });
 
   it("POST /api/projects/:projectId/skills/sync triggers disk sync", async () => {
-    const skillDir = join(projectHomeDir, ".orchestrator", "skills", "synced");
+    const skillDir = join(projectHomeDir, ".orch8", "skills", "synced");
     await mkdir(skillDir, { recursive: true });
     await writeFile(join(skillDir, "SKILL.md"), "---\nname: Synced\n---\n# S\nBody");
 

@@ -28,7 +28,7 @@ export async function runProcess(
     stdio: ["pipe", "pipe", "pipe"],
   }) as ChildProcess;
 
-  // Write prompt to stdin and close (spec §2.1)
+  // Write prompt to stdin and close (--print - reads from stdin)
   proc.stdin!.write(input.prompt);
   proc.stdin!.end();
 

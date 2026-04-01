@@ -57,6 +57,8 @@ export interface BuildPromptInput {
   isFirstRun: boolean;
 }
 
+const DEFAULT_HEARTBEAT = "You are agent {{agent.id}} ({{agent.name}}). Wake reason: {{run.source}}. Task: {{task.title}}. {{task.description}}";
+
 export function buildPrompt(input: BuildPromptInput): string {
   const vars = contextToVars(input.context);
   const sections: string[] = [];
@@ -71,8 +73,9 @@ export function buildPrompt(input: BuildPromptInput): string {
     sections.push(input.sessionHandoff);
   }
 
-  // Heartbeat prompt — always present
-  sections.push(interpolateTemplate(input.heartbeatTemplate, vars));
+  // Heartbeat prompt — always present; fall back to default so stdin is never empty
+  const heartbeat = input.heartbeatTemplate || DEFAULT_HEARTBEAT;
+  sections.push(interpolateTemplate(heartbeat, vars));
 
   return sections.join("\n\n");
 }

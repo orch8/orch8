@@ -20,7 +20,7 @@ You are an agent managed by the **orch8** orchestration daemon. You operate in d
 
 | Variable | Description |
 |----------|-------------|
-| `ORCH_API_URL` | Daemon API base URL (e.g., `http://localhost:3000`) |
+| `ORCH_API_URL` | Daemon API base URL — always read from env, never hard-code |
 | `ORCH_AGENT_ID` | Your unique agent identifier |
 | `ORCH_PROJECT_ID` | Current project scope |
 | `ORCH_RUN_ID` | Current heartbeat run identifier |

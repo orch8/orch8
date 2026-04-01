@@ -151,6 +151,7 @@ export class AgentCreatorService {
       "--print", prompt,
       "--output-format", "stream-json",
       "--verbose",
+      "--setting-sources", "project,local",
       "--model", session.model,
       "--max-turns", String(session.maxTurns),
     ];

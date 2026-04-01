@@ -7,7 +7,7 @@ import { DaemonLogFilterSchema, DaemonConfigPatchSchema } from "@orch/shared";
 import { loadGlobalConfig } from "../../config/loader.js";
 import "../../types.js";
 
-const CONFIG_PATH = join(homedir(), ".orchestrator", "config.yaml");
+const CONFIG_PATH = join(homedir(), ".orch8", "config.yaml");
 
 export async function daemonRoutes(app: FastifyInstance) {
   const startTime = Date.now();

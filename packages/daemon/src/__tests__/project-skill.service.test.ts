@@ -67,7 +67,7 @@ describe("ProjectSkillService", () => {
 
     // Create temp dir for skill files
     projectHomeDir = await mkdtemp(join(tmpdir(), "orch-test-skills-"));
-    const skillsDir = join(projectHomeDir, ".orchestrator", "skills");
+    const skillsDir = join(projectHomeDir, ".orch8", "skills");
     await mkdir(skillsDir, { recursive: true });
 
     // Insert a test project
@@ -88,7 +88,7 @@ describe("ProjectSkillService", () => {
 
   describe("create", () => {
     it("creates a skill from a local directory with SKILL.md", async () => {
-      const skillDir = join(projectHomeDir, ".orchestrator", "skills", "my-skill");
+      const skillDir = join(projectHomeDir, ".orch8", "skills", "my-skill");
       await mkdir(skillDir, { recursive: true });
       await writeFile(join(skillDir, "SKILL.md"), [
         "---",
@@ -115,7 +115,7 @@ describe("ProjectSkillService", () => {
     });
 
     it("derives scripts_executables trust level when .sh exists", async () => {
-      const skillDir = join(projectHomeDir, ".orchestrator", "skills", "scripted");
+      const skillDir = join(projectHomeDir, ".orch8", "skills", "scripted");
       await mkdir(skillDir, { recursive: true });
       await writeFile(join(skillDir, "SKILL.md"), "---\nname: Scripted\n---\n# S\nContent");
       await writeFile(join(skillDir, "setup.sh"), "#!/bin/bash\necho hi");
@@ -132,7 +132,7 @@ describe("ProjectSkillService", () => {
   describe("list", () => {
     it("returns all skills and auto-prunes missing directories", async () => {
       // Insert two skills: one with a valid dir, one with a missing dir
-      const validDir = join(projectHomeDir, ".orchestrator", "skills", "valid");
+      const validDir = join(projectHomeDir, ".orch8", "skills", "valid");
       await mkdir(validDir, { recursive: true });
       await writeFile(join(validDir, "SKILL.md"), "---\nname: Valid\n---\n# V\nContent");
 
@@ -157,7 +157,7 @@ describe("ProjectSkillService", () => {
 
   describe("get", () => {
     it("retrieves a skill by slug", async () => {
-      const skillDir = join(projectHomeDir, ".orchestrator", "skills", "lookup");
+      const skillDir = join(projectHomeDir, ".orch8", "skills", "lookup");
       await mkdir(skillDir, { recursive: true });
       await writeFile(join(skillDir, "SKILL.md"), "---\nname: Lookup\n---\n# L\nContent");
 
@@ -169,7 +169,7 @@ describe("ProjectSkillService", () => {
     });
 
     it("retrieves a skill by id", async () => {
-      const skillDir = join(projectHomeDir, ".orchestrator", "skills", "byid");
+      const skillDir = join(projectHomeDir, ".orch8", "skills", "byid");
       await mkdir(skillDir, { recursive: true });
       await writeFile(join(skillDir, "SKILL.md"), "---\nname: ById\n---\n# B\nContent");
 
@@ -188,7 +188,7 @@ describe("ProjectSkillService", () => {
 
   describe("delete", () => {
     it("removes the DB row and strips slug from agents desiredSkills", async () => {
-      const skillDir = join(projectHomeDir, ".orchestrator", "skills", "doomed");
+      const skillDir = join(projectHomeDir, ".orch8", "skills", "doomed");
       await mkdir(skillDir, { recursive: true });
       await writeFile(join(skillDir, "SKILL.md"), "---\nname: Doomed\n---\n# D\nContent");
 
@@ -232,7 +232,7 @@ describe("ProjectSkillService", () => {
   describe("syncFromDisk", () => {
     it("upserts skills from disk and prunes stale rows", async () => {
       // Create two skill directories on disk
-      const skillsBase = join(projectHomeDir, ".orchestrator", "skills");
+      const skillsBase = join(projectHomeDir, ".orch8", "skills");
       const s1 = join(skillsBase, "alpha");
       const s2 = join(skillsBase, "beta");
       await mkdir(s1, { recursive: true });

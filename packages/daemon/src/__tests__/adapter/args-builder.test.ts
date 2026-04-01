@@ -13,6 +13,18 @@ describe("buildArgs", () => {
     expect(args).toContain("--verbose");
   });
 
+  it("includes --setting-sources project,local", () => {
+    const args = buildArgs({});
+    const idx = args.indexOf("--setting-sources");
+    expect(idx).toBeGreaterThan(-1);
+    expect(args[idx + 1]).toBe("project,local");
+  });
+
+  it("includes --dangerously-skip-permissions always", () => {
+    const args = buildArgs({});
+    expect(args).toContain("--dangerously-skip-permissions");
+  });
+
   it("adds --model when configured", () => {
     const args = buildArgs({ model: "claude-opus-4-6" });
     const idx = args.indexOf("--model");
@@ -54,11 +66,6 @@ describe("buildArgs", () => {
   it("does not add --chrome when disabled", () => {
     const args = buildArgs({ chrome: false });
     expect(args).not.toContain("--chrome");
-  });
-
-  it("adds --dangerously-skip-permissions flag when enabled", () => {
-    const args = buildArgs({ dangerouslySkipPermissions: true });
-    expect(args).toContain("--dangerously-skip-permissions");
   });
 
   it("adds --append-system-prompt-file when provided", () => {

@@ -136,9 +136,9 @@ api:
 });
 
 describe("loadProjectConfig", () => {
-  it("loads project-level config from .orchestrator/config.yaml", () => {
+  it("loads project-level config from .orch8/config.yaml", () => {
     const dir = join(tmpdir(), `orch-proj-${randomUUID()}`);
-    const orchDir = join(dir, ".orchestrator");
+    const orchDir = join(dir, ".orch8");
     mkdirSync(orchDir, { recursive: true });
     writeFileSync(join(orchDir, "config.yaml"), `
 project:

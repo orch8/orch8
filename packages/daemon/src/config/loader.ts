@@ -19,7 +19,7 @@ export function loadGlobalConfig(configPath: string): GlobalConfig {
 }
 
 export function loadProjectConfig(projectDir: string): ProjectConfig | null {
-  const configPath = join(projectDir, ".orchestrator", "config.yaml");
+  const configPath = join(projectDir, ".orch8", "config.yaml");
   if (!existsSync(configPath)) {
     return null;
   }

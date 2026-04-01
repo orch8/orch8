@@ -3274,7 +3274,7 @@ paths:
             application/json:
               schema:
                 type: object
-                description: Global config from ~/.orchestrator/config.yaml
+                description: Global config from ~/.orch8/config.yaml
     patch:
       tags: [Daemon]
       summary: Update daemon config

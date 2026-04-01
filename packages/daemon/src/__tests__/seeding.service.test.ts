@@ -16,11 +16,11 @@ afterEach(async () => {
 
 describe("SeedingService", () => {
   describe("copyDefaults", () => {
-    it("copies skills directory to .orchestrator/skills/", async () => {
+    it("copies skills directory to .orch8/skills/", async () => {
       const service = new SeedingService();
       await service.copyDefaults(tempDir);
 
-      const skillsDir = join(tempDir, ".orchestrator", "skills");
+      const skillsDir = join(tempDir, ".orch8", "skills");
       const entries = await readdir(skillsDir);
       expect(entries).toContain("tdd");
       expect(entries).toContain("verification");
@@ -34,15 +34,23 @@ describe("SeedingService", () => {
       expect(tddContent).toContain("name: tdd");
     });
 
-    it("copies agents directory to .orchestrator/agents/", async () => {
+    it("copies no agents when agentIds is omitted", async () => {
       const service = new SeedingService();
       await service.copyDefaults(tempDir);
 
-      const agentsDir = join(tempDir, ".orchestrator", "agents");
+      const agentsDir = join(tempDir, ".orch8", "agents");
       const entries = await readdir(agentsDir);
-      expect(entries).toContain("researcher");
-      expect(entries).toContain("implementer");
-      expect(entries).toContain("cto");
+      expect(entries).toHaveLength(0);
+    });
+
+    it("copies only selected agents when agentIds is provided", async () => {
+      const service = new SeedingService();
+      await service.copyDefaults(tempDir, ["cto", "implementer"]);
+
+      const agentsDir = join(tempDir, ".orch8", "agents");
+      const entries = await readdir(agentsDir);
+      expect(entries).toEqual(expect.arrayContaining(["cto", "implementer"]));
+      expect(entries).toHaveLength(2);
 
       // Verify companion files copied
       const heartbeatContent = await readFile(
@@ -51,12 +59,23 @@ describe("SeedingService", () => {
       );
       expect(heartbeatContent).toContain("Heartbeat");
     });
+
+    it("ignores unknown agent IDs", async () => {
+      const service = new SeedingService();
+      await service.copyDefaults(tempDir, ["implementer", "nonexistent"]);
+
+      const agentsDir = join(tempDir, ".orch8", "agents");
+      const entries = await readdir(agentsDir);
+      expect(entries).toEqual(["implementer"]);
+    });
   });
 
   describe("parseAgentDefinitions", () => {
+    const ALL_AGENTS = ["cto", "implementer", "planner", "qa", "researcher", "reviewer"];
+
     it("parses all agent AGENTS.md files and returns structured data", async () => {
       const service = new SeedingService();
-      await service.copyDefaults(tempDir);
+      await service.copyDefaults(tempDir, ALL_AGENTS);
 
       const agents = await service.parseAgentDefinitions(tempDir);
 
@@ -75,7 +94,7 @@ describe("SeedingService", () => {
 
     it("resolves skill names to absolute paths", async () => {
       const service = new SeedingService();
-      await service.copyDefaults(tempDir);
+      await service.copyDefaults(tempDir, ["implementer"]);
 
       const agents = await service.parseAgentDefinitions(tempDir);
       const implementer = agents.find((a) => a.name === "implementer");
@@ -84,22 +103,22 @@ describe("SeedingService", () => {
       expect(implementer!.resolvedSkillPaths!.length).toBeGreaterThan(0);
 
       for (const p of implementer!.resolvedSkillPaths!) {
-        expect(p).toContain(".orchestrator/skills/");
+        expect(p).toContain(".orch8/skills/");
         expect(p).toMatch(/SKILL\.md$/);
       }
     });
   });
 
   describe("ensureGitignore", () => {
-    it("creates .gitignore with .orchestrator/ if none exists", async () => {
+    it("creates .gitignore with .orch8/ if none exists", async () => {
       const service = new SeedingService();
       await service.ensureGitignore(tempDir);
 
       const content = await readFile(join(tempDir, ".gitignore"), "utf-8");
-      expect(content).toContain(".orchestrator/");
+      expect(content).toContain(".orch8/");
     });
 
-    it("appends .orchestrator/ if .gitignore exists without it", async () => {
+    it("appends .orch8/ if .gitignore exists without it", async () => {
       await writeFile(join(tempDir, ".gitignore"), "node_modules/\n.env\n");
 
       const service = new SeedingService();
@@ -107,20 +126,20 @@ describe("SeedingService", () => {
 
       const content = await readFile(join(tempDir, ".gitignore"), "utf-8");
       expect(content).toContain("node_modules/");
-      expect(content).toContain(".orchestrator/");
+      expect(content).toContain(".orch8/");
     });
 
-    it("does not duplicate if .orchestrator/ already present", async () => {
+    it("does not duplicate if .orch8/ already present", async () => {
       await writeFile(
         join(tempDir, ".gitignore"),
-        "node_modules/\n.orchestrator/\n",
+        "node_modules/\n.orch8/\n",
       );
 
       const service = new SeedingService();
       await service.ensureGitignore(tempDir);
 
       const content = await readFile(join(tempDir, ".gitignore"), "utf-8");
-      const matches = content.match(/\.orchestrator\//g);
+      const matches = content.match(/\.orch8\//g);
       expect(matches).toHaveLength(1);
     });
   });

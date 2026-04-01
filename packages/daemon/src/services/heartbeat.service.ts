@@ -83,6 +83,7 @@ export class HeartbeatService {
   private onRunCompleted?: (taskId: string, status: string) => Promise<void>;
   private worktreeService?: WorktreeService;
   private sessionManager: SessionManager | null = null;
+  private apiUrl: string = "http://localhost:3847";
 
   setLogger(logger: FastifyBaseLogger): void {
     this.logger = logger;
@@ -121,6 +122,10 @@ export class HeartbeatService {
 
   setSessionManager(sessionManager: SessionManager): void {
     this.sessionManager = sessionManager;
+  }
+
+  setApiUrl(url: string): void {
+    this.apiUrl = url;
   }
 
   get activeCount(): number {
@@ -557,7 +562,7 @@ export class HeartbeatService {
         runId,
         taskId: claimedRun.taskId ?? undefined,
         wakeReason: claimedRun.invocationSource,
-        apiUrl: process.env.ORCH_API_URL ?? "http://localhost:3000",
+        apiUrl: process.env.ORCH_API_URL ?? this.apiUrl,
         cwd,
         logStream: logHandle.stream,
         taskTitle: taskData?.title,
