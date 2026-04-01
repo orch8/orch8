@@ -65,7 +65,7 @@ describe("ProjectForm — edit mode new fields", () => {
     defaultBranch: "main",
     defaultModel: "claude-opus-4-6",
     defaultMaxTurns: 25,
-    verificationRequired: true,
+
     budgetLimitUsd: 500,
     budgetSpentUsd: 123.45,
     budgetPaused: false,
@@ -87,11 +87,6 @@ describe("ProjectForm — edit mode new fields", () => {
   it("renders defaultMaxTurns field in edit mode", () => {
     renderWithProviders(<ProjectForm project={mockProject} />);
     expect(screen.getByLabelText(/default max turns/i)).toBeInTheDocument();
-  });
-
-  it("renders verificationRequired toggle in edit mode", () => {
-    renderWithProviders(<ProjectForm project={mockProject} />);
-    expect(screen.getByLabelText(/verification required/i)).toBeInTheDocument();
   });
 
   it("displays budget spent as read-only", () => {

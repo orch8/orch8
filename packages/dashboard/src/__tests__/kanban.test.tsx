@@ -61,7 +61,7 @@ describe("TaskCard", () => {
 });
 
 describe("KanbanBoard", () => {
-  it("renders all six columns", async () => {
+  it("renders all four columns", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve([]),
@@ -72,8 +72,6 @@ describe("KanbanBoard", () => {
     expect(screen.getByText("Backlog")).toBeInTheDocument();
     expect(screen.getByText("Blocked")).toBeInTheDocument();
     expect(screen.getByText("In Progress")).toBeInTheDocument();
-    expect(screen.getByText("Review")).toBeInTheDocument();
-    expect(screen.getByText("Verification")).toBeInTheDocument();
     expect(screen.getByText("Done")).toBeInTheDocument();
   });
 
@@ -86,7 +84,7 @@ describe("KanbanBoard", () => {
           json: () =>
             Promise.resolve([
               { ...mockTask, id: "t1", column: "backlog" },
-              { ...mockTask, id: "t2", title: "Review PR", column: "review" },
+              { ...mockTask, id: "t2", title: "Done task", column: "done" },
             ]),
         });
       }
@@ -100,7 +98,7 @@ describe("KanbanBoard", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Implement login")).toBeInTheDocument();
-      expect(screen.getByText("Review PR")).toBeInTheDocument();
+      expect(screen.getByText("Done task")).toBeInTheDocument();
     });
   });
 });

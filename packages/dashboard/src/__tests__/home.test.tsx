@@ -40,7 +40,7 @@ function mockApiResponses() {
     json: () =>
       Promise.resolve([
         { id: "task_1", title: "Auth", column: "in_progress", projectId: "proj_1", executionAgentId: "eng-1" },
-        { id: "task_2", title: "Review", column: "review", projectId: "proj_1" },
+        { id: "task_2", title: "Done task", column: "done", projectId: "proj_1" },
       ]),
   });
   // cost summary
