@@ -80,6 +80,7 @@ export const TaskFilterSchema = z.object({
   taskType: TaskTypeSchema.optional(),
   assignee: z.string().optional(),
   complexPhase: ComplexPhaseSchema.optional(),
+  pipelineId: z.string().optional(),
 });
 
 export type CreateTask = z.infer<typeof CreateTaskSchema>;

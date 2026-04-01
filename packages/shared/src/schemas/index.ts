@@ -64,3 +64,19 @@ export {
 } from "./daemon.js";
 export type { DaemonLogFilter, DaemonConfigPatch } from "./daemon.js";
 export { AddBundledAgentsSchema, type BundledAgent } from "./bundled-agents.js";
+export {
+  CreatePipelineTemplateSchema,
+  UpdatePipelineTemplateSchema,
+  PipelineTemplateFilterSchema,
+  CreatePipelineSchema,
+  PipelineFilterSchema,
+  UpdatePipelineStepSchema,
+} from "./pipeline.js";
+export type {
+  CreatePipelineTemplate,
+  UpdatePipelineTemplate,
+  PipelineTemplateFilter,
+  CreatePipeline,
+  PipelineFilter,
+  UpdatePipelineStep,
+} from "./pipeline.js";
