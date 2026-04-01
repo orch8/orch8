@@ -145,6 +145,7 @@ export const agents = pgTable("agents", {
 
   mcpTools: text("mcp_tools").array().default(sql`'{}'`),
   skillPaths: text("skill_paths").array().default(sql`'{}'`),
+  desiredSkills: text("desired_skills").array(),
 
   workLogDir: text("work_log_dir"),
   lessonsFile: text("lessons_file"),
@@ -443,3 +444,23 @@ export const notifications = pgTable("notifications", {
   read: boolean("read").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Project Skills ─────────────────────────────────────
+
+export const projectSkills = pgTable("project_skills", {
+  id: text("id").primaryKey().$defaultFn(() => `skill_${randomUUID()}`),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  slug: text("slug").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  markdown: text("markdown").notNull(),
+  sourceType: text("source_type").notNull().default("local_path"),
+  sourceLocator: text("source_locator"),
+  trustLevel: text("trust_level").notNull().default("markdown_only"),
+  fileInventory: jsonb("file_inventory").notNull().default([]),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("project_skills_project_slug_idx").on(table.projectId, table.slug),
+]);
