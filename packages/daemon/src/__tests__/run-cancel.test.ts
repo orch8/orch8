@@ -6,6 +6,10 @@ import { runRoutes } from "../api/routes/runs.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
+import { writeFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 
 describe("Run Cancel + Log Routes", () => {
   let testDb: TestDb;
@@ -95,12 +99,17 @@ describe("Run Cancel + Log Routes", () => {
 
   describe("GET /api/runs/:id/log", () => {
     it("returns log content for a run", async () => {
+      const logDir = join(tmpdir(), `orch8-test-${randomUUID()}`);
+      await mkdir(logDir, { recursive: true });
+      const logPath = join(logDir, "test.log");
+      await writeFile(logPath, "Line 1\nLine 2\nDone");
+
       await testDb.db.insert(agents).values({
         id: "eng-1", projectId, name: "Eng", role: "engineer",
       });
       const [run] = await testDb.db.insert(heartbeatRuns).values({
         agentId: "eng-1", projectId, invocationSource: "on_demand",
-        status: "succeeded", logStore: "inline", logRef: "Line 1\nLine 2\nDone",
+        status: "succeeded", logStore: "local", logRef: logPath,
       }).returning();
 
       const res = await app.inject({
@@ -110,7 +119,7 @@ describe("Run Cancel + Log Routes", () => {
       });
 
       expect(res.statusCode).toBe(200);
-      expect(res.json().log).toBe("Line 1\nLine 2\nDone");
+      expect(res.json().content).toBe("Line 1\nLine 2\nDone");
     });
 
     it("returns 404 for run with no log", async () => {
