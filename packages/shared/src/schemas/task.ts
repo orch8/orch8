@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const TaskTypeSchema = z.enum(["quick", "complex", "brainstorm"]);
 export const TaskColumnSchema = z.enum([
-  "backlog", "blocked", "in_progress", "review", "verification", "done",
+  "backlog", "blocked", "in_progress", "done",
 ]);
 export const TaskPrioritySchema = z.enum(["high", "medium", "low"]);
 export const ComplexPhaseSchema = z.enum(["research", "plan", "implement", "review"]);

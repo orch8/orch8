@@ -53,13 +53,6 @@ export {
   LogFilterSchema,
 } from "./activity.js";
 export {
-  SubmitVerdictSchema,
-  ImplementerResponseSchema,
-  RefereeVerdictSchema,
-  SpawnVerifierSchema,
-  SpawnRefereeSchema,
-} from "./verification.js";
-export {
   NotificationTypeSchema,
   NotificationFilterSchema,
   MarkNotificationsReadSchema,

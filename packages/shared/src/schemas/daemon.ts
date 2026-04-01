@@ -16,7 +16,6 @@ export const DaemonConfigPatchSchema = z.object({
     max_turns: z.number().int().positive().optional(),
     auto_commit: z.boolean().optional(),
     auto_pr: z.boolean().optional(),
-    verification_required: z.boolean().optional(),
     brainstorm_idle_timeout_min: z.number().int().nonnegative().optional(),
   }).optional(),
   limits: z.object({

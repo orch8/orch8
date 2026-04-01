@@ -8,7 +8,7 @@ import { sql } from "drizzle-orm";
 // ─── Enums ───────────────────────────────────────────────
 
 export const taskColumnEnum = pgEnum("task_column", [
-  "backlog", "blocked", "in_progress", "review", "verification", "done",
+  "backlog", "blocked", "in_progress", "done",
 ]);
 
 export const taskTypeEnum = pgEnum("task_type", [
@@ -21,10 +21,6 @@ export const taskPriorityEnum = pgEnum("task_priority", [
 
 export const complexPhaseEnum = pgEnum("complex_phase", [
   "research", "plan", "implement", "review",
-]);
-
-export const verificationResultEnum = pgEnum("verification_result", [
-  "pass", "fail", "partial",
 ]);
 
 export const commentTypeEnum = pgEnum("comment_type", [
@@ -75,8 +71,6 @@ export const brainstormStatusEnum = pgEnum("brainstorm_status", [
 ]);
 
 export const notificationTypeEnum = pgEnum("notification_type", [
-  "verification_failed",
-  "verification_passed",
   "budget_warning",
   "budget_exceeded",
   "agent_failure",
@@ -101,7 +95,6 @@ export const projects = pgTable("projects", {
 
   defaultModel: text("default_model"),
   defaultMaxTurns: integer("default_max_turns"),
-  verificationRequired: boolean("verification_required").default(true),
 
   budgetLimitUsd: real("budget_limit_usd"),
   budgetSpentUsd: real("budget_spent_usd").notNull().default(0),
@@ -217,11 +210,6 @@ export const tasks = pgTable("tasks", {
   autoPr: boolean("auto_pr").notNull().default(true),
   branch: text("branch"),
   worktreePath: text("worktree_path"),
-
-  // Verification
-  verificationResult: verificationResultEnum("verification_result"),
-  verifierReport: text("verifier_report"),
-  refereeVerdict: text("referee_verdict"),
 
   // Execution locking
   executionRunId: text("execution_run_id"),

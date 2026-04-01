@@ -1,8 +1,6 @@
 import { z } from "zod";
 
 export const NotificationTypeSchema = z.enum([
-  "verification_failed",
-  "verification_passed",
   "budget_warning",
   "budget_exceeded",
   "agent_failure",

@@ -10,7 +10,6 @@ export const CreateProjectSchema = z.object({
   defaultBranch: z.string().default("main"),
   defaultModel: z.string().optional(),
   defaultMaxTurns: z.number().int().min(1).optional(),
-  verificationRequired: z.boolean().default(true),
   budgetLimitUsd: z.number().min(0).optional(),
 });
 
@@ -21,7 +20,6 @@ export const UpdateProjectSchema = z.object({
   defaultBranch: z.string().optional(),
   defaultModel: z.string().nullable().optional(),
   defaultMaxTurns: z.number().int().min(1).nullable().optional(),
-  verificationRequired: z.boolean().optional(),
   budgetLimitUsd: z.number().min(0).nullable().optional(),
   active: z.boolean().optional(),
 });
