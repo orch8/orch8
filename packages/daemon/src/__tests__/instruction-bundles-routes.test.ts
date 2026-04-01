@@ -5,6 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Fastify from "fastify";
+import { authPlugin } from "../api/middleware/auth.js";
 import { instructionBundleRoutes } from "../api/routes/instruction-bundles.js";
 import { InstructionBundleService } from "../services/instruction-bundle.service.js";
 
@@ -13,6 +14,7 @@ describe("instruction-bundles routes", () => {
   let projectId: string;
   let tempDir: string;
   let app: ReturnType<typeof Fastify>;
+  let bundleService: InstructionBundleService;
 
   beforeAll(async () => {
     testDb = await setupTestDb();
@@ -55,11 +57,14 @@ describe("instruction-bundles routes", () => {
     });
 
     app = Fastify();
-    const bundleService = new InstructionBundleService(testDb.db, tempDir);
+    bundleService = new InstructionBundleService(testDb.db, tempDir);
     app.decorate("db", testDb.db);
     app.decorate("instructionBundleService", bundleService);
+    app.register(authPlugin);
     app.register(instructionBundleRoutes);
     await app.ready();
+
+    await bundleService.ensure("agent-1", projectId, "engineer");
   });
 
   afterEach(async () => {
@@ -68,10 +73,6 @@ describe("instruction-bundles routes", () => {
   });
 
   it("GET /api/agents/:id/instructions returns bundle after ensure", async () => {
-    // Ensure first
-    const bundleService = new InstructionBundleService(testDb.db, tempDir);
-    await bundleService.ensure("agent-1", projectId, "engineer");
-
     const res = await app.inject({
       method: "GET",
       url: "/api/agents/agent-1/instructions",
@@ -83,9 +84,6 @@ describe("instruction-bundles routes", () => {
   });
 
   it("GET /api/agents/:id/instructions/files lists files", async () => {
-    const bundleService = new InstructionBundleService(testDb.db, tempDir);
-    await bundleService.ensure("agent-1", projectId, "engineer");
-
     const res = await app.inject({
       method: "GET",
       url: "/api/agents/agent-1/instructions/files",
@@ -98,9 +96,6 @@ describe("instruction-bundles routes", () => {
   });
 
   it("PUT + GET /api/agents/:id/instructions/files/:path round-trips", async () => {
-    const bundleService = new InstructionBundleService(testDb.db, tempDir);
-    await bundleService.ensure("agent-1", projectId, "engineer");
-
     const putRes = await app.inject({
       method: "PUT",
       url: "/api/agents/agent-1/instructions/files/SOUL.md",
@@ -119,8 +114,6 @@ describe("instruction-bundles routes", () => {
   });
 
   it("DELETE /api/agents/:id/instructions/files/:path removes file", async () => {
-    const bundleService = new InstructionBundleService(testDb.db, tempDir);
-    await bundleService.ensure("agent-1", projectId, "engineer");
     await bundleService.writeFile("agent-1", projectId, "extra.md", "Extra");
 
     const res = await app.inject({
@@ -132,9 +125,6 @@ describe("instruction-bundles routes", () => {
   });
 
   it("PATCH /api/agents/:id/instructions updates mode", async () => {
-    const bundleService = new InstructionBundleService(testDb.db, tempDir);
-    await bundleService.ensure("agent-1", projectId, "engineer");
-
     const res = await app.inject({
       method: "PATCH",
       url: "/api/agents/agent-1/instructions",
