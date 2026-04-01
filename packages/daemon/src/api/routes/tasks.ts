@@ -154,6 +154,55 @@ export async function taskRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: "not_found", message: "Task not found" });
     }
 
+    // Pipeline step completion
+    if (task.pipelineId && task.pipelineStepId) {
+      const parsed = CompletePhaseSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({
+          error: "validation_error",
+          message: "Pipeline step completion requires 'output' field",
+          details: parsed.error.issues,
+        });
+      }
+
+      const pipelineData = await app.pipelineService.findByTaskId(task.id);
+      if (!pipelineData) {
+        return reply.code(500).send({ error: "internal", message: "Pipeline data not found for task" });
+      }
+
+      const outputFilePath = pipelineData.step.outputFilePath
+        ?? `.orch8/pipelines/${pipelineData.pipeline.id}/${pipelineData.step.label}.md`;
+
+      const result = await app.pipelineService.completeStep(
+        pipelineData.pipeline.id,
+        pipelineData.step.id,
+        parsed.data.output,
+        outputFilePath,
+      );
+
+      // Transition task to done
+      try {
+        await app.lifecycleService.transition(task.id, "done");
+      } catch {
+        // Best-effort: task may already be in done state
+      }
+
+      // Wake next step's agent if there is one
+      if (result.nextStep?.agentId && result.nextTask) {
+        await app.heartbeatService.enqueueWakeup(
+          result.nextStep.agentId,
+          task.projectId,
+          {
+            source: "automation",
+            taskId: result.nextTask.id,
+            reason: "pipeline_step_ready",
+          },
+        );
+      }
+
+      return result;
+    }
+
     if (task.taskType === "complex" && task.complexPhase) {
       const parsed = CompletePhaseSchema.safeParse(request.body);
       if (!parsed.success) {
