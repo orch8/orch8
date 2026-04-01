@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type RenderResult, render, type RenderOptions } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 function createTestQueryClient() {
   return new QueryClient({
@@ -15,8 +16,9 @@ function createTestQueryClient() {
 export function renderWithProviders(
   ui: ReactNode,
   options?: Omit<RenderOptions, "wrapper">,
-): RenderResult & { queryClient: QueryClient } {
+): RenderResult & { queryClient: QueryClient; user: ReturnType<typeof userEvent.setup> } {
   const queryClient = createTestQueryClient();
+  const user = userEvent.setup();
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
@@ -24,7 +26,7 @@ export function renderWithProviders(
       </QueryClientProvider>
     );
   }
-  return { ...render(ui, { wrapper: Wrapper, ...options }), queryClient };
+  return { ...render(ui, { wrapper: Wrapper, ...options }), queryClient, user };
 }
 
 export { screen, waitFor, within, act } from "@testing-library/react";
