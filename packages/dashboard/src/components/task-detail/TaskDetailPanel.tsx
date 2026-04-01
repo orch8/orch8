@@ -148,31 +148,6 @@ export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelP
         </div>
       )}
 
-      {/* Verification result */}
-      {task.verificationResult && (
-        <div>
-          <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Verification
-          </h4>
-          <span
-            className={`rounded px-2 py-0.5 text-xs font-medium ${
-              task.verificationResult === "pass"
-                ? "bg-emerald-900/50 text-emerald-300"
-                : task.verificationResult === "fail"
-                  ? "bg-red-900/50 text-red-300"
-                  : "bg-yellow-900/50 text-yellow-300"
-            }`}
-          >
-            {task.verificationResult}
-          </span>
-          {task.verifierReport && (
-            <pre className="mt-2 max-h-40 overflow-auto rounded bg-zinc-950 p-2 text-xs text-zinc-400">
-              {task.verifierReport}
-            </pre>
-          )}
-        </div>
-      )}
-
       {/* Cost breakdown */}
       {taskCost && (
         <div>

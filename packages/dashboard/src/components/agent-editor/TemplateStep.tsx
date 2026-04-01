@@ -21,7 +21,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
       model: "claude-opus-4-6",
       systemPrompt: "You are an implementation agent. Write clean, tested code.",
       canCreateTasks: false,
-      canMoveTo: ["in_progress", "review", "done"],
+      canMoveTo: ["in_progress", "done"],
     },
   },
   {
@@ -33,7 +33,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
       model: "claude-opus-4-6",
       systemPrompt: "You are a code reviewer. Verify implementations thoroughly.",
       canCreateTasks: false,
-      canMoveTo: ["review", "verification"],
+      canMoveTo: ["done"],
     },
   },
   {
@@ -69,7 +69,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
       model: "claude-opus-4-6",
       systemPrompt: "You are a referee. Make final decisions on disputed tasks.",
       canCreateTasks: false,
-      canMoveTo: ["review", "done"],
+      canMoveTo: ["done"],
     },
   },
   {

@@ -37,9 +37,6 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
   const [defaultMaxTurns, setDefaultMaxTurns] = useState(
     project?.defaultMaxTurns?.toString() ?? "",
   );
-  const [verificationRequired, setVerificationRequired] = useState(
-    project?.verificationRequired ?? true,
-  );
   const [budgetLimitUsd, setBudgetLimitUsd] = useState(
     project?.budgetLimitUsd?.toString() ?? "",
   );
@@ -72,7 +69,6 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
         repoUrl: repoUrl || null,
         defaultModel: defaultModel || null,
         defaultMaxTurns: defaultMaxTurns ? parseInt(defaultMaxTurns, 10) : null,
-        verificationRequired,
         budgetLimitUsd: budget ?? null,
       });
       onSuccess?.(result);
@@ -87,7 +83,6 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
         repoUrl: repoUrl || undefined,
         defaultModel: defaultModel || undefined,
         defaultMaxTurns: defaultMaxTurns ? parseInt(defaultMaxTurns, 10) : undefined,
-        verificationRequired,
         budgetLimitUsd: budget,
       });
       onSuccess?.(result);
@@ -237,19 +232,6 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
           placeholder="25"
           className={inputClass}
         />
-      </div>
-
-      <div className="flex items-center gap-2">
-        <input
-          id="project-verification"
-          type="checkbox"
-          checked={verificationRequired}
-          onChange={(e) => setVerificationRequired(e.target.checked)}
-          className="rounded border-zinc-700"
-        />
-        <label htmlFor="project-verification" className="text-sm font-medium text-zinc-300">
-          Verification Required
-        </label>
       </div>
 
       <div className="flex flex-col gap-1">

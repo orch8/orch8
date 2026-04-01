@@ -1,4 +1,4 @@
-import { useCompleteTask, useSpawnVerifier, useConvertTask } from "../../hooks/useVerification.js";
+import { useCompleteTask, useConvertTask } from "../../hooks/useVerification.js";
 
 interface TaskActionsProps {
   taskId: string;
@@ -9,14 +9,12 @@ interface TaskActionsProps {
 
 export function TaskActions({ taskId, column, taskType, brainstormStatus }: TaskActionsProps) {
   const completeTask = useCompleteTask();
-  const spawnVerifier = useSpawnVerifier();
   const convertTask = useConvertTask();
 
-  const showComplete = column === "in_progress" || column === "verification";
-  const showVerifier = column === "review";
+  const showComplete = column === "in_progress";
   const showConvert = taskType === "brainstorm" && brainstormStatus === "ready";
 
-  if (!showComplete && !showVerifier && !showConvert) return null;
+  if (!showComplete && !showConvert) return null;
 
   return (
     <div className="flex flex-col gap-2">
@@ -31,15 +29,6 @@ export function TaskActions({ taskId, column, taskType, brainstormStatus }: Task
             className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
           >
             Mark Complete
-          </button>
-        )}
-        {showVerifier && (
-          <button
-            onClick={() => spawnVerifier.mutate(taskId)}
-            disabled={spawnVerifier.isPending}
-            className="rounded-md bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-500 disabled:opacity-40"
-          >
-            Spawn Verifier
           </button>
         )}
         {showConvert && (

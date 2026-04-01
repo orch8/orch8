@@ -69,8 +69,6 @@ export const KANBAN_COLUMNS = [
   "backlog",
   "blocked",
   "in_progress",
-  "review",
-  "verification",
   "done",
 ] as const;
 
@@ -81,8 +79,6 @@ export const COLUMN_LABELS: Record<KanbanColumn, string> = {
   backlog: "Backlog",
   blocked: "Blocked",
   in_progress: "In Progress",
-  review: "Review",
-  verification: "Verification",
   done: "Done",
 };
 
