@@ -109,6 +109,51 @@ describe("SeedingService", () => {
     });
   });
 
+  describe("listBundledAgents", () => {
+    it("returns all 6 bundled agents", async () => {
+      const service = new SeedingService();
+      const agents = await service.listBundledAgents();
+
+      expect(agents).toHaveLength(6);
+      const ids = agents.map((a) => a.id).sort();
+      expect(ids).toEqual(["cto", "implementer", "planner", "qa", "researcher", "reviewer"]);
+    });
+
+    it("resolves model shorthands to full IDs", async () => {
+      const service = new SeedingService();
+      const agents = await service.listBundledAgents();
+
+      const cto = agents.find((a) => a.id === "cto")!;
+      expect(cto.model).toBe("claude-opus-4-20250514");
+
+      const implementer = agents.find((a) => a.id === "implementer")!;
+      expect(implementer.model).toBe("claude-sonnet-4-20250514");
+    });
+
+    it("includes parsed prompt sections", async () => {
+      const service = new SeedingService();
+      const agents = await service.listBundledAgents();
+
+      const implementer = agents.find((a) => a.id === "implementer")!;
+      expect(implementer.systemPrompt).toContain("implementer agent");
+      expect(implementer.promptTemplate).toBeDefined();
+      expect(implementer.bootstrapPromptTemplate).toBeDefined();
+    });
+
+    it("includes heartbeat config", async () => {
+      const service = new SeedingService();
+      const agents = await service.listBundledAgents();
+
+      const cto = agents.find((a) => a.id === "cto")!;
+      expect(cto.heartbeatEnabled).toBe(true);
+      expect(cto.heartbeatIntervalSec).toBe(120);
+
+      const implementer = agents.find((a) => a.id === "implementer")!;
+      expect(implementer.heartbeatEnabled).toBe(false);
+      expect(implementer.heartbeatIntervalSec).toBeUndefined();
+    });
+  });
+
   describe("ensureGitignore", () => {
     it("creates .gitignore with .orch8/ if none exists", async () => {
       const service = new SeedingService();

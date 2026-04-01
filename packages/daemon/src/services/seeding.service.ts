@@ -13,7 +13,14 @@ import {
   DEFAULT_SKILLS_DIR,
   DEFAULT_AGENTS_DIR,
   type ParsedAgentsMd,
+  type BundledAgent,
 } from "@orch/shared";
+
+const MODEL_MAP: Record<string, string> = {
+  opus: "claude-opus-4-20250514",
+  sonnet: "claude-sonnet-4-20250514",
+  haiku: "claude-haiku-4-5-20251001",
+};
 
 export interface ParsedAgentWithPaths extends ParsedAgentsMd {
   resolvedSkillPaths?: string[];
@@ -109,6 +116,49 @@ export class SeedingService {
       gitignorePath,
       `${suffix}\n# orch8 orchestrator data\n.orch8/\n`,
     );
+  }
+
+  /**
+   * Lists all bundled agent templates by reading directly from the
+   * defaults directory. Returns parsed configs with model shorthands
+   * resolved to full model IDs. No disk copy required.
+   */
+  async listBundledAgents(): Promise<BundledAgent[]> {
+    const entries = await readdir(DEFAULT_AGENTS_DIR);
+    const results: BundledAgent[] = [];
+
+    for (const entry of entries) {
+      const agentsMdPath = join(DEFAULT_AGENTS_DIR, entry, "AGENTS.md");
+      if (!existsSync(agentsMdPath)) continue;
+
+      const content = await readFile(agentsMdPath, "utf-8");
+      const parsed = parseAgentsMd(content);
+
+      results.push({
+        id: entry,
+        name: parsed.name,
+        role: parsed.role,
+        model: MODEL_MAP[parsed.model] ?? parsed.model,
+        effort: parsed.effort,
+        maxTurns: parsed.maxTurns,
+        skills: parsed.skills,
+        heartbeatEnabled: parsed.heartbeat.enabled,
+        ...(parsed.heartbeat.intervalSec != null
+          ? { heartbeatIntervalSec: parsed.heartbeat.intervalSec }
+          : {}),
+        systemPrompt: parsed.systemPrompt,
+        ...(parsed.promptTemplate != null ? { promptTemplate: parsed.promptTemplate } : {}),
+        ...(parsed.bootstrapPromptTemplate != null
+          ? { bootstrapPromptTemplate: parsed.bootstrapPromptTemplate }
+          : {}),
+        ...(parsed.researchPrompt != null ? { researchPrompt: parsed.researchPrompt } : {}),
+        ...(parsed.planPrompt != null ? { planPrompt: parsed.planPrompt } : {}),
+        ...(parsed.implementPrompt != null ? { implementPrompt: parsed.implementPrompt } : {}),
+        ...(parsed.reviewPrompt != null ? { reviewPrompt: parsed.reviewPrompt } : {}),
+      });
+    }
+
+    return results;
   }
 }
 
