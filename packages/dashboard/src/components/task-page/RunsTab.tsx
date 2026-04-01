@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useRuns } from "../../hooks/useRuns.js";
+import { RunViewer } from "../runs/RunViewer.js";
 
 interface RunsTabProps {
   taskId: string;
@@ -7,6 +9,7 @@ interface RunsTabProps {
 
 export function RunsTab({ taskId, projectId }: RunsTabProps) {
   const { data: runs, isLoading } = useRuns(projectId, { taskId });
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   if (isLoading) return <p className="text-sm text-zinc-600">Loading runs...</p>;
 
@@ -19,7 +22,8 @@ export function RunsTab({ taskId, projectId }: RunsTabProps) {
       {runs.map((run) => (
         <div
           key={run.id}
-          className="flex items-center justify-between rounded-md border border-zinc-800 bg-zinc-900/50 px-4 py-3"
+          onClick={() => setSelectedRunId(run.id)}
+          className="flex cursor-pointer items-center justify-between rounded-md border border-zinc-800 bg-zinc-900/50 px-4 py-3 transition-colors hover:border-zinc-700"
         >
           <div className="flex items-center gap-3">
             <span
@@ -40,6 +44,14 @@ export function RunsTab({ taskId, projectId }: RunsTabProps) {
           </div>
         </div>
       ))}
+
+      {selectedRunId && (
+        <RunViewer
+          runId={selectedRunId}
+          projectId={projectId}
+          onClose={() => setSelectedRunId(null)}
+        />
+      )}
     </div>
   );
 }
