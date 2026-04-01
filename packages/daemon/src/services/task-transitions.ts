@@ -2,16 +2,12 @@ export type TaskColumn =
   | "backlog"
   | "blocked"
   | "in_progress"
-  | "review"
-  | "verification"
   | "done";
 
 export const VALID_TRANSITIONS: Record<TaskColumn, TaskColumn[]> = {
   backlog: ["blocked", "in_progress"],
   blocked: ["backlog", "in_progress"],
-  in_progress: ["review"],
-  review: ["in_progress", "verification"],
-  verification: ["done", "in_progress"],
+  in_progress: ["done"],
   done: [],
 };
 
