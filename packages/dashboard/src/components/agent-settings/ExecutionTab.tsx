@@ -26,6 +26,18 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
   const [wakeOnOnDemand, setWakeOnOnDemand] = useState(agent.wakeOnOnDemand);
   const [wakeOnAutomation, setWakeOnAutomation] = useState(agent.wakeOnAutomation);
   const [workingHours, setWorkingHours] = useState(agent.workingHours ?? "");
+  const [sessionCompactionEnabled, setSessionCompactionEnabled] = useState(
+    agent.sessionCompactionEnabled ?? false,
+  );
+  const [sessionMaxRuns, setSessionMaxRuns] = useState(
+    agent.sessionMaxRuns?.toString() ?? "",
+  );
+  const [sessionMaxInputTokens, setSessionMaxInputTokens] = useState(
+    agent.sessionMaxInputTokens?.toString() ?? "",
+  );
+  const [sessionMaxAgeHours, setSessionMaxAgeHours] = useState(
+    agent.sessionMaxAgeHours?.toString() ?? "",
+  );
 
   useEffect(() => {
     setMaxTurns(agent.maxTurns.toString());
@@ -38,6 +50,10 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
     setWakeOnOnDemand(agent.wakeOnOnDemand);
     setWakeOnAutomation(agent.wakeOnAutomation);
     setWorkingHours(agent.workingHours ?? "");
+    setSessionCompactionEnabled(agent.sessionCompactionEnabled ?? false);
+    setSessionMaxRuns(agent.sessionMaxRuns?.toString() ?? "");
+    setSessionMaxInputTokens(agent.sessionMaxInputTokens?.toString() ?? "");
+    setSessionMaxAgeHours(agent.sessionMaxAgeHours?.toString() ?? "");
   }, [agent]);
 
   function handleSave() {
@@ -54,6 +70,10 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
       wakeOnOnDemand,
       wakeOnAutomation,
       workingHours: workingHours || null,
+      sessionCompactionEnabled,
+      sessionMaxRuns: sessionMaxRuns ? parseInt(sessionMaxRuns, 10) : null,
+      sessionMaxInputTokens: sessionMaxInputTokens ? parseInt(sessionMaxInputTokens, 10) : null,
+      sessionMaxAgeHours: sessionMaxAgeHours ? parseInt(sessionMaxAgeHours, 10) : null,
     });
   }
 
@@ -92,6 +112,60 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
           </FormField>
         )}
       </div>
+
+      {heartbeatEnabled && (
+        <div className="flex flex-col gap-3 rounded-lg border border-zinc-800 p-3">
+          <label className="flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={sessionCompactionEnabled}
+              onChange={(e) => setSessionCompactionEnabled(e.target.checked)}
+              className="rounded border-zinc-700"
+            />
+            Session Compaction
+          </label>
+          <p className="text-xs text-zinc-500">
+            Rotate Claude Code sessions when thresholds are exceeded. Disabled by default — Claude Code handles compaction internally.
+          </p>
+
+          {sessionCompactionEnabled && (
+            <div className="grid grid-cols-3 gap-3">
+              <FormField label="Max Runs" description="Rotate after N runs">
+                <input
+                  type="number"
+                  min={0}
+                  value={sessionMaxRuns}
+                  onChange={(e) => setSessionMaxRuns(e.target.value)}
+                  placeholder="No limit"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Max Input Tokens" description="Rotate at token threshold">
+                <input
+                  type="number"
+                  min={0}
+                  value={sessionMaxInputTokens}
+                  onChange={(e) => setSessionMaxInputTokens(e.target.value)}
+                  placeholder="No limit"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Max Age (hours)" description="Rotate at age threshold">
+                <input
+                  type="number"
+                  min={0}
+                  value={sessionMaxAgeHours}
+                  onChange={(e) => setSessionMaxAgeHours(e.target.value)}
+                  placeholder="No limit"
+                  className={inputClass}
+                />
+              </FormField>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         <p className="text-sm font-medium text-zinc-300">Wake Triggers</p>
