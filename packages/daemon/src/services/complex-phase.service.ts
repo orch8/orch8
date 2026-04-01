@@ -49,8 +49,8 @@ export class ComplexPhaseService {
     if (nextPhase) {
       updateValues.complexPhase = nextPhase;
     } else {
-      // Final phase complete — move task to review column
-      updateValues.column = "review";
+      // Final phase complete — move task to done column
+      updateValues.column = "done";
     }
 
     const [updated] = await this.db

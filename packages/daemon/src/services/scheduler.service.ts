@@ -1,5 +1,5 @@
-import { eq, and, sql, isNull } from "drizzle-orm";
-import { heartbeatRuns, projects, agents, tasks } from "@orch/shared/db";
+import { eq, and, sql } from "drizzle-orm";
+import { heartbeatRuns, projects, agents } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { HeartbeatService } from "./heartbeat.service.js";
 import type { SummaryService } from "./summary.service.js";
@@ -112,9 +112,6 @@ export class SchedulerService {
           }
         }
       }
-
-      // Process stuck verification queue
-      await this.processVerificationQueue(project.id);
     }
   }
 
@@ -244,53 +241,6 @@ export class SchedulerService {
     }
 
     return woken;
-  }
-
-  async processVerificationQueue(projectId: string): Promise<number> {
-    // Find tasks in verification column with no active execution
-    const stuckTasks = await this.db
-      .select()
-      .from(tasks)
-      .where(
-        and(
-          eq(tasks.projectId, projectId),
-          eq(tasks.column, "verification"),
-          isNull(tasks.executionRunId),
-        ),
-      );
-
-    if (stuckTasks.length === 0) return 0;
-
-    // Find the verifier agent for this project
-    const [verifier] = await this.db
-      .select()
-      .from(agents)
-      .where(
-        and(
-          eq(agents.projectId, projectId),
-          eq(agents.role, "verifier"),
-          eq(agents.status, "active"),
-        ),
-      )
-      .limit(1);
-
-    if (!verifier) return 0;
-
-    let processed = 0;
-    for (const task of stuckTasks) {
-      try {
-        await this.heartbeatService.enqueueWakeup(verifier.id, projectId, {
-          source: "automation",
-          taskId: task.id,
-          reason: "verification_queue",
-        });
-        processed++;
-      } catch {
-        // Skip tasks that fail to enqueue
-      }
-    }
-
-    return processed;
   }
 
   async regenerateAllProjectSummaries(): Promise<void> {

@@ -13,16 +13,11 @@ export interface TransitionOpts {
   runId?: string;
 }
 
-export interface LifecycleHooks {
-  onReview?: (taskId: string, projectId: string) => Promise<void>;
-}
-
 export class TaskLifecycleService {
   constructor(
     private db: SchemaDb,
     private taskService: TaskService,
     private worktreeService: WorktreeService,
-    private hooks?: LifecycleHooks,
     private broadcastService?: BroadcastService,
   ) {}
 
@@ -70,13 +65,6 @@ export class TaskLifecycleService {
       }
     }
 
-    if (to === "review" || to === "verification") {
-      // Clear execution lock when leaving in_progress
-      updateValues.executionAgentId = null;
-      updateValues.executionRunId = null;
-      updateValues.executionLockedAt = null;
-    }
-
     if (to === "done") {
       updateValues.executionAgentId = null;
       updateValues.executionRunId = null;
@@ -109,14 +97,6 @@ export class TaskLifecycleService {
       to,
       agentId: opts?.agentId,
     });
-
-    // Post-transition: trigger verification pipeline on review
-    if (to === "review" && this.hooks?.onReview) {
-      const project = await this.loadProject(task.projectId);
-      if (project.verificationRequired) {
-        await this.hooks.onReview(taskId, task.projectId);
-      }
-    }
 
     // Post-transition: unblock dependents when task completes
     if (to === "done") {
