@@ -1,5 +1,6 @@
 // packages/daemon/src/adapter/claude-local-adapter.ts
 import { spawn as nodeSpawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import type { SpawnFn } from "../services/brainstorm.service.js";
 import type { SchemaDb } from "../db/client.js";
 import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "./types.js";
@@ -13,6 +14,7 @@ import { SessionManager } from "./session-manager.js";
 import { runProcess } from "./process-runner.js";
 import { resolveClaudePath } from "./resolve-claude-path.js";
 import type { ProjectSkillService } from "../services/project-skill.service.js";
+import type { InstructionBundleService } from "../services/instruction-bundle.service.js";
 
 export async function resolveSkillPaths(
   skillService: ProjectSkillService,
@@ -46,6 +48,7 @@ export class ClaudeLocalAdapter {
     private db: SchemaDb,
     private spawnFn: SpawnFn = nodeSpawn,
     private projectSkillService?: ProjectSkillService,
+    private bundleService?: InstructionBundleService,
   ) {
     this.sessionManager = new SessionManager(db);
   }
@@ -93,6 +96,12 @@ export class ClaudeLocalAdapter {
       }
       skillsDir = await createSkillsDir(effectiveSkillPaths);
       if (skillsDir) tempPaths.push(skillsDir);
+
+      // Stale recovery: if instructionsFilePath is set but the file is missing, attempt recovery
+      if (config.instructionsFilePath && !existsSync(config.instructionsFilePath) && this.bundleService) {
+        const agentRole = (ctx as any).agentRole ?? "engineer";
+        await this.bundleService.recover(ctx.agentId, ctx.projectId, agentRole);
+      }
 
       if (config.instructionsFilePath) {
         instructionsFilePath = await createInstructionsFile(config.instructionsFilePath);
