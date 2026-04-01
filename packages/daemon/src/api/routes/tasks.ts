@@ -177,11 +177,11 @@ export async function taskRoutes(app: FastifyInstance) {
           });
         }
       } else {
-        // Final phase — use lifecycle transition for review so onReview hook fires
+        // Final phase — use lifecycle transition for done side-effects (worktree cleanup etc.)
         try {
-          await app.lifecycleService.transition(task.id, "review");
+          await app.lifecycleService.transition(task.id, "done");
         } catch {
-          // completePhase already set column to "review" directly, so this is best-effort
+          // completePhase already set column to "done" directly, so this is best-effort
         }
       }
 
@@ -190,7 +190,7 @@ export async function taskRoutes(app: FastifyInstance) {
 
     // Quick task completion — use lifecycle service
     try {
-      const updated = await app.lifecycleService.transition(task.id, "review");
+      const updated = await app.lifecycleService.transition(task.id, "done");
       return updated;
     } catch (err) {
       const message = (err as Error).message;
