@@ -123,6 +123,13 @@ export const agents = pgTable("agents", {
 
   heartbeatEnabled: boolean("heartbeat_enabled").notNull().default(false),
   heartbeatIntervalSec: integer("heartbeat_interval_sec").notNull().default(0),
+
+  // Session compaction config
+  sessionCompactionEnabled: boolean("session_compaction_enabled").default(false),
+  sessionMaxRuns: integer("session_max_runs"),
+  sessionMaxInputTokens: integer("session_max_input_tokens"),
+  sessionMaxAgeHours: integer("session_max_age_hours"),
+
   wakeOnAssignment: boolean("wake_on_assignment").notNull().default(true),
   wakeOnOnDemand: boolean("wake_on_on_demand").notNull().default(true),
   wakeOnAutomation: boolean("wake_on_automation").notNull().default(true),
