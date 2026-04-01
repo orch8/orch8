@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useProject, useArchiveProject } from "../../../hooks/useProjects.js";
 import { ProjectForm } from "../../../components/project/ProjectForm.js";
+import { PipelineTemplateSettings } from "../../../components/settings/PipelineTemplateSettings.js";
 import type { Project } from "../../../types.js";
 
 function ProjectSettingsPage() {
@@ -38,6 +39,13 @@ function ProjectSettingsPage() {
       </h1>
 
       <ProjectForm project={project} onSuccess={handleSuccess} />
+
+      <div className="mt-8 border-t border-zinc-800 pt-6">
+        <h2 className="mb-3 text-sm font-medium text-zinc-300">
+          Pipeline Templates
+        </h2>
+        <PipelineTemplateSettings projectId={projectId} />
+      </div>
 
       <div className="mt-8 border-t border-zinc-800 pt-6">
         <h2 className="mb-3 text-sm font-medium text-red-400">
