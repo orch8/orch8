@@ -2,7 +2,9 @@ import { eq } from "drizzle-orm";
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process";
 import type { FastifyBaseLogger } from "fastify";
 import { agents } from "@orch/shared/db";
+import { CreateAgentSchema } from "@orch/shared";
 import type { SchemaDb } from "../db/client.js";
+import type { AgentService } from "./agent.service.js";
 import { resolveClaudePath } from "../adapter/resolve-claude-path.js";
 import { randomUUID } from "node:crypto";
 
@@ -286,6 +288,50 @@ export class AgentCreatorService {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
     return session.transcript.join("\n\n");
+  }
+
+  static extractConfigJson(transcript: string[]): Record<string, unknown> | null {
+    const fullText = transcript.join("\n");
+    // Find all ```agent-config ... ``` blocks, take the last one
+    const regex = /```agent-config\s*\n([\s\S]*?)```/g;
+    let lastMatch: string | null = null;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(fullText)) !== null) {
+      lastMatch = match[1].trim();
+    }
+
+    if (!lastMatch) return null;
+
+    try {
+      return JSON.parse(lastMatch);
+    } catch {
+      return null;
+    }
+  }
+
+  async confirmAgent(sessionId: string, agentService: AgentService): Promise<ReturnType<AgentService["create"]> extends Promise<infer T> ? T : never> {
+    this.logger?.info({ sessionId }, "agent-creator: confirmAgent called");
+
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error("No active creator session with this ID");
+    }
+
+    const rawConfig = AgentCreatorService.extractConfigJson(session.transcript);
+    if (!rawConfig) {
+      throw new Error("No agent-config block found in the conversation");
+    }
+
+    // Ensure projectId is set to the session's project
+    rawConfig.projectId = session.projectId;
+
+    const parsed = CreateAgentSchema.parse(rawConfig);
+    const agent = await agentService.create(parsed);
+
+    this.cleanupSession(sessionId);
+    this.logger?.info({ sessionId, agentId: agent.id }, "agent-creator: agent created, session cleaned up");
+
+    return agent;
   }
 
   async buildSystemPrompt(projectId: string): Promise<string> {

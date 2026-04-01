@@ -4,6 +4,7 @@ import { Writable, Readable } from "node:stream";
 import { projects, agents } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { AgentCreatorService, type SpawnFn } from "../services/agent-creator.service.js";
+import { AgentService } from "../services/agent.service.js";
 
 function createMockProcess() {
   const stdin = new Writable({
@@ -194,6 +195,117 @@ describe("AgentCreatorService", () => {
 
       const transcript = service.getTranscript(sessionId);
       expect(transcript).toContain("[user] Make a QA bot");
+    });
+  });
+
+  describe("extractConfigJson", () => {
+    it("extracts JSON from the last agent-config fence in transcript", () => {
+      const config = { id: "test-bot", projectId, name: "Test Bot", role: "custom" };
+      const transcript = [
+        "[system] You are...",
+        "[user] Make me a bot",
+        `[agent] Here's the config:\n\`\`\`agent-config\n${JSON.stringify(config)}\n\`\`\`\nLet me know if you want changes.`,
+      ];
+
+      const result = AgentCreatorService.extractConfigJson(transcript);
+      expect(result).toEqual(config);
+    });
+
+    it("returns the LAST config if multiple exist", () => {
+      const first = { id: "v1", projectId, name: "V1", role: "custom" };
+      const second = { id: "v2", projectId, name: "V2", role: "engineer" };
+      const transcript = [
+        `[agent] \`\`\`agent-config\n${JSON.stringify(first)}\n\`\`\``,
+        "[user] Change the role to engineer",
+        `[agent] \`\`\`agent-config\n${JSON.stringify(second)}\n\`\`\``,
+      ];
+
+      const result = AgentCreatorService.extractConfigJson(transcript);
+      expect(result).toEqual(second);
+    });
+
+    it("returns null if no config fence found", () => {
+      const transcript = ["[system] You are...", "[user] Hello", "[agent] Hi there!"];
+      const result = AgentCreatorService.extractConfigJson(transcript);
+      expect(result).toBeNull();
+    });
+
+    it("returns null if JSON is malformed", () => {
+      const transcript = [
+        "[agent] ```agent-config\n{invalid json}\n```",
+      ];
+      const result = AgentCreatorService.extractConfigJson(transcript);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("confirmAgent", () => {
+    it("extracts config, validates, creates agent, and cleans up session", async () => {
+      const sessionId = await service.startSession(projectId, "/tmp/ct");
+
+      // Simulate AI outputting a config
+      const config = {
+        id: "new-reviewer",
+        projectId,
+        name: "New Reviewer",
+        role: "reviewer",
+        model: "claude-sonnet-4-6",
+        maxTurns: 15,
+      };
+      const configLine = JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [{
+            type: "text",
+            text: `Here's your config:\n\`\`\`agent-config\n${JSON.stringify(config)}\n\`\`\``,
+          }],
+        },
+      });
+      lastMockProcess.stdout!.push(Buffer.from(configLine + "\n"));
+      await new Promise((r) => setTimeout(r, 10));
+      lastMockProcess.emit("close", 0, null);
+
+      const agentService = new AgentService(testDb.db);
+      const agent = await service.confirmAgent(sessionId, agentService);
+
+      expect(agent.id).toBe("new-reviewer");
+      expect(agent.name).toBe("New Reviewer");
+      expect(agent.role).toBe("reviewer");
+      expect(service.hasActiveSession(sessionId)).toBe(false);
+    });
+
+    it("throws if no config found in transcript", async () => {
+      const sessionId = await service.startSession(projectId, "/tmp/ct");
+      lastMockProcess.emit("close", 0, null);
+
+      const agentService = new AgentService(testDb.db);
+      await expect(
+        service.confirmAgent(sessionId, agentService),
+      ).rejects.toThrow("No agent-config");
+    });
+
+    it("throws with validation errors for invalid config", async () => {
+      const sessionId = await service.startSession(projectId, "/tmp/ct");
+
+      // Config missing required fields
+      const config = { name: "Bad Agent" }; // missing id, projectId, role
+      const configLine = JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [{
+            type: "text",
+            text: `\`\`\`agent-config\n${JSON.stringify(config)}\n\`\`\``,
+          }],
+        },
+      });
+      lastMockProcess.stdout!.push(Buffer.from(configLine + "\n"));
+      await new Promise((r) => setTimeout(r, 10));
+      lastMockProcess.emit("close", 0, null);
+
+      const agentService = new AgentService(testDb.db);
+      await expect(
+        service.confirmAgent(sessionId, agentService),
+      ).rejects.toThrow();
     });
   });
 });
