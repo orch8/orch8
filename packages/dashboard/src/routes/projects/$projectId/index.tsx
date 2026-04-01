@@ -16,7 +16,7 @@ function ProjectHomePage() {
 
   const activeAgents = agents?.filter((a) => a.status === "active") ?? [];
   const inProgressTasks = tasks?.filter((t) => t.column === "in_progress") ?? [];
-  const reviewTasks = tasks?.filter((t) => t.column === "review") ?? [];
+
   const budgetWarning = costSummary ? costSummary.total > 0 : false;
 
   return (
@@ -32,7 +32,6 @@ function ProjectHomePage() {
         <StatCard
           label="Tasks In Progress"
           value={inProgressTasks.length}
-          subtitle={`${reviewTasks.length} in review`}
         />
         <StatCard
           label="Today's Spend"
