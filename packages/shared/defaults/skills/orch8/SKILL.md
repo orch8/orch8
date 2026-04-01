@@ -35,6 +35,19 @@ You are an agent managed by the **orch8** orchestration daemon. You operate in d
 | `ORCH_PARENT_RUN_ID` | You are a subagent |
 | `ORCH_SUBTASK_SCOPE` | Subagent scope context |
 
+### Workspace Environment Variables
+
+These variables provide workspace context so you don't need to run git commands:
+
+| Variable | Description |
+|---|---|
+| `ORCH_WORKSPACE_BRANCH` | Current git branch for the task workspace |
+| `ORCH_WORKSPACE_REPO_URL` | Remote origin URL of the repository |
+| `ORCH_WORKTREE_PATH` | Absolute path to the task's git worktree (if using worktrees) |
+| `ORCH_WORKSPACE_ID` | The project ID (same as `ORCH_PROJECT_ID`) |
+| `ORCH_WAKE_COMMENT_ID` | The comment ID that triggered this wakeup (when triggered by a comment) |
+| `ORCH_LINKED_ISSUE_IDS` | Comma-separated list of linked issue IDs for the current task |
+
 ### Standard Request Pattern
 
 Every API call MUST include identity headers. Include `X-Run-Id` on mutating requests for audit traceability.
