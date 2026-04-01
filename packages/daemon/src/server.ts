@@ -6,11 +6,13 @@ import { registerSwagger } from "./api/swagger.js";
 import { healthRoutes } from "./api/routes/health.js";
 import { taskRoutes } from "./api/routes/tasks.js";
 import { brainstormRoutes } from "./api/routes/brainstorm.js";
+import { agentCreatorRoutes } from "./api/routes/agent-creator.js";
 import { commentRoutes } from "./api/routes/comments.js";
 import { agentRoutes } from "./api/routes/agents.js";
 import { websocketRoutes } from "./api/websocket.js";
 import { authPlugin } from "./api/middleware/auth.js";
 import { BrainstormService } from "./services/brainstorm.service.js";
+import { AgentCreatorService } from "./services/agent-creator.service.js";
 import { TaskService } from "./services/task.service.js";
 import { WorktreeService } from "./services/worktree.service.js";
 import { TaskLifecycleService } from "./services/task-lifecycle.service.js";
@@ -83,6 +85,11 @@ export function buildServer(options: ServerOptions = {}) {
     const brainstormService = new BrainstormService(dbClient.db, broadcast, spawnFn);
     brainstormService.setLogger(app.log);
     app.decorate("brainstormService", brainstormService);
+
+    // Agent creator service
+    const agentCreatorService = new AgentCreatorService(dbClient.db, broadcast, spawnFn);
+    agentCreatorService.setLogger(app.log);
+    app.decorate("agentCreatorService", agentCreatorService);
 
     // Core services
     const taskService = new TaskService(dbClient.db);
@@ -179,6 +186,7 @@ export function buildServer(options: ServerOptions = {}) {
 
     app.register(taskRoutes);
     app.register(brainstormRoutes);
+    app.register(agentCreatorRoutes);
     app.register(commentRoutes);
     app.register(agentRoutes);
     app.register(runRoutes);
