@@ -99,6 +99,18 @@ export interface RunContext {
   // Subagent context
   parentRunId?: string;
   subtaskScope?: string;
+
+  // Workspace metadata (Phase 3)
+  workspaceBranch?: string;
+  workspaceRepoUrl?: string;
+  worktreePath?: string;
+  workspaceId?: string;
+
+  // Wake trigger details (Phase 3)
+  wakeCommentId?: string;
+
+  // Task linkage (Phase 3)
+  linkedIssueIds?: string;
 }
 
 // ─── Session Params (spec §5.2) ──────────────────────────
