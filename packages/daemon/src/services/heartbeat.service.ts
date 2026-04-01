@@ -13,6 +13,9 @@ import type { FastifyBaseLogger } from "fastify";
 import { RunLogger, type LogHandle } from "./run-logger.js";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+const execFileAsync = promisify(execFile);
 import { mapStreamEvent } from "../adapter/tool-mapper.js";
 
 type Agent = typeof agents.$inferSelect;
@@ -45,6 +48,15 @@ export interface WakeupOpts {
   reason?: string;
   payload?: unknown;
   idempotencyKey?: string;
+}
+
+async function getRepoUrl(cwd: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync("git", ["config", "--get", "remote.origin.url"], { cwd });
+    return stdout.trim() || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export class HeartbeatService {
@@ -511,6 +523,18 @@ export class HeartbeatService {
         }
       };
 
+      // Phase 3: Look up wakeup request for commentId
+      let wakeCommentId: string | undefined;
+      const [wakeupReq] = await this.db
+        .select()
+        .from(wakeupRequests)
+        .where(eq(wakeupRequests.runId, runId));
+      if (wakeupReq?.commentId) {
+        wakeCommentId = wakeupReq.commentId;
+      }
+
+      const workspaceRepoUrl = await getRepoUrl(cwd);
+
       const ctx: RunContext = {
         agentId: agent.id,
         agentName: agent.name,
@@ -527,6 +551,18 @@ export class HeartbeatService {
         taskResearchOutput: taskData?.researchOutput ?? undefined,
         taskPlanOutput: taskData?.planOutput ?? undefined,
         onEvent,
+
+        // Phase 3: Workspace metadata
+        workspaceBranch: taskData?.branch ?? undefined,
+        worktreePath: taskData?.worktreePath ?? undefined,
+        workspaceId: claimedRun.projectId,
+        workspaceRepoUrl,
+
+        // Phase 3: Wake trigger details
+        wakeCommentId,
+
+        // Phase 3: Task linkage
+        linkedIssueIds: taskData?.linkedIssueIds?.join(",") ?? undefined,
       };
 
       const prompts: RunAgentPrompts = {
