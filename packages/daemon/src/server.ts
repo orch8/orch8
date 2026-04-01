@@ -157,20 +157,6 @@ export function buildServer(options: ServerOptions = {}) {
     const lifecycleService = new TaskLifecycleService(dbClient.db, taskService, worktreeService, broadcastService);
     app.decorate("lifecycleService", lifecycleService);
 
-    // Wire run completion → lifecycle transition (quick tasks only; complex tasks use completePhase)
-    heartbeatService.setOnRunCompleted(async (taskId, status) => {
-      if (status === "succeeded") {
-        try {
-          const task = await taskService.getById(taskId);
-          if (task && task.taskType !== "complex") {
-            await lifecycleService.transition(taskId, "done");
-          }
-        } catch (err) {
-          app.log.error({ err, taskId, status }, "Failed to transition task after run completion");
-        }
-      }
-    });
-
     // Auth middleware + routes that require DB
     app.register(authPlugin);
 
