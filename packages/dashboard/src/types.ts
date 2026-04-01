@@ -60,8 +60,22 @@ export interface PhaseCost {
 }
 
 export interface RunLog {
-  log: string;
+  content: string;
   store: string;
+  bytes: number;
+}
+
+export interface RunEvent {
+  id: string;
+  runId: string;
+  projectId: string;
+  seq: number;
+  timestamp: string;
+  eventType: "init" | "tool_use" | "tool_result" | "assistant_text" | "result" | "error";
+  toolName: string | null;
+  summary: string;
+  payload: unknown;
+  createdAt: string;
 }
 
 // Kanban column ordering

@@ -1,6 +1,6 @@
 import { eq, and, sql } from "drizzle-orm";
 import {
-  agents, heartbeatRuns, wakeupRequests, tasks, projects,
+  agents, heartbeatRuns, wakeupRequests, tasks, projects, runEvents,
 } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import { checkBudget, autoPauseIfExhausted } from "./budget.service.js";
@@ -13,6 +13,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { RunLogger, type LogHandle } from "./run-logger.js";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { mapStreamEvent } from "../adapter/tool-mapper.js";
 
 type Agent = typeof agents.$inferSelect;
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
@@ -475,6 +476,41 @@ export class HeartbeatService {
         },
       };
 
+      // Real-time event emission (run viewer spec)
+      let eventSeq = 0;
+      const onEvent = (rawEvent: import("../adapter/types.js").StreamEvent): void => {
+        const mapped = mapStreamEvent(rawEvent);
+        for (const m of mapped) {
+          const seq = eventSeq++;
+          const timestamp = new Date().toISOString();
+
+          // Fire-and-forget: DB insert + WebSocket broadcast
+          this.db
+            .insert(runEvents)
+            .values({
+              runId,
+              projectId: claimedRun.projectId,
+              seq,
+              timestamp: new Date(),
+              eventType: m.eventType,
+              toolName: m.toolName,
+              summary: m.summary,
+              payload: rawEvent,
+            })
+            .catch((err) => console.error(`[heartbeat] run_event insert failed: ${err}`));
+
+          this.broadcastService.runEvent(claimedRun.projectId, {
+            runId,
+            seq,
+            eventType: m.eventType,
+            toolName: m.toolName,
+            summary: m.summary,
+            timestamp,
+            payload: rawEvent,
+          });
+        }
+      };
+
       const ctx: RunContext = {
         agentId: agent.id,
         agentName: agent.name,
@@ -490,6 +526,7 @@ export class HeartbeatService {
         taskPhase: taskData?.complexPhase ?? undefined,
         taskResearchOutput: taskData?.researchOutput ?? undefined,
         taskPlanOutput: taskData?.planOutput ?? undefined,
+        onEvent,
       };
 
       const prompts: RunAgentPrompts = {

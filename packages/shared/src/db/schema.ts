@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   pgTable, pgEnum, text, boolean, integer, timestamp, real,
-  jsonb, primaryKey, check, uniqueIndex, type AnyPgColumn,
+  jsonb, primaryKey, check, uniqueIndex, index, type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -290,6 +290,32 @@ export const heartbeatRuns = pgTable("heartbeat_runs", {
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Run Events ─────────────────────────────────────────
+export const runEvents = pgTable(
+  "run_events",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => `evt_${randomUUID()}`),
+    runId: text("run_id")
+      .notNull()
+      .references(() => heartbeatRuns.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    timestamp: timestamp("timestamp", { withTimezone: true }).notNull(),
+    eventType: text("event_type").notNull(),
+    toolName: text("tool_name"),
+    summary: text("summary").notNull(),
+    payload: jsonb("payload"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("run_events_run_id_seq_idx").on(table.runId, table.seq),
+  ],
+);
 
 // ─── Wakeup Requests ─────────────────────────────────────
 

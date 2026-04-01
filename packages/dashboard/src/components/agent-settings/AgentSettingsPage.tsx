@@ -7,6 +7,7 @@ import { PromptsTab } from "./PromptsTab.js";
 import { SkillsToolsTab } from "./SkillsToolsTab.js";
 import { PermissionsTab } from "./PermissionsTab.js";
 import { BudgetTab } from "./BudgetTab.js";
+import { RunInspector } from "../runs/RunInspector.js";
 
 const TABS = [
   "General",
@@ -15,6 +16,7 @@ const TABS = [
   "Skills & Tools",
   "Permissions",
   "Budget",
+  "Runs",
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -112,6 +114,9 @@ export function AgentSettingsPage({ agent, projectId }: AgentSettingsPageProps) 
       )}
       {activeTab === "Budget" && (
         <BudgetTab agent={agent} projectId={projectId} updateAgent={updateAgent} />
+      )}
+      {activeTab === "Runs" && (
+        <RunInspector projectId={projectId} defaultAgentId={agent.id} />
       )}
     </div>
   );

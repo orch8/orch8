@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { eq, and, desc, inArray } from "drizzle-orm";
-import { heartbeatRuns } from "@orch/shared/db";
+import { eq, and, desc, inArray, asc } from "drizzle-orm";
+import { heartbeatRuns, runEvents } from "@orch/shared/db";
+import { readFile } from "node:fs/promises";
 import "../../types.js";
 
 export async function runRoutes(app: FastifyInstance) {
@@ -60,6 +61,27 @@ export async function runRoutes(app: FastifyInstance) {
     }
 
     return run;
+  });
+
+  // GET /api/runs/:id/events — Get structured events for a run
+  app.get("/api/runs/:id/events", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const projectId = request.projectId;
+    if (!projectId) {
+      return reply.code(400).send({ error: "validation_error", message: "projectId is required" });
+    }
+
+    const events = await app.db
+      .select()
+      .from(runEvents)
+      .where(
+        and(
+          eq(runEvents.runId, request.params.id),
+          eq(runEvents.projectId, projectId),
+        ),
+      )
+      .orderBy(asc(runEvents.seq));
+
+    return events;
   });
 
   // POST /api/runs/:id/cancel — Cancel a queued or running run
@@ -128,6 +150,21 @@ export async function runRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: "not_found", message: "No log found for this run" });
     }
 
-    return { log: run.logRef, store: run.logStore };
+    const params = request.query as { tail?: string };
+
+    try {
+      const raw = await readFile(run.logRef, "utf-8");
+      let content = raw;
+
+      if (params.tail) {
+        const n = parseInt(params.tail, 10);
+        const lines = raw.split("\n").filter(Boolean);
+        content = lines.slice(-n).join("\n");
+      }
+
+      return { content, store: run.logStore, bytes: Buffer.byteLength(raw) };
+    } catch {
+      return reply.code(404).send({ error: "not_found", message: "Log file not accessible" });
+    }
   });
 }

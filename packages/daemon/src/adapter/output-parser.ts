@@ -18,7 +18,7 @@ export interface ParsedOutput {
   unparsedLines: string[];
 }
 
-export async function parseOutputStream(stream: Readable): Promise<ParsedOutput> {
+export async function parseOutputStream(stream: Readable, onEvent?: (event: StreamEvent) => void): Promise<ParsedOutput> {
   const output: ParsedOutput = {
     sessionId: null,
     model: null,
@@ -44,6 +44,7 @@ export async function parseOutputStream(stream: Readable): Promise<ParsedOutput>
     }
 
     const event = parsed as StreamEvent;
+    if (onEvent) onEvent(event);
     output.events.push(event);
 
     if (event.type === "system" && (event as StreamInitEvent).subtype === "init") {

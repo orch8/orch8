@@ -14,6 +14,7 @@ export interface ProcessRunInput {
   timeoutSec: number;
   graceSec: number;
   logStream?: import("node:fs").WriteStream;
+  onEvent?: (event: import("./types.js").StreamEvent) => void;
 }
 
 export async function runProcess(
@@ -48,7 +49,7 @@ export async function runProcess(
   }
 
   // Parse stdout
-  const parsedOutputPromise = parseOutputStream(proc.stdout!);
+  const parsedOutputPromise = parseOutputStream(proc.stdout!, input.onEvent);
 
   // Wait for process exit
   const exitPromise = new Promise<{ exitCode: number | null; signal: string | null }>(

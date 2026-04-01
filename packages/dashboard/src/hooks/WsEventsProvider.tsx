@@ -112,6 +112,9 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
             qc.invalidateQueries({ queryKey: ["comments", event.taskId] });
           }
           break;
+        case "run_event":
+          // Handled by useRunEventStream subscribers — no invalidation needed.
+          break;
       }
     },
     [qc, addToast],
