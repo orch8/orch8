@@ -121,7 +121,9 @@ export function AgentCreatorChat({ projectId }: AgentCreatorChatProps) {
     if (!input.trim() || !sessionId) return;
     const content = input.trim();
     setMessages((prev) => [...prev, { role: "user", content }]);
-    sendMessage.mutate({ sessionId, content });
+    sendMessage.mutate({ sessionId, content }, {
+      onError: (err) => setError(`Failed to send message: ${err.message}`),
+    });
     setInput("");
   }
 
@@ -268,7 +270,7 @@ export function AgentCreatorChat({ projectId }: AgentCreatorChatProps) {
         />
         <button
           type="submit"
-          disabled={!input.trim() || !sessionId}
+          disabled={!input.trim() || !sessionId || sendMessage.isPending}
           className="rounded-md bg-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-600 disabled:opacity-40"
         >
           Send

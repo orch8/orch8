@@ -53,6 +53,9 @@ export async function agentCreatorRoutes(app: FastifyInstance) {
       if (msg.includes("No active")) {
         return reply.code(404).send({ error: "not_found", message: msg });
       }
+      if (msg.includes("still processing")) {
+        return reply.code(409).send({ error: "conflict", message: msg });
+      }
       throw err;
     }
   });
