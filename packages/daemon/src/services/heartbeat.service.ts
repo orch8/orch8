@@ -583,7 +583,27 @@ export class HeartbeatService {
 
         // Phase 3: Task linkage
         linkedIssueIds: taskData?.linkedIssueIds?.join(",") ?? undefined,
+
+        // Pipeline context
+        pipelineContext: undefined as string | undefined,
+        pipelineOutputFilePath: undefined as string | undefined,
       };
+
+      // Inject pipeline context if this task belongs to a pipeline step
+      if (taskData?.pipelineId && taskData?.pipelineStepId) {
+        const pipelineService = new (await import("./pipeline.service.js")).PipelineService(
+          this.db,
+          new (await import("./pipeline-template.service.js")).PipelineTemplateService(this.db),
+        );
+        const pipelineData = await pipelineService.findByTaskId(taskData.id);
+        if (pipelineData) {
+          ctx.pipelineContext = await pipelineService.buildStepContext(
+            pipelineData.pipeline.id,
+            pipelineData.step.order,
+          );
+          ctx.pipelineOutputFilePath = pipelineData.step.outputFilePath ?? undefined;
+        }
+      }
 
       const prompts: RunAgentPrompts = {
         heartbeatTemplate: agent.promptTemplate ?? "",

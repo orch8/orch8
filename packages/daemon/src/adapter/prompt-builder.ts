@@ -37,6 +37,10 @@ function contextToVars(ctx: RunContext): Record<string, string | undefined> {
 
     // Task linkage (Phase 3)
     "task.linkedIssueIds": ctx.linkedIssueIds,
+
+    // Pipeline context
+    "pipeline.context": ctx.pipelineContext,
+    "pipeline.outputFilePath": ctx.pipelineOutputFilePath,
   };
 
   // Add context.* variables

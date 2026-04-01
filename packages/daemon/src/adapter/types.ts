@@ -111,6 +111,10 @@ export interface RunContext {
 
   // Task linkage (Phase 3)
   linkedIssueIds?: string;
+
+  // Pipeline context
+  pipelineContext?: string;
+  pipelineOutputFilePath?: string;
 }
 
 // ─── Session Params (spec §5.2) ──────────────────────────
