@@ -93,6 +93,9 @@ export interface RunContext {
   // Log capture
   logStream?: import("node:fs").WriteStream;
 
+  // Real-time event callback
+  onEvent?: (event: StreamEvent) => void;
+
   // Subagent context
   parentRunId?: string;
   subtaskScope?: string;
