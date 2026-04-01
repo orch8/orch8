@@ -28,6 +28,7 @@ declare module "fastify" {
     memoryExtractionService: MemoryExtractionService;
     broadcastService: BroadcastService;
     notificationService: NotificationService;
+    projectSkillService: import("./services/project-skill.service.js").ProjectSkillService;
   }
   interface FastifyRequest {
     agent?: typeof schema.agents.$inferSelect;

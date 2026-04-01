@@ -36,6 +36,8 @@ import { SummaryService } from "./services/summary.service.js";
 import { MemoryExtractionService } from "./services/memory-extraction.service.js";
 import { BroadcastService } from "./services/broadcast.service.js";
 import { NotificationService } from "./services/notification.service.js";
+import { projectSkillRoutes } from "./api/routes/project-skills.js";
+import { ProjectSkillService } from "./services/project-skill.service.js";
 import type { GlobalConfig } from "./config/schema.js";
 import "./types.js";
 
@@ -99,6 +101,10 @@ export function buildServer(options: ServerOptions = {}) {
     // Agent service
     const agentService = new AgentService(dbClient.db, broadcastService);
     app.decorate("agentService", agentService);
+
+    // Project skill service
+    const projectSkillService = new ProjectSkillService(dbClient.db);
+    app.decorate("projectSkillService", projectSkillService);
 
     // Heartbeat service
     const heartbeatService = new HeartbeatService(dbClient.db, broadcastService);
@@ -197,6 +203,7 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(activityRoutes);
     app.register(daemonRoutes);
     app.register(notificationRoutes);
+    app.register(projectSkillRoutes);
   }
 
   app.register(websocketRoutes);
