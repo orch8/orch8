@@ -1,5 +1,6 @@
+import path from "node:path";
 import { eq, and } from "drizzle-orm";
-import { agents, wakeupRequests } from "@orch/shared/db";
+import { agents, projects, wakeupRequests } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { CreateAgent, UpdateAgent, AgentFilter } from "@orch/shared";
 import type { BroadcastService } from "./broadcast.service.js";
@@ -113,6 +114,24 @@ export class AgentService {
       ...defaults,
       ...stripUndefined(input),
     };
+
+    // Auto-populate workLogDir and lessonsFile from project homeDir
+    if (!values.workLogDir || !values.lessonsFile) {
+      const [project] = await this.db
+        .select({ homeDir: projects.homeDir })
+        .from(projects)
+        .where(eq(projects.id, input.projectId));
+
+      if (project) {
+        const memoryBase = path.join(project.homeDir, ".orch", "memory");
+        if (!values.workLogDir) {
+          values.workLogDir = path.join(memoryBase, "logs", input.id);
+        }
+        if (!values.lessonsFile) {
+          values.lessonsFile = path.join(memoryBase, "lessons", `${input.id}.md`);
+        }
+      }
+    }
 
     const [agent] = await this.db.insert(agents).values(values).returning();
     return agent;
