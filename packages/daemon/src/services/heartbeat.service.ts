@@ -203,27 +203,24 @@ export class HeartbeatService {
   ): Promise<WakeupRequest> {
     const taskId = opts.taskId!;
 
-    // Load task to check existing execution lock
-    const [task] = await this.db
+    // Coalesce if there's already a queued/running run for this agent + task
+    const [existingRun] = await this.db
       .select()
-      .from(tasks)
-      .where(eq(tasks.id, taskId));
+      .from(heartbeatRuns)
+      .where(
+        and(
+          eq(heartbeatRuns.agentId, agentId),
+          eq(heartbeatRuns.projectId, projectId),
+          eq(heartbeatRuns.taskId, taskId),
+          sql`${heartbeatRuns.status} IN ('queued', 'running')`,
+        ),
+      );
 
-    if (!task) throw new Error("Task not found");
-
-    // Case A: Same agent already executing this task → COALESCE
-    if (task.executionAgentId === agentId && task.executionRunId) {
+    if (existingRun) {
       return this.recordWakeup(agentId, projectId, opts, "coalesced");
     }
 
-    // Case B: Different agent executing this task → DEFER
-    if (task.executionAgentId && task.executionAgentId !== agentId) {
-      return this.recordWakeup(
-        agentId, projectId, opts, "deferred_issue_execution",
-      );
-    }
-
-    // Case C: No active execution → CLAIM lock, create run as queued
+    // Create new queued run — no lock or transition on the task
     const [run] = await this.db
       .insert(heartbeatRuns)
       .values({
@@ -235,30 +232,6 @@ export class HeartbeatService {
       })
       .returning();
 
-    // Set execution lock on the task; only transition column when in backlog
-    const shouldTransition = task.column === "backlog";
-    await this.db
-      .update(tasks)
-      .set({
-        executionRunId: run.id,
-        executionAgentId: agentId,
-        executionLockedAt: new Date(),
-        ...(shouldTransition ? { column: "in_progress" } : {}),
-        updatedAt: new Date(),
-      })
-      .where(eq(tasks.id, taskId));
-
-    if (shouldTransition) {
-      // Broadcast column transition
-      this.broadcastService.taskTransitioned(projectId, {
-        taskId,
-        from: task.column,
-        to: "in_progress",
-        agentId,
-      });
-    }
-
-    // Broadcast run_created (spec §14 §2.1)
     this.broadcastService.runCreated(projectId, {
       runId: run.id,
       agentId,
@@ -470,25 +443,9 @@ export class HeartbeatService {
           .where(eq(tasks.id, claimedRun.taskId));
         if (task?.worktreePath) {
           cwd = task.worktreePath;
-        } else if (task && task.taskType !== "brainstorm" && this.worktreeService) {
-          // Lazy worktree creation for tasks without one
-          const slug = WorktreeService.slugify(task.title);
-          cwd = await this.worktreeService.create({
-            homeDir: project.homeDir,
-            worktreeDir: project.worktreeDir,
-            taskId: task.id,
-            slug,
-            defaultBranch: project.defaultBranch,
-          });
-          await this.db
-            .update(tasks)
-            .set({
-              worktreePath: cwd,
-              branch: `task/${task.id}/${slug}`,
-              updatedAt: new Date(),
-            })
-            .where(eq(tasks.id, task.id));
         }
+        // Note: worktree creation is now handled by POST /api/tasks/:id/checkout.
+        // If the task has no worktree yet, the agent will create one via checkout.
       }
 
       // 7. Invoke adapter
@@ -649,9 +606,20 @@ export class HeartbeatService {
           // Best-effort cleanup — don't let log finalization crash the run cleanup
         }
       }
-      // 11. Release task execution lock
-      if (claimedRun.taskId) {
-        await this.releaseTaskLock(claimedRun.taskId);
+      // 11. Crash recovery — release any tasks locked by this run
+      try {
+        const lockedTasks = await this.db
+          .select({ id: tasks.id })
+          .from(tasks)
+          .where(eq(tasks.executionRunId, runId));
+        for (const t of lockedTasks) {
+          await this.releaseTaskLock(t.id);
+        }
+      } catch (lockErr) {
+        this.logger?.error(
+          { err: lockErr, runId },
+          "Failed to release task locks during run cleanup",
+        );
       }
 
       // 12. Start next queued run

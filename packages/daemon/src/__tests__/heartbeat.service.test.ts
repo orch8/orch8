@@ -127,8 +127,8 @@ describe("HeartbeatService", () => {
     });
   });
 
-  describe("enqueueWakeup — task execution locking", () => {
-    it("claims lock when no active execution on task", async () => {
+  describe("enqueueWakeup — task-scoped wakeup", () => {
+    it("creates a queued run for the task without setting execution lock", async () => {
       await testDb.db.insert(agents).values({
         id: "eng-1", projectId, name: "Eng", role: "engineer",
       });
@@ -141,15 +141,25 @@ describe("HeartbeatService", () => {
         taskId: task.id,
       });
       expect(result.status).toBe("queued");
+      expect(result.runId).toBeTruthy();
 
-      // Task should now have the execution lock
+      // Run should exist with correct taskId
+      const [run] = await testDb.db
+        .select()
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.id, result.runId!));
+      expect(run.taskId).toBe(task.id);
+      expect(run.agentId).toBe("eng-1");
+      expect(run.status).not.toBe("queued"); // was promoted to running by startNext
+
+      // Task should NOT have execution lock set by heartbeat
       const [updated] = await testDb.db
         .select()
         .from(tasks)
         .where(eq(tasks.id, task.id));
-      expect(updated.executionAgentId).toBe("eng-1");
-      expect(updated.executionRunId).toBeTruthy();
-      expect(updated.executionLockedAt).toBeTruthy();
+      expect(updated.executionAgentId).toBeNull();
+      expect(updated.executionRunId).toBeNull();
+      expect(updated.executionLockedAt).toBeNull();
     });
 
     it("coalesces when same agent re-wakes same task", async () => {
@@ -175,28 +185,29 @@ describe("HeartbeatService", () => {
       expect(second.status).toBe("coalesced");
     });
 
-    it("defers when different agent wakes same task", async () => {
+    it("allows different agent to create separate queued run for same task", async () => {
       await testDb.db.insert(agents).values([
         { id: "eng-1", projectId, name: "Eng 1", role: "engineer" },
         { id: "eng-2", projectId, name: "Eng 2", role: "engineer" },
       ]);
       const [task] = await testDb.db.insert(tasks).values({
-        projectId, title: "Defer Task",
+        projectId, title: "Multi Agent Task",
       }).returning();
 
-      // First agent claims
+      // First agent gets a queued run
       const first = await service.enqueueWakeup("eng-1", projectId, {
         source: "on_demand",
         taskId: task.id,
       });
       expect(first.status).toBe("queued");
 
-      // Second agent deferred
+      // Second agent also gets a queued run (no deferral since no lock-based gating)
       const second = await service.enqueueWakeup("eng-2", projectId, {
         source: "on_demand",
         taskId: task.id,
       });
-      expect(second.status).toBe("deferred_issue_execution");
+      expect(second.status).toBe("queued");
+      expect(second.runId).toBeTruthy();
     });
 
     it("general wakeup (no taskId) coalesces into existing queued run", async () => {

@@ -111,7 +111,7 @@ describe("Heartbeat Pipeline Integration", () => {
     expect(mockSocket.send).toHaveBeenCalled();
   });
 
-  it("task-scoped pipeline: lock → execute → release → promote deferred", async () => {
+  it("task-scoped pipeline: both agents get queued runs for same task", async () => {
     await testDb.db.insert(agents).values([
       { id: "eng-1", projectId, name: "Eng 1", role: "engineer" as const, adapterType: "claude_local", adapterConfig: {} },
       { id: "eng-2", projectId, name: "Eng 2", role: "engineer" as const, adapterType: "claude_local", adapterConfig: {} },
@@ -130,37 +130,32 @@ describe("Heartbeat Pipeline Integration", () => {
     };
     service.setAdapter(mockAdapter as any);
 
-    // Agent 1 wakes the task — gets the lock, run created and claimed
+    // Agent 1 wakes the task — run created as queued
     const wake1 = await service.enqueueWakeup("eng-1", projectId, {
       source: "on_demand",
       taskId: task.id,
     });
     expect(wake1.status).toBe("queued");
 
-    // Agent 2 wakes the same task — deferred (task locked by eng-1)
+    // Agent 2 wakes the same task — also gets a queued run (no deferral)
     const wake2 = await service.enqueueWakeup("eng-2", projectId, {
       source: "on_demand",
       taskId: task.id,
     });
-    expect(wake2.status).toBe("deferred_issue_execution");
+    expect(wake2.status).toBe("queued");
 
-    // Execute eng-1's run. The finally block in executeRun calls releaseTaskLock,
-    // which promotes eng-2's deferred wakeup by re-enqueueing it. That creates a
-    // new run for eng-2 and claims it to "running" via startNextQueuedRunForAgent.
+    // Execute eng-1's run
     await service.executeRun(wake1.runId!);
 
-    // eng-2 should now have a run (created by releaseTaskLock → enqueueWakeup)
+    // eng-2 should have its own run
     const eng2Runs = await testDb.db
       .select()
       .from(heartbeatRuns)
       .where(eq(heartbeatRuns.agentId, "eng-2"));
     expect(eng2Runs.length).toBeGreaterThanOrEqual(1);
 
-    // The promoted run should be "running" (claimed but not yet executed)
+    // Execute eng-2's run to completion
     const eng2Run = eng2Runs[0];
-    expect(eng2Run.status).toBe("running");
-
-    // Execute eng-2's promoted run to completion
     await service.executeRun(eng2Run.id);
 
     // Verify eng-2's run completed successfully
@@ -170,7 +165,7 @@ describe("Heartbeat Pipeline Integration", () => {
       .where(eq(heartbeatRuns.id, eng2Run.id));
     expect(eng2Finished.status).toBe("succeeded");
 
-    // Verify the full chain: eng-1 succeeded, eng-2 succeeded
+    // Verify both agents succeeded
     const eng1Runs = await testDb.db
       .select()
       .from(heartbeatRuns)
