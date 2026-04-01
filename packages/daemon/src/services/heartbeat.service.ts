@@ -434,13 +434,15 @@ export class HeartbeatService {
         return;
       }
 
-      // 6. Resolve working directory
+      // 6. Resolve working directory and load task context
       let cwd = project.homeDir;
+      let taskData: typeof tasks.$inferSelect | undefined;
       if (claimedRun.taskId) {
         const [task] = await this.db
           .select()
           .from(tasks)
           .where(eq(tasks.id, claimedRun.taskId));
+        taskData = task;
         if (task?.worktreePath) {
           cwd = task.worktreePath;
         }
@@ -483,6 +485,11 @@ export class HeartbeatService {
         apiUrl: process.env.ORCH_API_URL ?? "http://localhost:3000",
         cwd,
         logStream: logHandle.stream,
+        taskTitle: taskData?.title,
+        taskDescription: taskData?.description ?? undefined,
+        taskPhase: taskData?.complexPhase ?? undefined,
+        taskResearchOutput: taskData?.researchOutput ?? undefined,
+        taskPlanOutput: taskData?.planOutput ?? undefined,
       };
 
       const prompts: RunAgentPrompts = {
