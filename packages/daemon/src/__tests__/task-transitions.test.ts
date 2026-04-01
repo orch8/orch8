@@ -28,6 +28,7 @@ describe("task-transitions", () => {
       ["backlog", "in_progress"],
       ["blocked", "backlog"],
       ["blocked", "in_progress"],
+      ["in_progress", "blocked"],
       ["in_progress", "done"],
     ] as [TaskColumn, TaskColumn][])("allows %s → %s", (from, to) => {
       expect(isValidTransition(from, to)).toBe(true);
@@ -36,7 +37,6 @@ describe("task-transitions", () => {
     it.each([
       ["backlog", "done"],
       ["in_progress", "backlog"],
-      ["in_progress", "blocked"],
       ["done", "backlog"],
       ["done", "in_progress"],
     ] as [TaskColumn, TaskColumn][])("rejects %s → %s", (from, to) => {

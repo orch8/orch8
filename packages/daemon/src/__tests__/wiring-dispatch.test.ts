@@ -41,8 +41,8 @@ describe("Wiring: Dispatch", () => {
     await testDb.db.delete(agents);
   });
 
-  describe("P0 #2: enqueueTaskScopedWakeup sets column to in_progress", () => {
-    it("transitions task from backlog to in_progress when claiming", async () => {
+  describe("P0 #2: enqueueTaskScopedWakeup creates queued run", () => {
+    it("creates a queued run for the task without transitioning it", async () => {
       await testDb.db.insert(agents).values({
         id: "agent-1",
         projectId,
@@ -71,17 +71,17 @@ describe("Wiring: Dispatch", () => {
         reason: "task_assigned",
       });
 
-      // Task should now be in_progress
+      // Task should remain in backlog (agents checkout tasks themselves now)
       const [updated] = await testDb.db
         .select()
         .from(tasks)
         .where(eq(tasks.id, task.id));
-      expect(updated.column).toBe("in_progress");
+      expect(updated.column).toBe("backlog");
     });
   });
 
-  describe("P0 #2: lazy worktree creation in executeRun", () => {
-    it("creates worktree when task has no worktreePath", async () => {
+  describe("P0 #2: worktree resolution in executeRun", () => {
+    it("does not create worktree lazily (agents handle via checkout)", async () => {
       await testDb.db.insert(agents).values({
         id: "agent-1",
         projectId,
@@ -129,21 +129,15 @@ describe("Wiring: Dispatch", () => {
 
       await service.executeRun(run.id);
 
-      expect(mockWorktreeService.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          homeDir: "/tmp/wiring-test",
-          worktreeDir: "/tmp/wiring-wt",
-          taskId: task.id,
-        }),
-      );
+      // Worktree should NOT be created lazily — agents handle this via checkout
+      expect(mockWorktreeService.create).not.toHaveBeenCalled();
 
-      // Task should have worktreePath set
+      // Task should not have worktreePath set (no lazy creation)
       const [updated] = await testDb.db
         .select()
         .from(tasks)
         .where(eq(tasks.id, task.id));
-      expect(updated.worktreePath).toBe("/tmp/wiring-wt/task-" + task.id);
-      expect(updated.branch).toMatch(/^task\//);
+      expect(updated.worktreePath).toBeNull();
     });
 
     it("skips worktree creation for brainstorm tasks", async () => {
