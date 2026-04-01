@@ -26,6 +26,17 @@ function contextToVars(ctx: RunContext): Record<string, string | undefined> {
     "task.researchOutput": ctx.taskResearchOutput,
     "task.planOutput": ctx.taskPlanOutput,
     "task.brainstormTranscript": ctx.brainstormTranscript,
+
+    // Workspace metadata (Phase 3)
+    "workspace.branch": ctx.workspaceBranch,
+    "workspace.repoUrl": ctx.workspaceRepoUrl,
+    "workspace.worktreePath": ctx.worktreePath,
+
+    // Wake trigger details (Phase 3)
+    "wake.commentId": ctx.wakeCommentId,
+
+    // Task linkage (Phase 3)
+    "task.linkedIssueIds": ctx.linkedIssueIds,
   };
 
   // Add context.* variables

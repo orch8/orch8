@@ -37,19 +37,19 @@ describe("interpolateTemplate", () => {
   });
 });
 
-describe("buildPrompt", () => {
-  const baseContext: RunContext = {
-    agentId: "agent-1",
-    agentName: "Builder",
-    projectId: "proj-1",
-    runId: "run-1",
-    wakeReason: "assignment",
-    apiUrl: "http://localhost:3847",
-    cwd: "/tmp/ws",
-    taskTitle: "Fix login bug",
-    taskDescription: "The login page crashes on submit",
-  };
+const baseContext: RunContext = {
+  agentId: "agent-1",
+  agentName: "Builder",
+  projectId: "proj-1",
+  runId: "run-1",
+  wakeReason: "assignment",
+  apiUrl: "http://localhost:3847",
+  cwd: "/tmp/ws",
+  taskTitle: "Fix login bug",
+  taskDescription: "The login page crashes on submit",
+};
 
+describe("buildPrompt", () => {
   it("includes only heartbeat prompt when no bootstrap or handoff", () => {
     const result = buildPrompt({
       heartbeatTemplate: "Work on: {{task.title}}",
@@ -134,5 +134,66 @@ describe("buildPrompt", () => {
     expect(result).toContain("Phase: implement");
     expect(result).toContain("Research: Found the issue.");
     expect(result).toContain("Plan: Fix with patch.");
+  });
+});
+
+describe("prompt-builder — Phase 3 template vars", () => {
+  it("interpolates {{workspace.branch}}", () => {
+    const ctx: RunContext = { ...baseContext, workspaceBranch: "feature/foo" };
+    const result = buildPrompt({
+      heartbeatTemplate: "Branch: {{workspace.branch}}",
+      context: ctx,
+      isFirstRun: false,
+    });
+    expect(result).toBe("Branch: feature/foo");
+  });
+
+  it("interpolates {{workspace.repoUrl}}", () => {
+    const ctx: RunContext = { ...baseContext, workspaceRepoUrl: "https://github.com/org/repo.git" };
+    const result = buildPrompt({
+      heartbeatTemplate: "Repo: {{workspace.repoUrl}}",
+      context: ctx,
+      isFirstRun: false,
+    });
+    expect(result).toBe("Repo: https://github.com/org/repo.git");
+  });
+
+  it("interpolates {{workspace.worktreePath}}", () => {
+    const ctx: RunContext = { ...baseContext, worktreePath: "/worktrees/task-1" };
+    const result = buildPrompt({
+      heartbeatTemplate: "WT: {{workspace.worktreePath}}",
+      context: ctx,
+      isFirstRun: false,
+    });
+    expect(result).toBe("WT: /worktrees/task-1");
+  });
+
+  it("interpolates {{wake.commentId}}", () => {
+    const ctx: RunContext = { ...baseContext, wakeCommentId: "comment-42" };
+    const result = buildPrompt({
+      heartbeatTemplate: "Comment: {{wake.commentId}}",
+      context: ctx,
+      isFirstRun: false,
+    });
+    expect(result).toBe("Comment: comment-42");
+  });
+
+  it("interpolates {{task.linkedIssueIds}}", () => {
+    const ctx: RunContext = { ...baseContext, linkedIssueIds: "ISS-1,ISS-2" };
+    const result = buildPrompt({
+      heartbeatTemplate: "Issues: {{task.linkedIssueIds}}",
+      context: ctx,
+      isFirstRun: false,
+    });
+    expect(result).toBe("Issues: ISS-1,ISS-2");
+  });
+
+  it("replaces missing Phase 3 vars with empty string", () => {
+    const result = buildPrompt({
+      heartbeatTemplate: "Branch: {{workspace.branch}}, Comment: {{wake.commentId}}",
+      context: baseContext,
+      isFirstRun: false,
+    });
+    expect(result).toBe("Branch: , Comment: ");
   });
 });
