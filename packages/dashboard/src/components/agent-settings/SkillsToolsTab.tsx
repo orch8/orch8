@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { FormField } from "../shared/FormField.js";
 import type { Agent } from "../../types.js";
 import type { UseMutationResult } from "@tanstack/react-query";
+import { useProjectSkills, useSyncProjectSkills } from "../../hooks/useProjectSkills.js";
 
 interface SkillsToolsTabProps {
   agent: Agent;
@@ -9,25 +10,39 @@ interface SkillsToolsTabProps {
   updateAgent: UseMutationResult<any, any, any, any>;
 }
 
+const TRUST_BADGE: Record<string, { label: string; color: string }> = {
+  markdown_only: { label: "Markdown", color: "bg-green-900 text-green-300" },
+  assets: { label: "Assets", color: "bg-yellow-900 text-yellow-300" },
+  scripts_executables: { label: "Scripts", color: "bg-red-900 text-red-300" },
+};
+
 export function SkillsToolsTab({ agent, projectId, updateAgent }: SkillsToolsTabProps) {
-  const [skillPaths, setSkillPaths] = useState<string[]>(agent.skillPaths ?? []);
+  const [desiredSkills, setDesiredSkills] = useState<string[]>(agent.desiredSkills ?? []);
   const [mcpTools, setMcpTools] = useState<string[]>(agent.mcpTools ?? []);
   const [allowedTools, setAllowedTools] = useState<string[]>(agent.allowedTools ?? []);
-  const [newSkillPath, setNewSkillPath] = useState("");
   const [newMcpTool, setNewMcpTool] = useState("");
   const [newAllowedTool, setNewAllowedTool] = useState("");
 
+  const { data: projectSkills, isLoading } = useProjectSkills(projectId);
+  const syncMutation = useSyncProjectSkills(projectId);
+
   useEffect(() => {
-    setSkillPaths(agent.skillPaths ?? []);
+    setDesiredSkills(agent.desiredSkills ?? []);
     setMcpTools(agent.mcpTools ?? []);
     setAllowedTools(agent.allowedTools ?? []);
   }, [agent]);
+
+  function toggleSkill(slug: string) {
+    setDesiredSkills((prev) =>
+      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug],
+    );
+  }
 
   function handleSave() {
     updateAgent.mutate({
       agentId: agent.id,
       projectId,
-      skillPaths,
+      desiredSkills,
       mcpTools,
       allowedTools,
     });
@@ -90,7 +105,51 @@ export function SkillsToolsTab({ agent, projectId, updateAgent }: SkillsToolsTab
 
   return (
     <div className="flex flex-col gap-5">
-      {renderList("Skill Paths", "File paths to skill definitions", skillPaths, setSkillPaths, newSkillPath, setNewSkillPath, "/path/to/skill.md")}
+      <FormField
+        label="Project Skills"
+        description="Select which skills this agent should use. Skills are managed at the project level."
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <button
+            type="button"
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending}
+            className="rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
+          >
+            {syncMutation.isPending ? "Syncing..." : "Sync from Disk"}
+          </button>
+        </div>
+
+        {isLoading ? (
+          <p className="text-xs text-zinc-500">Loading skills...</p>
+        ) : projectSkills && projectSkills.length > 0 ? (
+          <div className="flex flex-col gap-1">
+            {projectSkills.map((skill) => {
+              const badge = TRUST_BADGE[skill.trustLevel] ?? TRUST_BADGE.markdown_only;
+              return (
+                <label key={skill.slug} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-zinc-800/50">
+                  <input
+                    type="checkbox"
+                    checked={desiredSkills.includes(skill.slug)}
+                    onChange={() => toggleSkill(skill.slug)}
+                    className="rounded border-zinc-700"
+                  />
+                  <span className="text-sm text-zinc-200">{skill.name}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${badge.color}`}>
+                    {badge.label}
+                  </span>
+                  {skill.description && (
+                    <span className="text-xs text-zinc-500">{skill.description}</span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-zinc-500">No skills found. Click "Sync from Disk" to discover skills.</p>
+        )}
+      </FormField>
+
       {renderList("MCP Tools", "MCP tool identifiers this agent can use", mcpTools, setMcpTools, newMcpTool, setNewMcpTool, "tool-name")}
       {renderList("Allowed Tools", "Restrict which tools the agent can call", allowedTools, setAllowedTools, newAllowedTool, setNewAllowedTool, "Read, Write, Bash, ...")}
 
