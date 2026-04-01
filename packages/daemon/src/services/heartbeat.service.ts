@@ -17,6 +17,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 import { mapStreamEvent } from "../adapter/tool-mapper.js";
+import { SessionManager, type SessionStats as AdapterSessionStats } from "../adapter/session-manager.js";
 
 type Agent = typeof agents.$inferSelect;
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
@@ -81,6 +82,7 @@ export class HeartbeatService {
   private logger: FastifyBaseLogger | null = null;
   private onRunCompleted?: (taskId: string, status: string) => Promise<void>;
   private worktreeService?: WorktreeService;
+  private sessionManager: SessionManager | null = null;
 
   setLogger(logger: FastifyBaseLogger): void {
     this.logger = logger;
@@ -115,6 +117,10 @@ export class HeartbeatService {
 
   setWorktreeService(worktreeService: WorktreeService): void {
     this.worktreeService = worktreeService;
+  }
+
+  setSessionManager(sessionManager: SessionManager): void {
+    this.sessionManager = sessionManager;
   }
 
   get activeCount(): number {
@@ -580,6 +586,50 @@ export class HeartbeatService {
         skillPaths: agent.skillPaths ?? undefined,
         desiredSkills: agent.desiredSkills ?? undefined,
       };
+
+      // Phase 4: Session compaction — evaluate before launching process
+      if (agent.sessionCompactionEnabled && this.sessionManager) {
+        const taskKey = claimedRun.taskId ?? runId;
+        const stats = await this.sessionManager.getSessionStats(
+          agent.id, taskKey, "claude_local",
+        );
+
+        if (stats) {
+          const policy: CompactionPolicy = {
+            enabled: true,
+            maxSessionRuns: agent.sessionMaxRuns ?? 0,
+            maxRawInputTokens: agent.sessionMaxInputTokens ?? 0,
+            maxSessionAgeHours: agent.sessionMaxAgeHours ?? 0,
+          };
+
+          const compactionResult = this.checkCompactionThresholds(policy, stats);
+          if (compactionResult.needsRotation) {
+            this.logger?.info(
+              { agentId: agent.id, runId, reason: compactionResult.reason },
+              "Session compaction: rotating session",
+            );
+
+            // Build handoff note from structured template
+            const handoff = [
+              "Session rotated:",
+              `- Task: ${taskData?.title ?? "unknown"}`,
+              `- Rotation reason: ${compactionResult.reason}`,
+              `- Last run summary: ${stats.latestResultText.slice(0, 500)}`,
+              "Continue from the current task state. Rebuild only the minimum context you need.",
+            ].join("\n");
+
+            // Clear the old session
+            await this.sessionManager.clearSession({
+              agentId: agent.id,
+              taskKey,
+              adapterType: "claude_local",
+            });
+
+            // Set sessionHandoff on prompts so the adapter includes it
+            prompts.sessionHandoff = handoff;
+          }
+        }
+      }
 
       const result = await this.adapter.runAgent(adapterConfig, ctx, prompts);
 

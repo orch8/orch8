@@ -20,6 +20,7 @@ import { AgentService } from "./services/agent.service.js";
 import { HeartbeatService } from "./services/heartbeat.service.js";
 import { SchedulerService } from "./services/scheduler.service.js";
 import { ClaudeLocalAdapter } from "./adapter/claude-local-adapter.js";
+import { SessionManager } from "./adapter/session-manager.js";
 import { runRoutes } from "./api/routes/runs.js";
 import { identityRoutes } from "./api/routes/identity.js";
 import { projectRoutes } from "./api/routes/projects.js";
@@ -116,6 +117,8 @@ export function buildServer(options: ServerOptions = {}) {
     const heartbeatService = new HeartbeatService(dbClient.db, broadcastService);
     const adapter = new ClaudeLocalAdapter(dbClient.db, spawnFn, projectSkillService, instructionBundleService);
     heartbeatService.setAdapter(adapter);
+    const sessionMgr = new SessionManager(dbClient.db);
+    heartbeatService.setSessionManager(sessionMgr);
 
     heartbeatService.setLogger(app.log);
     heartbeatService.setWorktreeService(worktreeService);
