@@ -43,6 +43,10 @@ import { instructionBundleRoutes } from "./api/routes/instruction-bundles.js";
 import { InstructionBundleService } from "./services/instruction-bundle.service.js";
 import { SeedingService } from "./services/seeding.service.js";
 import { bundledAgentRoutes } from "./api/routes/bundled-agents.js";
+import { PipelineTemplateService } from "./services/pipeline-template.service.js";
+import { PipelineService } from "./services/pipeline.service.js";
+import { pipelineTemplateRoutes } from "./api/routes/pipeline-templates.js";
+import { pipelineRoutes } from "./api/routes/pipelines.js";
 import type { GlobalConfig } from "./config/schema.js";
 import "./types.js";
 
@@ -101,6 +105,13 @@ export function buildServer(options: ServerOptions = {}) {
     // Core services
     const taskService = new TaskService(dbClient.db);
     app.decorate("taskService", taskService);
+
+    // Pipeline services
+    const pipelineTemplateService = new PipelineTemplateService(dbClient.db);
+    app.decorate("pipelineTemplateService", pipelineTemplateService);
+    const pipelineService = new PipelineService(dbClient.db, pipelineTemplateService);
+    app.decorate("pipelineService", pipelineService);
+
     const worktreeService = new WorktreeService();
 
     // Agent service
@@ -224,6 +235,8 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(projectSkillRoutes);
     app.register(instructionBundleRoutes);
     app.register(bundledAgentRoutes);
+    app.register(pipelineTemplateRoutes);
+    app.register(pipelineRoutes);
   }
 
   app.register(websocketRoutes);
