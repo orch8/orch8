@@ -38,8 +38,7 @@ const mockTask = {
   autoPr: true,
   branch: "feat/fix-auth",
   worktreePath: "/tmp/wt/fix-auth",
-  verificationResult: null,
-  verifierReport: null,
+
   mcpTools: [],
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),

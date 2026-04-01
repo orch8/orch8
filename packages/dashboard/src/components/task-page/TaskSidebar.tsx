@@ -132,22 +132,6 @@ export function TaskSidebar({ task, projectId, allTasks }: TaskSidebarProps) {
 
       {/* Dependencies */}
       <DependenciesSection task={task} allTasks={allTasks} />
-
-      {/* Verification */}
-      {task.verificationResult && (
-        <div>
-          <span className="text-xs text-zinc-500">Verification</span>
-          <p className="mt-1">
-            <span className={`rounded px-2 py-0.5 text-xs font-medium ${
-              task.verificationResult === "pass" ? "bg-emerald-900/50 text-emerald-300"
-                : task.verificationResult === "fail" ? "bg-red-900/50 text-red-300"
-                : "bg-yellow-900/50 text-yellow-300"
-            }`}>
-              {task.verificationResult}
-            </span>
-          </p>
-        </div>
-      )}
     </aside>
   );
 }

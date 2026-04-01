@@ -137,7 +137,7 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
       homeDir: repoPath,
       worktreeDir: `${repoPath}/.worktrees`,
       defaultBranch,
-      verificationRequired: true,
+
       budgetLimitUsd: dailyBudget ? parseFloat(dailyBudget) : undefined,
     });
 

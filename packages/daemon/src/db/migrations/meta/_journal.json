@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1774862542277,
-      "tag": "0000_graceful_tombstone",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1774867115986,
-      "tag": "0001_wise_lyja",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1774948816671,
-      "tag": "0002_notifications",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1774975638279,
-      "tag": "0003_auto_pause_threshold",
+      "when": 1775019948821,
+      "tag": "0000_workable_zaran",
       "breakpoints": true
     }
   ]
