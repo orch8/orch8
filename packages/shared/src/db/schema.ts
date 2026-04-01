@@ -226,6 +226,8 @@ export const tasks = pgTable("tasks", {
 
   mcpTools: text("mcp_tools").array().default(sql`'{}'`),
   retryCount: integer("retry_count").notNull().default(0),
+  pipelineId: text("pipeline_id"),
+  pipelineStepId: text("pipeline_step_id"),
   linkedIssueIds: text("linked_issue_ids").array(),
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
