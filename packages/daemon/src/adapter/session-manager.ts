@@ -1,7 +1,7 @@
 // packages/daemon/src/adapter/session-manager.ts
 import { eq, and } from "drizzle-orm";
 import { resolve } from "node:path";
-import { taskSessions } from "@orch/shared/db";
+import { taskSessions, heartbeatRuns } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { SessionParams } from "./types.js";
 
@@ -27,6 +27,13 @@ export interface ClearSessionInput {
   agentId: string;
   taskKey: string;
   adapterType: string;
+}
+
+export interface SessionStats {
+  runCount: number;
+  totalInputTokens: number;
+  sessionAgeHours: number;
+  latestResultText: string;
 }
 
 export class SessionManager {
@@ -96,5 +103,63 @@ export class SessionManager {
           eq(taskSessions.adapterType, input.adapterType),
         ),
       );
+  }
+
+  async getSessionStats(
+    agentId: string,
+    taskKey: string,
+    adapterType: string,
+  ): Promise<SessionStats | null> {
+    // Find the session
+    const rows = await this.db
+      .select()
+      .from(taskSessions)
+      .where(
+        and(
+          eq(taskSessions.agentId, agentId),
+          eq(taskSessions.taskKey, taskKey),
+          eq(taskSessions.adapterType, adapterType),
+        ),
+      );
+
+    if (rows.length === 0) return null;
+    const session = rows[0];
+
+    // Query runs since session creation
+    const runs = await this.db
+      .select()
+      .from(heartbeatRuns)
+      .where(
+        and(
+          eq(heartbeatRuns.agentId, agentId),
+          eq(heartbeatRuns.taskId, taskKey),
+        ),
+      );
+
+    // Filter to runs after session creation
+    const sessionRuns = runs.filter(
+      (r) => r.createdAt >= session.createdAt,
+    );
+
+    const totalInputTokens = sessionRuns.reduce((sum, r) => {
+      const usage = r.usageJson as { input_tokens?: number } | null;
+      return sum + (usage?.input_tokens ?? 0);
+    }, 0);
+
+    const sessionAgeHours =
+      (Date.now() - session.createdAt.getTime()) / (1000 * 60 * 60);
+
+    // Get latest result text
+    const latestRun = sessionRuns
+      .filter((r) => r.resultJson)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    const latestResultText = (latestRun?.resultJson as { text?: string })?.text ?? "";
+
+    return {
+      runCount: sessionRuns.length,
+      totalInputTokens,
+      sessionAgeHours,
+      latestResultText,
+    };
   }
 }
