@@ -63,3 +63,4 @@ export {
   DaemonConfigPatchSchema,
 } from "./daemon.js";
 export type { DaemonLogFilter, DaemonConfigPatch } from "./daemon.js";
+export { AddBundledAgentsSchema, type BundledAgent } from "./bundled-agents.js";

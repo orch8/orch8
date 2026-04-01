@@ -68,3 +68,8 @@ import type {
 
 export type CreateLogEntry = z.infer<typeof CreateLogEntrySchema>;
 export type LogFilter = z.infer<typeof LogFilterSchema>;
+
+// Bundled agent types
+import type { AddBundledAgentsSchema } from "../schemas/index.js";
+
+export type AddBundledAgents = z.infer<typeof AddBundledAgentsSchema>;
