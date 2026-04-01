@@ -3,6 +3,7 @@ import { FormField } from "../shared/FormField.js";
 import { MarkdownEditor } from "../shared/MarkdownEditor.js";
 import type { Agent } from "../../types.js";
 import type { UseMutationResult } from "@tanstack/react-query";
+import { useInstructionBundle, useBundleFiles, useBundleFileContent, useWriteBundleFile, useUpdateBundleMode } from "../../hooks/useInstructionBundle.js";
 
 interface PromptsTabProps {
   agent: Agent;
@@ -23,6 +24,19 @@ export function PromptsTab({ agent, projectId, updateAgent }: PromptsTabProps) {
   const [planPrompt, setPlanPrompt] = useState(agent.planPrompt ?? "");
   const [implementPrompt, setImplementPrompt] = useState(agent.implementPrompt ?? "");
   const [reviewPrompt, setReviewPrompt] = useState(agent.reviewPrompt ?? "");
+
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+
+  const { data: bundle } = useInstructionBundle(agent.id, projectId);
+  const { data: bundleFiles } = useBundleFiles(agent.id, projectId);
+  const { data: fileData } = useBundleFileContent(agent.id, projectId, selectedFile);
+  const writeFile = useWriteBundleFile(agent.id, projectId);
+  const updateMode = useUpdateBundleMode(agent.id, projectId);
+
+  useEffect(() => {
+    if (fileData?.content != null) setEditContent(fileData.content);
+  }, [fileData]);
 
   useEffect(() => {
     setSystemPrompt(agent.systemPrompt ?? "");
@@ -67,8 +81,60 @@ export function PromptsTab({ agent, projectId, updateAgent }: PromptsTabProps) {
         <MarkdownEditor value={bootstrapPromptTemplate} onChange={setBootstrapPromptTemplate} placeholder="Enter bootstrap prompt..." />
       </FormField>
 
-      <FormField label="Instructions File Path" description="Path to an instructions file on disk">
-        <input value={instructionsFilePath} onChange={(e) => setInstructionsFilePath(e.target.value)} placeholder="/path/to/instructions.md" className={inputClass} />
+      {/* Instructions Bundle */}
+      <FormField label="Instructions Bundle" description="Manages agent instruction files">
+        {bundle ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-zinc-400">Mode:</span>
+              <select
+                value={bundle.mode}
+                onChange={(e) => updateMode.mutate({ mode: e.target.value })}
+                className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-100"
+              >
+                <option value="managed">Managed</option>
+                <option value="external">External</option>
+              </select>
+            </div>
+
+            {bundleFiles && bundleFiles.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-zinc-400">Files:</span>
+                {bundleFiles.map((f: any) => (
+                  <button
+                    key={f.path}
+                    onClick={() => setSelectedFile(f.path)}
+                    className={`text-left text-xs px-2 py-1 rounded ${
+                      selectedFile === f.path ? "bg-zinc-700 text-zinc-100" : "text-zinc-400 hover:bg-zinc-800"
+                    }`}
+                  >
+                    {f.path} {f.path === bundle.entryFile && "(entry)"}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {selectedFile && bundle.mode === "managed" && (
+              <div className="flex flex-col gap-1">
+                <MarkdownEditor value={editContent} onChange={setEditContent} />
+                <button
+                  onClick={() => writeFile.mutate({ path: selectedFile, content: editContent })}
+                  disabled={writeFile.isPending}
+                  className="self-start rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
+                >
+                  {writeFile.isPending ? "Saving..." : "Save File"}
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <input
+            value={instructionsFilePath}
+            onChange={(e) => setInstructionsFilePath(e.target.value)}
+            placeholder="/path/to/AGENTS.md"
+            className={inputClass}
+          />
+        )}
       </FormField>
 
       <h3 className="mt-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">Phase Prompts</h3>
