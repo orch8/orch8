@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { deriveTrustLevel } from "../services/project-skill.service.js";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { and, eq } from "drizzle-orm";
+import { deriveTrustLevel, ProjectSkillService } from "../services/project-skill.service.js";
+import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { projects, projectSkills } from "@orch/shared/db";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 describe("deriveTrustLevel", () => {
   it("returns markdown_only for only .md files", () => {
@@ -36,5 +42,222 @@ describe("deriveTrustLevel", () => {
 
   it("returns markdown_only for empty array", () => {
     expect(deriveTrustLevel([])).toBe("markdown_only");
+  });
+});
+
+describe("ProjectSkillService", () => {
+  let testDb: TestDb;
+  let service: ProjectSkillService;
+  let projectId: string;
+  let projectHomeDir: string;
+
+  beforeAll(async () => {
+    testDb = await setupTestDb();
+  }, 60_000);
+
+  afterAll(async () => {
+    await teardownTestDb(testDb);
+  });
+
+  beforeEach(async () => {
+    // Clean tables
+    await testDb.db.delete(projectSkills);
+    await testDb.db.delete(projects);
+
+    // Create temp dir for skill files
+    projectHomeDir = await mkdtemp(join(tmpdir(), "orch-test-skills-"));
+    const skillsDir = join(projectHomeDir, ".orchestrator", "skills");
+    await mkdir(skillsDir, { recursive: true });
+
+    // Insert a test project
+    const [proj] = await testDb.db.insert(projects).values({
+      name: "Test Project",
+      slug: "test-project",
+      homeDir: projectHomeDir,
+      worktreeDir: join(projectHomeDir, "worktrees"),
+    }).returning();
+    projectId = proj.id;
+
+    service = new ProjectSkillService(testDb.db);
+  });
+
+  afterEach(async () => {
+    await rm(projectHomeDir, { recursive: true, force: true });
+  });
+
+  describe("create", () => {
+    it("creates a skill from a local directory with SKILL.md", async () => {
+      const skillDir = join(projectHomeDir, ".orchestrator", "skills", "my-skill");
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, "SKILL.md"), [
+        "---",
+        "name: My Skill",
+        "description: A test skill",
+        "---",
+        "",
+        "# My Skill",
+        "",
+        "Do the thing.",
+      ].join("\n"));
+
+      const skill = await service.create(projectId, {
+        slug: "my-skill",
+        sourceLocator: skillDir,
+      });
+
+      expect(skill.slug).toBe("my-skill");
+      expect(skill.name).toBe("My Skill");
+      expect(skill.description).toBe("A test skill");
+      expect(skill.trustLevel).toBe("markdown_only");
+      expect(skill.markdown).toContain("Do the thing.");
+      expect(skill.sourceType).toBe("local_path");
+    });
+
+    it("derives scripts_executables trust level when .sh exists", async () => {
+      const skillDir = join(projectHomeDir, ".orchestrator", "skills", "scripted");
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, "SKILL.md"), "---\nname: Scripted\n---\n# S\nContent");
+      await writeFile(join(skillDir, "setup.sh"), "#!/bin/bash\necho hi");
+
+      const skill = await service.create(projectId, {
+        slug: "scripted",
+        sourceLocator: skillDir,
+      });
+
+      expect(skill.trustLevel).toBe("scripts_executables");
+    });
+  });
+
+  describe("list", () => {
+    it("returns all skills and auto-prunes missing directories", async () => {
+      // Insert two skills: one with a valid dir, one with a missing dir
+      const validDir = join(projectHomeDir, ".orchestrator", "skills", "valid");
+      await mkdir(validDir, { recursive: true });
+      await writeFile(join(validDir, "SKILL.md"), "---\nname: Valid\n---\n# V\nContent");
+
+      await service.create(projectId, { slug: "valid", sourceLocator: validDir });
+
+      // Insert a stale skill pointing to a non-existent dir
+      await testDb.db.insert(projectSkills).values({
+        projectId,
+        slug: "stale",
+        name: "Stale",
+        markdown: "gone",
+        sourceLocator: "/nonexistent/path",
+        trustLevel: "markdown_only",
+      });
+
+      const skills = await service.list(projectId);
+
+      expect(skills).toHaveLength(1);
+      expect(skills[0].slug).toBe("valid");
+    });
+  });
+
+  describe("get", () => {
+    it("retrieves a skill by slug", async () => {
+      const skillDir = join(projectHomeDir, ".orchestrator", "skills", "lookup");
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, "SKILL.md"), "---\nname: Lookup\n---\n# L\nContent");
+
+      const created = await service.create(projectId, { slug: "lookup", sourceLocator: skillDir });
+      const fetched = await service.get(projectId, "lookup");
+
+      expect(fetched).not.toBeNull();
+      expect(fetched!.id).toBe(created.id);
+    });
+
+    it("retrieves a skill by id", async () => {
+      const skillDir = join(projectHomeDir, ".orchestrator", "skills", "byid");
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, "SKILL.md"), "---\nname: ById\n---\n# B\nContent");
+
+      const created = await service.create(projectId, { slug: "byid", sourceLocator: skillDir });
+      const fetched = await service.get(projectId, created.id);
+
+      expect(fetched).not.toBeNull();
+      expect(fetched!.slug).toBe("byid");
+    });
+
+    it("returns null for unknown slug", async () => {
+      const fetched = await service.get(projectId, "nope");
+      expect(fetched).toBeNull();
+    });
+  });
+
+  describe("delete", () => {
+    it("removes the DB row and strips slug from agents desiredSkills", async () => {
+      const skillDir = join(projectHomeDir, ".orchestrator", "skills", "doomed");
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, "SKILL.md"), "---\nname: Doomed\n---\n# D\nContent");
+
+      await service.create(projectId, { slug: "doomed", sourceLocator: skillDir });
+
+      // Insert an agent that references this skill
+      const { agents: agentsTable } = await import("@orch/shared/db");
+      await testDb.db.insert(agentsTable).values({
+        id: "agent-1",
+        projectId,
+        name: "Test Agent",
+        role: "engineer",
+        status: "active",
+        model: "opus",
+        maxTurns: 10,
+        maxConcurrentRuns: 1,
+        heartbeatEnabled: false,
+        heartbeatIntervalSec: 60,
+        wakeOnAssignment: true,
+        wakeOnOnDemand: true,
+        wakeOnAutomation: false,
+        budgetSpentUsd: 0,
+        desiredSkills: ["doomed", "other-skill"],
+      });
+
+      await service.delete(projectId, "doomed");
+
+      // Verify skill row is gone
+      const skill = await service.get(projectId, "doomed");
+      expect(skill).toBeNull();
+
+      // Verify agent's desiredSkills no longer contains "doomed"
+      const [agent] = await testDb.db
+        .select()
+        .from(agentsTable)
+        .where(and(eq(agentsTable.id, "agent-1"), eq(agentsTable.projectId, projectId)));
+      expect(agent.desiredSkills).toEqual(["other-skill"]);
+    });
+  });
+
+  describe("syncFromDisk", () => {
+    it("upserts skills from disk and prunes stale rows", async () => {
+      // Create two skill directories on disk
+      const skillsBase = join(projectHomeDir, ".orchestrator", "skills");
+      const s1 = join(skillsBase, "alpha");
+      const s2 = join(skillsBase, "beta");
+      await mkdir(s1, { recursive: true });
+      await mkdir(s2, { recursive: true });
+      await writeFile(join(s1, "SKILL.md"), "---\nname: Alpha\ndescription: First\n---\n# Alpha\nA content");
+      await writeFile(join(s2, "SKILL.md"), "---\nname: Beta\n---\n# Beta\nB content");
+
+      // Insert a stale skill in DB
+      await testDb.db.insert(projectSkills).values({
+        projectId,
+        slug: "removed",
+        name: "Removed",
+        markdown: "gone",
+        sourceLocator: join(skillsBase, "removed"),
+        trustLevel: "markdown_only",
+      });
+
+      await service.syncFromDisk(projectId, projectHomeDir);
+
+      const skills = await service.list(projectId);
+      const slugs = skills.map((s) => s.slug).sort();
+      expect(slugs).toEqual(["alpha", "beta"]);
+
+      // Stale "removed" should be pruned
+      const stale = await service.get(projectId, "removed");
+      expect(stale).toBeNull();
+    });
   });
 });
