@@ -1,5 +1,5 @@
 {
-  "id": "a06eef18-8b1c-4667-b62e-6f43cd5b7197",
+  "id": "b28b72a5-2b71-4f55-bed8-93329a1d61a3",
   "prevId": "c9287b63-0c60-4f68-99d7-cd89577e109c",
   "version": "7",
   "dialect": "postgresql",
@@ -2434,6 +2434,42 @@
           "columns": [
             {
               "expression": "pipeline_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pipeline_steps_pipeline_order_idx": {
+          "name": "pipeline_steps_pipeline_order_idx",
+          "columns": [
+            {
+              "expression": "pipeline_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pipeline_steps_task_id_idx": {
+          "name": "pipeline_steps_task_id_idx",
+          "columns": [
+            {
+              "expression": "task_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

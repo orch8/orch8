@@ -226,8 +226,8 @@ export const tasks = pgTable("tasks", {
 
   mcpTools: text("mcp_tools").array().default(sql`'{}'`),
   retryCount: integer("retry_count").notNull().default(0),
-  pipelineId: text("pipeline_id"),
-  pipelineStepId: text("pipeline_step_id"),
+  pipelineId: text("pipeline_id"), // FK to pipelines — defined in migration SQL to avoid circular imports
+  pipelineStepId: text("pipeline_step_id"), // FK to pipeline_steps — defined in migration SQL to avoid circular imports
   linkedIssueIds: text("linked_issue_ids").array(),
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

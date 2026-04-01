@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
-  pgTable, pgEnum, text, boolean, integer, timestamp, jsonb, index,
+  pgTable, pgEnum, text, boolean, integer, timestamp, jsonb, index, uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { projects } from "./schema.js";
 
@@ -56,8 +56,8 @@ export const pipelineSteps = pgTable("pipeline_steps", {
   pipelineId: text("pipeline_id").notNull().references(() => pipelines.id, { onDelete: "cascade" }),
   order: integer("order").notNull(),
   label: text("label").notNull(),
-  taskId: text("task_id"),
-  agentId: text("agent_id"),
+  taskId: text("task_id"), // FK to tasks — defined in migration SQL to avoid circular imports
+  agentId: text("agent_id"), // No FK: agents use composite PK (id, projectId)
   promptOverride: text("prompt_override"),
   outputFilePath: text("output_file_path"),
   outputSummary: text("output_summary"),
@@ -66,4 +66,6 @@ export const pipelineSteps = pgTable("pipeline_steps", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("pipeline_steps_pipeline_id_idx").on(table.pipelineId),
+  uniqueIndex("pipeline_steps_pipeline_order_idx").on(table.pipelineId, table.order),
+  index("pipeline_steps_task_id_idx").on(table.taskId),
 ]);

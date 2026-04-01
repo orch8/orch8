@@ -46,6 +46,8 @@ ALTER TABLE "pipeline_templates" ADD CONSTRAINT "pipeline_templates_project_id_p
 ALTER TABLE "pipelines" ADD CONSTRAINT "pipelines_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "pipelines" ADD CONSTRAINT "pipelines_template_id_pipeline_templates_id_fk" FOREIGN KEY ("template_id") REFERENCES "public"."pipeline_templates"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "pipeline_steps_pipeline_id_idx" ON "pipeline_steps" USING btree ("pipeline_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "pipeline_steps_pipeline_order_idx" ON "pipeline_steps" USING btree ("pipeline_id","order");--> statement-breakpoint
+CREATE INDEX "pipeline_steps_task_id_idx" ON "pipeline_steps" USING btree ("task_id");--> statement-breakpoint
 CREATE INDEX "pipelines_project_id_idx" ON "pipelines" USING btree ("project_id");--> statement-breakpoint
 ALTER TABLE "tasks" ADD CONSTRAINT "tasks_pipeline_id_fk" FOREIGN KEY ("pipeline_id") REFERENCES "pipelines"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "tasks" ADD CONSTRAINT "tasks_pipeline_step_id_fk" FOREIGN KEY ("pipeline_step_id") REFERENCES "pipeline_steps"("id") ON DELETE SET NULL;
