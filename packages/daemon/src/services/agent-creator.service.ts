@@ -264,6 +264,30 @@ export class AgentCreatorService {
     if (proc) proc.kill("SIGTERM");
   }
 
+  async sendMessage(sessionId: string, content: string): Promise<void> {
+    this.logger?.info({ sessionId, contentLength: content.length }, "agent-creator: sendMessage called");
+
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error("No active creator session with this ID");
+    }
+
+    if (session.process) {
+      throw new Error("Agent is still processing the previous message");
+    }
+
+    session.transcript.push(`[user] ${content}`);
+    this.spawnTurn(session, content);
+    this.resetIdleTimer(session);
+    this.logger?.info({ sessionId }, "agent-creator: follow-up turn spawned");
+  }
+
+  getTranscript(sessionId: string): string | null {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    return session.transcript.join("\n\n");
+  }
+
   async buildSystemPrompt(projectId: string): Promise<string> {
     // Query existing agents
     const existingAgents = await this.db

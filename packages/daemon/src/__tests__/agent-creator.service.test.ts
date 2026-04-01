@@ -157,4 +157,43 @@ describe("AgentCreatorService", () => {
       });
     });
   });
+
+  describe("sendMessage", () => {
+    it("spawns a --continue process for follow-up messages", async () => {
+      const sessionId = await service.startSession(projectId, "/tmp/ct");
+      lastMockProcess.emit("close", 0, null);
+
+      const callsBefore = (mockSpawn as ReturnType<typeof vi.fn>).mock.calls.length;
+      await service.sendMessage(sessionId, "I want a code reviewer");
+
+      const newCalls = (mockSpawn as ReturnType<typeof vi.fn>).mock.calls.slice(callsBefore);
+      expect(newCalls).toHaveLength(1);
+      expect(newCalls[0][1]).toContain("--continue");
+      expect(newCalls[0][1]).toContain("I want a code reviewer");
+    });
+
+    it("rejects if previous turn is still running", async () => {
+      const sessionId = await service.startSession(projectId, "/tmp/ct");
+
+      await expect(
+        service.sendMessage(sessionId, "Hello"),
+      ).rejects.toThrow("still processing");
+    });
+
+    it("throws if no active session", async () => {
+      await expect(
+        service.sendMessage("nonexistent", "Hi"),
+      ).rejects.toThrow("No active creator session");
+    });
+
+    it("appends user message to transcript", async () => {
+      const sessionId = await service.startSession(projectId, "/tmp/ct");
+      lastMockProcess.emit("close", 0, null);
+
+      await service.sendMessage(sessionId, "Make a QA bot");
+
+      const transcript = service.getTranscript(sessionId);
+      expect(transcript).toContain("[user] Make a QA bot");
+    });
+  });
 });
