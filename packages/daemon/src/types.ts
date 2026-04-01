@@ -11,6 +11,7 @@ import type { SummaryService } from "./services/summary.service.js";
 import type { MemoryExtractionService } from "./services/memory-extraction.service.js";
 import type { BroadcastService } from "./services/broadcast.service.js";
 import type { NotificationService } from "./services/notification.service.js";
+import type { SeedingService } from "./services/seeding.service.js";
 
 export type SchemaDb = PostgresJsDatabase<typeof schema>;
 
@@ -30,6 +31,7 @@ declare module "fastify" {
     notificationService: NotificationService;
     projectSkillService: import("./services/project-skill.service.js").ProjectSkillService;
     instructionBundleService: import("./services/instruction-bundle.service.js").InstructionBundleService;
+    seedingService: SeedingService;
   }
   interface FastifyRequest {
     agent?: typeof schema.agents.$inferSelect;

@@ -41,6 +41,8 @@ import { projectSkillRoutes } from "./api/routes/project-skills.js";
 import { ProjectSkillService } from "./services/project-skill.service.js";
 import { instructionBundleRoutes } from "./api/routes/instruction-bundles.js";
 import { InstructionBundleService } from "./services/instruction-bundle.service.js";
+import { SeedingService } from "./services/seeding.service.js";
+import { bundledAgentRoutes } from "./api/routes/bundled-agents.js";
 import type { GlobalConfig } from "./config/schema.js";
 import "./types.js";
 
@@ -145,6 +147,10 @@ export function buildServer(options: ServerOptions = {}) {
     const projectService = new ProjectService(dbClient.db);
     app.decorate("projectService", projectService);
 
+    // Seeding service
+    const seedingService = new SeedingService();
+    app.decorate("seedingService", seedingService);
+
     // Memory service
     const memoryService = new MemoryService(dbClient.db);
     app.decorate("memoryService", memoryService);
@@ -217,6 +223,7 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(notificationRoutes);
     app.register(projectSkillRoutes);
     app.register(instructionBundleRoutes);
+    app.register(bundledAgentRoutes);
   }
 
   app.register(websocketRoutes);
