@@ -1,11 +1,13 @@
+// packages/dashboard/src/components/agent-editor/AgentWizard.tsx
 import { useState } from "react";
 import { WizardStepper } from "../shared/WizardStepper.js";
-import { TemplateStep, type AgentTemplate, AGENT_TEMPLATES } from "./TemplateStep.js";
+import { TemplateStep } from "./TemplateStep.js";
 import { IdentityStep, type IdentityData } from "./IdentityStep.js";
 import { PromptsStep, type PromptsData } from "./PromptsStep.js";
 import { PermissionsStep, type PermissionsData } from "./PermissionsStep.js";
 import { BudgetStep, type BudgetData } from "./BudgetStep.js";
 import { useCreateAgent, useAgents } from "../../hooks/useAgents.js";
+import type { BundledAgent } from "@orch/shared";
 
 interface AgentWizardProps {
   projectId: string;
@@ -17,8 +19,10 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
   const createAgent = useCreateAgent();
   const { data: existingAgents } = useAgents(projectId);
 
-  // Wizard state
+  // Store both the selected ID and the full bundled agent data
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [selectedBundled, setSelectedBundled] = useState<BundledAgent | null>(null);
+
   const [identity, setIdentity] = useState<IdentityData>({
     name: "",
     slug: "",
@@ -43,32 +47,43 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
     autoPauseThreshold: "90",
   });
 
-  function handleTemplateSelect(template: AgentTemplate) {
-    setSelectedTemplate(template.key);
-    // Pre-fill from template
+  function handleTemplateSelect(agent: BundledAgent) {
+    setSelectedTemplate(agent.id);
+    setSelectedBundled(agent.id === "blank" ? null : agent);
+
+    // Pre-fill identity from bundled data
     setIdentity((prev) => ({
       ...prev,
-      model: template.defaults.model,
+      name: agent.name,
+      slug: agent.id === "blank" ? "" : agent.id,
+      model: agent.model,
+      effort: agent.effort ?? "medium",
+      maxTurns: agent.maxTurns,
     }));
-    setPrompts((prev) => ({
-      ...prev,
-      systemPrompt: template.defaults.systemPrompt,
-    }));
+
+    // Pre-fill ALL prompt fields from bundled data
+    setPrompts({
+      instructionsFilePath: "",
+      systemPrompt: agent.systemPrompt ?? "",
+      promptTemplate: agent.promptTemplate ?? "",
+      bootstrapPromptTemplate: agent.bootstrapPromptTemplate ?? "",
+      skillPaths: agent.skills ?? [],
+    });
+
+    // Permissions stay at defaults — role defaults are applied server-side
     setPermissions((prev) => ({
       ...prev,
-      canCreateTasks: template.defaults.canCreateTasks,
-      canMoveTo: template.defaults.canMoveTo,
+      canCreateTasks: false,
+      canMoveTo: [],
     }));
   }
 
   async function handleCreate() {
-    const selectedTemplateObj = AGENT_TEMPLATES.find((t) => t.key === selectedTemplate);
-
     await createAgent.mutateAsync({
       id: identity.slug,
       projectId,
       name: identity.name,
-      role: (selectedTemplateObj?.defaults.role ?? "custom") as any,
+      role: (selectedBundled?.role ?? "custom") as any,
       model: identity.model,
       effort: identity.effort || undefined,
       maxTurns: identity.maxTurns,
@@ -80,6 +95,14 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
       canCreateTasks: permissions.canCreateTasks,
       canMoveTo: permissions.canMoveTo as any,
       canAssignTo: permissions.canAssignTo,
+      // Include phase prompts from bundled data
+      researchPrompt: selectedBundled?.researchPrompt || undefined,
+      planPrompt: selectedBundled?.planPrompt || undefined,
+      implementPrompt: selectedBundled?.implementPrompt || undefined,
+      reviewPrompt: selectedBundled?.reviewPrompt || undefined,
+      // Include heartbeat config from bundled data
+      heartbeatEnabled: selectedBundled?.heartbeatEnabled,
+      heartbeatIntervalSec: selectedBundled?.heartbeatIntervalSec,
       budgetLimitUsd: budget.totalBudgetLimit ? parseFloat(budget.totalBudgetLimit) : undefined,
       autoPauseThreshold: budget.autoPauseThreshold ? parseInt(budget.autoPauseThreshold, 10) : undefined,
     });
@@ -92,7 +115,7 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
       label: "Template",
       content: (
         <TemplateStep
-          selectedTemplate={selectedTemplate}
+          selected={selectedTemplate}
           onSelect={handleTemplateSelect}
         />
       ),
