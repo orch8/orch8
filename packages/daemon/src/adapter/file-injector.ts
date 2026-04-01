@@ -15,8 +15,12 @@ export async function createSkillsDir(skillPaths: string[]): Promise<string | nu
   await mkdir(skillsDir, { recursive: true });
 
   for (const srcPath of skillPaths) {
-    const name = basename(srcPath);
-    await symlink(srcPath, join(skillsDir, name));
+    // Use parent directory name as subdirectory to avoid collisions
+    // (all skill files are named SKILL.md, so basename alone would collide)
+    const parentName = basename(dirname(srcPath));
+    const skillSubDir = join(skillsDir, parentName);
+    await mkdir(skillSubDir, { recursive: true });
+    await symlink(srcPath, join(skillSubDir, basename(srcPath)));
   }
 
   return tempDir;

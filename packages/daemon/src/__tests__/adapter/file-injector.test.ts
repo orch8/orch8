@@ -19,16 +19,18 @@ afterEach(async () => {
 });
 
 describe("createSkillsDir", () => {
-  it("creates temp dir with symlinks under .claude/skills/", async () => {
-    // Set up source skill files
+  it("creates temp dir with symlinks under .claude/skills/<parent>/", async () => {
+    // Set up source skill files (mimic real layout: <skill-name>/SKILL.md)
     const srcDir = await mkdtemp(join(tmpdir(), "skill-src-"));
     tempPaths.push(srcDir);
-    await writeFile(join(srcDir, "skill-a.md"), "# Skill A");
-    await writeFile(join(srcDir, "skill-b.md"), "# Skill B");
+    await mkdir(join(srcDir, "tdd"));
+    await mkdir(join(srcDir, "verification"));
+    await writeFile(join(srcDir, "tdd", "SKILL.md"), "# TDD");
+    await writeFile(join(srcDir, "verification", "SKILL.md"), "# Verification");
 
     const result = await createSkillsDir([
-      join(srcDir, "skill-a.md"),
-      join(srcDir, "skill-b.md"),
+      join(srcDir, "tdd", "SKILL.md"),
+      join(srcDir, "verification", "SKILL.md"),
     ]);
     expect(result).not.toBeNull();
     tempPaths.push(result!);
@@ -37,11 +39,12 @@ describe("createSkillsDir", () => {
     const skillsPath = join(result!, ".claude", "skills");
     expect(existsSync(skillsPath)).toBe(true);
 
-    // Verify symlinks
+    // Verify symlinks in subdirectories (avoids SKILL.md name collisions)
     const entries = readdirSync(skillsPath);
-    expect(entries).toContain("skill-a.md");
-    expect(entries).toContain("skill-b.md");
-    expect(lstatSync(join(skillsPath, "skill-a.md")).isSymbolicLink()).toBe(true);
+    expect(entries).toContain("tdd");
+    expect(entries).toContain("verification");
+    expect(lstatSync(join(skillsPath, "tdd", "SKILL.md")).isSymbolicLink()).toBe(true);
+    expect(lstatSync(join(skillsPath, "verification", "SKILL.md")).isSymbolicLink()).toBe(true);
   });
 
   it("returns null when given empty array", async () => {
