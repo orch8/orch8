@@ -219,6 +219,7 @@ export const tasks = pgTable("tasks", {
 
   mcpTools: text("mcp_tools").array().default(sql`'{}'`),
   retryCount: integer("retry_count").notNull().default(0),
+  linkedIssueIds: text("linked_issue_ids").array(),
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -329,6 +330,7 @@ export const wakeupRequests = pgTable("wakeup_requests", {
   source: wakeupSourceEnum("source").notNull(),
   triggerDetail: text("trigger_detail"),
   reason: text("reason"),
+  commentId: text("comment_id"),
   payload: jsonb("payload"),
 
   status: wakeupStatusEnum("status").notNull().default("queued"),
