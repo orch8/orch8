@@ -59,7 +59,7 @@ describe("AgentService", () => {
         heartbeatIntervalSec: 120,
         canCreateTasks: true,
         canAssignTo: ["fe-eng", "be-eng"],
-        canMoveTo: ["in_progress", "review"],
+        canMoveTo: ["in_progress", "done"],
         systemPrompt: "You are the CTO.",
         budgetLimitUsd: 50.0,
       });
@@ -69,7 +69,7 @@ describe("AgentService", () => {
       expect(agent.heartbeatIntervalSec).toBe(120);
       expect(agent.canCreateTasks).toBe(true);
       expect(agent.canAssignTo).toEqual(["fe-eng", "be-eng"]);
-      expect(agent.canMoveTo).toEqual(["in_progress", "review"]);
+      expect(agent.canMoveTo).toEqual(["in_progress", "done"]);
       expect(agent.budgetLimitUsd).toBe(50.0);
     });
 

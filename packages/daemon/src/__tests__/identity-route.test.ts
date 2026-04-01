@@ -47,7 +47,7 @@ describe("Identity Route", () => {
       name: "Frontend Engineer",
       role: "engineer",
       canCreateTasks: true,
-      canMoveTo: ["review", "done"],
+      canMoveTo: ["done"],
       canAssignTo: ["qa-eng"],
       budgetLimitUsd: 50,
       budgetSpentUsd: 10,
@@ -68,7 +68,7 @@ describe("Identity Route", () => {
     expect(body.agent.id).toBe("fe-eng");
     expect(body.agent.role).toBe("engineer");
     expect(body.permissions.canCreateTasks).toBe(true);
-    expect(body.permissions.canMoveTo).toEqual(["review", "done"]);
+    expect(body.permissions.canMoveTo).toEqual(["done"]);
     expect(body.permissions.canAssignTo).toEqual(["qa-eng"]);
     expect(body.project.id).toBe(projectId);
     expect(body.project.budgetLimitUsd).toBe(100);

@@ -84,7 +84,7 @@ describe("ComplexPhaseService", () => {
       expect(result.nextPhase).toBe("review");
     });
 
-    it("completes review phase → moves to review column, null nextPhase", async () => {
+    it("completes review phase → moves to done column, null nextPhase", async () => {
       const [task] = await testDb.db.insert(tasks).values({
         projectId,
         title: "Complex task",
@@ -95,7 +95,7 @@ describe("ComplexPhaseService", () => {
       const result = await service.completePhase(task.id, "Review report");
 
       expect(result.task.reviewOutput).toBe("Review report");
-      expect(result.task.column).toBe("review");
+      expect(result.task.column).toBe("done");
       expect(result.nextPhase).toBeNull();
     });
 

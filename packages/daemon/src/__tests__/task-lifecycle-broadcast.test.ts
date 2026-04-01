@@ -21,7 +21,7 @@ describe("TaskLifecycleService broadcast", () => {
     const sockets = new Set([mockSocket]) as unknown as Set<import("ws").WebSocket>;
     broadcastService = new BroadcastService(sockets);
 
-    service = new TaskLifecycleService(testDb.db, taskService, worktreeService, {}, broadcastService);
+    service = new TaskLifecycleService(testDb.db, taskService, worktreeService, broadcastService);
   }, 60_000);
 
   afterAll(async () => {
@@ -51,13 +51,13 @@ describe("TaskLifecycleService broadcast", () => {
       column: "in_progress",
     }).returning();
 
-    await service.transition(task.id, "review");
+    await service.transition(task.id, "done");
 
     expect(mockSocket.send).toHaveBeenCalledOnce();
     const payload = JSON.parse(mockSocket.send.mock.calls[0][0]);
     expect(payload.type).toBe("task_transitioned");
     expect(payload.taskId).toBe(task.id);
     expect(payload.from).toBe("in_progress");
-    expect(payload.to).toBe("review");
+    expect(payload.to).toBe("done");
   });
 });

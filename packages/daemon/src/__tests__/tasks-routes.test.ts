@@ -213,7 +213,7 @@ describe("Task API Routes", () => {
   });
 
   describe("POST /api/tasks/:id/complete", () => {
-    it("signals quick task completion by moving to review", async () => {
+    it("signals quick task completion by moving to done", async () => {
       const [task] = await testDb.db.insert(tasks).values({
         projectId,
         title: "Complete me",
@@ -229,7 +229,7 @@ describe("Task API Routes", () => {
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
-      expect(body.column).toBe("review");
+      expect(body.column).toBe("done");
     });
 
     it("signals complex task phase completion", async () => {

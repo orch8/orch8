@@ -105,12 +105,12 @@ describe("TaskLifecycleService", () => {
         projectId,
         title: "Rework",
         taskType: "quick",
-        column: "review",
+        column: "backlog",
         worktreePath: "/tmp/lifecycle-wt/task-existing",
         branch: "task/existing/rework",
       }).returning();
 
-      // review → in_progress (rejection)
+      // backlog → in_progress (re-dispatch with existing worktree)
       await lifecycleService.transition(task.id, "in_progress", {
         agentId: "agent-1",
         runId: "run-1",
@@ -124,10 +124,10 @@ describe("TaskLifecycleService", () => {
       );
     });
 
-    it("moves in_progress to review and clears execution lock", async () => {
+    it("moves in_progress to done and clears execution lock", async () => {
       const [task] = await testDb.db.insert(tasks).values({
         projectId,
-        title: "Review me",
+        title: "Complete me",
         taskType: "quick",
         column: "in_progress",
         executionAgentId: "agent-1",
@@ -135,15 +135,15 @@ describe("TaskLifecycleService", () => {
         executionLockedAt: new Date(),
       }).returning();
 
-      const updated = await lifecycleService.transition(task.id, "review");
+      const updated = await lifecycleService.transition(task.id, "done");
 
-      expect(updated.column).toBe("review");
+      expect(updated.column).toBe("done");
       expect(updated.executionAgentId).toBeNull();
       expect(updated.executionRunId).toBeNull();
       expect(updated.executionLockedAt).toBeNull();
     });
 
-    it("moves verification to done, removes worktree, and unblocks dependents", async () => {
+    it("moves in_progress to done, removes worktree, and unblocks dependents", async () => {
       // Create a blocked task that depends on the first
       const main = await taskService.create({
         title: "Main task",
@@ -159,7 +159,9 @@ describe("TaskLifecycleService", () => {
       await taskService.addDependency(blocked.id, main.id);
       await testDb.db.update(tasks).set({ column: "blocked" }).where(eq(tasks.id, blocked.id));
       await testDb.db.update(tasks).set({
-        column: "verification",
+        column: "in_progress",
+        executionAgentId: "agent-1",
+        executionRunId: "run-1",
         worktreePath: "/tmp/lifecycle-wt/task-main",
         branch: "task/main/main-task",
       }).where(eq(tasks.id, main.id));

@@ -204,7 +204,7 @@ describe("SchedulerService", () => {
   });
 
   describe("enhanced tick loop", () => {
-    it("tick runs tickTimers, reapOrphanedRuns, unblockResolved, and processVerificationQueue", async () => {
+    it("tick runs tickTimers, reapOrphanedRuns, and unblockResolved", async () => {
       // Setup: agent with heartbeat due
       const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
       await testDb.db.insert(agents).values({

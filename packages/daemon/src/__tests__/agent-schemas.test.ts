@@ -39,7 +39,7 @@ describe("Agent Schemas", () => {
         maxConcurrentRuns: 2,
         canAssignTo: ["fe-eng", "be-eng"],
         canCreateTasks: true,
-        canMoveTo: ["in_progress", "review"],
+        canMoveTo: ["in_progress", "done"],
         systemPrompt: "You are the CTO.",
         promptTemplate: "Review task: {{task.title}}",
         mcpTools: ["orchestrator-api"],

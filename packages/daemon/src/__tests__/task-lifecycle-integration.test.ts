@@ -46,7 +46,7 @@ describe("Task Lifecycle Integration", () => {
     vi.clearAllMocks();
   });
 
-  it("quick task: full lifecycle backlog → in_progress → review → verification → done", async () => {
+  it("quick task: full lifecycle backlog → in_progress → done", async () => {
     // Create task in backlog
     const task = await taskService.create({
       title: "Fix login bug",
@@ -80,72 +80,10 @@ describe("Task Lifecycle Integration", () => {
     });
     expect(comment.id).toMatch(/^cmt_/);
 
-    // Agent completes: in_progress → review
-    const reviewed = await lifecycleService.transition(task.id, "review");
-    expect(reviewed.column).toBe("review");
-    expect(reviewed.executionAgentId).toBeNull();
-
-    // QA approves: review → verification
-    const verifying = await lifecycleService.transition(task.id, "verification");
-    expect(verifying.column).toBe("verification");
-
-    // Verifier passes: verification → done
+    // Agent completes: in_progress → done
     const done = await lifecycleService.transition(task.id, "done");
     expect(done.column).toBe("done");
-  });
-
-  it("verification rejection: verification → in_progress → review cycle", async () => {
-    const [task] = await testDb.db.insert(tasks).values({
-      projectId,
-      title: "Flaky impl",
-      taskType: "quick",
-      column: "verification",
-      worktreePath: "/tmp/int-test-wt/task-existing",
-      branch: "task/existing/flaky-impl",
-    }).returning();
-
-    // Verifier fails: verification → in_progress
-    const reworked = await lifecycleService.transition(task.id, "in_progress", {
-      agentId: "engineer-1",
-      runId: "run-002",
-    });
-    expect(reworked.column).toBe("in_progress");
-    // Worktree should NOT be recreated
-    expect(execFn).not.toHaveBeenCalledWith(
-      "git",
-      expect.arrayContaining(["worktree", "add"]),
-      expect.any(Object),
-    );
-
-    // Agent fixes: in_progress → review
-    const reviewed = await lifecycleService.transition(task.id, "review");
-    expect(reviewed.column).toBe("review");
-  });
-
-  it("QA rejection: review → in_progress with comment", async () => {
-    const [task] = await testDb.db.insert(tasks).values({
-      projectId,
-      title: "Bad impl",
-      taskType: "quick",
-      column: "review",
-      worktreePath: "/tmp/int-test-wt/task-bad",
-      branch: "task/bad/bad-impl",
-    }).returning();
-
-    // QA leaves rejection comment
-    await commentService.create({
-      taskId: task.id,
-      author: "qa-agent",
-      body: "Edge case not handled",
-      type: "inline",
-    });
-
-    // Reject: review → in_progress
-    const reworked = await lifecycleService.transition(task.id, "in_progress", {
-      agentId: "engineer-1",
-      runId: "run-003",
-    });
-    expect(reworked.column).toBe("in_progress");
+    expect(done.executionAgentId).toBeNull();
   });
 
   it("dependency resolution: completing a task unblocks dependents", async () => {
@@ -162,9 +100,13 @@ describe("Task Lifecycle Integration", () => {
 
     await taskService.addDependency(blocked.id, dep.id);
     await testDb.db.update(tasks).set({ column: "blocked" }).where(eq(tasks.id, blocked.id));
-    await testDb.db.update(tasks).set({ column: "verification" }).where(eq(tasks.id, dep.id));
+    await testDb.db.update(tasks).set({
+      column: "in_progress",
+      executionAgentId: "agent-1",
+      executionRunId: "run-1",
+    }).where(eq(tasks.id, dep.id));
 
-    // Complete the dependency: verification → done
+    // Complete the dependency: in_progress → done
     await lifecycleService.transition(dep.id, "done");
 
     // Blocked task should now be in backlog
@@ -179,19 +121,9 @@ describe("Task Lifecycle Integration", () => {
       taskType: "quick",
     });
 
-    // backlog → done (skip everything)
+    // backlog → done (skip in_progress)
     await expect(
       lifecycleService.transition(task.id, "done"),
-    ).rejects.toThrow("Invalid transition");
-
-    // backlog → review (skip in_progress)
-    await expect(
-      lifecycleService.transition(task.id, "review"),
-    ).rejects.toThrow("Invalid transition");
-
-    // backlog → verification
-    await expect(
-      lifecycleService.transition(task.id, "verification"),
     ).rejects.toThrow("Invalid transition");
   });
 });

@@ -94,7 +94,7 @@ describe("Integration: Task Type Lifecycle", () => {
     });
     expect(completeRes.statusCode).toBe(200);
     const completed = JSON.parse(completeRes.body);
-    expect(completed.column).toBe("review");
+    expect(completed.column).toBe("done");
   });
 
   it("full complex task lifecycle: create → phase through research/plan/implement/review", async () => {
@@ -135,7 +135,7 @@ describe("Integration: Task Type Lifecycle", () => {
     });
     expect(JSON.parse(r3.body).task.complexPhase).toBe("review");
 
-    // Complete review → moves to review column
+    // Complete review → moves to done column
     const r4 = await app.inject({
       method: "POST",
       url: `/api/tasks/${task.id}/complete`,
@@ -143,7 +143,7 @@ describe("Integration: Task Type Lifecycle", () => {
       payload: { output: "Review: all looks good" },
     });
     const final = JSON.parse(r4.body);
-    expect(final.task.column).toBe("review");
+    expect(final.task.column).toBe("done");
     expect(final.nextPhase).toBeNull();
   });
 

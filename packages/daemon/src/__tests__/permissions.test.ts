@@ -116,7 +116,7 @@ describe("Permission Middleware", () => {
         projectId,
         name: "Mover",
         role: "engineer",
-        canMoveTo: ["review"],
+        canMoveTo: ["done"],
       });
 
       const app = buildApp("move_task");
@@ -127,7 +127,7 @@ describe("Permission Middleware", () => {
           "x-agent-id": "mover",
           "x-project-id": projectId,
         },
-        payload: { column: "review" },
+        payload: { column: "done" },
       });
 
       expect(response.statusCode).toBe(200);
@@ -140,7 +140,7 @@ describe("Permission Middleware", () => {
         projectId,
         name: "Limited",
         role: "engineer",
-        canMoveTo: ["review"],
+        canMoveTo: ["done"],
       });
 
       const app = buildApp("move_task");
@@ -151,7 +151,7 @@ describe("Permission Middleware", () => {
           "x-agent-id": "limited-mover",
           "x-project-id": projectId,
         },
-        payload: { column: "done" },
+        payload: { column: "in_progress" },
       });
 
       expect(response.statusCode).toBe(403);

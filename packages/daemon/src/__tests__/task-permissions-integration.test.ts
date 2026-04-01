@@ -44,7 +44,7 @@ describe("Task Routes Permission Enforcement", () => {
         role: "cto",
         canCreateTasks: true,
         canAssignTo: ["eng-agent"],
-        canMoveTo: ["in_progress", "review", "verification", "done"],
+        canMoveTo: ["in_progress", "done"],
       },
       {
         id: "eng-agent",
@@ -53,7 +53,7 @@ describe("Task Routes Permission Enforcement", () => {
         role: "engineer",
         canCreateTasks: false,
         canAssignTo: [],
-        canMoveTo: ["review"],
+        canMoveTo: ["done"],
       },
     ]);
 
@@ -177,7 +177,7 @@ describe("Task Routes Permission Enforcement", () => {
         projectId,
         title: "Move reject",
         taskType: "quick",
-        column: "review",
+        column: "backlog",
       }).returning();
 
       const response = await app.inject({
@@ -187,7 +187,7 @@ describe("Task Routes Permission Enforcement", () => {
           "x-agent-id": "eng-agent",
           "x-project-id": projectId,
         },
-        payload: { column: "done" },
+        payload: { column: "in_progress" },
       });
 
       expect(response.statusCode).toBe(403);
