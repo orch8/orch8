@@ -103,4 +103,58 @@ describe("AgentCreatorService", () => {
       expect(prompt).toContain("agent-config");
     });
   });
+
+  describe("startSession", () => {
+    it("spawns a process and returns a sessionId", async () => {
+      const sessionId = await service.startSession(projectId, "/tmp/ct");
+
+      expect(sessionId).toBeTruthy();
+      expect(typeof sessionId).toBe("string");
+      expect(mockSpawn).toHaveBeenCalled();
+      expect(service.hasActiveSession(sessionId)).toBe(true);
+    });
+
+    it("passes system prompt as --print argument", async () => {
+      const callsBefore = (mockSpawn as ReturnType<typeof vi.fn>).mock.calls.length;
+      await service.startSession(projectId, "/tmp/ct");
+
+      const spawnCall = (mockSpawn as ReturnType<typeof vi.fn>).mock.calls[callsBefore];
+      const args = spawnCall[1] as string[];
+      expect(args).toContain("--print");
+
+      const printIdx = args.indexOf("--print");
+      const prompt = args[printIdx + 1];
+      expect(prompt).toContain("agent configuration assistant");
+      expect(prompt).toContain("agent-a");
+    });
+
+    it("throws if project already has an active session", async () => {
+      await service.startSession(projectId, "/tmp/ct");
+
+      await expect(
+        service.startSession(projectId, "/tmp/ct"),
+      ).rejects.toThrow("already has an active");
+    });
+
+    it("broadcasts agent_creator_output events from stream-json", async () => {
+      await service.startSession(projectId, "/tmp/ct");
+      broadcasts.length = 0;
+
+      const line = JSON.stringify({
+        type: "assistant",
+        message: { content: [{ type: "text", text: "Hello! What kind of agent?" }] },
+      });
+      lastMockProcess.stdout!.push(Buffer.from(line + "\n"));
+
+      // Readable data events are emitted asynchronously; wait one tick
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(broadcasts).toHaveLength(1);
+      expect(broadcasts[0]).toEqual({
+        type: "agent_creator_output",
+        sessionId: expect.any(String),
+        chunk: "Hello! What kind of agent?",
+      });
+    });
+  });
 });

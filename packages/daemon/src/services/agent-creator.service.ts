@@ -96,6 +96,174 @@ export class AgentCreatorService {
     this.logger = logger;
   }
 
+  hasActiveSession(sessionId: string): boolean {
+    return this.sessions.has(sessionId);
+  }
+
+  hasActiveProjectSession(projectId: string): boolean {
+    return this.projectSessions.has(projectId);
+  }
+
+  getSessionByProject(projectId: string): string | null {
+    return this.projectSessions.get(projectId) ?? null;
+  }
+
+  async startSession(projectId: string, cwd: string): Promise<string> {
+    this.logger?.info({ projectId, cwd }, "agent-creator: startSession called");
+
+    if (this.projectSessions.has(projectId)) {
+      throw new Error(`Project ${projectId} already has an active creator session`);
+    }
+
+    const sessionId = randomUUID();
+    const systemPrompt = await this.buildSystemPrompt(projectId);
+
+    const session: AgentCreatorSession = {
+      sessionId,
+      projectId,
+      process: null,
+      transcript: [],
+      startedAt: new Date(),
+      cwd,
+      model: "claude-sonnet-4-20250514",
+      maxTurns: 50,
+      firstTurnDone: false,
+      stdoutBuffer: "",
+      idleTimer: null,
+    };
+
+    this.sessions.set(sessionId, session);
+    this.projectSessions.set(projectId, sessionId);
+    session.transcript.push(`[system] ${systemPrompt}`);
+
+    this.spawnTurn(session, systemPrompt);
+    this.resetIdleTimer(session);
+
+    this.logger?.info({ sessionId, projectId }, "agent-creator: session started");
+    return sessionId;
+  }
+
+  /** Spawn a one-shot `claude --print` process for a single turn. */
+  private spawnTurn(session: AgentCreatorSession, prompt: string): void {
+    const args = [
+      "--print", prompt,
+      "--output-format", "stream-json",
+      "--verbose",
+      "--model", session.model,
+      "--max-turns", String(session.maxTurns),
+    ];
+
+    if (session.firstTurnDone) {
+      args.push("--continue");
+    }
+
+    const mergedEnv = { ...process.env };
+    delete mergedEnv.CLAUDECODE;
+    delete mergedEnv.CLAUDE_CODE_ENTRYPOINT;
+    delete mergedEnv.CLAUDE_CODE_SESSION;
+    delete mergedEnv.CLAUDE_CODE_PARENT_SESSION;
+
+    const claudePath = resolveClaudePath();
+    this.logger?.info(
+      { sessionId: session.sessionId, claudePath, cwd: session.cwd, continue: session.firstTurnDone },
+      "agent-creator: spawning turn",
+    );
+
+    const proc = this.spawnFn(claudePath, args, {
+      cwd: session.cwd,
+      env: mergedEnv,
+      shell: false,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    session.process = proc;
+
+    proc.stdout!.on("data", (chunk: Buffer) => {
+      session.stdoutBuffer += chunk.toString();
+      const lines = session.stdoutBuffer.split("\n");
+      session.stdoutBuffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        const text = this.extractAssistantText(trimmed);
+        if (text) {
+          session.transcript.push(`[agent] ${text}`);
+          this.broadcast(session.projectId, {
+            type: "agent_creator_output",
+            sessionId: session.sessionId,
+            chunk: text,
+          });
+        }
+      }
+    });
+
+    proc.stderr!.on("data", (chunk: Buffer) => {
+      this.logger?.warn({ sessionId: session.sessionId, stderr: chunk.toString() }, "agent-creator: stderr");
+    });
+
+    proc.on("error", (err) => {
+      this.logger?.error({ sessionId: session.sessionId, err }, "agent-creator: process error");
+      session.process = null;
+    });
+
+    proc.on("close", (code, signal) => {
+      if (session.stdoutBuffer.trim()) {
+        const text = this.extractAssistantText(session.stdoutBuffer.trim());
+        if (text) {
+          session.transcript.push(`[agent] ${text}`);
+          this.broadcast(session.projectId, {
+            type: "agent_creator_output",
+            sessionId: session.sessionId,
+            chunk: text,
+          });
+        }
+        session.stdoutBuffer = "";
+      }
+
+      this.logger?.info({ sessionId: session.sessionId, code, signal }, "agent-creator: turn completed");
+      session.process = null;
+      session.firstTurnDone = true;
+    });
+  }
+
+  private extractAssistantText(line: string): string | null {
+    try {
+      const event = JSON.parse(line);
+      if (event.type !== "assistant" || !event.message?.content) return null;
+
+      const texts: string[] = [];
+      for (const block of event.message.content) {
+        if (block.type === "text" && block.text) {
+          texts.push(block.text);
+        }
+      }
+      return texts.length > 0 ? texts.join("") : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private resetIdleTimer(session: AgentCreatorSession): void {
+    if (session.idleTimer) clearTimeout(session.idleTimer);
+    session.idleTimer = setTimeout(() => {
+      this.logger?.info({ sessionId: session.sessionId }, "agent-creator: idle timeout, killing session");
+      this.cleanupSession(session.sessionId);
+    }, IDLE_TIMEOUT_MS);
+  }
+
+  private cleanupSession(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    if (session.idleTimer) clearTimeout(session.idleTimer);
+    const proc = session.process;
+    this.sessions.delete(sessionId);
+    this.projectSessions.delete(session.projectId);
+    if (proc) proc.kill("SIGTERM");
+  }
+
   async buildSystemPrompt(projectId: string): Promise<string> {
     // Query existing agents
     const existingAgents = await this.db
