@@ -113,6 +113,79 @@ export class TaskLifecycleService {
     return updated;
   }
 
+  /**
+   * Atomic task checkout: claim lock + transition to in_progress + create worktree.
+   * Returns 409-style error if locked by another agent. Idempotent for same agent.
+   */
+  async checkout(
+    taskId: string,
+    agentId: string,
+    runId: string,
+  ): Promise<Task> {
+    const task = await this.taskService.getById(taskId);
+    if (!task) throw new Error("Task not found");
+
+    // Idempotent: same agent already holds lock
+    if (task.executionAgentId === agentId) {
+      return task;
+    }
+
+    // Conflict: another agent holds lock
+    if (task.executionAgentId) {
+      throw new Error(`Checkout conflict: locked by ${task.executionAgentId}`);
+    }
+
+    // Cannot checkout completed tasks
+    if (task.column === "done") {
+      throw new Error("Cannot checkout completed task");
+    }
+
+    // Backlog or blocked → delegate to transition (handles lock + worktree)
+    if (task.column !== "in_progress") {
+      return this.transition(taskId, "in_progress", { agentId, runId });
+    }
+
+    // Already in_progress but unlocked → just set the lock
+    const [updated] = await this.db
+      .update(tasks)
+      .set({
+        executionAgentId: agentId,
+        executionRunId: runId,
+        executionLockedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(tasks.id, taskId))
+      .returning();
+
+    return updated;
+  }
+
+  /**
+   * Release execution lock without completing the task.
+   * Task stays in current column. Only the lock holder can release.
+   */
+  async release(taskId: string, agentId: string): Promise<Task> {
+    const task = await this.taskService.getById(taskId);
+    if (!task) throw new Error("Task not found");
+
+    if (task.executionAgentId !== agentId) {
+      throw new Error("Agent does not hold execution lock");
+    }
+
+    const [updated] = await this.db
+      .update(tasks)
+      .set({
+        executionAgentId: null,
+        executionRunId: null,
+        executionLockedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(tasks.id, taskId))
+      .returning();
+
+    return updated;
+  }
+
   private async loadProject(projectId: string) {
     const [project] = await this.db
       .select()
