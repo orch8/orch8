@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, symlink, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, symlink, readFile, writeFile, rm, unlink } from "node:fs/promises";
 import { join, dirname, basename } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -20,7 +20,10 @@ export async function createSkillsDir(skillPaths: string[]): Promise<string | nu
     const parentName = basename(dirname(srcPath));
     const skillSubDir = join(skillsDir, parentName);
     await mkdir(skillSubDir, { recursive: true });
-    await symlink(srcPath, join(skillSubDir, basename(srcPath)));
+    const dest = join(skillSubDir, basename(srcPath));
+    // Remove any existing symlink to avoid EEXIST when duplicates are passed
+    await unlink(dest).catch(() => {});
+    await symlink(srcPath, dest);
   }
 
   return tempDir;
