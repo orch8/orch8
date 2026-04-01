@@ -5,6 +5,7 @@ model: opus
 effort: high
 maxTurns: 50
 skills:
+  - orch8
   - verification
   - parallel-decomposition
 heartbeat:

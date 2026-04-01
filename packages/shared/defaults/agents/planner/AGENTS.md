@@ -5,6 +5,7 @@ model: sonnet
 effort: high
 maxTurns: 30
 skills:
+  - orch8
   - plan-quality
   - verification
 heartbeat:

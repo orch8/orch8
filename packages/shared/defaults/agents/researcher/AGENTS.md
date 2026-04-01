@@ -5,6 +5,7 @@ model: sonnet
 effort: high
 maxTurns: 40
 skills:
+  - orch8
   - research-methodology
   - verification
 heartbeat:

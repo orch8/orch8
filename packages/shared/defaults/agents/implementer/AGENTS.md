@@ -5,6 +5,7 @@ model: sonnet
 effort: high
 maxTurns: 200
 skills:
+  - orch8
   - tdd
   - systematic-debugging
   - verification
