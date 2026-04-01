@@ -7,7 +7,7 @@ export type TaskColumn =
 export const VALID_TRANSITIONS: Record<TaskColumn, TaskColumn[]> = {
   backlog: ["blocked", "in_progress"],
   blocked: ["backlog", "in_progress"],
-  in_progress: ["done"],
+  in_progress: ["blocked", "done"],
   done: [],
 };
 

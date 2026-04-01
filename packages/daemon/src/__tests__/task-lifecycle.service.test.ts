@@ -200,6 +200,25 @@ describe("TaskLifecycleService", () => {
       ).rejects.toThrow("Task not found");
     });
 
+    it("moves in_progress to blocked and clears execution lock", async () => {
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Block me",
+        taskType: "quick",
+        column: "in_progress",
+        executionAgentId: "agent-1",
+        executionRunId: "run-1",
+        executionLockedAt: new Date(),
+      }).returning();
+
+      const updated = await lifecycleService.transition(task.id, "blocked");
+
+      expect(updated.column).toBe("blocked");
+      expect(updated.executionAgentId).toBeNull();
+      expect(updated.executionRunId).toBeNull();
+      expect(updated.executionLockedAt).toBeNull();
+    });
+
     it("requires agentId and runId when moving to in_progress", async () => {
       const task = await taskService.create({
         title: "Need lock",

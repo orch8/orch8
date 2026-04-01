@@ -65,6 +65,13 @@ export class TaskLifecycleService {
       }
     }
 
+    if (to === "blocked") {
+      // Release execution lock — task is not being actively worked
+      updateValues.executionAgentId = null;
+      updateValues.executionRunId = null;
+      updateValues.executionLockedAt = null;
+    }
+
     if (to === "done") {
       updateValues.executionAgentId = null;
       updateValues.executionRunId = null;
