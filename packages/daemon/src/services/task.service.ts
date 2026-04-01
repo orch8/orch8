@@ -51,6 +51,7 @@ export class TaskService {
     if (filter.taskType) conditions.push(eq(tasks.taskType, filter.taskType));
     if (filter.assignee) conditions.push(eq(tasks.assignee, filter.assignee));
     if (filter.complexPhase) conditions.push(eq(tasks.complexPhase, filter.complexPhase));
+    if (filter.pipelineId) conditions.push(eq(tasks.pipelineId, filter.pipelineId));
 
     if (conditions.length === 0) {
       return this.db.select().from(tasks);
