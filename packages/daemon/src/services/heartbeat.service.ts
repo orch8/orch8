@@ -59,6 +59,15 @@ async function getRepoUrl(cwd: string): Promise<string | undefined> {
   }
 }
 
+async function getBranch(cwd: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd });
+    return stdout.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export class HeartbeatService {
   // In-memory tracking for orphan detection
   private activeRunExecutions = new Set<string>();
@@ -553,7 +562,7 @@ export class HeartbeatService {
         onEvent,
 
         // Phase 3: Workspace metadata
-        workspaceBranch: taskData?.branch ?? undefined,
+        workspaceBranch: taskData?.branch ?? await getBranch(cwd),
         worktreePath: taskData?.worktreePath ?? undefined,
         workspaceId: claimedRun.projectId,
         workspaceRepoUrl,
