@@ -89,7 +89,7 @@ describe("SeedingService", () => {
       const cto = agents.find((a) => a.name === "cto");
       expect(cto).toBeDefined();
       expect(cto!.heartbeat.enabled).toBe(true);
-      expect(cto!.heartbeat.intervalSec).toBe(120);
+      expect(cto!.heartbeat.intervalSec).toBe(3600);
     });
 
     it("resolves skill names to absolute paths", async () => {
@@ -124,10 +124,10 @@ describe("SeedingService", () => {
       const agents = await service.listBundledAgents();
 
       const cto = agents.find((a) => a.id === "cto")!;
-      expect(cto.model).toBe("claude-opus-4-20250514");
+      expect(cto.model).toBe("claude-opus-4-6");
 
       const implementer = agents.find((a) => a.id === "implementer")!;
-      expect(implementer.model).toBe("claude-sonnet-4-20250514");
+      expect(implementer.model).toBe("claude-sonnet-4-6");
     });
 
     it("includes parsed prompt sections", async () => {
@@ -146,7 +146,7 @@ describe("SeedingService", () => {
 
       const cto = agents.find((a) => a.id === "cto")!;
       expect(cto.heartbeatEnabled).toBe(true);
-      expect(cto.heartbeatIntervalSec).toBe(120);
+      expect(cto.heartbeatIntervalSec).toBe(3600);
 
       const implementer = agents.find((a) => a.id === "implementer")!;
       expect(implementer.heartbeatEnabled).toBe(false);

@@ -592,7 +592,7 @@ describe("HeartbeatService", () => {
       const mockAdapter = {
         runAgent: async () => ({
           sessionId: "sess_abc",
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
           result: "Task completed successfully",
           usage: { input_tokens: 1000, output_tokens: 500 },
           costUsd: 0.05,
@@ -615,7 +615,7 @@ describe("HeartbeatService", () => {
 
       expect(finished.status).toBe("succeeded");
       expect(finished.costUsd).toBe(0.05);
-      expect(finished.model).toBe("claude-sonnet-4-20250514");
+      expect(finished.model).toBe("claude-sonnet-4-6");
       expect(finished.sessionIdAfter).toBe("sess_abc");
       expect(finished.usageJson).toEqual({ input_tokens: 1000, output_tokens: 500 });
     });

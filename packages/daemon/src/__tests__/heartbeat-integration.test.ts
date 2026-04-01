@@ -62,7 +62,7 @@ describe("Heartbeat Pipeline Integration", () => {
     const mockAdapter = {
       runAgent: async () => ({
         sessionId: "sess_123",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         result: "Work completed",
         usage: { input_tokens: 500, output_tokens: 200 },
         costUsd: 0.02,

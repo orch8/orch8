@@ -42,7 +42,7 @@ export function useCancelRun() {
     }: {
       runId: string;
       projectId: string;
-    }) => api.post<Run>(`/runs/${runId}/cancel`, { projectId }),
+    }) => api.post<Run>(`/runs/${runId}/cancel`, {}, { projectId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["runs"] });
     },

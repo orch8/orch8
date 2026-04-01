@@ -9,7 +9,7 @@ skills:
   - verification
 heartbeat:
   enabled: true
-  intervalSec: 60
+  intervalSec: 3600
 ---
 
 # QA

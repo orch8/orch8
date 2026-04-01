@@ -17,8 +17,8 @@ import {
 } from "@orch/shared";
 
 const MODEL_MAP: Record<string, string> = {
-  opus: "claude-opus-4-20250514",
-  sonnet: "claude-sonnet-4-20250514",
+  opus: "claude-opus-4-6",
+  sonnet: "claude-sonnet-4-6",
   haiku: "claude-haiku-4-5-20251001",
 };
 

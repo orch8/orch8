@@ -35,7 +35,7 @@ export function useUpdateAgent() {
       projectId,
       ...input
     }: UpdateAgent & { agentId: string; projectId: string }) =>
-      api.patch<Agent>(`/agents/${agentId}`, { ...input, projectId }),
+      api.patch<Agent>(`/agents/${agentId}`, input, { projectId }),
     onSuccess: (agent) => {
       qc.invalidateQueries({ queryKey: ["agents", agent.projectId] });
       qc.invalidateQueries({
@@ -50,12 +50,13 @@ export function usePauseAgent() {
   return useMutation({
     mutationFn: ({
       agentId,
+      projectId,
       reason,
     }: {
       agentId: string;
       projectId: string;
       reason?: string;
-    }) => api.post<Agent>(`/agents/${agentId}/pause`, { reason }),
+    }) => api.post<Agent>(`/agents/${agentId}/pause`, { reason }, { projectId }),
     onSuccess: (agent) => {
       qc.invalidateQueries({ queryKey: ["agents", agent.projectId] });
     },
@@ -65,8 +66,8 @@ export function usePauseAgent() {
 export function useResumeAgent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ agentId }: { agentId: string; projectId: string }) =>
-      api.post<Agent>(`/agents/${agentId}/resume`, {}),
+    mutationFn: ({ agentId, projectId }: { agentId: string; projectId: string }) =>
+      api.post<Agent>(`/agents/${agentId}/resume`, {}, { projectId }),
     onSuccess: (agent) => {
       qc.invalidateQueries({ queryKey: ["agents", agent.projectId] });
     },
@@ -77,12 +78,14 @@ export function useWakeAgent() {
   return useMutation({
     mutationFn: ({
       agentId,
+      projectId,
       taskId,
       reason,
     }: {
       agentId: string;
+      projectId: string;
       taskId?: string;
       reason?: string;
-    }) => api.post(`/agents/${agentId}/wake`, { taskId, reason }),
+    }) => api.post(`/agents/${agentId}/wake`, { taskId, reason }, { projectId }),
   });
 }

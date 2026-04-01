@@ -48,9 +48,9 @@ describe("Agent Role Defaults (Integration)", () => {
     });
 
     const body = JSON.parse(response.body);
-    expect(body.model).toBe("claude-opus-4-20250514");
+    expect(body.model).toBe("claude-opus-4-6");
     expect(body.heartbeatEnabled).toBe(true);
-    expect(body.heartbeatIntervalSec).toBe(120);
+    expect(body.heartbeatIntervalSec).toBe(3600);
     expect(body.canCreateTasks).toBe(true);
     expect(body.maxTurns).toBe(50);
 
@@ -66,14 +66,14 @@ describe("Agent Role Defaults (Integration)", () => {
     });
 
     const body = JSON.parse(response.body);
-    expect(body.model).toBe("claude-sonnet-4-20250514");
+    expect(body.model).toBe("claude-opus-4-6");
     expect(body.heartbeatEnabled).toBe(false);
     expect(body.wakeOnAssignment).toBe(true);
 
     await app.close();
   });
 
-  it("QA gets short heartbeat interval", async () => {
+  it("QA gets heartbeat enabled", async () => {
     const response = await app.inject({
       method: "POST",
       url: "/api/agents",
@@ -83,7 +83,7 @@ describe("Agent Role Defaults (Integration)", () => {
 
     const body = JSON.parse(response.body);
     expect(body.heartbeatEnabled).toBe(true);
-    expect(body.heartbeatIntervalSec).toBe(60);
+    expect(body.heartbeatIntervalSec).toBe(3600);
 
     await app.close();
   });
@@ -97,7 +97,7 @@ describe("Agent Role Defaults (Integration)", () => {
     });
 
     const body = JSON.parse(response.body);
-    expect(body.model).toBe("claude-opus-4-20250514");
+    expect(body.model).toBe("claude-opus-4-6");
     expect(body.wakeOnAutomation).toBe(true);
 
     await app.close();
@@ -113,7 +113,7 @@ describe("Agent Role Defaults (Integration)", () => {
         projectId,
         name: "Custom Engineer",
         role: "engineer",
-        model: "claude-opus-4-20250514",
+        model: "claude-opus-4-6",
         maxTurns: 100,
         heartbeatEnabled: true,
         heartbeatIntervalSec: 300,
@@ -121,7 +121,7 @@ describe("Agent Role Defaults (Integration)", () => {
     });
 
     const body = JSON.parse(response.body);
-    expect(body.model).toBe("claude-opus-4-20250514");
+    expect(body.model).toBe("claude-opus-4-6");
     expect(body.maxTurns).toBe(100);
     expect(body.heartbeatEnabled).toBe(true);
     expect(body.heartbeatIntervalSec).toBe(300);

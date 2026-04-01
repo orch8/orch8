@@ -17,7 +17,7 @@ describe("TaskDispatcher", () => {
       slug: "dispatch-test",
       homeDir: "/tmp/dispatch",
       worktreeDir: "/tmp/dispatch-wt",
-      defaultModel: "claude-sonnet-4-20250514",
+      defaultModel: "claude-sonnet-4-6",
     }).returning();
     projectId = project.id;
 

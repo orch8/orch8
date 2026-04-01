@@ -84,7 +84,7 @@ describe("Project seeding integration", () => {
     const cto = agents.find((a) => a.name === "cto")!;
     expect(cto.model).toBe("opus");
     expect(cto.heartbeat.enabled).toBe(true);
-    expect(cto.heartbeat.intervalSec).toBe(120);
+    expect(cto.heartbeat.intervalSec).toBe(3600);
 
     const implementer = agents.find((a) => a.name === "implementer")!;
     expect(implementer.maxTurns).toBe(200);

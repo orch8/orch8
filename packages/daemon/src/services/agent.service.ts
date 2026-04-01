@@ -15,12 +15,12 @@ interface WakeupOpts {
   payload?: unknown;
 }
 
-const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
+export const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
   cto: {
-    model: "claude-opus-4-20250514",
-    maxTurns: 50,
+    model: "claude-opus-4-6",
+    maxTurns: 200,
     heartbeatEnabled: true,
-    heartbeatIntervalSec: 120,
+    heartbeatIntervalSec: 3600,
     canCreateTasks: true,
     wakeOnAssignment: true,
     wakeOnOnDemand: true,
@@ -29,7 +29,7 @@ const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
   },
   engineer: {
     model: "claude-opus-4-6",
-    maxTurns: 25,
+    maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
     wakeOnOnDemand: true,
@@ -37,9 +37,9 @@ const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
   },
   qa: {
     model: "claude-opus-4-6",
-    maxTurns: 25,
+    maxTurns: 200,
     heartbeatEnabled: true,
-    heartbeatIntervalSec: 60,
+    heartbeatIntervalSec: 3600,
     wakeOnAssignment: true,
     wakeOnOnDemand: true,
     wakeOnAutomation: true,
@@ -47,21 +47,21 @@ const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
   },
   researcher: {
     model: "claude-opus-4-6",
-    maxTurns: 40,
+    maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
     maxConcurrentRuns: 1,
   },
   planner: {
     model: "claude-opus-4-6",
-    maxTurns: 30,
+    maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
     maxConcurrentRuns: 1,
   },
   implementer: {
     model: "claude-opus-4-6",
-    maxTurns: 40,
+    maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
     maxConcurrentRuns: 1,
@@ -69,28 +69,28 @@ const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
   },
   reviewer: {
     model: "claude-opus-4-6",
-    maxTurns: 20,
+    maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
     maxConcurrentRuns: 1,
   },
   verifier: {
     model: "claude-opus-4-6",
-    maxTurns: 20,
+    maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAutomation: true,
     maxConcurrentRuns: 1,
   },
   referee: {
-    model: "claude-opus-4-20250514",
-    maxTurns: 15,
+    model: "claude-opus-4-6",
+    maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAutomation: true,
     maxConcurrentRuns: 1,
   },
   custom: {
     model: "claude-opus-4-6",
-    maxTurns: 25,
+    maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
     wakeOnOnDemand: true,
@@ -110,10 +110,10 @@ export class AgentService {
 
   async create(input: CreateAgent): Promise<Agent> {
     const defaults = AgentService.getRoleDefaults(input.role);
-    const values: typeof agents.$inferInsert = {
+    const values = {
       ...defaults,
       ...stripUndefined(input),
-    };
+    } as typeof agents.$inferInsert;
 
     // Auto-populate workLogDir and lessonsFile from project homeDir
     if (!values.workLogDir || !values.lessonsFile) {

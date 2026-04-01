@@ -51,7 +51,7 @@ export class BrainstormService {
     if (task.taskType !== "brainstorm") throw new Error("Task is not a brainstorm task");
 
     // Resolve agent config
-    let model = "claude-sonnet-4-20250514";
+    let model = "claude-sonnet-4-6";
     let maxTurns = 50;
     if (task.assignee) {
       const [agent] = await this.db

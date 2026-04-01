@@ -10,7 +10,7 @@ skills:
   - parallel-decomposition
 heartbeat:
   enabled: true
-  intervalSec: 120
+  intervalSec: 3600
 ---
 
 # CTO

@@ -45,7 +45,7 @@ describe("AgentService", () => {
       expect(agent.name).toBe("Frontend Engineer");
       expect(agent.role).toBe("engineer");
       expect(agent.status).toBe("active");
-      expect(agent.model).toBe("claude-sonnet-4-20250514");
+      expect(agent.model).toBe("claude-opus-4-6");
     });
 
     it("creates an agent with all optional fields", async () => {
@@ -54,9 +54,9 @@ describe("AgentService", () => {
         projectId,
         name: "CTO",
         role: "cto",
-        model: "claude-opus-4-20250514",
+        model: "claude-opus-4-6",
         heartbeatEnabled: true,
-        heartbeatIntervalSec: 120,
+        heartbeatIntervalSec: 3600,
         canCreateTasks: true,
         canAssignTo: ["fe-eng", "be-eng"],
         canMoveTo: ["in_progress", "done"],
@@ -64,9 +64,9 @@ describe("AgentService", () => {
         budgetLimitUsd: 50.0,
       });
 
-      expect(agent.model).toBe("claude-opus-4-20250514");
+      expect(agent.model).toBe("claude-opus-4-6");
       expect(agent.heartbeatEnabled).toBe(true);
-      expect(agent.heartbeatIntervalSec).toBe(120);
+      expect(agent.heartbeatIntervalSec).toBe(3600);
       expect(agent.canCreateTasks).toBe(true);
       expect(agent.canAssignTo).toEqual(["fe-eng", "be-eng"]);
       expect(agent.canMoveTo).toEqual(["in_progress", "done"]);
@@ -131,12 +131,12 @@ describe("AgentService", () => {
       await service.create({ id: "upd-1", projectId, name: "Original", role: "engineer" });
       const updated = await service.update("upd-1", projectId, {
         name: "Updated",
-        model: "claude-opus-4-20250514",
+        model: "claude-opus-4-6",
         maxTurns: 50,
       });
 
       expect(updated.name).toBe("Updated");
-      expect(updated.model).toBe("claude-opus-4-20250514");
+      expect(updated.model).toBe("claude-opus-4-6");
       expect(updated.maxTurns).toBe(50);
     });
 
@@ -225,7 +225,7 @@ describe("AgentService", () => {
   describe("getRoleDefaults", () => {
     it("returns CTO defaults with heartbeat and task creation", () => {
       const defaults = AgentService.getRoleDefaults("cto");
-      expect(defaults.model).toBe("claude-opus-4-20250514");
+      expect(defaults.model).toBe("claude-opus-4-6");
       expect(defaults.heartbeatEnabled).toBe(true);
       expect(defaults.canCreateTasks).toBe(true);
       expect(defaults.maxTurns).toBeGreaterThan(25);
@@ -240,7 +240,7 @@ describe("AgentService", () => {
     it("returns QA defaults with short heartbeat", () => {
       const defaults = AgentService.getRoleDefaults("qa");
       expect(defaults.heartbeatEnabled).toBe(true);
-      expect(defaults.heartbeatIntervalSec).toBeLessThan(120);
+      expect(defaults.heartbeatIntervalSec).toBe(3600);
     });
 
     it("returns minimal defaults for custom role", () => {

@@ -31,11 +31,11 @@ describe("Agent Schemas", () => {
         role: "cto",
         icon: "🧠",
         color: "#FF0000",
-        model: "claude-opus-4-20250514",
+        model: "claude-opus-4-6",
         effort: "high",
         maxTurns: 50,
         heartbeatEnabled: true,
-        heartbeatIntervalSec: 120,
+        heartbeatIntervalSec: 3600,
         maxConcurrentRuns: 2,
         canAssignTo: ["fe-eng", "be-eng"],
         canCreateTasks: true,
@@ -95,7 +95,7 @@ describe("Agent Schemas", () => {
     it("validates partial update", () => {
       const result = UpdateAgentSchema.safeParse({
         name: "Updated Name",
-        model: "claude-opus-4-20250514",
+        model: "claude-opus-4-6",
       });
       expect(result.success).toBe(true);
     });

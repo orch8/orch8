@@ -5,6 +5,7 @@ import { agents } from "@orch/shared/db";
 import { CreateAgentSchema } from "@orch/shared";
 import type { SchemaDb } from "../db/client.js";
 import type { AgentService } from "./agent.service.js";
+import { ROLE_DEFAULTS } from "./agent.service.js";
 import { resolveClaudePath } from "../adapter/resolve-claude-path.js";
 import { randomUUID } from "node:crypto";
 
@@ -29,18 +30,33 @@ const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 const TASK_COLUMNS = ["backlog", "blocked", "in_progress", "done"];
 
-const ROLE_DEFAULTS_DOC: Record<string, string> = {
-  cto: "model=claude-opus-4-20250514, maxTurns=50, heartbeat=on (120s), canCreateTasks=true, all wake triggers",
-  engineer: "model=claude-opus-4-6, maxTurns=25, heartbeat=off, wakeOnAssignment+onDemand",
-  qa: "model=claude-opus-4-6, maxTurns=25, heartbeat=on (60s), all wake triggers",
-  researcher: "model=claude-opus-4-6, maxTurns=40, heartbeat=off, wakeOnAssignment",
-  planner: "model=claude-opus-4-6, maxTurns=30, heartbeat=off, wakeOnAssignment",
-  implementer: "model=claude-opus-4-6, maxTurns=40, heartbeat=off, wakeOnAssignment, maxConcurrentSubagents=3",
-  reviewer: "model=claude-opus-4-6, maxTurns=20, heartbeat=off, wakeOnAssignment",
-  verifier: "model=claude-opus-4-6, maxTurns=20, heartbeat=off, wakeOnAutomation",
-  referee: "model=claude-opus-4-20250514, maxTurns=15, heartbeat=off, wakeOnAutomation",
-  custom: "model=claude-opus-4-6, maxTurns=25, heartbeat=off, wakeOnAssignment+onDemand",
-};
+function describeRoleDefaults(role: string, defaults: Record<string, unknown>): string {
+  const parts: string[] = [];
+  if (defaults.model) parts.push(`model=${defaults.model}`);
+  if (defaults.maxTurns) parts.push(`maxTurns=${defaults.maxTurns}`);
+
+  if (defaults.heartbeatEnabled) {
+    parts.push(`heartbeat=on (${defaults.heartbeatIntervalSec ?? 0}s)`);
+  } else {
+    parts.push("heartbeat=off");
+  }
+
+  if (defaults.canCreateTasks) parts.push("canCreateTasks=true");
+  if (defaults.maxConcurrentSubagents) parts.push(`maxConcurrentSubagents=${defaults.maxConcurrentSubagents}`);
+
+  const wakeFlags = [];
+  if (defaults.wakeOnAssignment) wakeFlags.push("wakeOnAssignment");
+  if (defaults.wakeOnOnDemand) wakeFlags.push("onDemand");
+  if (defaults.wakeOnAutomation) wakeFlags.push("wakeOnAutomation");
+
+  if (wakeFlags.length === 3) {
+    parts.push("all wake triggers");
+  } else if (wakeFlags.length > 0) {
+    parts.push(wakeFlags.join("+"));
+  }
+
+  return parts.join(", ");
+}
 
 const SCHEMA_FIELDS_DOC = `Required fields:
 - id (string, 1-100 chars): Unique agent slug/identifier
@@ -127,7 +143,7 @@ export class AgentCreatorService {
       transcript: [],
       startedAt: new Date(),
       cwd,
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       maxTurns: 50,
       firstTurnDone: false,
       stdoutBuffer: "",
@@ -360,8 +376,8 @@ export class AgentCreatorService {
 
     const agentIds = existingAgents.map((a) => a.id);
 
-    const roleDefaultsList = Object.entries(ROLE_DEFAULTS_DOC)
-      .map(([role, desc]) => `- ${role}: ${desc}`)
+    const roleDefaultsList = Object.entries(ROLE_DEFAULTS)
+      .map(([role, defaults]) => `- ${role}: ${describeRoleDefaults(role, defaults as Record<string, unknown>)}`)
       .join("\n");
 
     return `You are an agent configuration assistant for orch8. You help users create AI agents by understanding their needs and generating complete configurations.

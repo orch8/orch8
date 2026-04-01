@@ -43,7 +43,7 @@ skills:
   - parallel-decomposition
 heartbeat:
   enabled: true
-  intervalSec: 120
+  intervalSec: 3600
 ---
 
 # CTO
@@ -135,7 +135,7 @@ describe("parseAgentsMd", () => {
   it("handles heartbeat with intervalSec", () => {
     const result = parseAgentsMd(CTO_AGENTS_MD);
 
-    expect(result.heartbeat).toEqual({ enabled: true, intervalSec: 120 });
+    expect(result.heartbeat).toEqual({ enabled: true, intervalSec: 3600 });
   });
 
   it("extracts system prompt that stops before first ## section", () => {
@@ -168,7 +168,7 @@ describe("parseAgentsMd — sessionCompaction", () => {
       "maxTurns: 50",
       "heartbeat:",
       "  enabled: true",
-      "  intervalSec: 120",
+      "  intervalSec: 3600",
       "  sessionCompaction:",
       "    enabled: true",
       "    maxRuns: 200",

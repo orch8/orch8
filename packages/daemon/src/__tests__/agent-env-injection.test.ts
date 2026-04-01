@@ -5,7 +5,7 @@ import type { ClaudeLocalAdapterConfig, RunContext } from "../adapter/types.js";
 describe("Agent envVars injection", () => {
   it("includes agent-configured env vars in the process environment", () => {
     const config: ClaudeLocalAdapterConfig = {
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       env: {
         CUSTOM_API_KEY: "sk-test-123",
         FEATURE_FLAG: "true",
