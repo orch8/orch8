@@ -247,4 +247,73 @@ export async function taskRoutes(app: FastifyInstance) {
       throw err;
     }
   });
+
+  // POST /api/tasks/:id/checkout — Atomic task claim (agent-driven)
+  app.post(
+    "/api/tasks/:id/checkout",
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const agentId = request.agent?.id;
+      const runId = request.runId;
+
+      if (!agentId) {
+        return reply.code(401).send({
+          error: "unauthorized",
+          message: "Agent authentication required for checkout",
+        });
+      }
+
+      try {
+        const task = await app.lifecycleService.checkout(
+          request.params.id,
+          agentId,
+          runId ?? "unknown",
+        );
+        return task;
+      } catch (err) {
+        const message = (err as Error).message;
+        if (message.startsWith("Checkout conflict")) {
+          return reply.code(409).send({ error: "conflict", message });
+        }
+        if (message === "Task not found") {
+          return reply.code(404).send({ error: "not_found", message });
+        }
+        if (message.startsWith("Cannot checkout")) {
+          return reply.code(400).send({ error: "bad_request", message });
+        }
+        throw err;
+      }
+    },
+  );
+
+  // POST /api/tasks/:id/release — Release execution lock without completing
+  app.post(
+    "/api/tasks/:id/release",
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const agentId = request.agent?.id;
+
+      if (!agentId) {
+        return reply.code(401).send({
+          error: "unauthorized",
+          message: "Agent authentication required for release",
+        });
+      }
+
+      try {
+        const task = await app.lifecycleService.release(
+          request.params.id,
+          agentId,
+        );
+        return task;
+      } catch (err) {
+        const message = (err as Error).message;
+        if (message === "Task not found") {
+          return reply.code(404).send({ error: "not_found", message });
+        }
+        if (message.includes("does not hold")) {
+          return reply.code(403).send({ error: "forbidden", message });
+        }
+        throw err;
+      }
+    },
+  );
 }

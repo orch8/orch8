@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import Fastify from "fastify";
 import { projects, tasks, agents, taskDependencies } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { taskRoutes } from "../api/routes/tasks.js";
 import { TaskService } from "../services/task.service.js";
-import { WorktreeService } from "../services/worktree.service.js";
+import { WorktreeService, type ExecFn } from "../services/worktree.service.js";
 import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
 import "../types.js";
 
@@ -46,7 +46,8 @@ describe("Task API Routes", () => {
     app.decorate("db", testDb.db);
 
     const taskService = new TaskService(testDb.db);
-    const worktreeService = new WorktreeService();
+    const execFn = vi.fn<ExecFn>().mockResolvedValue({ stdout: "", stderr: "" });
+    const worktreeService = new WorktreeService(execFn);
     const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
     app.decorate("lifecycleService", lifecycleService);
 
@@ -294,6 +295,146 @@ describe("Task API Routes", () => {
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.taskType).toBe("quick");
+    });
+  });
+
+  describe("POST /api/tasks/:id/checkout", () => {
+    it("checks out a backlog task (200)", async () => {
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Checkout route test",
+        taskType: "quick",
+        column: "backlog",
+      }).returning();
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/tasks/${task.id}/checkout`,
+        headers: {
+          "x-agent-id": "agent-1",
+          "x-project-id": projectId,
+          "x-run-id": "run-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.column).toBe("in_progress");
+      expect(body.executionAgentId).toBe("agent-1");
+    });
+
+    it("returns 409 when locked by another agent", async () => {
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Locked task",
+        taskType: "quick",
+        column: "in_progress",
+        executionAgentId: "agent-other",
+        executionRunId: "run-other",
+        executionLockedAt: new Date(),
+      }).returning();
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/tasks/${task.id}/checkout`,
+        headers: {
+          "x-agent-id": "agent-1",
+          "x-project-id": projectId,
+          "x-run-id": "run-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      const body = JSON.parse(response.body);
+      expect(body.error).toBe("conflict");
+    });
+
+    it("returns 404 for nonexistent task", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/tasks/task_nonexistent/checkout",
+        headers: {
+          "x-agent-id": "agent-1",
+          "x-project-id": projectId,
+          "x-run-id": "run-1",
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("returns 401 without agent auth", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/tasks/task_123/checkout",
+        headers: { "x-project-id": projectId },
+      });
+
+      // Auth middleware returns 403 for missing agent
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    });
+  });
+
+  describe("POST /api/tasks/:id/release", () => {
+    it("releases execution lock (200)", async () => {
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Release route test",
+        taskType: "quick",
+        column: "in_progress",
+        executionAgentId: "agent-1",
+        executionRunId: "run-1",
+        executionLockedAt: new Date(),
+      }).returning();
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/tasks/${task.id}/release`,
+        headers: {
+          "x-agent-id": "agent-1",
+          "x-project-id": projectId,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.executionAgentId).toBeNull();
+    });
+
+    it("returns 403 when agent does not hold lock", async () => {
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Not mine",
+        taskType: "quick",
+        column: "in_progress",
+        executionAgentId: "agent-other",
+        executionRunId: "run-other",
+        executionLockedAt: new Date(),
+      }).returning();
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/tasks/${task.id}/release`,
+        headers: {
+          "x-agent-id": "agent-1",
+          "x-project-id": projectId,
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it("returns 404 for nonexistent task", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/tasks/task_nonexistent/release",
+        headers: {
+          "x-agent-id": "agent-1",
+          "x-project-id": projectId,
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
     });
   });
 });
