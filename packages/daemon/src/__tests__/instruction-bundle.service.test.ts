@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { InstructionBundleService } from "../services/instruction-bundle.service.js";
 import { projects, agents, instructionBundles } from "@orch/shared/db";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { existsSync } from "node:fs";
@@ -55,7 +55,7 @@ describe("InstructionBundleService", () => {
       budgetSpentUsd: 0,
     });
 
-    service = new InstructionBundleService(testDb.db);
+    service = new InstructionBundleService(testDb.db, tempDir);
   });
 
   afterEach(async () => {
@@ -112,6 +112,13 @@ describe("InstructionBundleService", () => {
 
       const content = await service.readFile("agent-1", projectId, "notes.md");
       expect(content).toBe("# Notes\nSome notes");
+    });
+
+    it("throws on path traversal attempt", async () => {
+      await service.ensure("agent-1", projectId, "engineer");
+      await expect(
+        service.readFile("agent-1", projectId, "../../etc/passwd"),
+      ).rejects.toThrow(/path traversal/i);
     });
 
     it("throws on write to external mode bundle", async () => {

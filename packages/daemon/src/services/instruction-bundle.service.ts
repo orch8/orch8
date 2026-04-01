@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { readdir, readFile, writeFile, rm, mkdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { instructionBundles, agents } from "@orch/shared/db";
@@ -10,8 +10,17 @@ type InstructionBundle = typeof instructionBundles.$inferSelect;
 
 const DEFAULT_ENTRY_FILE = "AGENTS.md";
 
-function defaultBundleDir(projectId: string, agentId: string): string {
-  return join(homedir(), ".orch8", "projects", projectId, "agents", agentId, "instructions");
+function safePath(rootPath: string, relativePath: string): string {
+  const resolved = resolve(rootPath, relativePath);
+  if (!resolved.startsWith(rootPath + "/") && resolved !== rootPath) {
+    throw new Error("Path traversal detected");
+  }
+  return resolved;
+}
+
+function defaultBundleDir(projectId: string, agentId: string, basePath?: string): string {
+  const root = basePath ?? join(homedir(), ".orch8");
+  return join(root, "projects", projectId, "agents", agentId, "instructions");
 }
 
 function defaultTemplate(role: string): string {
@@ -29,7 +38,7 @@ function defaultTemplate(role: string): string {
 }
 
 export class InstructionBundleService {
-  constructor(private db: SchemaDb) {}
+  constructor(private db: SchemaDb, private basePath?: string) {}
 
   async get(agentId: string, projectId: string): Promise<InstructionBundle | null> {
     const rows = await this.db
@@ -48,7 +57,7 @@ export class InstructionBundleService {
     const existing = await this.get(agentId, projectId);
     if (existing) return existing;
 
-    const rootPath = defaultBundleDir(projectId, agentId);
+    const rootPath = defaultBundleDir(projectId, agentId, this.basePath);
     await mkdir(rootPath, { recursive: true });
 
     // Seed default AGENTS.md
@@ -122,7 +131,7 @@ export class InstructionBundleService {
     const bundle = await this.get(agentId, projectId);
     if (!bundle) throw new Error("Bundle not found");
 
-    const fullPath = join(bundle.rootPath, relativePath);
+    const fullPath = safePath(bundle.rootPath, relativePath);
     return readFile(fullPath, "utf-8");
   }
 
@@ -136,7 +145,7 @@ export class InstructionBundleService {
     if (!bundle) throw new Error("Bundle not found");
     if (bundle.mode === "external") throw new Error("Cannot write to external mode bundle");
 
-    const fullPath = join(bundle.rootPath, relativePath);
+    const fullPath = safePath(bundle.rootPath, relativePath);
     await writeFile(fullPath, content, "utf-8");
 
     // Re-sync inventory
@@ -153,7 +162,7 @@ export class InstructionBundleService {
     if (bundle.mode === "external") throw new Error("Cannot delete from external mode bundle");
     if (relativePath === bundle.entryFile) throw new Error("Cannot delete entry file");
 
-    const fullPath = join(bundle.rootPath, relativePath);
+    const fullPath = safePath(bundle.rootPath, relativePath);
     await rm(fullPath);
 
     const inventory = await this.buildInventory(bundle.rootPath);
@@ -186,6 +195,12 @@ export class InstructionBundleService {
     if (bundle.mode === "managed") {
       await mkdir(bundle.rootPath, { recursive: true });
       await writeFile(entryPath, defaultTemplate(role), "utf-8");
+      // Re-sync inventory
+      const inventory = await this.buildInventory(bundle.rootPath);
+      await this.db
+        .update(instructionBundles)
+        .set({ fileInventory: inventory, updatedAt: new Date() })
+        .where(eq(instructionBundles.id, bundle.id));
       return "recovered";
     }
 
