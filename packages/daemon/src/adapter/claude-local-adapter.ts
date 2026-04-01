@@ -6,8 +6,9 @@ import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "./types.js
 import { buildArgs } from "./args-builder.js";
 import { buildEnv } from "./env-builder.js";
 import { buildPrompt } from "./prompt-builder.js";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { createSkillsDir, createInstructionsFile, cleanupTempPath } from "./file-injector.js";
+import { DEFAULT_SKILLS_DIR } from "@orch/shared";
 import { SessionManager } from "./session-manager.js";
 import { runProcess } from "./process-runner.js";
 import { resolveClaudePath } from "./resolve-claude-path.js";
@@ -55,10 +56,15 @@ export class ClaudeLocalAdapter {
     let instructionsFilePath: string | undefined;
 
     try {
-      if (prompts.skillPaths && prompts.skillPaths.length > 0) {
-        skillsDir = await createSkillsDir(prompts.skillPaths);
-        if (skillsDir) tempPaths.push(skillsDir);
+      // Always inject the orch8 skill — it's the agent's guide to the control plane.
+      // Custom agents may have no other skills; this ensures universal coverage.
+      const ORCH8_SKILL_PATH = join(DEFAULT_SKILLS_DIR, "orch8", "SKILL.md");
+      const effectiveSkillPaths = [...(prompts.skillPaths ?? [])];
+      if (!effectiveSkillPaths.includes(ORCH8_SKILL_PATH)) {
+        effectiveSkillPaths.push(ORCH8_SKILL_PATH);
       }
+      skillsDir = await createSkillsDir(effectiveSkillPaths);
+      if (skillsDir) tempPaths.push(skillsDir);
 
       if (config.instructionsFilePath) {
         instructionsFilePath = await createInstructionsFile(config.instructionsFilePath);
