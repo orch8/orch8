@@ -8,6 +8,9 @@ import type {
   knowledgeFacts,
   activityLog,
   notifications,
+  pipelines,
+  pipelineSteps,
+  pipelineTemplates,
 } from "@orch/shared";
 
 // Row types inferred from Drizzle schema
@@ -20,6 +23,14 @@ export type Entity = typeof knowledgeEntities.$inferSelect;
 export type Fact = typeof knowledgeFacts.$inferSelect;
 export type LogEntry = typeof activityLog.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type Pipeline = typeof pipelines.$inferSelect;
+export type PipelineStep = typeof pipelineSteps.$inferSelect;
+export type PipelineTemplate = typeof pipelineTemplates.$inferSelect;
+
+export interface PipelineWithSteps {
+  pipeline: Pipeline;
+  steps: PipelineStep[];
+}
 
 // API-specific response types
 export interface CostSummary {
