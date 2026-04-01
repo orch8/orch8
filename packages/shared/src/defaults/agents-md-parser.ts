@@ -11,6 +11,12 @@ export interface ParsedAgentsMd {
   heartbeat: {
     enabled: boolean;
     intervalSec?: number;
+    sessionCompaction?: {
+      enabled: boolean;
+      maxRuns?: number;
+      maxInputTokens?: number;
+      maxAgeHours?: number;
+    };
   };
 
   // Parsed markdown sections
@@ -52,6 +58,22 @@ export function parseAgentsMd(content: string): ParsedAgentsMd {
   const heartbeat = fm.heartbeat ?? { enabled: false };
   const skills: string[] = Array.isArray(fm.skills) ? fm.skills : [];
 
+  // Parse session compaction if present
+  const sessionCompaction = heartbeat.sessionCompaction
+    ? {
+        enabled: Boolean(heartbeat.sessionCompaction.enabled),
+        ...(heartbeat.sessionCompaction.maxRuns != null
+          ? { maxRuns: heartbeat.sessionCompaction.maxRuns }
+          : {}),
+        ...(heartbeat.sessionCompaction.maxInputTokens != null
+          ? { maxInputTokens: heartbeat.sessionCompaction.maxInputTokens }
+          : {}),
+        ...(heartbeat.sessionCompaction.maxAgeHours != null
+          ? { maxAgeHours: heartbeat.sessionCompaction.maxAgeHours }
+          : {}),
+      }
+    : undefined;
+
   // Parse markdown sections
   const sections = parseSections(body);
 
@@ -67,6 +89,7 @@ export function parseAgentsMd(content: string): ParsedAgentsMd {
       ...(heartbeat.intervalSec != null
         ? { intervalSec: heartbeat.intervalSec }
         : {}),
+      ...(sessionCompaction ? { sessionCompaction } : {}),
     },
     systemPrompt: sections.systemPrompt,
     ...(sections.promptTemplate != null

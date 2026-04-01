@@ -157,3 +157,82 @@ No role field.
     expect(() => parseAgentsMd(badMd)).toThrow();
   });
 });
+
+describe("parseAgentsMd — sessionCompaction", () => {
+  it("parses sessionCompaction from heartbeat block", () => {
+    const content = [
+      "---",
+      "name: cto",
+      "role: cto",
+      "model: opus",
+      "maxTurns: 50",
+      "heartbeat:",
+      "  enabled: true",
+      "  intervalSec: 120",
+      "  sessionCompaction:",
+      "    enabled: true",
+      "    maxRuns: 200",
+      "    maxInputTokens: 2000000",
+      "    maxAgeHours: 72",
+      "---",
+      "",
+      "# CTO",
+      "",
+      "System prompt.",
+    ].join("\n");
+
+    const parsed = parseAgentsMd(content);
+    expect(parsed.heartbeat.sessionCompaction).toEqual({
+      enabled: true,
+      maxRuns: 200,
+      maxInputTokens: 2000000,
+      maxAgeHours: 72,
+    });
+  });
+
+  it("defaults sessionCompaction to undefined when not present", () => {
+    const content = [
+      "---",
+      "name: eng",
+      "role: engineer",
+      "model: opus",
+      "maxTurns: 10",
+      "heartbeat:",
+      "  enabled: true",
+      "---",
+      "",
+      "# Eng",
+      "",
+      "System prompt.",
+    ].join("\n");
+
+    const parsed = parseAgentsMd(content);
+    expect(parsed.heartbeat.sessionCompaction).toBeUndefined();
+  });
+
+  it("parses partial sessionCompaction (only maxRuns)", () => {
+    const content = [
+      "---",
+      "name: qa",
+      "role: qa",
+      "model: opus",
+      "maxTurns: 10",
+      "heartbeat:",
+      "  enabled: true",
+      "  sessionCompaction:",
+      "    enabled: true",
+      "    maxRuns: 100",
+      "---",
+      "",
+      "# QA",
+      "",
+      "System prompt.",
+    ].join("\n");
+
+    const parsed = parseAgentsMd(content);
+    expect(parsed.heartbeat.sessionCompaction).toEqual({
+      enabled: true,
+      maxRuns: 100,
+    });
+  });
+});
