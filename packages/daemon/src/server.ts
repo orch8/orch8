@@ -108,7 +108,7 @@ export function buildServer(options: ServerOptions = {}) {
 
     // Heartbeat service
     const heartbeatService = new HeartbeatService(dbClient.db, broadcastService);
-    const adapter = new ClaudeLocalAdapter(dbClient.db, spawnFn);
+    const adapter = new ClaudeLocalAdapter(dbClient.db, spawnFn, projectSkillService);
     heartbeatService.setAdapter(adapter);
 
     heartbeatService.setLogger(app.log);

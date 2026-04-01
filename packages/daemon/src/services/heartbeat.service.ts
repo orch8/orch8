@@ -533,6 +533,7 @@ export class HeartbeatService {
         heartbeatTemplate: agent.promptTemplate ?? "",
         bootstrapTemplate: agent.bootstrapPromptTemplate ?? undefined,
         skillPaths: agent.skillPaths ?? undefined,
+        desiredSkills: agent.desiredSkills ?? undefined,
       };
 
       const result = await this.adapter.runAgent(adapterConfig, ctx, prompts);

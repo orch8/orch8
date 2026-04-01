@@ -254,3 +254,50 @@ describe("ClaudeLocalAdapter", () => {
     expect(writtenPrompts[0]).not.toContain("BOOTSTRAP");
   });
 });
+
+describe("ClaudeLocalAdapter skill resolution", () => {
+  it("resolves desiredSkills slugs to sourceLocator paths", async () => {
+    const { resolveSkillPaths } = await import("../../adapter/claude-local-adapter.js");
+
+    const mockService = {
+      get: vi.fn()
+        .mockResolvedValueOnce({ sourceLocator: "/skills/alpha", slug: "alpha" })
+        .mockResolvedValueOnce({ sourceLocator: "/skills/beta", slug: "beta" }),
+    };
+
+    const paths = await resolveSkillPaths(
+      mockService as any,
+      "proj-1",
+      ["alpha", "beta"],
+    );
+
+    expect(paths).toEqual([
+      "/skills/alpha/SKILL.md",
+      "/skills/beta/SKILL.md",
+    ]);
+    expect(mockService.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("falls back to skillPaths when desiredSkills is empty", async () => {
+    const { resolveSkillPaths } = await import("../../adapter/claude-local-adapter.js");
+
+    const mockService = { get: vi.fn() };
+    const paths = await resolveSkillPaths(mockService as any, "proj-1", []);
+
+    expect(paths).toEqual([]);
+    expect(mockService.get).not.toHaveBeenCalled();
+  });
+
+  it("skips slugs that resolve to null (missing skills)", async () => {
+    const { resolveSkillPaths } = await import("../../adapter/claude-local-adapter.js");
+
+    const mockService = {
+      get: vi.fn()
+        .mockResolvedValueOnce({ sourceLocator: "/skills/good", slug: "good" })
+        .mockResolvedValueOnce(null),
+    };
+
+    const paths = await resolveSkillPaths(mockService as any, "proj-1", ["good", "missing"]);
+    expect(paths).toEqual(["/skills/good/SKILL.md"]);
+  });
+});

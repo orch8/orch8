@@ -12,12 +12,31 @@ import { DEFAULT_SKILLS_DIR } from "@orch/shared";
 import { SessionManager } from "./session-manager.js";
 import { runProcess } from "./process-runner.js";
 import { resolveClaudePath } from "./resolve-claude-path.js";
+import type { ProjectSkillService } from "../services/project-skill.service.js";
+
+export async function resolveSkillPaths(
+  skillService: ProjectSkillService,
+  projectId: string,
+  desiredSkills: string[],
+): Promise<string[]> {
+  if (desiredSkills.length === 0) return [];
+
+  const paths: string[] = [];
+  for (const slug of desiredSkills) {
+    const skill = await skillService.get(projectId, slug);
+    if (skill?.sourceLocator) {
+      paths.push(join(skill.sourceLocator, "SKILL.md"));
+    }
+  }
+  return paths;
+}
 
 export interface RunAgentPrompts {
   heartbeatTemplate: string;
   bootstrapTemplate?: string;
   sessionHandoff?: string;
   skillPaths?: string[];
+  desiredSkills?: string[];
 }
 
 export class ClaudeLocalAdapter {
@@ -26,6 +45,7 @@ export class ClaudeLocalAdapter {
   constructor(
     private db: SchemaDb,
     private spawnFn: SpawnFn = nodeSpawn,
+    private projectSkillService?: ProjectSkillService,
   ) {
     this.sessionManager = new SessionManager(db);
   }
@@ -56,10 +76,18 @@ export class ClaudeLocalAdapter {
     let instructionsFilePath: string | undefined;
 
     try {
-      // Always inject the orch8 skill — it's the agent's guide to the control plane.
-      // Custom agents may have no other skills; this ensures universal coverage.
+      // Resolve skill paths: desiredSkills (new) takes precedence over skillPaths (legacy)
+      let effectiveSkillPaths: string[];
+      if (prompts.desiredSkills && prompts.desiredSkills.length > 0 && this.projectSkillService) {
+        effectiveSkillPaths = await resolveSkillPaths(
+          this.projectSkillService, ctx.projectId, prompts.desiredSkills,
+        );
+      } else {
+        effectiveSkillPaths = [...(prompts.skillPaths ?? [])];
+      }
+
+      // Always inject the orch8 skill
       const ORCH8_SKILL_PATH = join(DEFAULT_SKILLS_DIR, "orch8", "SKILL.md");
-      const effectiveSkillPaths = [...(prompts.skillPaths ?? [])];
       if (!effectiveSkillPaths.includes(ORCH8_SKILL_PATH)) {
         effectiveSkillPaths.push(ORCH8_SKILL_PATH);
       }
