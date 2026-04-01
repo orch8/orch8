@@ -29,6 +29,7 @@ declare module "fastify" {
     broadcastService: BroadcastService;
     notificationService: NotificationService;
     projectSkillService: import("./services/project-skill.service.js").ProjectSkillService;
+    instructionBundleService: import("./services/instruction-bundle.service.js").InstructionBundleService;
   }
   interface FastifyRequest {
     agent?: typeof schema.agents.$inferSelect;
