@@ -45,6 +45,30 @@ export function buildEnv(
     env.ORCH_SUBTASK_SCOPE = ctx.subtaskScope;
   }
 
+  // Workspace metadata (spec Phase 3)
+  if (ctx.workspaceBranch) {
+    env.ORCH_WORKSPACE_BRANCH = ctx.workspaceBranch;
+  }
+  if (ctx.workspaceRepoUrl) {
+    env.ORCH_WORKSPACE_REPO_URL = ctx.workspaceRepoUrl;
+  }
+  if (ctx.worktreePath) {
+    env.ORCH_WORKTREE_PATH = ctx.worktreePath;
+  }
+  if (ctx.workspaceId) {
+    env.ORCH_WORKSPACE_ID = ctx.workspaceId;
+  }
+
+  // Wake trigger details (spec Phase 3)
+  if (ctx.wakeCommentId) {
+    env.ORCH_WAKE_COMMENT_ID = ctx.wakeCommentId;
+  }
+
+  // Task linkage (spec Phase 3)
+  if (ctx.linkedIssueIds) {
+    env.ORCH_LINKED_ISSUE_IDS = ctx.linkedIssueIds;
+  }
+
   return env;
 }
 

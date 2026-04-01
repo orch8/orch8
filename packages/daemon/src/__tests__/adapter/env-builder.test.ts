@@ -89,3 +89,40 @@ describe("resolveBillingType", () => {
     expect(resolveBillingType({})).toBe("subscription");
   });
 });
+
+describe("buildEnv — Phase 3 vars", () => {
+  it("sets ORCH_WORKSPACE_BRANCH when workspaceBranch is provided", () => {
+    const env = buildEnv({}, { ...baseContext, workspaceBranch: "feature/foo" }, {});
+    expect(env.ORCH_WORKSPACE_BRANCH).toBe("feature/foo");
+  });
+
+  it("does not set ORCH_WORKSPACE_BRANCH when workspaceBranch is undefined", () => {
+    const env = buildEnv({}, baseContext, {});
+    expect(env.ORCH_WORKSPACE_BRANCH).toBeUndefined();
+  });
+
+  it("sets ORCH_WORKSPACE_REPO_URL when workspaceRepoUrl is provided", () => {
+    const env = buildEnv({}, { ...baseContext, workspaceRepoUrl: "https://github.com/org/repo.git" }, {});
+    expect(env.ORCH_WORKSPACE_REPO_URL).toBe("https://github.com/org/repo.git");
+  });
+
+  it("sets ORCH_WORKTREE_PATH when worktreePath is provided", () => {
+    const env = buildEnv({}, { ...baseContext, worktreePath: "/worktrees/task-123" }, {});
+    expect(env.ORCH_WORKTREE_PATH).toBe("/worktrees/task-123");
+  });
+
+  it("sets ORCH_WORKSPACE_ID when workspaceId is provided", () => {
+    const env = buildEnv({}, { ...baseContext, workspaceId: "proj-1" }, {});
+    expect(env.ORCH_WORKSPACE_ID).toBe("proj-1");
+  });
+
+  it("sets ORCH_WAKE_COMMENT_ID when wakeCommentId is provided", () => {
+    const env = buildEnv({}, { ...baseContext, wakeCommentId: "comment-42" }, {});
+    expect(env.ORCH_WAKE_COMMENT_ID).toBe("comment-42");
+  });
+
+  it("sets ORCH_LINKED_ISSUE_IDS when linkedIssueIds is provided", () => {
+    const env = buildEnv({}, { ...baseContext, linkedIssueIds: "ISS-1,ISS-2,ISS-3" }, {});
+    expect(env.ORCH_LINKED_ISSUE_IDS).toBe("ISS-1,ISS-2,ISS-3");
+  });
+});
