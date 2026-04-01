@@ -1,9 +1,10 @@
+// packages/dashboard/src/components/onboarding/WelcomeWizard.tsx
 import { useState } from "react";
 import { WizardStepper } from "../shared/WizardStepper.js";
 import { FormField } from "../shared/FormField.js";
-import { TemplateStep, AGENT_TEMPLATES } from "../agent-editor/TemplateStep.js";
+import { TemplateStep } from "../agent-editor/TemplateStep.js";
 import { useCreateProject } from "../../hooks/useProjects.js";
-import { useCreateAgent } from "../../hooks/useAgents.js";
+import { useAddBundledAgents } from "../../hooks/useBundledAgents.js";
 import { useCreateTask } from "../../hooks/useTasks.js";
 
 interface WelcomeWizardProps {
@@ -13,7 +14,7 @@ interface WelcomeWizardProps {
 export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
   const [step, setStep] = useState(0);
   const createProject = useCreateProject();
-  const createAgent = useCreateAgent();
+  const addBundledAgents = useAddBundledAgents();
   const createTask = useCreateTask();
   // Project fields
   const [projectName, setProjectName] = useState("");
@@ -21,11 +22,19 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
   const [defaultBranch, setDefaultBranch] = useState("main");
   const [dailyBudget, setDailyBudget] = useState("");
 
-  // Agent template
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  // Selected bundled agents (multi-select)
+  const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
 
   // First task
   const [taskTitle, setTaskTitle] = useState("");
+
+  function toggleAgent(agentId: string) {
+    setSelectedAgentIds((prev) =>
+      prev.includes(agentId)
+        ? prev.filter((id) => id !== agentId)
+        : [...prev, agentId],
+    );
+  }
 
   const steps = [
     {
@@ -101,11 +110,15 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
       label: "Agents",
       content: (
         <div className="flex flex-col gap-4">
-          <h3 className="text-lg font-semibold text-zinc-100">Create Your First Agent</h3>
+          <h3 className="text-lg font-semibold text-zinc-100">Add Agents</h3>
           <p className="text-xs text-zinc-500">
-            We recommend starting with an Implementer and a Reviewer. You can skip this and add agents later.
+            Select agents to add to your project. You can skip this and add agents later.
           </p>
-          <TemplateStep selectedTemplate={selectedTemplate} onSelect={(t) => setSelectedTemplate(t.key)} />
+          <TemplateStep
+            mode="multi"
+            selected={selectedAgentIds}
+            onToggle={toggleAgent}
+          />
         </div>
       ),
     },
@@ -137,28 +150,18 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
       homeDir: repoPath,
       worktreeDir: `${repoPath}/.worktrees`,
       defaultBranch,
-
       budgetLimitUsd: dailyBudget ? parseFloat(dailyBudget) : undefined,
     });
 
-    // Create agent if template selected
-    if (selectedTemplate) {
-      const tmpl = AGENT_TEMPLATES.find((t) => t.key === selectedTemplate);
-      if (tmpl) {
-        try {
-          await createAgent.mutateAsync({
-            id: tmpl.key,
-            projectId: project.id,
-            name: tmpl.label,
-            role: tmpl.defaults.role as any,
-            model: tmpl.defaults.model,
-            systemPrompt: tmpl.defaults.systemPrompt,
-            canCreateTasks: tmpl.defaults.canCreateTasks,
-            canMoveTo: tmpl.defaults.canMoveTo as any,
-          });
-        } catch {
-          // Agent creation failure should not block wizard completion
-        }
+    // Batch-create selected bundled agents
+    if (selectedAgentIds.length > 0) {
+      try {
+        await addBundledAgents.mutateAsync({
+          projectId: project.id,
+          agentIds: selectedAgentIds,
+        });
+      } catch {
+        // Agent creation failure should not block wizard completion
       }
     }
 
@@ -170,7 +173,6 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
           title: taskTitle.trim(),
           taskType: "quick",
           priority: "medium",
-          assignee: selectedTemplate ?? undefined,
         } as any);
       } catch {
         // Task creation failure should not block wizard completion
