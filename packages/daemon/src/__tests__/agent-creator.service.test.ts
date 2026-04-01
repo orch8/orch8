@@ -54,7 +54,7 @@ describe("AgentCreatorService", () => {
 
   afterAll(async () => {
     await teardownTestDb(testDb);
-  });
+  }, 60_000);
 
   beforeEach(() => {
     broadcasts.length = 0;
@@ -306,6 +306,47 @@ describe("AgentCreatorService", () => {
       await expect(
         service.confirmAgent(sessionId, agentService),
       ).rejects.toThrow();
+    });
+  });
+
+  describe("cancelSession", () => {
+    it("kills process and cleans up session", async () => {
+      const sessionId = await service.startSession(projectId, "/tmp/ct");
+      service.cancelSession(sessionId);
+
+      expect(lastMockProcess.kill).toHaveBeenCalled();
+      expect(service.hasActiveSession(sessionId)).toBe(false);
+      expect(service.hasActiveProjectSession(projectId)).toBe(false);
+    });
+
+    it("throws if no active session", () => {
+      expect(() => service.cancelSession("nonexistent")).toThrow("No active creator session");
+    });
+
+    it("allows starting a new session after cancellation", async () => {
+      const sessionId = await service.startSession(projectId, "/tmp/ct");
+      service.cancelSession(sessionId);
+
+      const newSessionId = await service.startSession(projectId, "/tmp/ct");
+      expect(newSessionId).toBeTruthy();
+      expect(newSessionId).not.toBe(sessionId);
+    });
+  });
+
+  describe("idle timeout", () => {
+    it("cleans up session after idle timeout", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const sessionId = await service.startSession(projectId, "/tmp/ct");
+        expect(service.hasActiveSession(sessionId)).toBe(true);
+
+        vi.advanceTimersByTime(10 * 60 * 1000); // 10 minutes
+
+        expect(service.hasActiveSession(sessionId)).toBe(false);
+        expect(service.hasActiveProjectSession(projectId)).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

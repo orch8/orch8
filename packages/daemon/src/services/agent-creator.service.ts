@@ -266,6 +266,18 @@ export class AgentCreatorService {
     if (proc) proc.kill("SIGTERM");
   }
 
+  cancelSession(sessionId: string): void {
+    this.logger?.info({ sessionId }, "agent-creator: cancelSession called");
+
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error("No active creator session with this ID");
+    }
+
+    this.cleanupSession(sessionId);
+    this.logger?.info({ sessionId }, "agent-creator: session cancelled");
+  }
+
   async sendMessage(sessionId: string, content: string): Promise<void> {
     this.logger?.info({ sessionId, contentLength: content.length }, "agent-creator: sendMessage called");
 
