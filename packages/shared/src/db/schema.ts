@@ -464,3 +464,20 @@ export const projectSkills = pgTable("project_skills", {
 }, (table) => [
   uniqueIndex("project_skills_project_slug_idx").on(table.projectId, table.slug),
 ]);
+
+// ─── Instruction Bundles ────────────────────────────────
+
+export const instructionBundles = pgTable("instruction_bundles", {
+  id: text("id").primaryKey().$defaultFn(() => `ibun_${randomUUID()}`),
+  agentId: text("agent_id").notNull(),
+  projectId: text("project_id").notNull().references(() => projects.id),
+  mode: text("mode").notNull().default("managed"),
+  rootPath: text("root_path").notNull(),
+  entryFile: text("entry_file").notNull().default("AGENTS.md"),
+  fileInventory: jsonb("file_inventory").notNull().default([]),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("instruction_bundles_agent_project_idx").on(table.agentId, table.projectId),
+]);
