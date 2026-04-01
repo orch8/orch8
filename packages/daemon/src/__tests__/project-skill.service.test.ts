@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { deriveTrustLevel, ProjectSkillService } from "../services/project-skill.service.js";
+import { SeedingService } from "../services/seeding.service.js";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { projects, projectSkills } from "@orch/shared/db";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
@@ -259,5 +260,53 @@ describe("ProjectSkillService", () => {
       const stale = await service.get(projectId, "removed");
       expect(stale).toBeNull();
     });
+  });
+});
+
+describe("SeedingService + ProjectSkillService integration", () => {
+  let testDb: TestDb;
+  let skillService: ProjectSkillService;
+  let projectId: string;
+  let projectHomeDir: string;
+
+  beforeAll(async () => {
+    testDb = await setupTestDb();
+  }, 60_000);
+
+  afterAll(async () => {
+    await teardownTestDb(testDb);
+  });
+
+  beforeEach(async () => {
+    await testDb.db.delete(projectSkills);
+    await testDb.db.delete(projects);
+
+    projectHomeDir = await mkdtemp(join(tmpdir(), "orch-seed-test-"));
+
+    const [proj] = await testDb.db.insert(projects).values({
+      name: "Seed Test",
+      slug: "seed-test",
+      homeDir: projectHomeDir,
+      worktreeDir: join(projectHomeDir, "worktrees"),
+    }).returning();
+    projectId = proj.id;
+
+    skillService = new ProjectSkillService(testDb.db);
+  });
+
+  afterEach(async () => {
+    await rm(projectHomeDir, { recursive: true, force: true });
+  });
+
+  it("copyDefaults populates project skills from disk", async () => {
+    const seedingService = new SeedingService();
+    await seedingService.copyDefaults(projectHomeDir);
+    await skillService.syncFromDisk(projectId, projectHomeDir);
+
+    const skills = await skillService.list(projectId);
+    // Should contain at least the orch8 skill from bundled defaults
+    const slugs = skills.map((s) => s.slug);
+    expect(slugs).toContain("orch8");
+    expect(skills.length).toBeGreaterThan(0);
   });
 });
