@@ -7,6 +7,7 @@ import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
 import { ActivityTimeline } from "../shared/ActivityTimeline.js";
 import { DependenciesSection } from "./DependenciesSection.js";
 import { TaskActions } from "./TaskActions.js";
+import { PipelineDetail } from "../pipeline/PipelineDetail.js";
 
 interface TaskDetailPanelProps {
   taskId: string;
@@ -97,8 +98,18 @@ export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelP
         </div>
       </div>
 
-      {/* Phase progress for complex tasks */}
-      {task.taskType === "complex" && (
+      {/* Pipeline progress */}
+      {task.pipelineId && (
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            Pipeline Progress
+          </h4>
+          <PipelineDetail pipelineId={task.pipelineId} />
+        </div>
+      )}
+
+      {/* Legacy phase progress for complex tasks without pipeline */}
+      {task.taskType === "complex" && !task.pipelineId && (
         <div>
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
             Phase Progress
