@@ -102,6 +102,16 @@ export interface CommentNewPayload {
   authorId: string;
 }
 
+export interface RunEventPayload {
+  runId: string;
+  seq: number;
+  eventType: string;
+  toolName: string | null;
+  summary: string;
+  timestamp: string;
+  payload: unknown;
+}
+
 export class BroadcastService {
   constructor(private sockets: Set<WebSocket>) {}
 
@@ -127,6 +137,10 @@ export class BroadcastService {
 
   runFailed(projectId: string, payload: RunFailedPayload): void {
     this.send(projectId, { type: "run_failed", ...payload });
+  }
+
+  runEvent(projectId: string, payload: RunEventPayload): void {
+    this.send(projectId, { type: "run_event", ...payload });
   }
 
   budgetAlert(projectId: string, payload: BudgetAlertPayload): void {

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import type { WebSocket } from "ws";
 import { BroadcastService } from "../services/broadcast.service.js";
 
 function createMockSocket() {
@@ -115,5 +116,30 @@ describe("BroadcastService", () => {
     expect(payload.type).toBe("budget_alert");
     expect(payload.level).toBe("agent");
     expect(payload.entityId).toBe("eng");
+  });
+
+  it("broadcasts run_event to all connected sockets", () => {
+    const s1 = createMockSocket();
+    const s2 = createMockSocket();
+    const sockets = new Set([s1, s2]) as unknown as Set<WebSocket>;
+    const bs = new BroadcastService(sockets);
+
+    bs.runEvent("proj_1", {
+      runId: "run_1",
+      seq: 0,
+      eventType: "init",
+      toolName: null,
+      summary: "Session initialized (claude-sonnet-4-6)",
+      timestamp: "2026-04-01T10:00:00.000Z",
+      payload: { type: "system", subtype: "init" },
+    });
+
+    for (const s of [s1, s2]) {
+      const payload = JSON.parse(s.send.mock.calls[0][0]);
+      expect(payload.type).toBe("run_event");
+      expect(payload.runId).toBe("run_1");
+      expect(payload.seq).toBe(0);
+      expect(payload.eventType).toBe("init");
+    }
   });
 });
