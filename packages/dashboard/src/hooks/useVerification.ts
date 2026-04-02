@@ -20,7 +20,7 @@ export function useConvertTask() {
       taskType,
     }: {
       taskId: string;
-      taskType: "quick" | "complex";
+      taskType: "quick";
     }) => api.post(`/tasks/${taskId}/convert`, { taskType }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tasks"] });

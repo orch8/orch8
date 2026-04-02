@@ -75,7 +75,6 @@ export function TaskSidebar({ task, projectId, allTasks }: TaskSidebarProps) {
         <p className="mt-1 text-sm">
           <span className={`rounded px-2 py-0.5 text-xs font-medium ${
             task.taskType === "quick" ? "bg-blue-900/50 text-blue-300"
-              : task.taskType === "complex" ? "bg-purple-900/50 text-purple-300"
               : "bg-amber-900/50 text-amber-300"
           }`}>
             {task.taskType}

@@ -2,13 +2,11 @@ import type { Task } from "../../types.js";
 
 const TYPE_COLORS: Record<string, string> = {
   quick: "bg-blue-900/50 text-blue-300",
-  complex: "bg-purple-900/50 text-purple-300",
   brainstorm: "bg-amber-900/50 text-amber-300",
 };
 
 const TYPE_LABELS: Record<string, string> = {
   quick: "Quick",
-  complex: "Complex",
   brainstorm: "Brainstorm",
 };
 

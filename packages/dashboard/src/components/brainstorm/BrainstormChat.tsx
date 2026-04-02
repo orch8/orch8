@@ -114,14 +114,6 @@ export function BrainstormChat({ taskId }: BrainstormChatProps) {
             Convert to Quick
           </button>
           <button
-            onClick={() =>
-              api.post<Task>(`/tasks/${taskId}/convert`, { taskType: "complex" })
-            }
-            className="rounded bg-purple-900/30 px-3 py-1 text-xs font-medium text-purple-300 hover:bg-purple-900/50"
-          >
-            Convert to Complex
-          </button>
-          <button
             onClick={() => setShowKillConfirm(true)}
             className="rounded bg-red-900/30 px-3 py-1 text-xs font-medium text-red-300 hover:bg-red-900/50"
           >

@@ -72,14 +72,6 @@ function BrainstormListPage() {
                   >
                     Convert to Quick
                   </button>
-                  <button
-                    onClick={() =>
-                      api.post(`/tasks/${task.id}/convert`, { taskType: "complex" })
-                    }
-                    className="rounded bg-purple-600 px-3 py-1 text-xs font-medium text-white hover:bg-purple-500"
-                  >
-                    Convert to Complex
-                  </button>
                 </>
               )}
               <button

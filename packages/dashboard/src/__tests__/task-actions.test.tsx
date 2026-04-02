@@ -15,12 +15,11 @@ describe("TaskActions", () => {
     expect(screen.getByText("Mark Complete")).toBeInTheDocument();
   });
 
-  it("shows Convert to Task for brainstorm tasks with ready status", () => {
+  it("shows Convert to Quick for brainstorm tasks with ready status", () => {
     renderWithProviders(
       <TaskActions taskId="task_1" column="backlog" taskType="brainstorm" brainstormStatus="ready" />,
     );
     expect(screen.getByText("Convert to Quick")).toBeInTheDocument();
-    expect(screen.getByText("Convert to Complex")).toBeInTheDocument();
   });
 
   it("hides actions when not applicable", () => {

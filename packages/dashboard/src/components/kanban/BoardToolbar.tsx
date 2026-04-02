@@ -66,7 +66,6 @@ export function BoardToolbar({ projectId, onFilterChange }: BoardToolbarProps) {
         >
           <option value="">All types</option>
           <option value="quick">Quick</option>
-          <option value="complex">Complex</option>
           <option value="brainstorm">Brainstorm</option>
         </select>
       </div>
