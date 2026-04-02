@@ -26,6 +26,13 @@ interface FailStepResult {
   step: PipelineStep;
 }
 
+interface RejectStepResult {
+  pipeline: Pipeline;
+  rejectedStep: PipelineStep;
+  targetStep: PipelineStep;
+  newTask: Task;
+}
+
 export class PipelineService {
   constructor(
     private db: SchemaDb,
@@ -242,6 +249,87 @@ export class PipelineService {
       completedStep: updatedStep,
       nextStep: updatedStep,
       nextTask: newTask,
+    };
+  }
+
+  async rejectStep(
+    pipelineId: string,
+    rejectingStepId: string,
+    targetStepId: string,
+    feedback: string,
+  ): Promise<RejectStepResult> {
+    const data = await this.getWithSteps(pipelineId);
+    if (!data) throw new Error("Pipeline not found");
+
+    const rejectingStep = data.steps.find(s => s.id === rejectingStepId);
+    if (!rejectingStep) throw new Error("Rejecting step not found");
+
+    const targetStep = data.steps.find(s => s.id === targetStepId);
+    if (!targetStep) throw new Error("Target step not found");
+
+    if (targetStep.order >= rejectingStep.order) {
+      throw new Error("Target step must have a lower order than the rejecting step");
+    }
+
+    // 1. Mark rejecting step as failed with rejection feedback
+    const [updatedRejectingStep] = await this.db
+      .update(pipelineSteps)
+      .set({
+        status: "failed",
+        outputSummary: `[REJECTED] ${feedback}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(pipelineSteps.id, rejectingStepId))
+      .returning();
+
+    // 2. Reset intermediate steps (target.order <= order < rejecting.order) to pending
+    for (const step of data.steps) {
+      if (step.order >= targetStep.order && step.order < rejectingStep.order) {
+        await this.db
+          .update(pipelineSteps)
+          .set({ status: "pending", taskId: null, updatedAt: new Date() })
+          .where(eq(pipelineSteps.id, step.id));
+      }
+    }
+
+    // 3. Update pipeline status and currentStep
+    const [updatedPipeline] = await this.db
+      .update(pipelines)
+      .set({
+        status: "running",
+        currentStep: targetStep.order,
+        updatedAt: new Date(),
+      })
+      .where(eq(pipelines.id, pipelineId))
+      .returning();
+
+    // 4. Build task description with rejection feedback
+    const originalPrompt = targetStep.promptOverride ?? `Pipeline step: ${targetStep.label}`;
+    const taskDescription = `${originalPrompt}\n\n---\n\n**Rejection feedback from ${rejectingStep.label} step:**\n${feedback}`;
+
+    // 5. Create new task for target step
+    const [newTask] = await this.db.insert(tasks).values({
+      projectId: updatedPipeline.projectId,
+      title: `[${updatedPipeline.name}] ${targetStep.label}`,
+      description: taskDescription,
+      taskType: "quick",
+      assignee: targetStep.agentId,
+      pipelineId: updatedPipeline.id,
+      pipelineStepId: targetStep.id,
+    }).returning();
+
+    // 6. Link task to target step
+    const [updatedTargetStep] = await this.db
+      .update(pipelineSteps)
+      .set({ taskId: newTask.id, status: "pending", updatedAt: new Date() })
+      .where(eq(pipelineSteps.id, targetStepId))
+      .returning();
+
+    return {
+      pipeline: updatedPipeline,
+      rejectedStep: updatedRejectingStep,
+      targetStep: updatedTargetStep,
+      newTask,
     };
   }
 
