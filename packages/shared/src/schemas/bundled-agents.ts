@@ -18,8 +18,4 @@ export interface BundledAgent {
   systemPrompt: string;
   promptTemplate?: string;
   bootstrapPromptTemplate?: string;
-  researchPrompt?: string;
-  planPrompt?: string;
-  implementPrompt?: string;
-  reviewPrompt?: string;
 }

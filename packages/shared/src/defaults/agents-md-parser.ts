@@ -23,19 +23,11 @@ export interface ParsedAgentsMd {
   systemPrompt: string;
   promptTemplate?: string;
   bootstrapPromptTemplate?: string;
-  researchPrompt?: string;
-  planPrompt?: string;
-  implementPrompt?: string;
-  reviewPrompt?: string;
 }
 
 const SECTION_MAP: Record<string, keyof ParsedAgentsMd> = {
   "on task assignment": "promptTemplate",
   "on first run": "bootstrapPromptTemplate",
-  "phase: research": "researchPrompt",
-  "phase: plan": "planPrompt",
-  "phase: implement": "implementPrompt",
-  "phase: review": "reviewPrompt",
 };
 
 export function parseAgentsMd(content: string): ParsedAgentsMd {
@@ -98,18 +90,6 @@ export function parseAgentsMd(content: string): ParsedAgentsMd {
     ...(sections.bootstrapPromptTemplate != null
       ? { bootstrapPromptTemplate: sections.bootstrapPromptTemplate }
       : {}),
-    ...(sections.researchPrompt != null
-      ? { researchPrompt: sections.researchPrompt }
-      : {}),
-    ...(sections.planPrompt != null
-      ? { planPrompt: sections.planPrompt }
-      : {}),
-    ...(sections.implementPrompt != null
-      ? { implementPrompt: sections.implementPrompt }
-      : {}),
-    ...(sections.reviewPrompt != null
-      ? { reviewPrompt: sections.reviewPrompt }
-      : {}),
   };
 }
 
@@ -117,10 +97,6 @@ interface ParsedSections {
   systemPrompt: string;
   promptTemplate?: string;
   bootstrapPromptTemplate?: string;
-  researchPrompt?: string;
-  planPrompt?: string;
-  implementPrompt?: string;
-  reviewPrompt?: string;
 }
 
 function parseSections(body: string): ParsedSections {

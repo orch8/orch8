@@ -1,11 +1,10 @@
 import { z } from "zod";
 
-export const TaskTypeSchema = z.enum(["quick", "complex", "brainstorm"]);
+export const TaskTypeSchema = z.enum(["quick", "brainstorm"]);
 export const TaskColumnSchema = z.enum([
   "backlog", "blocked", "in_progress", "done",
 ]);
 export const TaskPrioritySchema = z.enum(["high", "medium", "low"]);
-export const ComplexPhaseSchema = z.enum(["research", "plan", "implement", "review"]);
 export const BrainstormStatusSchema = z.enum(["active", "idle", "ready", "expired"]);
 
 const taskBase = {
@@ -21,19 +20,6 @@ export const CreateQuickTaskSchema = z.object({
   taskType: z.literal("quick"),
 });
 
-export const CreateComplexTaskSchema = z.object({
-  ...taskBase,
-  taskType: z.literal("complex"),
-  researchAgentId: z.string().optional(),
-  planAgentId: z.string().optional(),
-  implementAgentId: z.string().optional(),
-  reviewAgentId: z.string().optional(),
-  researchPromptOverride: z.string().optional(),
-  planPromptOverride: z.string().optional(),
-  implementPromptOverride: z.string().optional(),
-  reviewPromptOverride: z.string().optional(),
-});
-
 export const CreateBrainstormTaskSchema = z.object({
   ...taskBase,
   taskType: z.literal("brainstorm"),
@@ -41,7 +27,6 @@ export const CreateBrainstormTaskSchema = z.object({
 
 export const CreateTaskSchema = z.discriminatedUnion("taskType", [
   CreateQuickTaskSchema,
-  CreateComplexTaskSchema,
   CreateBrainstormTaskSchema,
 ]);
 
@@ -51,27 +36,15 @@ export const UpdateTaskSchema = z.object({
   column: TaskColumnSchema.optional(),
   priority: TaskPrioritySchema.optional(),
   assignee: z.string().nullable().optional(),
-  researchAgentId: z.string().nullable().optional(),
-  planAgentId: z.string().nullable().optional(),
-  implementAgentId: z.string().nullable().optional(),
-  reviewAgentId: z.string().nullable().optional(),
   autoCommit: z.boolean().optional(),
   autoPr: z.boolean().optional(),
   branch: z.string().nullable().optional(),
   worktreePath: z.string().nullable().optional(),
   mcpTools: z.array(z.string()).optional(),
-  researchPromptOverride: z.string().nullable().optional(),
-  planPromptOverride: z.string().nullable().optional(),
-  implementPromptOverride: z.string().nullable().optional(),
-  reviewPromptOverride: z.string().nullable().optional(),
-});
-
-export const CompletePhaseSchema = z.object({
-  output: z.string().min(1),
 });
 
 export const ConvertTaskSchema = z.object({
-  taskType: z.enum(["quick", "complex"]),
+  taskType: z.literal("quick"),
 });
 
 export const TaskFilterSchema = z.object({
@@ -79,13 +52,11 @@ export const TaskFilterSchema = z.object({
   column: TaskColumnSchema.optional(),
   taskType: TaskTypeSchema.optional(),
   assignee: z.string().optional(),
-  complexPhase: ComplexPhaseSchema.optional(),
   pipelineId: z.string().optional(),
 });
 
 export type CreateTask = z.infer<typeof CreateTaskSchema>;
 export type CreateTaskInput = z.input<typeof CreateTaskSchema>;
 export type UpdateTask = z.infer<typeof UpdateTaskSchema>;
-export type CompletePhase = z.infer<typeof CompletePhaseSchema>;
 export type ConvertTask = z.infer<typeof ConvertTaskSchema>;
 export type TaskFilter = z.infer<typeof TaskFilterSchema>;
