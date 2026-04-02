@@ -25,6 +25,7 @@ function useProjectSections(): NavSection[] {
       items: [
         { to: `${prefix}/board`, label: "Board" },
         { to: `${prefix}/brainstorm`, label: "Brainstorm" },
+        { to: `${prefix}/pipelines`, label: "Pipelines" },
       ],
     },
     {
