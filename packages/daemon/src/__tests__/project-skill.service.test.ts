@@ -254,35 +254,129 @@ describe("ProjectSkillService", () => {
   });
 
   describe("syncFromDisk", () => {
-    it("upserts skills from disk and prunes stale rows", async () => {
-      // Create two skill directories on disk
-      const skillsBase = join(projectHomeDir, ".orch8", "skills");
-      const s1 = join(skillsBase, "alpha");
-      const s2 = join(skillsBase, "beta");
-      await mkdir(s1, { recursive: true });
-      await mkdir(s2, { recursive: true });
-      await writeFile(join(s1, "SKILL.md"), "---\nname: Alpha\ndescription: First\n---\n# Alpha\nA content");
-      await writeFile(join(s2, "SKILL.md"), "---\nname: Beta\n---\n# Beta\nB content");
+    it("registers global skills with sourceType 'global'", async () => {
+      // Create a fake global skills dir
+      const globalDir = await mkdtemp(join(tmpdir(), "orch-global-"));
+      const tddDir = join(globalDir, "tdd");
+      await mkdir(tddDir, { recursive: true });
+      await writeFile(join(tddDir, "SKILL.md"), "---\nname: TDD\ndescription: Test-driven dev\n---\n# TDD\nContent");
 
-      // Insert a stale skill in DB
+      await service.syncFromDisk(projectId, projectHomeDir, globalDir);
+
+      const skills = await service.list(projectId);
+      expect(skills).toHaveLength(1);
+      expect(skills[0].slug).toBe("tdd");
+      expect(skills[0].sourceType).toBe("global");
+
+      await rm(globalDir, { recursive: true, force: true });
+    });
+
+    it("excludes orch8 from DB registration", async () => {
+      const globalDir = await mkdtemp(join(tmpdir(), "orch-global-"));
+      const orch8Dir = join(globalDir, "orch8");
+      const tddDir = join(globalDir, "tdd");
+      await mkdir(orch8Dir, { recursive: true });
+      await mkdir(tddDir, { recursive: true });
+      await writeFile(join(orch8Dir, "SKILL.md"), "---\nname: orch8\n---\n# Orch8\nContent");
+      await writeFile(join(tddDir, "SKILL.md"), "---\nname: TDD\n---\n# TDD\nContent");
+
+      await service.syncFromDisk(projectId, projectHomeDir, globalDir);
+
+      const skills = await service.list(projectId);
+      const slugs = skills.map((s) => s.slug);
+      expect(slugs).not.toContain("orch8");
+      expect(slugs).toContain("tdd");
+
+      await rm(globalDir, { recursive: true, force: true });
+    });
+
+    it("project-local skills override global skills with same slug", async () => {
+      const globalDir = await mkdtemp(join(tmpdir(), "orch-global-"));
+      const globalTdd = join(globalDir, "tdd");
+      await mkdir(globalTdd, { recursive: true });
+      await writeFile(join(globalTdd, "SKILL.md"), "---\nname: TDD Global\n---\n# TDD\nGlobal content");
+
+      // Create a local override
+      const localTdd = join(projectHomeDir, ".orch8", "skills", "tdd");
+      await mkdir(localTdd, { recursive: true });
+      await writeFile(join(localTdd, "SKILL.md"), "---\nname: TDD Local Override\n---\n# TDD\nLocal content");
+
+      await service.syncFromDisk(projectId, projectHomeDir, globalDir);
+
+      const skills = await service.list(projectId);
+      const tdd = skills.find((s) => s.slug === "tdd");
+      expect(tdd).toBeDefined();
+      expect(tdd!.sourceType).toBe("local_path");
+      expect(tdd!.name).toBe("TDD Local Override");
+
+      await rm(globalDir, { recursive: true, force: true });
+    });
+
+    it("registers both global and local skills when slugs differ", async () => {
+      const globalDir = await mkdtemp(join(tmpdir(), "orch-global-"));
+      const globalTdd = join(globalDir, "tdd");
+      await mkdir(globalTdd, { recursive: true });
+      await writeFile(join(globalTdd, "SKILL.md"), "---\nname: TDD\n---\n# TDD\nContent");
+
+      const localCustom = join(projectHomeDir, ".orch8", "skills", "my-custom");
+      await mkdir(localCustom, { recursive: true });
+      await writeFile(join(localCustom, "SKILL.md"), "---\nname: My Custom\n---\n# Custom\nContent");
+
+      await service.syncFromDisk(projectId, projectHomeDir, globalDir);
+
+      const skills = await service.list(projectId);
+      const slugs = skills.map((s) => s.slug).sort();
+      expect(slugs).toEqual(["my-custom", "tdd"]);
+
+      const tdd = skills.find((s) => s.slug === "tdd")!;
+      const custom = skills.find((s) => s.slug === "my-custom")!;
+      expect(tdd.sourceType).toBe("global");
+      expect(custom.sourceType).toBe("local_path");
+
+      await rm(globalDir, { recursive: true, force: true });
+    });
+
+    it("prunes stale DB rows not present on disk", async () => {
+      const globalDir = await mkdtemp(join(tmpdir(), "orch-global-"));
+
+      // Insert a stale skill directly in DB
       await testDb.db.insert(projectSkills).values({
         projectId,
         slug: "removed",
         name: "Removed",
         markdown: "gone",
-        sourceLocator: join(skillsBase, "removed"),
+        sourceType: "global",
+        sourceLocator: join(globalDir, "removed"),
         trustLevel: "markdown_only",
       });
 
-      await service.syncFromDisk(projectId, projectHomeDir);
+      await service.syncFromDisk(projectId, projectHomeDir, globalDir);
 
-      const skills = await service.list(projectId);
-      const slugs = skills.map((s) => s.slug).sort();
-      expect(slugs).toEqual(["alpha", "beta"]);
-
-      // Stale "removed" should be pruned
       const stale = await service.get(projectId, "removed");
       expect(stale).toBeNull();
+
+      await rm(globalDir, { recursive: true, force: true });
+    });
+
+    it("updates existing rows when content changes on disk", async () => {
+      const globalDir = await mkdtemp(join(tmpdir(), "orch-global-"));
+      const tddDir = join(globalDir, "tdd");
+      await mkdir(tddDir, { recursive: true });
+      await writeFile(join(tddDir, "SKILL.md"), "---\nname: TDD v1\n---\n# TDD\nOld content");
+
+      await service.syncFromDisk(projectId, projectHomeDir, globalDir);
+      let skills = await service.list(projectId);
+      expect(skills[0].name).toBe("TDD v1");
+
+      // Update content on disk
+      await writeFile(join(tddDir, "SKILL.md"), "---\nname: TDD v2\n---\n# TDD\nNew content");
+
+      await service.syncFromDisk(projectId, projectHomeDir, globalDir);
+      skills = await service.list(projectId);
+      expect(skills[0].name).toBe("TDD v2");
+      expect(skills[0].markdown).toContain("New content");
+
+      await rm(globalDir, { recursive: true, force: true });
     });
   });
 });

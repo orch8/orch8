@@ -3,6 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { existsSync } from "node:fs";
 import { projectSkills, agents } from "@orch/shared/db";
+import { GLOBAL_SKILLS_DIR } from "@orch/shared";
 import type { SchemaDb } from "../db/client.js";
 import matter from "gray-matter";
 
@@ -36,7 +37,7 @@ export class ProjectSkillService {
     // Auto-prune: remove rows whose local_path source directory is missing
     const valid: ProjectSkill[] = [];
     for (const row of rows) {
-      if (row.sourceType === "local_path" && row.sourceLocator && !existsSync(row.sourceLocator)) {
+      if (row.sourceLocator && !existsSync(row.sourceLocator)) {
         await this.db.delete(projectSkills).where(eq(projectSkills.id, row.id));
       } else {
         valid.push(row);
@@ -120,27 +121,53 @@ export class ProjectSkillService {
     }
   }
 
-  async syncFromDisk(projectId: string, projectHomeDir: string): Promise<void> {
-    const skillsDir = join(projectHomeDir, ".orch8", "skills");
-    if (!existsSync(skillsDir)) return;
+  async syncFromDisk(
+    projectId: string,
+    projectHomeDir: string,
+    globalSkillsDir: string = GLOBAL_SKILLS_DIR,
+  ): Promise<void> {
+    const localDir = join(projectHomeDir, ".orch8", "skills");
 
-    const entries = await readdir(skillsDir, { withFileTypes: true });
-    const diskSlugs = new Set<string>();
+    // 1. Scan global skills (excluding orch8)
+    const globalSlugs = new Map<string, string>();
+    if (existsSync(globalSkillsDir)) {
+      const entries = await readdir(globalSkillsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name === "orch8") continue;
+        if (!existsSync(join(globalSkillsDir, entry.name, "SKILL.md"))) continue;
+        globalSlugs.set(entry.name, join(globalSkillsDir, entry.name));
+      }
+    }
 
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const skillMdPath = join(skillsDir, entry.name, "SKILL.md");
-      if (!existsSync(skillMdPath)) continue;
+    // 2. Scan project-local skills
+    const localSlugs = new Map<string, string>();
+    if (existsSync(localDir)) {
+      const entries = await readdir(localDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        if (!existsSync(join(localDir, entry.name, "SKILL.md"))) continue;
+        localSlugs.set(entry.name, join(localDir, entry.name));
+      }
+    }
 
-      const slug = entry.name;
-      diskSlugs.add(slug);
+    // 3. Build effective set: local overrides global
+    const effective = new Map<string, { sourceLocator: string; sourceType: string }>();
+    for (const [slug, loc] of globalSlugs) {
+      if (!localSlugs.has(slug)) {
+        effective.set(slug, { sourceLocator: loc, sourceType: "global" });
+      }
+    }
+    for (const [slug, loc] of localSlugs) {
+      effective.set(slug, { sourceLocator: loc, sourceType: "local_path" });
+    }
 
+    // 4. Upsert each effective skill
+    for (const [slug, { sourceLocator, sourceType }] of effective) {
       const existing = await this.get(projectId, slug);
       if (existing) {
-        // Re-sync content from disk
-        const content = await readFile(skillMdPath, "utf-8");
+        const content = await readFile(join(sourceLocator, "SKILL.md"), "utf-8");
         const { data: fm } = matter(content);
-        const files = await readdir(join(skillsDir, entry.name));
+        const files = await readdir(sourceLocator);
         const fileInventory = files.map((f) => ({
           path: f,
           kind: extname(f).toLowerCase().replace(".", "") || "unknown",
@@ -152,27 +179,26 @@ export class ProjectSkillService {
             name: (fm.name as string) ?? slug,
             description: (fm.description as string) ?? null,
             markdown: content,
+            sourceType,
+            sourceLocator,
             trustLevel: deriveTrustLevel(files),
             fileInventory,
             updatedAt: new Date(),
           })
           .where(eq(projectSkills.id, existing.id));
       } else {
-        await this.create(projectId, {
-          slug,
-          sourceLocator: join(skillsDir, entry.name),
-        });
+        await this.create(projectId, { slug, sourceLocator, sourceType });
       }
     }
 
-    // Prune rows that no longer exist on disk
+    // 5. Prune rows not in effective set
     const allRows = await this.db
       .select()
       .from(projectSkills)
       .where(eq(projectSkills.projectId, projectId));
 
     for (const row of allRows) {
-      if (row.sourceType === "local_path" && !diskSlugs.has(row.slug)) {
+      if (!effective.has(row.slug)) {
         await this.db.delete(projectSkills).where(eq(projectSkills.id, row.id));
       }
     }
