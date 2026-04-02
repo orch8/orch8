@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useCreateTask } from "../../hooks/useTasks.js";
 import { useCreatePipeline } from "../../hooks/usePipelines.js";
 import { usePipelineTemplates } from "../../hooks/usePipelineTemplates.js";
@@ -140,12 +141,13 @@ export function TaskCreateModal({ projectId, open, onClose }: TaskCreateModalPro
                 ) : (
                   <p className="text-sm text-zinc-500">
                     No pipeline templates yet.{" "}
-                    <a
-                      href={`/projects/${projectId}/pipelines/templates`}
+                    <Link
+                      to="/projects/$projectId/pipelines/templates"
+                      params={{ projectId }}
                       className="text-blue-400 hover:text-blue-300"
                     >
                       Create one
-                    </a>
+                    </Link>
                   </p>
                 )}
               </FormField>

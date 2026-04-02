@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useCancelPipeline, useRetryPipeline } from "../../hooks/usePipelines.js";
-import { PipelineStepper } from "./PipelineStepper.js";
 import { PipelineDetail } from "./PipelineDetail.js";
 import type { Pipeline, PipelineStep } from "../../types.js";
 
