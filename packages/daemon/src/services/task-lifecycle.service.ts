@@ -49,7 +49,7 @@ export class TaskLifecycleService {
       updateValues.executionRunId = opts.runId;
       updateValues.executionLockedAt = new Date();
 
-      // Create worktree for quick/complex tasks on first dispatch
+      // Create worktree for non-brainstorm tasks on first dispatch
       if (task.taskType !== "brainstorm" && !task.worktreePath) {
         const project = await this.loadProject(task.projectId);
         const slug = WorktreeService.slugify(task.title);
