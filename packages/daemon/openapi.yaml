@@ -491,10 +491,11 @@ components:
           type: array
           items:
             type: string
-        skillPaths:
+        desiredSkills:
           type: array
           items:
             type: string
+          description: Skill slugs this agent should use (resolved from projectSkills at runtime)
         adapterType:
           type: string
         adapterConfig:
@@ -571,10 +572,11 @@ components:
           type: array
           items:
             type: string
-        skillPaths:
+        desiredSkills:
           type: array
           items:
             type: string
+          description: Skill slugs this agent should use (resolved from projectSkills at runtime)
         adapterType:
           type: string
         adapterConfig:
