@@ -416,15 +416,27 @@ describe("SeedingService + ProjectSkillService integration", () => {
     await rm(projectHomeDir, { recursive: true, force: true });
   });
 
-  it("copyDefaults populates project skills from disk", async () => {
+  it("populateGlobalSkills + syncFromDisk registers global skills for a project", async () => {
+    const globalDir = await mkdtemp(join(tmpdir(), "orch-global-int-"));
+
     const seedingService = new SeedingService();
-    await seedingService.copyDefaults(projectHomeDir);
-    await skillService.syncFromDisk(projectId, projectHomeDir);
+    await seedingService.populateGlobalSkills(globalDir);
+    await skillService.syncFromDisk(projectId, projectHomeDir, globalDir);
 
     const skills = await skillService.list(projectId);
-    // Should contain at least the orch8 skill from bundled defaults
     const slugs = skills.map((s) => s.slug);
-    expect(slugs).toContain("orch8");
+
+    // orch8 is excluded from DB (force-injected at runtime)
+    expect(slugs).not.toContain("orch8");
+    // Other bundled skills should be registered as global
+    expect(slugs).toContain("tdd");
+    expect(slugs).toContain("verification");
     expect(skills.length).toBeGreaterThan(0);
+
+    // Verify sourceType is "global"
+    const tdd = skills.find((s) => s.slug === "tdd")!;
+    expect(tdd.sourceType).toBe("global");
+
+    await rm(globalDir, { recursive: true, force: true });
   });
 });
