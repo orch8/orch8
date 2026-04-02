@@ -1,6 +1,6 @@
 import { useUpdateTask } from "../../hooks/useTasks.js";
 import { useAgents } from "../../hooks/useAgents.js";
-import { useTaskCost, usePhaseCost } from "../../hooks/useCost.js";
+import { useTaskCost } from "../../hooks/useCost.js";
 import { DependenciesSection } from "../task-detail/DependenciesSection.js";
 import { InlineEdit } from "./InlineEdit.js";
 import { KANBAN_COLUMNS, COLUMN_LABELS, type KanbanColumn } from "../../types.js";
@@ -25,10 +25,6 @@ export function TaskSidebar({ task, projectId, allTasks }: TaskSidebarProps) {
   const updateTask = useUpdateTask();
   const { data: agents } = useAgents(projectId);
   const { data: taskCost } = useTaskCost(task.id, projectId);
-  const { data: phaseCost } = usePhaseCost(
-    task.taskType === "complex" ? task.id : null,
-    projectId,
-  );
 
   function patch(field: string, value: any) {
     updateTask.mutate({ taskId: task.id, [field]: value });
@@ -106,13 +102,6 @@ export function TaskSidebar({ task, projectId, allTasks }: TaskSidebarProps) {
         </div>
       </div>
 
-      {/* Phase progress (complex tasks) */}
-      {task.taskType === "complex" && task.complexPhase && (
-        <div>
-          <span className="text-xs text-zinc-500">Phase</span>
-          <p className="mt-1 text-sm text-zinc-300">{task.complexPhase}</p>
-        </div>
-      )}
 
       {/* Branch */}
       {task.branch && (

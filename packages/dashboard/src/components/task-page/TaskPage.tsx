@@ -6,11 +6,10 @@ import { TaskActions } from "../task-detail/TaskActions.js";
 import { TaskSidebar } from "./TaskSidebar.js";
 import { ActivityTab } from "./ActivityTab.js";
 import { RunsTab } from "./RunsTab.js";
-import { PhasesTab } from "./PhasesTab.js";
 import { SettingsTab } from "./SettingsTab.js";
 import type { Task } from "../../types.js";
 
-const TABS = ["Activity", "Runs", "Phases", "Settings"] as const;
+const TABS = ["Activity", "Runs", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
 interface TaskPageProps {
@@ -41,8 +40,6 @@ export function TaskPage({ task, projectId }: TaskPageProps) {
     setEditingDescription(false);
   }
 
-  // Filter tabs: hide Phases for non-complex tasks
-  const visibleTabs = task.taskType === "complex" ? TABS : TABS.filter((t) => t !== "Phases");
 
   return (
     <div className="flex h-full gap-6">
@@ -111,7 +108,7 @@ export function TaskPage({ task, projectId }: TaskPageProps) {
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-zinc-800">
-          {visibleTabs.map((tab) => (
+          {TABS.map((tab) => (
             <button
               key={tab}
               type="button"
@@ -131,7 +128,6 @@ export function TaskPage({ task, projectId }: TaskPageProps) {
         <div className="flex-1">
           {activeTab === "Activity" && <ActivityTab taskId={task.id} projectId={projectId} />}
           {activeTab === "Runs" && <RunsTab taskId={task.id} projectId={projectId} />}
-          {activeTab === "Phases" && <PhasesTab task={task} projectId={projectId} />}
           {activeTab === "Settings" && <SettingsTab task={task} />}
         </div>
       </div>

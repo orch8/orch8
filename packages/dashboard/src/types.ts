@@ -61,15 +61,6 @@ export interface TaskCost {
   }>;
 }
 
-export interface PhaseCost {
-  total: number;
-  byPhase: Array<{
-    phase: string;
-    totalCost: number;
-    runCount: number;
-  }>;
-}
-
 export interface RunLog {
   content: string;
   store: string;

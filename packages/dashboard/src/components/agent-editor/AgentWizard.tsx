@@ -95,11 +95,6 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
       canCreateTasks: permissions.canCreateTasks,
       canMoveTo: permissions.canMoveTo as any,
       canAssignTo: permissions.canAssignTo,
-      // Include phase prompts from bundled data
-      researchPrompt: selectedBundled?.researchPrompt || undefined,
-      planPrompt: selectedBundled?.planPrompt || undefined,
-      implementPrompt: selectedBundled?.implementPrompt || undefined,
-      reviewPrompt: selectedBundled?.reviewPrompt || undefined,
       // Include heartbeat config from bundled data
       heartbeatEnabled: selectedBundled?.heartbeatEnabled,
       heartbeatIntervalSec: selectedBundled?.heartbeatIntervalSec,

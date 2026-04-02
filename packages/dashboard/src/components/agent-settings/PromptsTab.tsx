@@ -20,10 +20,6 @@ export function PromptsTab({ agent, projectId, updateAgent }: PromptsTabProps) {
   const [instructionsFilePath, setInstructionsFilePath] = useState(
     agent.instructionsFilePath ?? "",
   );
-  const [researchPrompt, setResearchPrompt] = useState(agent.researchPrompt ?? "");
-  const [planPrompt, setPlanPrompt] = useState(agent.planPrompt ?? "");
-  const [implementPrompt, setImplementPrompt] = useState(agent.implementPrompt ?? "");
-  const [reviewPrompt, setReviewPrompt] = useState(agent.reviewPrompt ?? "");
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -43,10 +39,6 @@ export function PromptsTab({ agent, projectId, updateAgent }: PromptsTabProps) {
     setPromptTemplate(agent.promptTemplate ?? "");
     setBootstrapPromptTemplate(agent.bootstrapPromptTemplate ?? "");
     setInstructionsFilePath(agent.instructionsFilePath ?? "");
-    setResearchPrompt(agent.researchPrompt ?? "");
-    setPlanPrompt(agent.planPrompt ?? "");
-    setImplementPrompt(agent.implementPrompt ?? "");
-    setReviewPrompt(agent.reviewPrompt ?? "");
   }, [agent]);
 
   function handleSave() {
@@ -57,10 +49,6 @@ export function PromptsTab({ agent, projectId, updateAgent }: PromptsTabProps) {
       promptTemplate,
       bootstrapPromptTemplate,
       instructionsFilePath: instructionsFilePath || null,
-      researchPrompt,
-      planPrompt,
-      implementPrompt,
-      reviewPrompt,
     });
   }
 
@@ -137,23 +125,6 @@ export function PromptsTab({ agent, projectId, updateAgent }: PromptsTabProps) {
         )}
       </FormField>
 
-      <h3 className="mt-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">Phase Prompts</h3>
-
-      <FormField label="Research Prompt">
-        <MarkdownEditor value={researchPrompt} onChange={setResearchPrompt} placeholder="Research phase prompt..." />
-      </FormField>
-
-      <FormField label="Plan Prompt">
-        <MarkdownEditor value={planPrompt} onChange={setPlanPrompt} placeholder="Plan phase prompt..." />
-      </FormField>
-
-      <FormField label="Implement Prompt">
-        <MarkdownEditor value={implementPrompt} onChange={setImplementPrompt} placeholder="Implement phase prompt..." />
-      </FormField>
-
-      <FormField label="Review Prompt">
-        <MarkdownEditor value={reviewPrompt} onChange={setReviewPrompt} placeholder="Review phase prompt..." />
-      </FormField>
 
       <button
         onClick={handleSave}

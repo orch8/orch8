@@ -1,7 +1,6 @@
 import { useTask, useTasks, useUpdateTask } from "../../hooks/useTasks.js";
 import { useAgents } from "../../hooks/useAgents.js";
-import { useTaskCost, usePhaseCost } from "../../hooks/useCost.js";
-import { PhaseProgress } from "./PhaseProgress.js";
+import { useTaskCost } from "../../hooks/useCost.js";
 import { CommentThread } from "./CommentThread.js";
 import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
 import { ActivityTimeline } from "../shared/ActivityTimeline.js";
@@ -18,10 +17,6 @@ interface TaskDetailPanelProps {
 export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelProps) {
   const { data: task, isLoading } = useTask(taskId);
   const { data: taskCost } = useTaskCost(taskId, projectId);
-  const { data: phaseCost } = usePhaseCost(
-    task?.taskType === "complex" ? taskId : null,
-    projectId,
-  );
   const { data: allTasks } = useTasks(projectId);
   const { data: agents } = useAgents(projectId);
   const updateTask = useUpdateTask();
@@ -108,56 +103,6 @@ export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelP
         </div>
       )}
 
-      {/* Legacy phase progress for complex tasks without pipeline */}
-      {task.taskType === "complex" && !task.pipelineId && (
-        <div>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Phase Progress
-          </h4>
-          <PhaseProgress currentPhase={task.complexPhase} />
-
-          {task.researchOutput && (
-            <details className="mt-2">
-              <summary className="cursor-pointer text-xs text-zinc-500 hover:text-zinc-300">
-                Research Output
-              </summary>
-              <pre className="mt-1 max-h-40 overflow-auto rounded bg-zinc-950 p-2 text-xs text-zinc-400">
-                {task.researchOutput}
-              </pre>
-            </details>
-          )}
-          {task.planOutput && (
-            <details className="mt-2">
-              <summary className="cursor-pointer text-xs text-zinc-500 hover:text-zinc-300">
-                Plan Output
-              </summary>
-              <pre className="mt-1 max-h-40 overflow-auto rounded bg-zinc-950 p-2 text-xs text-zinc-400">
-                {task.planOutput}
-              </pre>
-            </details>
-          )}
-          {task.implementationOutput && (
-            <details className="mt-2">
-              <summary className="cursor-pointer text-xs text-zinc-500 hover:text-zinc-300">
-                Implementation Output
-              </summary>
-              <pre className="mt-1 max-h-40 overflow-auto rounded bg-zinc-950 p-2 text-xs text-zinc-400">
-                {task.implementationOutput}
-              </pre>
-            </details>
-          )}
-          {task.reviewOutput && (
-            <details className="mt-2">
-              <summary className="cursor-pointer text-xs text-zinc-500 hover:text-zinc-300">
-                Review Output
-              </summary>
-              <pre className="mt-1 max-h-40 overflow-auto rounded bg-zinc-950 p-2 text-xs text-zinc-400">
-                {task.reviewOutput}
-              </pre>
-            </details>
-          )}
-        </div>
-      )}
 
       {/* Cost breakdown */}
       {taskCost && (
@@ -168,19 +113,6 @@ export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelP
           <p className="text-sm text-zinc-300">
             ${taskCost.total.toFixed(4)} total
           </p>
-          {phaseCost && phaseCost.byPhase.length > 0 && (
-            <div className="mt-1 space-y-1">
-              {phaseCost.byPhase.map((p) => (
-                <div
-                  key={p.phase}
-                  className="flex justify-between text-xs text-zinc-500"
-                >
-                  <span>{p.phase}</span>
-                  <span>${p.totalCost.toFixed(4)}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
 

@@ -52,11 +52,6 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
           </span>
         )}
 
-        {task.taskType === "complex" && task.complexPhase && (
-          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-400">
-            {task.complexPhase}
-          </span>
-        )}
       </div>
 
       {task.assignee && (

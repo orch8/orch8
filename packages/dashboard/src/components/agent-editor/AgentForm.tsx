@@ -155,36 +155,6 @@ export function AgentForm({ agent }: AgentFormProps) {
         />
       </div>
 
-      {/* Phase-specific prompts */}
-      {(agent.researchPrompt || agent.planPrompt || agent.implementPrompt || agent.reviewPrompt) && (
-        <div>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">Phase Prompts</h4>
-          {agent.researchPrompt && (
-            <details className="mb-2">
-              <summary className="cursor-pointer text-xs text-zinc-400">Research</summary>
-              <pre className="mt-1 rounded bg-zinc-950 p-2 text-xs text-zinc-500">{agent.researchPrompt}</pre>
-            </details>
-          )}
-          {agent.planPrompt && (
-            <details className="mb-2">
-              <summary className="cursor-pointer text-xs text-zinc-400">Plan</summary>
-              <pre className="mt-1 rounded bg-zinc-950 p-2 text-xs text-zinc-500">{agent.planPrompt}</pre>
-            </details>
-          )}
-          {agent.implementPrompt && (
-            <details className="mb-2">
-              <summary className="cursor-pointer text-xs text-zinc-400">Implement</summary>
-              <pre className="mt-1 rounded bg-zinc-950 p-2 text-xs text-zinc-500">{agent.implementPrompt}</pre>
-            </details>
-          )}
-          {agent.reviewPrompt && (
-            <details className="mb-2">
-              <summary className="cursor-pointer text-xs text-zinc-400">Review</summary>
-              <pre className="mt-1 rounded bg-zinc-950 p-2 text-xs text-zinc-500">{agent.reviewPrompt}</pre>
-            </details>
-          )}
-        </div>
-      )}
 
       {/* MCP Tools */}
       {agent.mcpTools && agent.mcpTools.length > 0 && (
