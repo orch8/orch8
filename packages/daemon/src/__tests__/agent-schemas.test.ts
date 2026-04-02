@@ -43,7 +43,7 @@ describe("Agent Schemas", () => {
         systemPrompt: "You are the CTO.",
         promptTemplate: "Review task: {{task.title}}",
         mcpTools: ["orchestrator-api"],
-        skillPaths: ["/skills/cto.md"],
+        desiredSkills: ["tdd", "verification"],
         adapterType: "claude_local",
         adapterConfig: { extraArgs: ["--verbose"] },
         envVars: { CUSTOM_VAR: "value" },

@@ -34,7 +34,7 @@ const mockAgent = {
   bootstrapPromptTemplate: "",
   instructionsFilePath: null,
   mcpTools: [],
-  skillPaths: [],
+  desiredSkills: [],
   adapterType: "claude_local",
   adapterConfig: {},
   envVars: {},

@@ -35,7 +35,7 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
     systemPrompt: "",
     promptTemplate: "",
     bootstrapPromptTemplate: "",
-    skillPaths: [],
+    desiredSkills: [],
   });
   const [permissions, setPermissions] = useState<PermissionsData>({
     canCreateTasks: false,
@@ -67,7 +67,7 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
       systemPrompt: agent.systemPrompt ?? "",
       promptTemplate: agent.promptTemplate ?? "",
       bootstrapPromptTemplate: agent.bootstrapPromptTemplate ?? "",
-      skillPaths: agent.skills ?? [],
+      desiredSkills: agent.skills ?? [],
     });
 
     // Permissions stay at defaults — role defaults are applied server-side
@@ -91,7 +91,7 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
       systemPrompt: prompts.systemPrompt || undefined,
       promptTemplate: prompts.promptTemplate || undefined,
       bootstrapPromptTemplate: prompts.bootstrapPromptTemplate || undefined,
-      skillPaths: prompts.skillPaths.length > 0 ? prompts.skillPaths : undefined,
+      desiredSkills: prompts.desiredSkills.length > 0 ? prompts.desiredSkills : undefined,
       canCreateTasks: permissions.canCreateTasks,
       canMoveTo: permissions.canMoveTo as any,
       canAssignTo: permissions.canAssignTo,

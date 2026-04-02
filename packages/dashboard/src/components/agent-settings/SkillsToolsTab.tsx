@@ -16,6 +16,11 @@ const TRUST_BADGE: Record<string, { label: string; color: string }> = {
   scripts_executables: { label: "Scripts", color: "bg-red-900 text-red-300" },
 };
 
+const ORIGIN_BADGE: Record<string, { label: string; color: string }> = {
+  global: { label: "Global", color: "bg-blue-900 text-blue-300" },
+  local_path: { label: "Project", color: "bg-purple-900 text-purple-300" },
+};
+
 export function SkillsToolsTab({ agent, projectId, updateAgent }: SkillsToolsTabProps) {
   const [desiredSkills, setDesiredSkills] = useState<string[]>(agent.desiredSkills ?? []);
   const [mcpTools, setMcpTools] = useState<string[]>(agent.mcpTools ?? []);
@@ -138,6 +143,14 @@ export function SkillsToolsTab({ agent, projectId, updateAgent }: SkillsToolsTab
                   <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${badge.color}`}>
                     {badge.label}
                   </span>
+                  {(() => {
+                    const origin = ORIGIN_BADGE[skill.sourceType] ?? ORIGIN_BADGE.local_path;
+                    return (
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${origin.color}`}>
+                        {origin.label}
+                      </span>
+                    );
+                  })()}
                   {skill.description && (
                     <span className="text-xs text-zinc-500">{skill.description}</span>
                   )}

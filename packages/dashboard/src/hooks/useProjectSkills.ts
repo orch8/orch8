@@ -8,6 +8,7 @@ interface ProjectSkill {
   name: string;
   description: string | null;
   trustLevel: string;
+  sourceType: string;
   markdown: string;
   sourceLocator: string | null;
   fileInventory: Array<{ path: string; kind: string }>;

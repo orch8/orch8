@@ -6,7 +6,7 @@ export interface PromptsData {
   systemPrompt: string;
   promptTemplate: string;
   bootstrapPromptTemplate: string;
-  skillPaths: string[];
+  desiredSkills: string[];
 }
 
 interface PromptsStepProps {
@@ -68,10 +68,10 @@ export function PromptsStep({ data, onChange }: PromptsStepProps) {
         description="Comma-separated list of markdown file paths injected via --add-dir"
       >
         <input
-          value={data.skillPaths.join(", ")}
+          value={data.desiredSkills.join(", ")}
           onChange={(e) =>
             update({
-              skillPaths: e.target.value
+              desiredSkills: e.target.value
                 .split(",")
                 .map((s) => s.trim())
                 .filter(Boolean),
