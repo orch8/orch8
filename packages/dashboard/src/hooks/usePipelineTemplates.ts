@@ -16,6 +16,7 @@ export function useCreatePipelineTemplate() {
       projectId: string;
       name: string;
       description?: string;
+      isDefault?: boolean;
       steps: Array<{ order: number; label: string; defaultAgentId?: string; promptTemplate?: string }>;
     }) => api.post<PipelineTemplate>("/pipeline-templates", input),
     onSuccess: (data) => {
@@ -31,6 +32,7 @@ export function useUpdatePipelineTemplate() {
       id: string;
       name?: string;
       description?: string;
+      isDefault?: boolean;
       steps?: Array<{ order: number; label: string; defaultAgentId?: string; promptTemplate?: string }>;
     }) => api.patch<PipelineTemplate>(`/pipeline-templates/${id}`, input),
     onSuccess: (data) => {
