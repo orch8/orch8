@@ -127,6 +127,30 @@ describe("ProjectSkillService", () => {
 
       expect(skill.trustLevel).toBe("scripts_executables");
     });
+
+    it("creates a global skill when sourceType is provided", async () => {
+      const skillDir = join(projectHomeDir, ".orch8", "skills", "global-skill");
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, "SKILL.md"), [
+        "---",
+        "name: Global Skill",
+        "description: A global test skill",
+        "---",
+        "",
+        "# Global Skill",
+        "",
+        "Global content.",
+      ].join("\n"));
+
+      const skill = await service.create(projectId, {
+        slug: "global-skill",
+        sourceLocator: skillDir,
+        sourceType: "global",
+      });
+
+      expect(skill.sourceType).toBe("global");
+      expect(skill.name).toBe("Global Skill");
+    });
   });
 
   describe("list", () => {

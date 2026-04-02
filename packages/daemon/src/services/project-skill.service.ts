@@ -65,7 +65,7 @@ export class ProjectSkillService {
 
   async create(
     projectId: string,
-    input: { slug: string; sourceLocator: string },
+    input: { slug: string; sourceLocator: string; sourceType?: string },
   ): Promise<ProjectSkill> {
     const skillMdPath = join(input.sourceLocator, "SKILL.md");
     const content = await readFile(skillMdPath, "utf-8");
@@ -86,7 +86,7 @@ export class ProjectSkillService {
         name: (fm.name as string) ?? input.slug,
         description: (fm.description as string) ?? null,
         markdown: content,
-        sourceType: "local_path",
+        sourceType: input.sourceType ?? "local_path",
         sourceLocator: input.sourceLocator,
         trustLevel,
         fileInventory,
