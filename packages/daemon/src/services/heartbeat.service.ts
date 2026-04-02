@@ -606,7 +606,6 @@ export class HeartbeatService {
       const prompts: RunAgentPrompts = {
         heartbeatTemplate: agent.promptTemplate ?? "",
         bootstrapTemplate: agent.bootstrapPromptTemplate ?? undefined,
-        skillPaths: agent.skillPaths ?? undefined,
         desiredSkills: agent.desiredSkills ?? undefined,
       };
 

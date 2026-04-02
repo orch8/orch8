@@ -9,7 +9,7 @@ import { buildEnv } from "./env-builder.js";
 import { buildPrompt } from "./prompt-builder.js";
 import { dirname, join } from "node:path";
 import { createSkillsDir, createInstructionsFile, cleanupTempPath } from "./file-injector.js";
-import { DEFAULT_SKILLS_DIR } from "@orch/shared";
+import { DEFAULT_SKILLS_DIR, GLOBAL_SKILLS_DIR } from "@orch/shared";
 import { SessionManager } from "./session-manager.js";
 import { runProcess } from "./process-runner.js";
 import { resolveClaudePath } from "./resolve-claude-path.js";
@@ -37,7 +37,6 @@ export interface RunAgentPrompts {
   heartbeatTemplate: string;
   bootstrapTemplate?: string;
   sessionHandoff?: string;
-  skillPaths?: string[];
   desiredSkills?: string[];
 }
 
@@ -79,18 +78,16 @@ export class ClaudeLocalAdapter {
     let instructionsFilePath: string | undefined;
 
     try {
-      // Resolve skill paths: desiredSkills (new) takes precedence over skillPaths (legacy)
-      let effectiveSkillPaths: string[];
+      // Resolve skill paths from desiredSkills
+      let effectiveSkillPaths: string[] = [];
       if (prompts.desiredSkills && prompts.desiredSkills.length > 0 && this.projectSkillService) {
         effectiveSkillPaths = await resolveSkillPaths(
           this.projectSkillService, ctx.projectId, prompts.desiredSkills,
         );
-      } else {
-        effectiveSkillPaths = [...(prompts.skillPaths ?? [])];
       }
 
-      // Always inject the orch8 skill
-      const ORCH8_SKILL_PATH = join(DEFAULT_SKILLS_DIR, "orch8", "SKILL.md");
+      // Always inject the orch8 skill from global directory
+      const ORCH8_SKILL_PATH = join(GLOBAL_SKILLS_DIR, "orch8", "SKILL.md");
       if (!effectiveSkillPaths.includes(ORCH8_SKILL_PATH)) {
         effectiveSkillPaths.push(ORCH8_SKILL_PATH);
       }
