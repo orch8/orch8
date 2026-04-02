@@ -16,6 +16,8 @@ function createMockProcess() {
     stdin, stdout, stderr, pid: 55555,
     kill: vi.fn(() => { proc.emit("close", 0, null); return true; }),
   });
+  // Simulate turn completing so session.process is cleared
+  process.nextTick(() => proc.emit("close", 0, null));
   return proc;
 }
 

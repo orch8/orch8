@@ -442,7 +442,8 @@ export class HeartbeatService {
       claimedRun = claimed;
     }
 
-    // 3. Add to in-memory tracking
+    // 3. Add to in-memory tracking (skip if already executing)
+    if (this.activeRunExecutions.has(runId)) return;
     this.activeRunExecutions.add(runId);
 
     let logHandle: LogHandle | undefined;

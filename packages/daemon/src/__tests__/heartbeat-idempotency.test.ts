@@ -41,6 +41,8 @@ describe("HeartbeatService idempotency", () => {
     const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
     const broadcastService = new BroadcastService(sockets);
     heartbeat = new HeartbeatService(testDb.db, broadcastService);
+    // Use a never-resolving adapter so fire-and-forget runs stay "running"
+    heartbeat.setAdapter({ runAgent: () => new Promise(() => {}) } as any);
   });
 
   it("deduplicates wakeups with the same idempotencyKey", async () => {

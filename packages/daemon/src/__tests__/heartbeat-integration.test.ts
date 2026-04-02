@@ -7,6 +7,16 @@ import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
 
+async function waitForRunComplete(db: TestDb["db"], runId: string, timeoutMs = 2000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const [r] = await db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, runId));
+    if (r && !["queued", "running"].includes(r.status)) return r;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error(`Run ${runId} did not complete within ${timeoutMs}ms`);
+}
+
 describe("Heartbeat Pipeline Integration", () => {
   let testDb: TestDb;
   let service: HeartbeatService;
@@ -76,7 +86,7 @@ describe("Heartbeat Pipeline Integration", () => {
     };
     service.setAdapter(mockAdapter as any);
 
-    // Enqueue — creates run as queued, then startNextQueuedRunForAgent claims it to "running"
+    // Enqueue — creates run as queued, then startNextQueuedRunForAgent claims and executes it
     const wakeup = await service.enqueueWakeup("eng-1", projectId, {
       source: "on_demand",
       reason: "integration test",
@@ -84,9 +94,8 @@ describe("Heartbeat Pipeline Integration", () => {
     expect(wakeup.status).toBe("queued");
     expect(wakeup.runId).toBeTruthy();
 
-    // startNextQueuedRunForAgent only claims (does not execute).
-    // Drive the run to completion explicitly.
-    await service.executeRun(wakeup.runId!);
+    // Wait for the fire-and-forget executeRun to complete
+    await waitForRunComplete(testDb.db, wakeup.runId!);
 
     // Check final run state
     const allRuns = await testDb.db
@@ -130,7 +139,7 @@ describe("Heartbeat Pipeline Integration", () => {
     };
     service.setAdapter(mockAdapter as any);
 
-    // Agent 1 wakes the task — run created as queued
+    // Agent 1 wakes the task — run created as queued, executeRun fires in background
     const wake1 = await service.enqueueWakeup("eng-1", projectId, {
       source: "on_demand",
       taskId: task.id,
@@ -144,26 +153,9 @@ describe("Heartbeat Pipeline Integration", () => {
     });
     expect(wake2.status).toBe("queued");
 
-    // Execute eng-1's run
-    await service.executeRun(wake1.runId!);
-
-    // eng-2 should have its own run
-    const eng2Runs = await testDb.db
-      .select()
-      .from(heartbeatRuns)
-      .where(eq(heartbeatRuns.agentId, "eng-2"));
-    expect(eng2Runs.length).toBeGreaterThanOrEqual(1);
-
-    // Execute eng-2's run to completion
-    const eng2Run = eng2Runs[0];
-    await service.executeRun(eng2Run.id);
-
-    // Verify eng-2's run completed successfully
-    const [eng2Finished] = await testDb.db
-      .select()
-      .from(heartbeatRuns)
-      .where(eq(heartbeatRuns.id, eng2Run.id));
-    expect(eng2Finished.status).toBe("succeeded");
+    // Wait for both fire-and-forget executions to complete
+    await waitForRunComplete(testDb.db, wake1.runId!);
+    await waitForRunComplete(testDb.db, wake2.runId!);
 
     // Verify both agents succeeded
     const eng1Runs = await testDb.db
@@ -172,6 +164,13 @@ describe("Heartbeat Pipeline Integration", () => {
       .where(eq(heartbeatRuns.agentId, "eng-1"));
     expect(eng1Runs).toHaveLength(1);
     expect(eng1Runs[0].status).toBe("succeeded");
+
+    const eng2Runs = await testDb.db
+      .select()
+      .from(heartbeatRuns)
+      .where(eq(heartbeatRuns.agentId, "eng-2"));
+    expect(eng2Runs.length).toBeGreaterThanOrEqual(1);
+    expect(eng2Runs[0].status).toBe("succeeded");
   });
 
   it("concurrent wakeups: second wakeup coalesces", async () => {

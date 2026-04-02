@@ -52,7 +52,7 @@ describe("Agent Role Defaults (Integration)", () => {
     expect(body.heartbeatEnabled).toBe(true);
     expect(body.heartbeatIntervalSec).toBe(3600);
     expect(body.canCreateTasks).toBe(true);
-    expect(body.maxTurns).toBe(50);
+    expect(body.maxTurns).toBe(200);
 
     await app.close();
   });

@@ -61,6 +61,9 @@ export async function brainstormRoutes(app: FastifyInstance) {
       if (msg.includes("No active")) {
         return reply.code(404).send({ error: "not_found", message: msg });
       }
+      if (msg.includes("still processing")) {
+        return reply.code(429).send({ error: "busy", message: msg });
+      }
       throw err;
     }
   });
