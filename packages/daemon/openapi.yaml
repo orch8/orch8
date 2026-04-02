@@ -244,32 +244,6 @@ components:
         assignee:
           type: string
           nullable: true
-        complexPhase:
-          $ref: "#/components/schemas/ComplexPhase"
-        researchAgentId:
-          type: string
-          nullable: true
-        planAgentId:
-          type: string
-          nullable: true
-        implementAgentId:
-          type: string
-          nullable: true
-        reviewAgentId:
-          type: string
-          nullable: true
-        researchOutput:
-          type: string
-          nullable: true
-        planOutput:
-          type: string
-          nullable: true
-        implementationOutput:
-          type: string
-          nullable: true
-        reviewOutput:
-          type: string
-          nullable: true
         brainstormStatus:
           $ref: "#/components/schemas/BrainstormStatus"
         branch:
@@ -324,45 +298,6 @@ components:
           type: string
           enum: [quick]
 
-    CreateComplexTask:
-      type: object
-      required: [title, projectId, taskType]
-      properties:
-        title:
-          type: string
-          minLength: 1
-          maxLength: 500
-        description:
-          type: string
-          maxLength: 10000
-          default: ""
-        projectId:
-          type: string
-          minLength: 1
-        priority:
-          $ref: "#/components/schemas/TaskPriority"
-        assignee:
-          type: string
-        taskType:
-          type: string
-          enum: [complex]
-        researchAgentId:
-          type: string
-        planAgentId:
-          type: string
-        implementAgentId:
-          type: string
-        reviewAgentId:
-          type: string
-        researchPromptOverride:
-          type: string
-        planPromptOverride:
-          type: string
-        implementPromptOverride:
-          type: string
-        reviewPromptOverride:
-          type: string
-
     CreateBrainstormTask:
       type: object
       required: [title, projectId, taskType]
@@ -389,13 +324,11 @@ components:
     CreateTask:
       oneOf:
         - $ref: "#/components/schemas/CreateQuickTask"
-        - $ref: "#/components/schemas/CreateComplexTask"
         - $ref: "#/components/schemas/CreateBrainstormTask"
       discriminator:
         propertyName: taskType
         mapping:
           quick: "#/components/schemas/CreateQuickTask"
-          complex: "#/components/schemas/CreateComplexTask"
           brainstorm: "#/components/schemas/CreateBrainstormTask"
 
     UpdateTask:
@@ -413,18 +346,6 @@ components:
         priority:
           $ref: "#/components/schemas/TaskPriority"
         assignee:
-          type: string
-          nullable: true
-        researchAgentId:
-          type: string
-          nullable: true
-        planAgentId:
-          type: string
-          nullable: true
-        implementAgentId:
-          type: string
-          nullable: true
-        reviewAgentId:
           type: string
           nullable: true
 
@@ -566,14 +487,6 @@ components:
           type: string
         instructionsFilePath:
           type: string
-        researchPrompt:
-          type: string
-        planPrompt:
-          type: string
-        implementPrompt:
-          type: string
-        reviewPrompt:
-          type: string
         mcpTools:
           type: array
           items:
@@ -654,14 +567,6 @@ components:
         instructionsFilePath:
           type: string
           nullable: true
-        researchPrompt:
-          type: string
-        planPrompt:
-          type: string
-        implementPrompt:
-          type: string
-        reviewPrompt:
-          type: string
         mcpTools:
           type: array
           items:
@@ -960,7 +865,7 @@ components:
     # --- Enums ---
     TaskType:
       type: string
-      enum: [quick, complex, brainstorm]
+      enum: [quick, brainstorm]
 
     TaskColumn:
       type: string
@@ -970,11 +875,6 @@ components:
       type: string
       enum: [high, medium, low]
       default: medium
-
-    ComplexPhase:
-      type: string
-      enum: [research, plan, implement, review]
-      nullable: true
 
     BrainstormStatus:
       type: string
@@ -1121,9 +1021,6 @@ paths:
                         type: string
                       taskType:
                         type: string
-                      complexPhase:
-                        type: string
-                        nullable: true
                   project:
                     $ref: "#/components/schemas/Project"
                   budget:
@@ -1310,7 +1207,7 @@ paths:
       tags: [Tasks]
       summary: Create task
       description: |
-        Creates a quick, complex, or brainstorm task. The request body is a discriminated union on `taskType`.
+        Creates a quick or brainstorm task. The request body is a discriminated union on `taskType`.
         Requires `create_task` permission.
       requestBody:
         required: true
@@ -1363,10 +1260,6 @@ paths:
           in: query
           schema:
             type: string
-        - name: complexPhase
-          in: query
-          schema:
-            $ref: "#/components/schemas/ComplexPhase"
       responses:
         "200":
           description: Task list
@@ -1512,9 +1405,8 @@ paths:
   /api/tasks/{id}/complete:
     post:
       tags: [Tasks]
-      summary: Signal task or phase completion
+      summary: Signal task completion
       description: |
-        For complex tasks with an active phase, requires `{ "output": "..." }`.
         For quick tasks, no body needed — transitions to review.
       parameters:
         - name: id
@@ -1531,7 +1423,7 @@ paths:
                 output:
                   type: string
                   minLength: 1
-                  description: Required for complex task phase completion
+                  description: Optional completion output
       responses:
         "200":
           description: Completed
@@ -1635,7 +1527,7 @@ paths:
               properties:
                 taskType:
                   type: string
-                  enum: [quick, complex]
+                  enum: [quick]
       responses:
         "200":
           description: Converted
@@ -3071,45 +2963,6 @@ paths:
                           type: string
                           format: date-time
                           nullable: true
-        "400":
-          description: Missing projectId
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /api/cost/task/{taskId}/phases:
-    get:
-      tags: [Cost]
-      summary: Per-phase cost breakdown
-      description: For complex tasks. Requires projectId.
-      parameters:
-        - name: taskId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Phase cost breakdown
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  total:
-                    type: number
-                  byPhase:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        phase:
-                          type: string
-                        totalCost:
-                          type: number
-                        runCount:
-                          type: integer
         "400":
           description: Missing projectId
           content:
