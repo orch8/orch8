@@ -34,9 +34,8 @@ describe("SubagentService", () => {
     // Create a parent run for each test
     const [task] = await testDb.db.insert(tasks).values({
       projectId,
-      title: "Complex task",
-      taskType: "complex",
-      complexPhase: "implement",
+      title: "Quick task",
+      taskType: "quick",
     }).returning();
 
     const [run] = await testDb.db.insert(heartbeatRuns).values({

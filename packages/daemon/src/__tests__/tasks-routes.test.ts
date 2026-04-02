@@ -76,24 +76,6 @@ describe("Task API Routes", () => {
       expect(body.column).toBe("backlog");
     });
 
-    it("creates a complex task with research phase", async () => {
-      const response = await app.inject({
-        method: "POST",
-        url: "/api/tasks",
-        headers: { "x-project-id": projectId },
-        payload: {
-          title: "New auth",
-          projectId,
-          taskType: "complex",
-        },
-      });
-
-      expect(response.statusCode).toBe(201);
-      const body = JSON.parse(response.body);
-      expect(body.taskType).toBe("complex");
-      expect(body.complexPhase).toBe("research");
-    });
-
     it("creates a brainstorm task", async () => {
       const response = await app.inject({
         method: "POST",
@@ -128,7 +110,7 @@ describe("Task API Routes", () => {
     it("lists tasks for a project", async () => {
       await testDb.db.insert(tasks).values([
         { projectId, title: "A", taskType: "quick" },
-        { projectId, title: "B", taskType: "complex", complexPhase: "research" },
+        { projectId, title: "B", taskType: "quick" },
       ]);
 
       const response = await app.inject({
@@ -145,19 +127,19 @@ describe("Task API Routes", () => {
     it("filters by task type", async () => {
       await testDb.db.insert(tasks).values([
         { projectId, title: "Quick", taskType: "quick" },
-        { projectId, title: "Complex", taskType: "complex", complexPhase: "research" },
+        { projectId, title: "Brainstorm", taskType: "brainstorm" },
       ]);
 
       const response = await app.inject({
         method: "GET",
-        url: `/api/tasks?projectId=${projectId}&taskType=complex`,
+        url: `/api/tasks?projectId=${projectId}&taskType=brainstorm`,
         headers: { "x-project-id": projectId },
       });
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body).toHaveLength(1);
-      expect(body[0].taskType).toBe("complex");
+      expect(body[0].taskType).toBe("brainstorm");
     });
   });
 
@@ -233,27 +215,6 @@ describe("Task API Routes", () => {
       expect(body.column).toBe("done");
     });
 
-    it("signals complex task phase completion", async () => {
-      const [task] = await testDb.db.insert(tasks).values({
-        projectId,
-        title: "Phase complete",
-        taskType: "complex",
-        complexPhase: "research",
-        column: "in_progress",
-      }).returning();
-
-      const response = await app.inject({
-        method: "POST",
-        url: `/api/tasks/${task.id}/complete`,
-        headers: { "x-project-id": projectId },
-        payload: { output: "Research findings..." },
-      });
-
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.task.complexPhase).toBe("plan");
-      expect(body.nextPhase).toBe("plan");
-    });
   });
 
   describe("POST /api/tasks/:id/dependencies", () => {

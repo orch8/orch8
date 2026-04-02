@@ -59,22 +59,6 @@ describe("Database Schema", () => {
     expect(task.id).toMatch(/^task_/);
     expect(task.taskType).toBe("quick");
     expect(task.column).toBe("backlog");
-    expect(task.complexPhase).toBeNull();
-  });
-
-  it("creates a complex task with initial phase", async () => {
-    const allProjects = await testDb.db.select().from(projects);
-    const projectId = allProjects[0].id;
-
-    const [task] = await testDb.db.insert(tasks).values({
-      projectId,
-      title: "New auth system",
-      taskType: "complex",
-      complexPhase: "research",
-    }).returning();
-
-    expect(task.taskType).toBe("complex");
-    expect(task.complexPhase).toBe("research");
   });
 
   it("creates a brainstorm task", async () => {

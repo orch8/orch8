@@ -68,54 +68,6 @@ describe("TaskDispatcher", () => {
     });
   });
 
-  describe("plan (complex tasks)", () => {
-    it("returns phase-specific agent for research phase", async () => {
-      const [task] = await testDb.db.insert(tasks).values({
-        projectId,
-        title: "Auth system",
-        taskType: "complex",
-        complexPhase: "research",
-        researchAgentId: "researcher",
-      }).returning();
-
-      const plan = await dispatcher.plan(task);
-
-      expect(plan.type).toBe("complex");
-      expect(plan.agentId).toBe("researcher");
-      expect(plan.phase).toBe("research");
-      expect(plan.needsWorktree).toBe(true);
-    });
-
-    it("returns phase-specific agent for implement phase", async () => {
-      const [task] = await testDb.db.insert(tasks).values({
-        projectId,
-        title: "Auth system",
-        taskType: "complex",
-        complexPhase: "implement",
-        implementAgentId: "implementer",
-      }).returning();
-
-      const plan = await dispatcher.plan(task);
-
-      expect(plan.agentId).toBe("implementer");
-      expect(plan.phase).toBe("implement");
-    });
-
-    it("falls back to task assignee when no phase agent set", async () => {
-      const [task] = await testDb.db.insert(tasks).values({
-        projectId,
-        title: "No phase agent",
-        taskType: "complex",
-        complexPhase: "research",
-        assignee: "engineer",
-      }).returning();
-
-      const plan = await dispatcher.plan(task);
-
-      expect(plan.agentId).toBe("engineer");
-    });
-  });
-
   describe("plan (brainstorm tasks)", () => {
     it("returns brainstorm dispatch plan without worktree", async () => {
       const [task] = await testDb.db.insert(tasks).values({

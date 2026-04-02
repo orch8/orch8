@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   CreateTaskSchema,
   UpdateTaskSchema,
-  CompletePhaseSchema,
   ConvertTaskSchema,
   TaskFilterSchema,
 } from "@orch/shared";
@@ -19,17 +18,6 @@ describe("Task Zod Schemas", () => {
       if (result.success) {
         expect(result.data.taskType).toBe("quick");
       }
-    });
-
-    it("validates a complex task with phase agent overrides", () => {
-      const result = CreateTaskSchema.safeParse({
-        title: "New auth",
-        projectId: "proj_123",
-        taskType: "complex",
-        researchAgentId: "researcher",
-        implementAgentId: "implementer",
-      });
-      expect(result.success).toBe(true);
     });
 
     it("validates a brainstorm task", () => {
@@ -90,26 +78,9 @@ describe("Task Zod Schemas", () => {
     });
   });
 
-  describe("CompletePhaseSchema", () => {
-    it("requires output", () => {
-      const result = CompletePhaseSchema.safeParse({ output: "Research findings..." });
-      expect(result.success).toBe(true);
-    });
-
-    it("rejects empty output", () => {
-      const result = CompletePhaseSchema.safeParse({ output: "" });
-      expect(result.success).toBe(false);
-    });
-  });
-
   describe("ConvertTaskSchema", () => {
     it("allows converting to quick", () => {
       const result = ConvertTaskSchema.safeParse({ taskType: "quick" });
-      expect(result.success).toBe(true);
-    });
-
-    it("allows converting to complex", () => {
-      const result = ConvertTaskSchema.safeParse({ taskType: "complex" });
       expect(result.success).toBe(true);
     });
 
@@ -129,9 +100,8 @@ describe("Task Zod Schemas", () => {
       const result = TaskFilterSchema.safeParse({
         projectId: "proj_123",
         column: "backlog",
-        taskType: "complex",
+        taskType: "quick",
         assignee: "fe-eng",
-        complexPhase: "implement",
       });
       expect(result.success).toBe(true);
     });

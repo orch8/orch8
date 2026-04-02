@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithProviders, screen, waitFor } from "../test-utils.js";
 import { TaskDetailPanel } from "../components/task-detail/TaskDetailPanel.js";
-import { PhaseProgress } from "../components/task-detail/PhaseProgress.js";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, ...props }: any) => (
@@ -26,11 +25,10 @@ const mockTask = {
   id: "task_1",
   title: "Build auth",
   description: "Implement OAuth flow",
-  taskType: "complex",
+  taskType: "quick",
   column: "in_progress",
   priority: "high",
   assignee: "engineer",
-  complexPhase: "implement",
   projectId: "proj_1",
   createdAt: "2026-03-30T00:00:00Z",
 };
@@ -51,11 +49,6 @@ function mockTaskDetailResponses() {
   mockFetch.mockResolvedValueOnce({
     ok: true,
     json: () => Promise.resolve({ total: 0.05 }),
-  });
-  // usePhaseCost — GET /api/cost/task/task_1/phases?projectId=proj_1
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve({ byPhase: [] }),
   });
   // useTasks — GET /api/tasks?projectId=proj_1
   mockFetch.mockResolvedValueOnce({
@@ -101,24 +94,3 @@ describe("TaskDetailPanel", () => {
   });
 });
 
-describe("PhaseProgress", () => {
-  it("highlights current phase", () => {
-    renderWithProviders(<PhaseProgress currentPhase="implement" />);
-
-    const implementEl = screen.getByText("implement");
-    expect(implementEl.closest("[data-active]")).toHaveAttribute(
-      "data-active",
-      "true",
-    );
-  });
-
-  it("marks completed phases", () => {
-    renderWithProviders(<PhaseProgress currentPhase="implement" />);
-
-    const researchEl = screen.getByText("research");
-    expect(researchEl.closest("[data-completed]")).toHaveAttribute(
-      "data-completed",
-      "true",
-    );
-  });
-});

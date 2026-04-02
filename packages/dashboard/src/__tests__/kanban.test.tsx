@@ -17,7 +17,6 @@ const mockTask: Partial<Task> = {
   priority: "high",
   column: "backlog",
   projectId: "proj_1",
-  complexPhase: null,
 };
 
 describe("TaskCard", () => {
@@ -46,18 +45,6 @@ describe("TaskCard", () => {
     expect(screen.getByText("engineer")).toBeInTheDocument();
   });
 
-  it("shows phase indicator for complex tasks", () => {
-    const complexTask = {
-      ...mockTask,
-      taskType: "complex" as const,
-      complexPhase: "implement" as const,
-    };
-    renderWithProviders(
-      <TaskCard task={complexTask as Task} onClick={() => {}} />,
-    );
-
-    expect(screen.getByText("implement")).toBeInTheDocument();
-  });
 });
 
 describe("KanbanBoard", () => {

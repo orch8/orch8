@@ -119,21 +119,17 @@ describe("buildPrompt", () => {
     expect(result).toBe("Repo: my-repo");
   });
 
-  it("interpolates task phase data", () => {
+  it("interpolates task-level context variables", () => {
     const ctx: RunContext = {
       ...baseContext,
-      taskPhase: "implement",
-      taskResearchOutput: "Found the issue.",
-      taskPlanOutput: "Fix with patch.",
+      context: { deployTarget: "staging" },
     };
     const result = buildPrompt({
-      heartbeatTemplate: "Phase: {{task.phase}}\n\nResearch: {{task.researchOutput}}\n\nPlan: {{task.planOutput}}",
+      heartbeatTemplate: "Deploy to: {{context.deployTarget}}",
       context: ctx,
       isFirstRun: false,
     });
-    expect(result).toContain("Phase: implement");
-    expect(result).toContain("Research: Found the issue.");
-    expect(result).toContain("Plan: Fix with patch.");
+    expect(result).toContain("Deploy to: staging");
   });
 });
 

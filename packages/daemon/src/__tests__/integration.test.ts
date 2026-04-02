@@ -97,56 +97,6 @@ describe("Integration: Task Type Lifecycle", () => {
     expect(completed.column).toBe("done");
   });
 
-  it("full complex task lifecycle: create → phase through research/plan/implement/review", async () => {
-    // Create
-    const createRes = await app.inject({
-      method: "POST",
-      url: "/api/tasks",
-      headers: { "x-project-id": projectId },
-      payload: { title: "Complex feature", projectId, taskType: "complex" },
-    });
-    const task = JSON.parse(createRes.body);
-    expect(task.complexPhase).toBe("research");
-
-    // Complete research
-    const r1 = await app.inject({
-      method: "POST",
-      url: `/api/tasks/${task.id}/complete`,
-      headers: { "x-project-id": projectId },
-      payload: { output: "Research: found 3 approaches" },
-    });
-    expect(JSON.parse(r1.body).task.complexPhase).toBe("plan");
-
-    // Complete plan
-    const r2 = await app.inject({
-      method: "POST",
-      url: `/api/tasks/${task.id}/complete`,
-      headers: { "x-project-id": projectId },
-      payload: { output: "Plan: implement approach B" },
-    });
-    expect(JSON.parse(r2.body).task.complexPhase).toBe("implement");
-
-    // Complete implement
-    const r3 = await app.inject({
-      method: "POST",
-      url: `/api/tasks/${task.id}/complete`,
-      headers: { "x-project-id": projectId },
-      payload: { output: "Implementation complete" },
-    });
-    expect(JSON.parse(r3.body).task.complexPhase).toBe("review");
-
-    // Complete review → moves to done column
-    const r4 = await app.inject({
-      method: "POST",
-      url: `/api/tasks/${task.id}/complete`,
-      headers: { "x-project-id": projectId },
-      payload: { output: "Review: all looks good" },
-    });
-    const final = JSON.parse(r4.body);
-    expect(final.task.column).toBe("done");
-    expect(final.nextPhase).toBeNull();
-  });
-
   it("brainstorm lifecycle: create → start → message → ready → convert", async () => {
     // Create
     const createRes = await app.inject({
@@ -192,17 +142,16 @@ describe("Integration: Task Type Lifecycle", () => {
     expect(transcriptRes.statusCode).toBe(200);
     expect(JSON.parse(transcriptRes.body).transcript).toBeTruthy();
 
-    // Convert to complex
+    // Convert to quick
     const convertRes = await app.inject({
       method: "POST",
       url: `/api/tasks/${task.id}/convert`,
       headers: { "x-project-id": projectId },
-      payload: { taskType: "complex" },
+      payload: { taskType: "quick" },
     });
     expect(convertRes.statusCode).toBe(200);
     const converted = JSON.parse(convertRes.body);
-    expect(converted.taskType).toBe("complex");
-    expect(converted.complexPhase).toBe("research");
+    expect(converted.taskType).toBe("quick");
   });
 
   it("dependency management: add dependency, reject cycle", async () => {

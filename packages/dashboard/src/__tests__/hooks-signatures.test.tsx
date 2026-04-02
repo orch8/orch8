@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { useAgents, useAgent } from "../hooks/useAgents.js";
 import { useTasks } from "../hooks/useTasks.js";
 import { useActivity } from "../hooks/useActivity.js";
-import { useCostSummary, useCostTimeseries, useTaskCost, usePhaseCost } from "../hooks/useCost.js";
+import { useCostSummary, useCostTimeseries, useTaskCost } from "../hooks/useCost.js";
 import { useRuns, useRun, useRunLog } from "../hooks/useRuns.js";
 import { useEntities } from "../hooks/useMemory.js";
 import { useNotifications } from "../hooks/useNotifications.js";
