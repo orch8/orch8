@@ -154,6 +154,29 @@ describe("SeedingService", () => {
     });
   });
 
+  describe("populateGlobalSkills", () => {
+    it("copies bundled skills to target directory, overwriting existing", async () => {
+      const globalDir = join(tempDir, "global-skills");
+      const service = new SeedingService();
+      await service.populateGlobalSkills(globalDir);
+
+      const entries = await readdir(globalDir);
+      expect(entries).toContain("tdd");
+      expect(entries).toContain("verification");
+      expect(entries).toContain("orch8");
+      expect(entries).toContain("systematic-debugging");
+
+      // Verify content
+      const tddContent = await readFile(join(globalDir, "tdd", "SKILL.md"), "utf-8");
+      expect(tddContent).toContain("name: tdd");
+
+      // Run again — should overwrite without error
+      await service.populateGlobalSkills(globalDir);
+      const entries2 = await readdir(globalDir);
+      expect(entries2).toContain("tdd");
+    });
+  });
+
   describe("ensureGitignore", () => {
     it("creates .gitignore with .orch8/ if none exists", async () => {
       const service = new SeedingService();

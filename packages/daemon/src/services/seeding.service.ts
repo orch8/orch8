@@ -12,6 +12,7 @@ import {
   parseAgentsMd,
   DEFAULT_SKILLS_DIR,
   DEFAULT_AGENTS_DIR,
+  GLOBAL_SKILLS_DIR,
   type ParsedAgentsMd,
   type BundledAgent,
 } from "@orch/shared";
@@ -28,6 +29,18 @@ export interface ParsedAgentWithPaths extends ParsedAgentsMd {
 }
 
 export class SeedingService {
+  /**
+   * Copies all bundled skills from the package defaults to the global
+   * skills directory (~/.orch8/skills/). Always overwrites to keep
+   * global skills in sync with the installed orch8 version.
+   *
+   * @param targetDir — override for testing (defaults to ~/.orch8/skills/)
+   */
+  async populateGlobalSkills(targetDir: string = GLOBAL_SKILLS_DIR): Promise<void> {
+    await mkdir(targetDir, { recursive: true });
+    await copyDirRecursive(DEFAULT_SKILLS_DIR, targetDir);
+  }
+
   /**
    * Copies bundled skill and agent defaults into the project's
    * .orch8/ directory. Creates the directory if needed.
