@@ -30,9 +30,12 @@ export async function bundledAgentRoutes(app: FastifyInstance) {
           .send({ error: "not_found", message: "Project not found" });
       }
 
-      // Copy skills + selected agent dirs to project's .orch8/
+      // Copy agent template dirs to project's .orch8/ (skills are global now)
       await app.seedingService.copyDefaults(project.homeDir, agentIds);
       await app.seedingService.ensureGitignore(project.homeDir);
+
+      // Ensure global + local skills are registered for this project
+      await app.projectSkillService.syncFromDisk(projectId, project.homeDir);
 
       // Parse copied agent definitions
       const agentDefs =
@@ -62,7 +65,7 @@ export async function bundledAgentRoutes(app: FastifyInstance) {
             promptTemplate: def.promptTemplate,
             bootstrapPromptTemplate: def.bootstrapPromptTemplate,
             instructionsFilePath: def.instructionsFilePath,
-            skillPaths: def.resolvedSkillPaths,
+            desiredSkills: def.skills,
             heartbeatEnabled: def.heartbeat.enabled,
             heartbeatIntervalSec: def.heartbeat.intervalSec,
           });
