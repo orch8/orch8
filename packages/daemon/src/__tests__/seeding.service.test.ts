@@ -16,22 +16,14 @@ afterEach(async () => {
 
 describe("SeedingService", () => {
   describe("copyDefaults", () => {
-    it("copies skills directory to .orch8/skills/", async () => {
+    it("does not copy skills to project directory", async () => {
       const service = new SeedingService();
       await service.copyDefaults(tempDir);
 
       const skillsDir = join(tempDir, ".orch8", "skills");
-      const entries = await readdir(skillsDir);
-      expect(entries).toContain("tdd");
-      expect(entries).toContain("verification");
-      expect(entries).toContain("systematic-debugging");
-
-      // Verify content was actually copied
-      const tddContent = await readFile(
-        join(skillsDir, "tdd", "SKILL.md"),
-        "utf-8",
-      );
-      expect(tddContent).toContain("name: tdd");
+      // Skills directory should not be created (no skills copied)
+      const { existsSync } = await import("node:fs");
+      expect(existsSync(skillsDir)).toBe(false);
     });
 
     it("copies no agents when agentIds is omitted", async () => {
@@ -92,20 +84,16 @@ describe("SeedingService", () => {
       expect(cto!.heartbeat.intervalSec).toBe(3600);
     });
 
-    it("resolves skill names to absolute paths", async () => {
+    it("returns skill slugs from parsed agent definitions", async () => {
       const service = new SeedingService();
       await service.copyDefaults(tempDir, ["implementer"]);
 
       const agents = await service.parseAgentDefinitions(tempDir);
       const implementer = agents.find((a) => a.name === "implementer");
 
-      expect(implementer!.resolvedSkillPaths).toBeDefined();
-      expect(implementer!.resolvedSkillPaths!.length).toBeGreaterThan(0);
-
-      for (const p of implementer!.resolvedSkillPaths!) {
-        expect(p).toContain(".orch8/skills/");
-        expect(p).toMatch(/SKILL\.md$/);
-      }
+      expect(implementer).toBeDefined();
+      expect(implementer!.skills).toContain("tdd");
+      expect(implementer!.skills).toContain("systematic-debugging");
     });
   });
 

@@ -24,7 +24,6 @@ const MODEL_MAP: Record<string, string> = {
 };
 
 export interface ParsedAgentWithPaths extends ParsedAgentsMd {
-  resolvedSkillPaths?: string[];
   instructionsFilePath: string;
 }
 
@@ -50,13 +49,9 @@ export class SeedingService {
    */
   async copyDefaults(projectHomeDir: string, agentIds?: string[]): Promise<void> {
     const orchDir = join(projectHomeDir, ".orch8");
-    const destSkills = join(orchDir, "skills");
     const destAgents = join(orchDir, "agents");
 
-    await mkdir(destSkills, { recursive: true });
     await mkdir(destAgents, { recursive: true });
-
-    await copyDirRecursive(DEFAULT_SKILLS_DIR, destSkills);
 
     if (agentIds && agentIds.length > 0) {
       for (const id of agentIds) {
@@ -87,15 +82,8 @@ export class SeedingService {
       const content = await readFile(agentsMdPath, "utf-8");
       const parsed = parseAgentsMd(content);
 
-      // Resolve skill names to absolute paths
-      const skillsDir = join(projectHomeDir, ".orch8", "skills");
-      const resolvedSkillPaths = parsed.skills.map((skillName) =>
-        join(skillsDir, skillName, "SKILL.md"),
-      );
-
       results.push({
         ...parsed,
-        resolvedSkillPaths,
         instructionsFilePath: agentsMdPath,
       });
     }
