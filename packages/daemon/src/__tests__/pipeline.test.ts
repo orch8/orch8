@@ -209,4 +209,108 @@ describe("PipelineService", () => {
       expect(result!.steps[1].order).toBe(2);
     });
   });
+
+  describe("rejectStep", () => {
+    it("rejects a step back to an earlier step", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Reject test",
+        steps: [
+          { label: "research", agentId: "agent-a" },
+          { label: "implement", agentId: "agent-b" },
+          { label: "review", agentId: "agent-a" },
+        ],
+      });
+
+      // Complete first two steps
+      await service.completeStep(
+        pipeline.id,
+        steps[0].id,
+        "Research done",
+        ".orch8/pipelines/test/research.md",
+      );
+      const step2Result = await service.completeStep(
+        pipeline.id,
+        steps[1].id,
+        "Impl done",
+        ".orch8/pipelines/test/implement.md",
+      );
+      // review step now has a task
+      const reviewStep = step2Result.nextStep!;
+
+      const result = await service.rejectStep(
+        pipeline.id,
+        reviewStep.id,
+        steps[0].id,
+        "Missing edge cases in research",
+      );
+
+      // Rejecting step is marked failed
+      expect(result.rejectedStep.status).toBe("failed");
+      expect(result.rejectedStep.outputSummary).toContain("[REJECTED]");
+
+      // Target step is reset to pending with a new task
+      expect(result.targetStep.status).toBe("pending");
+      expect(result.newTask).not.toBeNull();
+      expect(result.newTask.description).toContain("Missing edge cases in research");
+
+      // Pipeline is running, currentStep points to target
+      expect(result.pipeline.status).toBe("running");
+      expect(result.pipeline.currentStep).toBe(1);
+
+      // Intermediate step (implement) should also be reset
+      const full = await service.getWithSteps(pipeline.id);
+      const implStep = full!.steps.find((s) => s.label === "implement");
+      expect(implStep!.status).toBe("pending");
+      expect(implStep!.taskId).toBeNull();
+    });
+
+    it("rejects to the immediately previous step", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Adjacent reject",
+        steps: [
+          { label: "implement", agentId: "agent-a" },
+          { label: "review", agentId: "agent-b" },
+        ],
+      });
+
+      await service.completeStep(
+        pipeline.id,
+        steps[0].id,
+        "Done",
+        ".orch8/pipelines/test/implement.md",
+      );
+
+      const full = await service.getWithSteps(pipeline.id);
+      const reviewStep = full!.steps.find((s) => s.label === "review")!;
+
+      const result = await service.rejectStep(
+        pipeline.id,
+        reviewStep.id,
+        steps[0].id,
+        "Needs refactor",
+      );
+
+      expect(result.targetStep.status).toBe("pending");
+      expect(result.pipeline.currentStep).toBe(1);
+      expect(result.newTask.description).toContain("Needs refactor");
+    });
+
+    it("throws if target step is not before rejecting step", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Bad reject",
+        steps: [
+          { label: "research", agentId: "agent-a" },
+          { label: "review", agentId: "agent-b" },
+        ],
+      });
+
+      // Try to reject step[0] back to step[1] — invalid direction
+      await expect(
+        service.rejectStep(pipeline.id, steps[0].id, steps[1].id, "nope"),
+      ).rejects.toThrow("Target step must have a lower order");
+    });
+  });
 });
