@@ -55,3 +55,33 @@ export function useRetryPipeline() {
     },
   });
 }
+
+export function useRejectPipelineStep() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      pipelineId,
+      stepId,
+      targetStepId,
+      feedback,
+    }: {
+      pipelineId: string;
+      stepId: string;
+      targetStepId: string;
+      feedback: string;
+    }) =>
+      api.post<{
+        pipeline: Pipeline;
+        rejectedStep: unknown;
+        targetStep: unknown;
+        newTask: unknown;
+      }>(`/pipelines/${pipelineId}/steps/${stepId}/reject`, {
+        targetStepId,
+        feedback,
+      }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["pipelines", data.pipeline.projectId] });
+      qc.invalidateQueries({ queryKey: ["pipeline", data.pipeline.id] });
+    },
+  });
+}
