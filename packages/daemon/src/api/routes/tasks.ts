@@ -2,13 +2,11 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { CreateTaskSchema, UpdateTaskSchema, CompletePhaseSchema, ConvertTaskSchema, TaskFilterSchema } from "@orch/shared";
 import { TaskService } from "../../services/task.service.js";
-import { ComplexPhaseService } from "../../services/complex-phase.service.js";
 import type { TaskColumn } from "../../services/task-transitions.js";
 import { requirePermission } from "../middleware/permissions.js";
 
 export async function taskRoutes(app: FastifyInstance) {
   const taskService = new TaskService(app.db);
-  const phaseService = new ComplexPhaseService(app.db);
 
   // POST /api/tasks — Create task
   app.post("/api/tasks", {
@@ -198,40 +196,6 @@ export async function taskRoutes(app: FastifyInstance) {
             reason: "pipeline_step_ready",
           },
         );
-      }
-
-      return result;
-    }
-
-    if (task.taskType === "complex" && task.complexPhase) {
-      const parsed = CompletePhaseSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.code(400).send({
-          error: "validation_error",
-          message: "Complex task phase completion requires 'output' field",
-          details: parsed.error.issues,
-        });
-      }
-
-      const result = await phaseService.completePhase(task.id, parsed.data.output);
-
-      // Wake the next phase agent if there is one
-      if (result.nextPhase) {
-        const nextAgent = await phaseService.getPhaseAgent(result.task, result.nextPhase);
-        if (nextAgent) {
-          await app.heartbeatService.enqueueWakeup(nextAgent.id, task.projectId, {
-            source: "automation",
-            taskId: task.id,
-            reason: `phase_${result.nextPhase}_ready`,
-          });
-        }
-      } else {
-        // Final phase — use lifecycle transition for done side-effects (worktree cleanup etc.)
-        try {
-          await app.lifecycleService.transition(task.id, "done");
-        } catch {
-          // completePhase already set column to "done" directly, so this is best-effort
-        }
       }
 
       return result;

@@ -18,18 +18,6 @@ export class TaskService {
       assignee: input.assignee,
     };
 
-    if (input.taskType === "complex") {
-      values.complexPhase = "research";
-      if ("researchAgentId" in input) values.researchAgentId = input.researchAgentId;
-      if ("planAgentId" in input) values.planAgentId = input.planAgentId;
-      if ("implementAgentId" in input) values.implementAgentId = input.implementAgentId;
-      if ("reviewAgentId" in input) values.reviewAgentId = input.reviewAgentId;
-      if ("researchPromptOverride" in input) values.researchPromptOverride = input.researchPromptOverride;
-      if ("planPromptOverride" in input) values.planPromptOverride = input.planPromptOverride;
-      if ("implementPromptOverride" in input) values.implementPromptOverride = input.implementPromptOverride;
-      if ("reviewPromptOverride" in input) values.reviewPromptOverride = input.reviewPromptOverride;
-    }
-
     if (input.taskType === "brainstorm") {
       values.brainstormStatus = "active";
     }
@@ -50,7 +38,6 @@ export class TaskService {
     if (filter.column) conditions.push(eq(tasks.column, filter.column));
     if (filter.taskType) conditions.push(eq(tasks.taskType, filter.taskType));
     if (filter.assignee) conditions.push(eq(tasks.assignee, filter.assignee));
-    if (filter.complexPhase) conditions.push(eq(tasks.complexPhase, filter.complexPhase));
     if (filter.pipelineId) conditions.push(eq(tasks.pipelineId, filter.pipelineId));
 
     if (conditions.length === 0) {
@@ -100,7 +87,7 @@ export class TaskService {
       );
   }
 
-  async convertBrainstorm(taskId: string, newType: "quick" | "complex"): Promise<Task> {
+  async convertBrainstorm(taskId: string, newType: "quick"): Promise<Task> {
     const task = await this.getById(taskId);
     if (!task) throw new Error("Task not found");
     if (task.taskType !== "brainstorm") {
@@ -114,10 +101,6 @@ export class TaskService {
       brainstormSessionPid: null,
       updatedAt: new Date(),
     };
-
-    if (newType === "complex") {
-      updateValues.complexPhase = "research";
-    }
 
     const [updated] = await this.db
       .update(tasks)

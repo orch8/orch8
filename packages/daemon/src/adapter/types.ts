@@ -81,9 +81,6 @@ export interface RunContext {
   // Prompt data
   taskTitle?: string;
   taskDescription?: string;
-  taskPhase?: string;
-  taskResearchOutput?: string;
-  taskPlanOutput?: string;
   brainstormTranscript?: string;
   context?: Record<string, string>;
 

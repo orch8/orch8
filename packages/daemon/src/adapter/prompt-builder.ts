@@ -22,9 +22,6 @@ function contextToVars(ctx: RunContext): Record<string, string | undefined> {
     "run.source": ctx.wakeReason,
     "task.title": ctx.taskTitle,
     "task.description": ctx.taskDescription,
-    "task.phase": ctx.taskPhase,
-    "task.researchOutput": ctx.taskResearchOutput,
-    "task.planOutput": ctx.taskPlanOutput,
     "task.brainstormTranscript": ctx.brainstormTranscript,
 
     // Workspace metadata (Phase 3)

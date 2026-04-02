@@ -567,9 +567,6 @@ export class HeartbeatService {
         logStream: logHandle.stream,
         taskTitle: taskData?.title,
         taskDescription: taskData?.description ?? undefined,
-        taskPhase: taskData?.complexPhase ?? undefined,
-        taskResearchOutput: taskData?.researchOutput ?? undefined,
-        taskPlanOutput: taskData?.planOutput ?? undefined,
         onEvent,
 
         // Phase 3: Workspace metadata

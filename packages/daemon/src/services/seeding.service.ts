@@ -151,10 +151,6 @@ export class SeedingService {
         ...(parsed.bootstrapPromptTemplate != null
           ? { bootstrapPromptTemplate: parsed.bootstrapPromptTemplate }
           : {}),
-        ...(parsed.researchPrompt != null ? { researchPrompt: parsed.researchPrompt } : {}),
-        ...(parsed.planPrompt != null ? { planPrompt: parsed.planPrompt } : {}),
-        ...(parsed.implementPrompt != null ? { implementPrompt: parsed.implementPrompt } : {}),
-        ...(parsed.reviewPrompt != null ? { reviewPrompt: parsed.reviewPrompt } : {}),
       });
     }
 
