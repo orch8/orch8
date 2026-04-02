@@ -109,21 +109,11 @@ describe("parseAgentsMd", () => {
     expect(result.bootstrapPromptTemplate).toContain("Read the codebase first.");
   });
 
-  it("extracts phase-specific prompts from ## Phase: X sections", () => {
-    const result = parseAgentsMd(MINIMAL_AGENTS_MD);
-
-    expect(result.implementPrompt).toContain("Execute the plan.");
-  });
-
   it("returns undefined for missing sections", () => {
     const result = parseAgentsMd(MINIMAL_NO_SECTIONS);
 
     expect(result.promptTemplate).toBeUndefined();
     expect(result.bootstrapPromptTemplate).toBeUndefined();
-    expect(result.researchPrompt).toBeUndefined();
-    expect(result.planPrompt).toBeUndefined();
-    expect(result.implementPrompt).toBeUndefined();
-    expect(result.reviewPrompt).toBeUndefined();
   });
 
   it("handles agent with effort field", () => {

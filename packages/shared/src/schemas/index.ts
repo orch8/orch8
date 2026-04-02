@@ -68,6 +68,7 @@ export {
   CreatePipelineSchema,
   PipelineFilterSchema,
   UpdatePipelineStepSchema,
+  CompletePipelineStepSchema,
   RejectPipelineStepSchema,
 } from "./pipeline.js";
 export type {
@@ -77,5 +78,6 @@ export type {
   CreatePipeline,
   PipelineFilter,
   UpdatePipelineStep,
+  CompletePipelineStep,
   RejectPipelineStep,
 } from "./pipeline.js";

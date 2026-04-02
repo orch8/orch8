@@ -1,6 +1,6 @@
 // packages/daemon/src/api/routes/tasks.ts
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { CreateTaskSchema, UpdateTaskSchema, CompletePhaseSchema, ConvertTaskSchema, TaskFilterSchema } from "@orch/shared";
+import { CreateTaskSchema, UpdateTaskSchema, CompletePipelineStepSchema, ConvertTaskSchema, TaskFilterSchema } from "@orch/shared";
 import { TaskService } from "../../services/task.service.js";
 import type { TaskColumn } from "../../services/task-transitions.js";
 import { requirePermission } from "../middleware/permissions.js";
@@ -154,7 +154,7 @@ export async function taskRoutes(app: FastifyInstance) {
 
     // Pipeline step completion
     if (task.pipelineId && task.pipelineStepId) {
-      const parsed = CompletePhaseSchema.safeParse(request.body);
+      const parsed = CompletePipelineStepSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({
           error: "validation_error",

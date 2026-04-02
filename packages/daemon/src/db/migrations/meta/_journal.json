@@ -5,50 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1775019948821,
+      "when": 1775124783572,
       "tag": "0000_workable_zaran",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1775034154223,
-      "tag": "0001_misty_microbe",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1775046602942,
-      "tag": "0002_futuristic_shinobi_shaw",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1775049028814,
-      "tag": "0003_lovely_zeigeist",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1775053386919,
-      "tag": "0004_stormy_tinkerer",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1775054872697,
-      "tag": "0005_volatile_adam_destine",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1775064445237,
-      "tag": "0006_sticky_leper_queen",
       "breakpoints": true
     }
   ]

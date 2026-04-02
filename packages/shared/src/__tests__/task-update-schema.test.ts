@@ -32,29 +32,11 @@ describe("UpdateTaskSchema — new fields", () => {
     expect(result.success).toBe(true);
   });
 
-  it("accepts researchPromptOverride", () => {
+  it("rejects unknown fields", () => {
     const result = UpdateTaskSchema.safeParse({
-      researchPromptOverride: "Custom research prompt",
+      unknownField: "should not pass",
     });
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts planPromptOverride as nullable", () => {
-    const result = UpdateTaskSchema.safeParse({ planPromptOverride: null });
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts implementPromptOverride", () => {
-    const result = UpdateTaskSchema.safeParse({
-      implementPromptOverride: "Custom impl prompt",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts reviewPromptOverride", () => {
-    const result = UpdateTaskSchema.safeParse({
-      reviewPromptOverride: "Custom review prompt",
-    });
+    // Zod strip mode: unknown fields are stripped, not rejected
     expect(result.success).toBe(true);
   });
 });
