@@ -12,15 +12,11 @@ export const taskColumnEnum = pgEnum("task_column", [
 ]);
 
 export const taskTypeEnum = pgEnum("task_type", [
-  "quick", "complex", "brainstorm",
+  "quick", "brainstorm",
 ]);
 
 export const taskPriorityEnum = pgEnum("task_priority", [
   "high", "medium", "low",
-]);
-
-export const complexPhaseEnum = pgEnum("complex_phase", [
-  "research", "plan", "implement", "review",
 ]);
 
 export const commentTypeEnum = pgEnum("comment_type", [
@@ -145,11 +141,6 @@ export const agents = pgTable("agents", {
   bootstrapPromptTemplate: text("bootstrap_prompt_template").default(""),
   instructionsFilePath: text("instructions_file_path"),
 
-  researchPrompt: text("research_prompt").default(""),
-  planPrompt: text("plan_prompt").default(""),
-  implementPrompt: text("implement_prompt").default(""),
-  reviewPrompt: text("review_prompt").default(""),
-
   mcpTools: text("mcp_tools").array().default(sql`'{}'`),
   skillPaths: text("skill_paths").array().default(sql`'{}'`),
   desiredSkills: text("desired_skills").array(),
@@ -190,23 +181,6 @@ export const tasks = pgTable("tasks", {
   taskType: taskTypeEnum("task_type").notNull().default("quick"),
   assignee: text("assignee"),
   priority: taskPriorityEnum("priority").notNull().default("medium"),
-
-  // Complex task phases
-  complexPhase: complexPhaseEnum("complex_phase"),
-  researchOutput: text("research_output"),
-  planOutput: text("plan_output"),
-  implementationOutput: text("implementation_output"),
-  reviewOutput: text("review_output"),
-
-  researchAgentId: text("research_agent_id"),
-  planAgentId: text("plan_agent_id"),
-  implementAgentId: text("implement_agent_id"),
-  reviewAgentId: text("review_agent_id"),
-
-  researchPromptOverride: text("research_prompt_override"),
-  planPromptOverride: text("plan_prompt_override"),
-  implementPromptOverride: text("implement_prompt_override"),
-  reviewPromptOverride: text("review_prompt_override"),
 
   // Brainstorm
   brainstormStatus: brainstormStatusEnum("brainstorm_status"),
