@@ -123,6 +123,27 @@ describe("project-skills routes", () => {
     expect(getRes.statusCode).toBe(404);
   });
 
+  it("DELETE returns 403 for global skills", async () => {
+    // Insert a global skill directly
+    await testDb.db.insert(projectSkills).values({
+      projectId,
+      slug: "global-tdd",
+      name: "TDD",
+      markdown: "content",
+      sourceType: "global",
+      sourceLocator: "/global/tdd",
+      trustLevel: "markdown_only",
+    });
+
+    const res = await app.inject({
+      method: "DELETE",
+      url: `/api/projects/${projectId}/skills/global-tdd`,
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error).toContain("global");
+  });
+
   it("POST /api/projects/:projectId/skills/sync triggers disk sync", async () => {
     const skillDir = join(projectHomeDir, ".orch8", "skills", "synced");
     await mkdir(skillDir, { recursive: true });

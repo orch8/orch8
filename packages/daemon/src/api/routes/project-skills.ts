@@ -45,6 +45,16 @@ export async function projectSkillRoutes(app: FastifyInstance) {
   // DELETE /api/projects/:projectId/skills/:idOrSlug
   app.delete("/api/projects/:projectId/skills/:idOrSlug", async (request, reply) => {
     const { projectId, idOrSlug } = request.params as { projectId: string; idOrSlug: string };
+
+    const skill = await app.projectSkillService.get(projectId, idOrSlug);
+    if (!skill) return reply.status(404).send({ error: "Skill not found" });
+
+    if (skill.sourceType === "global") {
+      return reply.status(403).send({
+        error: "Cannot delete global skills. Create a project-local override instead.",
+      });
+    }
+
     await app.projectSkillService.delete(projectId, idOrSlug);
     return reply.status(204).send();
   });
