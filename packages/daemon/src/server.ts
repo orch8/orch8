@@ -188,6 +188,22 @@ export function buildServer(options: ServerOptions = {}) {
       app.log.error({ err }, "Failed to resume interrupted runs on startup");
     });
 
+    // Populate global skills directory and sync all projects
+    (async () => {
+      try {
+        await seedingService.populateGlobalSkills();
+        app.log.info("Global skills directory populated");
+
+        const allProjects = await projectService.list();
+        for (const project of allProjects) {
+          await projectSkillService.syncFromDisk(project.id, project.homeDir);
+        }
+        app.log.info({ count: allProjects.length }, "Synced skills for all projects");
+      } catch (err) {
+        app.log.error({ err }, "Failed to sync global skills on startup");
+      }
+    })();
+
     // Comment service
     const commentService = new CommentService(dbClient.db);
 
