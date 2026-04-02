@@ -39,7 +39,7 @@ export async function identityRoutes(app: FastifyInstance) {
 
     // Find current task (in_progress assigned to this agent)
     const [currentTask] = await app.db
-      .select({ id: tasks.id, title: tasks.title, column: tasks.column, taskType: tasks.taskType, complexPhase: tasks.complexPhase })
+      .select({ id: tasks.id, title: tasks.title, column: tasks.column, taskType: tasks.taskType })
       .from(tasks)
       .where(
         and(
