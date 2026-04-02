@@ -57,6 +57,11 @@ export const UpdatePipelineStepSchema = z.object({
   status: z.enum(["skipped"]).optional(),
 });
 
+export const RejectPipelineStepSchema = z.object({
+  targetStepId: z.string().min(1),
+  feedback: z.string().min(1).max(5000),
+});
+
 // ─── Types ──────────────────────────────────────────────
 
 export type CreatePipelineTemplate = z.infer<typeof CreatePipelineTemplateSchema>;
@@ -65,3 +70,4 @@ export type PipelineTemplateFilter = z.infer<typeof PipelineTemplateFilterSchema
 export type CreatePipeline = z.infer<typeof CreatePipelineSchema>;
 export type PipelineFilter = z.infer<typeof PipelineFilterSchema>;
 export type UpdatePipelineStep = z.infer<typeof UpdatePipelineStepSchema>;
+export type RejectPipelineStep = z.infer<typeof RejectPipelineStepSchema>;
