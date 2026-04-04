@@ -2,11 +2,13 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { CreateTaskSchema, UpdateTaskSchema, CompletePipelineStepSchema, ConvertTaskSchema, TaskFilterSchema } from "@orch/shared";
 import { TaskService } from "../../services/task.service.js";
+import { CommentService } from "../../services/comment.service.js";
 import type { TaskColumn } from "../../services/task-transitions.js";
 import { requirePermission } from "../middleware/permissions.js";
 
 export async function taskRoutes(app: FastifyInstance) {
   const taskService = new TaskService(app.db);
+  const commentService = new CommentService(app.db);
 
   // POST /api/tasks — Create task
   app.post("/api/tasks", {
@@ -177,6 +179,18 @@ export async function taskRoutes(app: FastifyInstance) {
         parsed.data.output,
         outputFilePath,
       );
+
+      // Post step output as a system comment on the task
+      try {
+        await commentService.create({
+          taskId: task.id,
+          author: request.agent?.id ?? "system",
+          body: parsed.data.output,
+          type: "system",
+        });
+      } catch {
+        // Best-effort — don't block completion if comment fails
+      }
 
       // Transition task to done
       try {
