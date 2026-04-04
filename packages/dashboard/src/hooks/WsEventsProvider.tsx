@@ -81,10 +81,11 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
           break;
         case "notification:new": {
           qc.invalidateQueries({ queryKey: ["notifications"] });
-          if (TOAST_TYPES.has(event.type as string)) {
+          const notifType = (event as any).notificationType as string;
+          if (TOAST_TYPES.has(notifType)) {
             addToast({
               id: (event as any).id ?? String(Date.now()),
-              type: (event as any).type ?? "info",
+              type: notifType ?? "info",
               title: (event as any).title ?? "Notification",
               message: (event as any).message ?? "",
               link: (event as any).link,

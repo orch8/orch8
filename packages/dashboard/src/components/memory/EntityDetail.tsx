@@ -90,6 +90,7 @@ export function EntityDetail({ entityId }: EntityDetailProps) {
                       entityId,
                       factId: fact.id,
                       newContent: supersedeContent,
+                      category: fact.category,
                     });
                     setSupersedeTarget(null);
                   }}

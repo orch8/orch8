@@ -6,8 +6,9 @@ export function useCreateEntity() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { projectId: string; name: string; entityType: string; description?: string }) => {
-      const slug = input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-      return api.post<Entity>("/memory/knowledge", { ...input, slug });
+      const { projectId, ...body } = input;
+      const slug = body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      return api.post<Entity>("/memory/knowledge", { ...body, slug }, { projectId });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["entities"] });
@@ -22,11 +23,13 @@ export function useSupersedeFact() {
       entityId,
       factId,
       newContent,
+      category,
     }: {
       entityId: string;
       factId: string;
       newContent: string;
-    }) => api.post(`/memory/knowledge/${entityId}/facts/${factId}/supersede`, { content: newContent }),
+      category: string;
+    }) => api.post(`/memory/knowledge/${entityId}/facts/${factId}/supersede`, { content: newContent, category }),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["entityFacts", vars.entityId] });
     },

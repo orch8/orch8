@@ -87,11 +87,11 @@ export function RunDetail({ runId, projectId, onClose }: RunDetailProps) {
         <p className="text-xs text-zinc-500">Continuation of run {run.parentRunId}</p>
       )}
 
-      {logData?.log && (
+      {logData?.content && (
         <div>
           <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">Log Output</h4>
           <pre className="max-h-96 overflow-auto rounded bg-zinc-950 p-3 font-mono text-xs text-zinc-400">
-            {logData.log}
+            {logData.content}
           </pre>
         </div>
       )}

@@ -148,7 +148,7 @@ export class BroadcastService {
   }
 
   notificationNew(projectId: string, payload: NotificationNewPayload): void {
-    this.send(projectId, { ...payload, type: "notification:new" });
+    this.send(projectId, { ...payload, notificationType: payload.type, type: "notification:new" });
   }
 
   verificationVerdict(projectId: string, payload: VerificationVerdictPayload): void {
