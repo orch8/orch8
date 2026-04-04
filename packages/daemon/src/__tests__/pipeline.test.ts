@@ -131,6 +131,46 @@ describe("PipelineService", () => {
       expect(result.nextStep).toBeNull();
     });
 
+    it("is idempotent — second call returns existing state without creating duplicate tasks", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Idempotent test",
+        steps: [
+          { label: "research", agentId: "agent-a" },
+          { label: "implement", agentId: "agent-b" },
+        ],
+      });
+
+      const first = await service.completeStep(
+        pipeline.id,
+        steps[0].id,
+        "Research complete",
+        ".orch8/pipelines/test/research.md",
+      );
+
+      expect(first.nextStep).not.toBeNull();
+      const firstNextTaskId = first.nextTask!.id;
+
+      // Second call to completeStep for the same step
+      const second = await service.completeStep(
+        pipeline.id,
+        steps[0].id,
+        "Research complete (retry)",
+        ".orch8/pipelines/test/research.md",
+      );
+
+      // Should return existing state, not create a new task
+      expect(second.completedStep.status).toBe("completed");
+      expect(second.nextStep).toBeNull();
+      expect(second.nextTask).toBeNull();
+
+      // Verify no duplicate tasks were created for the implement step
+      const allTasks = await testDb.db.select().from(tasks);
+      const implementTasks = allTasks.filter(t => t.pipelineStepId === steps[1].id);
+      expect(implementTasks).toHaveLength(1);
+      expect(implementTasks[0].id).toBe(firstNextTaskId);
+    });
+
     it("skips steps marked as skipped", async () => {
       const { pipeline, steps } = await service.create({
         projectId,

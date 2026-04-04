@@ -128,6 +128,15 @@ export class PipelineService {
     summary: string,
     outputFilePath: string,
   ): Promise<CompleteStepResult> {
+    // Idempotency guard: if step is already completed, return existing state
+    const [existingStep] = await this.db.select().from(pipelineSteps)
+      .where(eq(pipelineSteps.id, stepId));
+    if (existingStep?.status === "completed") {
+      const pipeline = await this.getById(pipelineId);
+      if (!pipeline) throw new Error("Pipeline not found");
+      return { pipeline, completedStep: existingStep, nextStep: null, nextTask: null };
+    }
+
     const [completedStep] = await this.db
       .update(pipelineSteps)
       .set({

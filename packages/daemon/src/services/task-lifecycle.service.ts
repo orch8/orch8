@@ -77,16 +77,20 @@ export class TaskLifecycleService {
       updateValues.executionRunId = null;
       updateValues.executionLockedAt = null;
 
-      // Remove worktree
+      // Remove worktree (best-effort — don't block the state transition)
       if (task.worktreePath && task.branch) {
-        const project = await this.loadProject(task.projectId);
-        const slug = task.branch.split("/").pop() ?? "";
-        await this.worktreeService.remove({
-          homeDir: project.homeDir,
-          worktreeDir: project.worktreeDir,
-          taskId: task.id,
-          slug,
-        });
+        try {
+          const project = await this.loadProject(task.projectId);
+          const slug = task.branch.split("/").pop() ?? "";
+          await this.worktreeService.remove({
+            homeDir: project.homeDir,
+            worktreeDir: project.worktreeDir,
+            taskId: task.id,
+            slug,
+          });
+        } catch {
+          // Worktree cleanup is non-critical; task must still transition to done
+        }
       }
     }
 
