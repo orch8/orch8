@@ -212,6 +212,21 @@ export function buildServer(options: ServerOptions = {}) {
           await projectSkillService.syncFromDisk(project.id, project.homeDir);
         }
         app.log.info({ count: allProjects.length }, "Synced skills for all projects");
+
+        // Chat-agent backfill: ensure every project has a chat agent.
+        let provisionedCount = 0;
+        for (const project of allProjects) {
+          const created = await seedingService.provisionChatAgent(
+            dbClient.db,
+            project.id,
+          );
+          if (created) provisionedCount++;
+          await seedingService.ensureInitialChat(dbClient.db, project.id);
+        }
+        app.log.info(
+          { scanned: allProjects.length, provisioned: provisionedCount },
+          "Chat-agent backfill complete",
+        );
       } catch (err) {
         app.log.error({ err }, "Failed to sync global skills on startup");
       }

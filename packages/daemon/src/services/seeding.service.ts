@@ -16,6 +16,87 @@ import {
   type ParsedAgentsMd,
   type BundledAgent,
 } from "@orch/shared";
+import { agents, chats } from "@orch/shared/db";
+import { eq, and } from "drizzle-orm";
+import type { SchemaDb } from "../db/client.js";
+
+/**
+ * System prompt for the project chat agent. The agent is the user's
+ * conversational entry point to orch8 — it uses skills to delegate
+ * work and emits confirmation cards for any state-changing actions.
+ */
+export const CHAT_AGENT_SYSTEM_PROMPT = `You are the project chat assistant.
+
+Your job is to help the user manage this orch8 project conversationally.
+You have skills that teach you how to do specific things — brainstorm,
+manage agents, manage tasks, build pipelines, query project state.
+When the user's intent matches a skill, follow that skill's instructions.
+When unclear, ask one focused clarifying question.
+
+CARD PROTOCOL — REQUIRED:
+For any action that creates, modifies, or deletes orch8 state
+(agents, tasks, pipelines, etc.), you MUST emit a confirmation card
+BEFORE calling the API. Format:
+
+  \`\`\`orch8-card
+  {
+    "kind": "confirm_create_agent",
+    "summary": "Create QA agent 'qa-bot' (sonnet, heartbeat 6h)",
+    "payload": { "...the proposed config...": true }
+  }
+  \`\`\`
+
+After emitting the card, STOP. The user will click Approve or Cancel.
+You will receive a system message: "User approved card_<id>" or
+"User cancelled card_<id>". Only AFTER an approval should you call
+the API. After the API call, emit a result card (kind: "result_*").
+
+IDS AND HYPERLINKS:
+When you reference a task, run, agent, pipeline, or chat thread,
+always use its canonical ID (e.g., task_abc123, run_xyz, agent_qa-bot,
+pipe_pipe456). The chat UI renders these as clickable links automatically.
+
+API access:
+The orch8 REST API is reachable via Bash + curl. The orch8-api skill
+explains all available endpoints. Never bypass the card protocol.`;
+
+/**
+ * Default config for a project chat agent. Id is the slug "chat", so
+ * the composite PK (id, projectId) gives us one chat agent per project.
+ * Skills are v1 bundled skills — the per-skill files live under
+ * packages/shared/defaults/skills/ (installed by populateGlobalSkills).
+ */
+export const CHAT_AGENT_DEFAULTS = {
+  id: "chat",
+  name: "Project Chat",
+  role: "custom" as const,
+  model: "claude-sonnet-4-6",
+  effort: "medium" as const,
+  maxTurns: 30,
+  heartbeatEnabled: false,
+  heartbeatIntervalSec: 0,
+  wakeOnAssignment: false,
+  wakeOnOnDemand: true,
+  wakeOnAutomation: false,
+  canCreateTasks: true,
+  allowedTools: ["Bash", "Read", "Edit", "Write", "Grep", "Glob"],
+  // Note: the `orch8` skill is ALWAYS auto-injected by claude-local-adapter
+  // (see ORCH8_SKILL_PATH in claude-local-adapter.ts). We don't list it here
+  // because that would double-inject. These are the 8 chat-specific skills
+  // created in Plan 02.
+  desiredSkills: [
+    "_card-protocol",
+    "brainstorm",
+    "tasks",
+    "agents",
+    "pipelines",
+    "runs",
+    "cost-and-budget",
+    "memory",
+  ],
+  systemPrompt: CHAT_AGENT_SYSTEM_PROMPT,
+  promptTemplate: "{{context.userMessage}}",
+} as const;
 
 const MODEL_MAP: Record<string, string> = {
   opus: "claude-opus-4-6",
@@ -156,6 +237,67 @@ export class SeedingService {
     }
 
     return results;
+  }
+
+  /**
+   * Creates the default chat agent for a project if it doesn't exist.
+   * Idempotent — safe to call on every daemon startup. Returns true if
+   * a new row was inserted, false if the agent was already present.
+   */
+  async provisionChatAgent(db: SchemaDb, projectId: string): Promise<boolean> {
+    const existing = await db
+      .select()
+      .from(agents)
+      .where(
+        and(
+          eq(agents.id, CHAT_AGENT_DEFAULTS.id),
+          eq(agents.projectId, projectId),
+        ),
+      );
+    if (existing.length > 0) return false;
+
+    await db.insert(agents).values({
+      id: CHAT_AGENT_DEFAULTS.id,
+      projectId,
+      name: CHAT_AGENT_DEFAULTS.name,
+      role: CHAT_AGENT_DEFAULTS.role,
+      model: CHAT_AGENT_DEFAULTS.model,
+      effort: CHAT_AGENT_DEFAULTS.effort,
+      maxTurns: CHAT_AGENT_DEFAULTS.maxTurns,
+      heartbeatEnabled: CHAT_AGENT_DEFAULTS.heartbeatEnabled,
+      heartbeatIntervalSec: CHAT_AGENT_DEFAULTS.heartbeatIntervalSec,
+      wakeOnAssignment: CHAT_AGENT_DEFAULTS.wakeOnAssignment,
+      wakeOnOnDemand: CHAT_AGENT_DEFAULTS.wakeOnOnDemand,
+      wakeOnAutomation: CHAT_AGENT_DEFAULTS.wakeOnAutomation,
+      canCreateTasks: CHAT_AGENT_DEFAULTS.canCreateTasks,
+      allowedTools: CHAT_AGENT_DEFAULTS.allowedTools as unknown as string[],
+      desiredSkills: CHAT_AGENT_DEFAULTS.desiredSkills as unknown as string[],
+      systemPrompt: CHAT_AGENT_DEFAULTS.systemPrompt,
+      promptTemplate: CHAT_AGENT_DEFAULTS.promptTemplate,
+      adapterType: "claude_local",
+    });
+
+    return true;
+  }
+
+  /**
+   * Creates an initial "Welcome" chat for a newly provisioned chat agent,
+   * if the project has no chats yet. Idempotent — safe for backfill.
+   */
+  async ensureInitialChat(db: SchemaDb, projectId: string): Promise<boolean> {
+    const existing = await db
+      .select()
+      .from(chats)
+      .where(eq(chats.projectId, projectId))
+      .limit(1);
+    if (existing.length > 0) return false;
+
+    await db.insert(chats).values({
+      projectId,
+      agentId: CHAT_AGENT_DEFAULTS.id,
+      title: "Welcome",
+    });
+    return true;
   }
 }
 

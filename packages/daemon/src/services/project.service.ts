@@ -12,6 +12,19 @@ export class ProjectService {
   async create(input: CreateProject): Promise<Project> {
     const [project] = await this.db.insert(projects).values(input).returning();
     await this.seedDefaultPipelineTemplate(project.id);
+
+    // Provision the default chat agent for this project. Failure here
+    // is logged but does not fail project creation — backfill on
+    // daemon startup will recover.
+    try {
+      const { SeedingService } = await import("./seeding.service.js");
+      const seeding = new SeedingService();
+      await seeding.provisionChatAgent(this.db, project.id);
+      await seeding.ensureInitialChat(this.db, project.id);
+    } catch {
+      // swallow — startup backfill will retry
+    }
+
     return project;
   }
 
