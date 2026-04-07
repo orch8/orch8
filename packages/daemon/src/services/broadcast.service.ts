@@ -112,6 +112,36 @@ export interface RunEventPayload {
   payload: unknown;
 }
 
+export interface ChatMessageStartedPayload {
+  chatId: string;
+  messageId: string;
+}
+
+export interface ChatMessageChunkPayload {
+  chatId: string;
+  messageId: string;
+  chunk: string;
+}
+
+export interface ChatMessageCompletePayload {
+  chatId: string;
+  messageId: string;
+  runId: string | null;
+  cardCount: number;
+}
+
+export interface ChatMessageErrorPayload {
+  chatId: string;
+  messageId: string;
+  error: string;
+}
+
+export interface ChatCardDecisionPayload {
+  chatId: string;
+  cardId: string;
+  status: "approved" | "cancelled";
+}
+
 export class BroadcastService {
   constructor(private sockets: Set<WebSocket>) {}
 
@@ -177,6 +207,26 @@ export class BroadcastService {
 
   commentNew(projectId: string, payload: CommentNewPayload): void {
     this.send(projectId, { ...payload, type: "comment:new" });
+  }
+
+  chatMessageStarted(projectId: string, payload: ChatMessageStartedPayload): void {
+    this.send(projectId, { type: "chat_message_started", ...payload });
+  }
+
+  chatMessageChunk(projectId: string, payload: ChatMessageChunkPayload): void {
+    this.send(projectId, { type: "chat_message_chunk", ...payload });
+  }
+
+  chatMessageComplete(projectId: string, payload: ChatMessageCompletePayload): void {
+    this.send(projectId, { type: "chat_message_complete", ...payload });
+  }
+
+  chatMessageError(projectId: string, payload: ChatMessageErrorPayload): void {
+    this.send(projectId, { type: "chat_message_error", ...payload });
+  }
+
+  chatCardDecision(projectId: string, payload: ChatCardDecisionPayload): void {
+    this.send(projectId, { type: "chat_card_decision", ...payload });
   }
 
   /** Raw send for backward compat (brainstorm_output, etc.) */
