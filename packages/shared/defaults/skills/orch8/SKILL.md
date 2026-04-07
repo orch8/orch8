@@ -409,3 +409,19 @@ Use logging for:
 | Activity log | GET/POST | `/api/log` |
 | Cost summary | GET | `/api/cost/summary` |
 | Daemon status | GET | `/api/daemon/status` |
+
+---
+
+## Chat agent — card protocol
+
+If you are the **project chat agent** (id `chat`, role `custom`),
+every state-changing API call MUST be preceded by a confirmation
+card and every read of structured data SHOULD be returned as an
+info card. See the `_card-protocol` skill for the full fence
+format and approval flow. The endpoints documented above are still
+correct — the only difference for the chat agent is *when* you call
+them (after user approval) and *how* you announce the result (via
+a `result_*` card).
+
+If you are not the chat agent, ignore this section — call the API
+endpoints directly as documented above.
