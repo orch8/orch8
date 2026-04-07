@@ -75,6 +75,14 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "stuck_task",
 ]);
 
+export const chatMessageRoleEnum = pgEnum("chat_message_role", [
+  "user", "assistant", "system",
+]);
+
+export const chatMessageStatusEnum = pgEnum("chat_message_status", [
+  "streaming", "complete", "error",
+]);
+
 // ─── Projects ─────────────────────────────────────────────
 
 export const projects = pgTable("projects", {
@@ -465,4 +473,37 @@ export const instructionBundles = pgTable("instruction_bundles", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("instruction_bundles_agent_project_idx").on(table.agentId, table.projectId),
+]);
+
+// ─── Chats ────────────────────────────────────────────────
+
+export const chats = pgTable("chats", {
+  id: text("id").primaryKey().$defaultFn(() => `chat_${randomUUID()}`),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  agentId: text("agent_id").notNull(),
+  title: text("title").notNull().default("New chat"),
+  pinned: boolean("pinned").notNull().default(false),
+  archived: boolean("archived").notNull().default(false),
+  lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("chats_project_last_msg_idx").on(table.projectId, table.lastMessageAt),
+  index("chats_project_archived_idx").on(table.projectId, table.archived),
+]);
+
+// ─── Chat Messages ────────────────────────────────────────
+
+export const chatMessages = pgTable("chat_messages", {
+  id: text("id").primaryKey().$defaultFn(() => `msg_${randomUUID()}`),
+  chatId: text("chat_id").notNull().references(() => chats.id, { onDelete: "cascade" }),
+  role: chatMessageRoleEnum("role").notNull(),
+  content: text("content").notNull().default(""),
+  cards: jsonb("cards").notNull().default([]),
+  skillInvoked: text("skill_invoked"),
+  runId: text("run_id").references(() => heartbeatRuns.id, { onDelete: "set null" }),
+  status: chatMessageStatusEnum("status").notNull().default("complete"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("chat_messages_chat_created_idx").on(table.chatId, table.createdAt),
 ]);
