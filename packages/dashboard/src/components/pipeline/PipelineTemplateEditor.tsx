@@ -12,6 +12,7 @@ interface StepDef {
   label: string;
   defaultAgentId?: string;
   promptTemplate?: string;
+  requiresVerification?: boolean;
 }
 
 interface PipelineTemplateEditorProps {
@@ -78,12 +79,19 @@ export function PipelineTemplateEditor({
     setSteps(updated);
   }
 
+  function setStepVerification(index: number, value: boolean) {
+    const updated = [...steps];
+    updated[index] = { ...updated[index], requiresVerification: value };
+    setSteps(updated);
+  }
+
   function handleSave() {
     const cleanSteps = steps.map((s, i) => ({
       order: i + 1,
       label: s.label,
       defaultAgentId: s.defaultAgentId,
       promptTemplate: s.promptTemplate || undefined,
+      requiresVerification: s.requiresVerification || undefined,
     }));
 
     if (template) {
@@ -197,6 +205,15 @@ export function PipelineTemplateEditor({
                 rows={2}
                 className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs text-zinc-300"
               />
+              <label className="flex items-center gap-2 text-xs text-zinc-400">
+                <input
+                  type="checkbox"
+                  checked={step.requiresVerification ?? false}
+                  onChange={(e) => setStepVerification(i, e.target.checked)}
+                  className="rounded border-zinc-600"
+                />
+                Requires human verification
+              </label>
             </div>
 
             <button
