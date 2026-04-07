@@ -4,6 +4,7 @@ import {
   useCancelPipeline,
   useRetryPipeline,
   useRejectPipelineStep,
+  useApprovePipelineStep,
 } from "../../hooks/usePipelines.js";
 import { PipelineStepper } from "./PipelineStepper.js";
 
@@ -16,6 +17,7 @@ export function PipelineDetail({ pipelineId }: PipelineDetailProps) {
   const cancelMutation = useCancelPipeline();
   const retryMutation = useRetryPipeline();
   const rejectMutation = useRejectPipelineStep();
+  const approveMutation = useApprovePipelineStep();
   const [rejectingStepId, setRejectingStepId] = useState<string | null>(null);
   const [targetStepId, setTargetStepId] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -142,6 +144,73 @@ export function PipelineDetail({ pipelineId }: PipelineDetailProps) {
                   )}
                 </div>
               )}
+
+            {/* Approve / Reject for steps awaiting verification */}
+            {step.status === "awaiting_verification" && (
+              <div className="mt-2 space-y-2">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() =>
+                      approveMutation.mutate({ pipelineId: pipeline.id, stepId: step.id })
+                    }
+                    disabled={approveMutation.isPending}
+                    className="rounded bg-emerald-800 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {approveMutation.isPending ? "Approving..." : "Approve"}
+                  </button>
+                  <button
+                    onClick={() => setRejectingStepId(step.id)}
+                    className="rounded bg-red-800 px-3 py-1 text-xs text-red-200 hover:bg-red-700"
+                  >
+                    Reject
+                  </button>
+                </div>
+                {rejectingStepId === step.id && step.order > 1 && (
+                  <div className="space-y-2 rounded border border-zinc-700 bg-zinc-800/50 p-3">
+                    <select
+                      value={targetStepId}
+                      onChange={(e) => setTargetStepId(e.target.value)}
+                      className="w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-200"
+                    >
+                      <option value="">Select target step...</option>
+                      {steps
+                        .filter((s) => s.order < step.order)
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            Step {s.order}: {s.label}
+                          </option>
+                        ))}
+                    </select>
+                    <textarea
+                      value={feedback}
+                      onChange={(e) => setFeedback(e.target.value)}
+                      placeholder="Rejection feedback..."
+                      rows={3}
+                      className="w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-200"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRejectSubmit(step.id)}
+                        disabled={!targetStepId || !feedback.trim() || rejectMutation.isPending}
+                        className="rounded bg-red-800 px-3 py-1 text-xs text-red-200 hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {rejectMutation.isPending ? "Rejecting..." : "Confirm Reject"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRejectingStepId(null);
+                          setTargetStepId("");
+                          setFeedback("");
+                        }}
+                        className="rounded border border-zinc-700 px-3 py-1 text-xs text-zinc-400 hover:bg-zinc-800"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
