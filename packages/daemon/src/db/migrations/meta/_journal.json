@@ -8,6 +8,13 @@
       "when": 1775124783572,
       "tag": "0000_workable_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775570574758,
+      "tag": "0001_daffy_hannibal_king",
+      "breakpoints": true
     }
   ]
 }

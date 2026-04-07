@@ -11,6 +11,7 @@ const STATUS_STYLES: Record<string, string> = {
   pending: "bg-zinc-900 text-zinc-600",
   skipped: "bg-zinc-900 text-zinc-700 line-through italic",
   failed: "bg-red-900/50 text-red-300",
+  awaiting_verification: "bg-amber-900/50 text-amber-300",
 };
 
 const CONNECTOR_STYLES: Record<string, string> = {
@@ -19,6 +20,7 @@ const CONNECTOR_STYLES: Record<string, string> = {
   pending: "bg-zinc-700",
   skipped: "bg-zinc-700",
   failed: "bg-red-600",
+  awaiting_verification: "bg-amber-600",
 };
 
 export function PipelineStepper({ steps, currentStep }: PipelineStepperProps) {

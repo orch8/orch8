@@ -7,6 +7,7 @@ const StepDefinitionSchema = z.object({
   label: z.string().min(1).max(100),
   defaultAgentId: z.string().optional(),
   promptTemplate: z.string().optional(),
+  requiresVerification: z.boolean().optional(),
 });
 
 export const CreatePipelineTemplateSchema = z.object({
@@ -34,6 +35,7 @@ const PipelineStepInputSchema = z.object({
   label: z.string().min(1).max(100),
   agentId: z.string().optional(),
   promptOverride: z.string().optional(),
+  requiresVerification: z.boolean().optional(),
 });
 
 export const CreatePipelineSchema = z.object({
@@ -55,6 +57,7 @@ export const UpdatePipelineStepSchema = z.object({
   agentId: z.string().nullable().optional(),
   promptOverride: z.string().nullable().optional(),
   status: z.enum(["skipped"]).optional(),
+  requiresVerification: z.boolean().optional(),
 });
 
 export const CompletePipelineStepSchema = z.object({

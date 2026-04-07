@@ -11,7 +11,7 @@ export const pipelineStatusEnum = pgEnum("pipeline_status", [
 ]);
 
 export const pipelineStepStatusEnum = pgEnum("pipeline_step_status", [
-  "pending", "running", "completed", "skipped", "failed",
+  "pending", "running", "completed", "skipped", "failed", "awaiting_verification",
 ]);
 
 // ─── Pipeline Templates ─────────────────────────────────
@@ -27,6 +27,7 @@ export const pipelineTemplates = pgTable("pipeline_templates", {
     label: string;
     defaultAgentId?: string;
     promptTemplate?: string;
+    requiresVerification?: boolean;
   }>>(),
   createdBy: text("created_by").notNull().default("user"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -59,6 +60,7 @@ export const pipelineSteps = pgTable("pipeline_steps", {
   taskId: text("task_id"), // FK to tasks — defined in migration SQL to avoid circular imports
   agentId: text("agent_id"), // No FK: agents use composite PK (id, projectId)
   promptOverride: text("prompt_override"),
+  requiresVerification: boolean("requires_verification").notNull().default(false),
   outputFilePath: text("output_file_path"),
   outputSummary: text("output_summary"),
   status: pipelineStepStatusEnum("status").notNull().default("pending"),

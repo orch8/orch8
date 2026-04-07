@@ -85,3 +85,26 @@ export function useRejectPipelineStep() {
     },
   });
 }
+
+export function useApprovePipelineStep() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      pipelineId,
+      stepId,
+    }: {
+      pipelineId: string;
+      stepId: string;
+    }) =>
+      api.post<{
+        pipeline: Pipeline;
+        approvedStep: unknown;
+        nextStep: unknown;
+        nextTask: unknown;
+      }>(`/pipelines/${pipelineId}/steps/${stepId}/approve`, {}),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["pipelines", data.pipeline.projectId] });
+      qc.invalidateQueries({ queryKey: ["pipeline", data.pipeline.id] });
+    },
+  });
+}

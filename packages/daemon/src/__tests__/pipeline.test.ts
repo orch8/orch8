@@ -196,6 +196,142 @@ describe("PipelineService", () => {
     });
   });
 
+  describe("verification gate", () => {
+    it("pauses at awaiting_verification when step has requiresVerification", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Verification test",
+        steps: [
+          { label: "plan", agentId: "agent-a", requiresVerification: true },
+          { label: "implement", agentId: "agent-b" },
+        ],
+      });
+
+      const result = await service.completeStep(
+        pipeline.id,
+        steps[0].id,
+        "Plan output",
+        ".orch8/pipelines/test/plan.md",
+      );
+
+      expect(result.completedStep.status).toBe("awaiting_verification");
+      expect(result.completedStep.outputSummary).toBe("Plan output");
+      expect(result.nextStep).toBeNull();
+      expect(result.nextTask).toBeNull();
+      expect(result.pipeline.currentStep).toBe(1);
+      expect(result.pipeline.status).toBe("running");
+    });
+
+    it("approveStep advances pipeline to next step", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Approve test",
+        steps: [
+          { label: "plan", agentId: "agent-a", requiresVerification: true },
+          { label: "implement", agentId: "agent-b" },
+        ],
+      });
+
+      await service.completeStep(
+        pipeline.id,
+        steps[0].id,
+        "Plan output",
+        ".orch8/pipelines/test/plan.md",
+      );
+
+      const result = await service.approveStep(pipeline.id, steps[0].id);
+
+      expect(result.approvedStep.status).toBe("completed");
+      expect(result.nextStep).not.toBeNull();
+      expect(result.nextStep!.label).toBe("implement");
+      expect(result.nextStep!.taskId).not.toBeNull();
+      expect(result.nextTask).not.toBeNull();
+      expect(result.pipeline.currentStep).toBe(2);
+      expect(result.pipeline.status).toBe("running");
+    });
+
+    it("approveStep completes pipeline when it is the last step", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Last step approve",
+        steps: [
+          { label: "review", agentId: "agent-a", requiresVerification: true },
+        ],
+      });
+
+      await service.completeStep(
+        pipeline.id,
+        steps[0].id,
+        "Review output",
+        ".orch8/pipelines/test/review.md",
+      );
+
+      const result = await service.approveStep(pipeline.id, steps[0].id);
+
+      expect(result.approvedStep.status).toBe("completed");
+      expect(result.pipeline.status).toBe("completed");
+      expect(result.nextStep).toBeNull();
+      expect(result.nextTask).toBeNull();
+    });
+
+    it("approveStep throws if step is not awaiting_verification", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Bad approve",
+        steps: [
+          { label: "plan", agentId: "agent-a" },
+        ],
+      });
+
+      await expect(
+        service.approveStep(pipeline.id, steps[0].id),
+      ).rejects.toThrow("Step is not awaiting verification");
+    });
+
+    it("rejectStep works from awaiting_verification status", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Reject from verification",
+        steps: [
+          { label: "research", agentId: "agent-a" },
+          { label: "plan", agentId: "agent-b", requiresVerification: true },
+        ],
+      });
+
+      // Complete step 1
+      await service.completeStep(
+        pipeline.id,
+        steps[0].id,
+        "Research done",
+        ".orch8/pipelines/test/research.md",
+      );
+
+      // Complete step 2 — pauses at awaiting_verification
+      const full = await service.getWithSteps(pipeline.id);
+      const planStep = full!.steps.find(s => s.label === "plan")!;
+
+      await service.completeStep(
+        pipeline.id,
+        planStep.id,
+        "Plan output",
+        ".orch8/pipelines/test/plan.md",
+      );
+
+      // Reject from awaiting_verification back to step 1
+      const result = await service.rejectStep(
+        pipeline.id,
+        planStep.id,
+        steps[0].id,
+        "Plan needs more detail",
+      );
+
+      expect(result.rejectedStep.status).toBe("failed");
+      expect(result.targetStep.status).toBe("pending");
+      expect(result.newTask.description).toContain("Plan needs more detail");
+      expect(result.pipeline.currentStep).toBe(1);
+    });
+  });
+
   describe("failStep", () => {
     it("marks step and pipeline as failed", async () => {
       const { pipeline, steps } = await service.create({

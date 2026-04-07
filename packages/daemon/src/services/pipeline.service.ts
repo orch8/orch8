@@ -33,6 +33,13 @@ interface RejectStepResult {
   newTask: Task;
 }
 
+interface ApproveStepResult {
+  pipeline: Pipeline;
+  approvedStep: PipelineStep;
+  nextStep: PipelineStep | null;
+  nextTask: Task | null;
+}
+
 export class PipelineService {
   constructor(
     private db: SchemaDb,
@@ -40,19 +47,20 @@ export class PipelineService {
   ) {}
 
   async create(input: CreatePipeline): Promise<CreateResult> {
-    let stepDefs: Array<{ label: string; agentId?: string; promptOverride?: string }>;
+    let stepDefs: Array<{ label: string; agentId?: string; promptOverride?: string; requiresVerification?: boolean }>;
 
     if (input.steps && input.steps.length > 0) {
       stepDefs = input.steps;
     } else if (input.templateId) {
       const tpl = await this.templateService.getById(input.templateId);
       if (!tpl) throw new Error("Pipeline template not found");
-      stepDefs = (tpl.steps as Array<{ label: string; defaultAgentId?: string; promptTemplate?: string; order: number }>)
+      stepDefs = (tpl.steps as Array<{ label: string; defaultAgentId?: string; promptTemplate?: string; order: number; requiresVerification?: boolean }>)
         .sort((a, b) => a.order - b.order)
         .map(s => ({
           label: s.label,
           agentId: s.defaultAgentId,
           promptOverride: s.promptTemplate,
+          requiresVerification: s.requiresVerification,
         }));
     } else {
       throw new Error("Either steps or templateId must be provided");
@@ -76,6 +84,7 @@ export class PipelineService {
         label: def.label,
         agentId: def.agentId,
         promptOverride: def.promptOverride,
+        requiresVerification: def.requiresVerification ?? false,
         outputFilePath: `.orch8/pipelines/${pipeline.id}/${def.label}.md`,
         status: "pending",
       }).returning();
@@ -128,13 +137,36 @@ export class PipelineService {
     summary: string,
     outputFilePath: string,
   ): Promise<CompleteStepResult> {
-    // Idempotency guard: if step is already completed, return existing state
+    // Idempotency guard: if step is already completed or awaiting_verification, return existing state
     const [existingStep] = await this.db.select().from(pipelineSteps)
       .where(eq(pipelineSteps.id, stepId));
-    if (existingStep?.status === "completed") {
+    if (existingStep?.status === "completed" || existingStep?.status === "awaiting_verification") {
       const pipeline = await this.getById(pipelineId);
       if (!pipeline) throw new Error("Pipeline not found");
       return { pipeline, completedStep: existingStep, nextStep: null, nextTask: null };
+    }
+
+    // If step requires verification, pause here
+    if (existingStep?.requiresVerification) {
+      const [pausedStep] = await this.db
+        .update(pipelineSteps)
+        .set({
+          status: "awaiting_verification",
+          outputSummary: summary,
+          outputFilePath,
+          updatedAt: new Date(),
+        })
+        .where(eq(pipelineSteps.id, stepId))
+        .returning();
+
+      // Ensure pipeline is marked running (may still be "pending" if this is step 1)
+      const [updatedPipeline] = await this.db
+        .update(pipelines)
+        .set({ status: "running", updatedAt: new Date() })
+        .where(eq(pipelines.id, pipelineId))
+        .returning();
+
+      return { pipeline: updatedPipeline, completedStep: pausedStep, nextStep: null, nextTask: null };
     }
 
     const [completedStep] = await this.db
@@ -191,6 +223,67 @@ export class PipelineService {
     return {
       pipeline: updatedPipeline,
       completedStep,
+      nextStep: updatedNextStep,
+      nextTask,
+    };
+  }
+
+  async approveStep(pipelineId: string, stepId: string): Promise<ApproveStepResult> {
+    const [step] = await this.db.select().from(pipelineSteps)
+      .where(eq(pipelineSteps.id, stepId));
+    if (!step || step.status !== "awaiting_verification") {
+      throw new Error("Step is not awaiting verification");
+    }
+
+    const [approvedStep] = await this.db
+      .update(pipelineSteps)
+      .set({ status: "completed", updatedAt: new Date() })
+      .where(eq(pipelineSteps.id, stepId))
+      .returning();
+
+    const allSteps = await this.db.select().from(pipelineSteps)
+      .where(eq(pipelineSteps.pipelineId, pipelineId))
+      .orderBy(asc(pipelineSteps.order));
+
+    const nextStep = allSteps.find(
+      s => s.order > approvedStep.order && s.status !== "skipped",
+    );
+
+    if (!nextStep) {
+      const [updatedPipeline] = await this.db
+        .update(pipelines)
+        .set({ status: "completed", updatedAt: new Date() })
+        .where(eq(pipelines.id, pipelineId))
+        .returning();
+
+      return { pipeline: updatedPipeline, approvedStep, nextStep: null, nextTask: null };
+    }
+
+    const [updatedPipeline] = await this.db
+      .update(pipelines)
+      .set({
+        status: "running",
+        currentStep: nextStep.order,
+        updatedAt: new Date(),
+      })
+      .where(eq(pipelines.id, pipelineId))
+      .returning();
+
+    const nextTask = await this.createTaskForStep(
+      updatedPipeline.projectId,
+      updatedPipeline,
+      nextStep,
+    );
+
+    const [updatedNextStep] = await this.db
+      .update(pipelineSteps)
+      .set({ taskId: nextTask.id, updatedAt: new Date() })
+      .where(eq(pipelineSteps.id, nextStep.id))
+      .returning();
+
+    return {
+      pipeline: updatedPipeline,
+      approvedStep,
       nextStep: updatedNextStep,
       nextTask,
     };
