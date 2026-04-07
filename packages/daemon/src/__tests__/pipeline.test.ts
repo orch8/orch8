@@ -196,6 +196,33 @@ describe("PipelineService", () => {
     });
   });
 
+  describe("verification gate", () => {
+    it("pauses at awaiting_verification when step has requiresVerification", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Verification test",
+        steps: [
+          { label: "plan", agentId: "agent-a", requiresVerification: true },
+          { label: "implement", agentId: "agent-b" },
+        ],
+      });
+
+      const result = await service.completeStep(
+        pipeline.id,
+        steps[0].id,
+        "Plan output",
+        ".orch8/pipelines/test/plan.md",
+      );
+
+      expect(result.completedStep.status).toBe("awaiting_verification");
+      expect(result.completedStep.outputSummary).toBe("Plan output");
+      expect(result.nextStep).toBeNull();
+      expect(result.nextTask).toBeNull();
+      expect(result.pipeline.currentStep).toBe(1);
+      expect(result.pipeline.status).toBe("running");
+    });
+  });
+
   describe("failStep", () => {
     it("marks step and pipeline as failed", async () => {
       const { pipeline, steps } = await service.create({
