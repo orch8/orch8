@@ -341,6 +341,112 @@ export class ChatService {
     }
   }
 
+  // ─── Card Decisions ───────────────────────────────────
+
+  /**
+   * Approves or cancels a card that was previously emitted by the
+   * assistant. Idempotent: re-calling with the same decision returns
+   * the existing state without re-triggering a run.
+   */
+  async decideCard(
+    chatId: string,
+    cardId: string,
+    decision: "approved" | "cancelled",
+    actor: string,
+  ): Promise<ChatMessage> {
+    const chat = await this.getChat(chatId);
+    if (!chat) throw new Error("Chat not found");
+
+    // Find the assistant message that contains this card.
+    const rows = await this.db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.chatId, chatId));
+
+    const target = rows.find((row) => {
+      const arr = row.cards as ExtractedCard[];
+      return Array.isArray(arr) && arr.some((c) => c.id === cardId);
+    });
+
+    if (!target) throw new Error("Card not found in any message in this chat");
+
+    const cardsArray = (target.cards as ExtractedCard[]) ?? [];
+    const idx = cardsArray.findIndex((c) => c.id === cardId);
+    const card = cardsArray[idx];
+
+    // Idempotency: return current state if already decided.
+    if (card.status !== "pending") {
+      return target;
+    }
+
+    const updated: ExtractedCard = {
+      ...card,
+      status: decision,
+      decidedAt: new Date().toISOString(),
+      decidedBy: actor,
+    };
+    const newCards = [...cardsArray];
+    newCards[idx] = updated;
+
+    const [updatedMessage] = await this.db
+      .update(chatMessages)
+      .set({ cards: newCards })
+      .where(eq(chatMessages.id, target.id))
+      .returning();
+
+    this.broadcast.chatCardDecision(chat.projectId, {
+      chatId,
+      cardId,
+      status: decision,
+    });
+
+    // Write a synthetic system message the agent will see on its next turn.
+    const systemContent = decision === "approved"
+      ? `User approved card_${cardId}: ${card.summary}`
+      : `User cancelled card_${cardId}: ${card.summary}`;
+
+    await this.db.insert(chatMessages).values({
+      chatId,
+      role: "system",
+      content: systemContent,
+      status: "complete",
+    });
+
+    await this.db
+      .update(chats)
+      .set({ lastMessageAt: new Date(), updatedAt: new Date() })
+      .where(eq(chats.id, chatId));
+
+    // Resume the agent so it can act on the decision.
+    // Pass the system content as the "user message" for prompt interpolation;
+    // Claude will already have the full prior context via --resume.
+    void this.runAssistantTurn(chat, systemContent).catch((err) => {
+      this.logger?.error(
+        { err, chatId, cardId },
+        "Assistant follow-up turn after card decision failed",
+      );
+    });
+
+    return updatedMessage;
+  }
+
+  // ─── Session Invalidation ─────────────────────────────
+
+  /**
+   * Wipes the persisted Claude session for this chat. Called by the
+   * agent-update hook (future: wired in plan 06 or when the agent
+   * editor is refactored). The next turn will start a fresh session.
+   */
+  async invalidateSession(chatId: string): Promise<void> {
+    const chat = await this.getChat(chatId);
+    if (!chat) return;
+    await this.sessionManager.clearSession({
+      agentId: chat.agentId,
+      taskKey: chat.id,
+      adapterType: "claude_local",
+    });
+  }
+
   // ─── Internal helpers ─────────────────────────────────
 
   private async getProject(projectId: string) {
