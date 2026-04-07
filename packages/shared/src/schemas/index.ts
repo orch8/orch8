@@ -81,3 +81,19 @@ export type {
   CompletePipelineStep,
   RejectPipelineStep,
 } from "./pipeline.js";
+export {
+  CreateChatSchema,
+  UpdateChatSchema,
+  SendChatMessageSchema,
+  CardDecisionSchema,
+  CardStatusSchema,
+  ExtractedCardSchema,
+} from "./chat.js";
+export type {
+  CreateChat,
+  UpdateChat,
+  SendChatMessage,
+  CardDecision,
+  CardStatus,
+  ExtractedCard,
+} from "./chat.js";
