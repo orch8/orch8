@@ -47,6 +47,8 @@ import { PipelineTemplateService } from "./services/pipeline-template.service.js
 import { PipelineService } from "./services/pipeline.service.js";
 import { pipelineTemplateRoutes } from "./api/routes/pipeline-templates.js";
 import { pipelineRoutes } from "./api/routes/pipelines.js";
+import { ChatService } from "./services/chat.service.js";
+import { chatsRoutes } from "./api/routes/chats.js";
 import type { GlobalConfig } from "./config/schema.js";
 import "./types.js";
 
@@ -139,6 +141,17 @@ export function buildServer(options: ServerOptions = {}) {
     heartbeatService.setLogger(app.log);
     heartbeatService.setWorktreeService(worktreeService);
     app.decorate("heartbeatService", heartbeatService);
+
+    // Chat service — reuses the adapter, session manager, and broadcast service.
+    const chatService = new ChatService(
+      dbClient.db,
+      adapter,
+      sessionMgr,
+      broadcastService,
+      `http://${apiHost}:${apiPort}`,
+    );
+    chatService.setLogger(app.log);
+    app.decorate("chatService", chatService);
 
     // Scheduler service
     const schedulerService = new SchedulerService(dbClient.db, heartbeatService, {
@@ -240,6 +253,7 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(agentCreatorRoutes);
     app.register(commentRoutes);
     app.register(agentRoutes);
+    app.register(chatsRoutes);
     app.register(runRoutes);
     app.register(identityRoutes);
     app.register(projectRoutes);
