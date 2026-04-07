@@ -33,6 +33,13 @@ interface RejectStepResult {
   newTask: Task;
 }
 
+interface ApproveStepResult {
+  pipeline: Pipeline;
+  approvedStep: PipelineStep;
+  nextStep: PipelineStep | null;
+  nextTask: Task | null;
+}
+
 export class PipelineService {
   constructor(
     private db: SchemaDb,
@@ -216,6 +223,67 @@ export class PipelineService {
     return {
       pipeline: updatedPipeline,
       completedStep,
+      nextStep: updatedNextStep,
+      nextTask,
+    };
+  }
+
+  async approveStep(pipelineId: string, stepId: string): Promise<ApproveStepResult> {
+    const [step] = await this.db.select().from(pipelineSteps)
+      .where(eq(pipelineSteps.id, stepId));
+    if (!step || step.status !== "awaiting_verification") {
+      throw new Error("Step is not awaiting verification");
+    }
+
+    const [approvedStep] = await this.db
+      .update(pipelineSteps)
+      .set({ status: "completed", updatedAt: new Date() })
+      .where(eq(pipelineSteps.id, stepId))
+      .returning();
+
+    const allSteps = await this.db.select().from(pipelineSteps)
+      .where(eq(pipelineSteps.pipelineId, pipelineId))
+      .orderBy(asc(pipelineSteps.order));
+
+    const nextStep = allSteps.find(
+      s => s.order > approvedStep.order && s.status !== "skipped",
+    );
+
+    if (!nextStep) {
+      const [updatedPipeline] = await this.db
+        .update(pipelines)
+        .set({ status: "completed", updatedAt: new Date() })
+        .where(eq(pipelines.id, pipelineId))
+        .returning();
+
+      return { pipeline: updatedPipeline, approvedStep, nextStep: null, nextTask: null };
+    }
+
+    const [updatedPipeline] = await this.db
+      .update(pipelines)
+      .set({
+        status: "running",
+        currentStep: nextStep.order,
+        updatedAt: new Date(),
+      })
+      .where(eq(pipelines.id, pipelineId))
+      .returning();
+
+    const nextTask = await this.createTaskForStep(
+      updatedPipeline.projectId,
+      updatedPipeline,
+      nextStep,
+    );
+
+    const [updatedNextStep] = await this.db
+      .update(pipelineSteps)
+      .set({ taskId: nextTask.id, updatedAt: new Date() })
+      .where(eq(pipelineSteps.id, nextStep.id))
+      .returning();
+
+    return {
+      pipeline: updatedPipeline,
+      approvedStep,
       nextStep: updatedNextStep,
       nextTask,
     };

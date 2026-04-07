@@ -221,6 +221,72 @@ describe("PipelineService", () => {
       expect(result.pipeline.currentStep).toBe(1);
       expect(result.pipeline.status).toBe("running");
     });
+
+    it("approveStep advances pipeline to next step", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Approve test",
+        steps: [
+          { label: "plan", agentId: "agent-a", requiresVerification: true },
+          { label: "implement", agentId: "agent-b" },
+        ],
+      });
+
+      await service.completeStep(
+        pipeline.id,
+        steps[0].id,
+        "Plan output",
+        ".orch8/pipelines/test/plan.md",
+      );
+
+      const result = await service.approveStep(pipeline.id, steps[0].id);
+
+      expect(result.approvedStep.status).toBe("completed");
+      expect(result.nextStep).not.toBeNull();
+      expect(result.nextStep!.label).toBe("implement");
+      expect(result.nextStep!.taskId).not.toBeNull();
+      expect(result.nextTask).not.toBeNull();
+      expect(result.pipeline.currentStep).toBe(2);
+      expect(result.pipeline.status).toBe("running");
+    });
+
+    it("approveStep completes pipeline when it is the last step", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Last step approve",
+        steps: [
+          { label: "review", agentId: "agent-a", requiresVerification: true },
+        ],
+      });
+
+      await service.completeStep(
+        pipeline.id,
+        steps[0].id,
+        "Review output",
+        ".orch8/pipelines/test/review.md",
+      );
+
+      const result = await service.approveStep(pipeline.id, steps[0].id);
+
+      expect(result.approvedStep.status).toBe("completed");
+      expect(result.pipeline.status).toBe("completed");
+      expect(result.nextStep).toBeNull();
+      expect(result.nextTask).toBeNull();
+    });
+
+    it("approveStep throws if step is not awaiting_verification", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Bad approve",
+        steps: [
+          { label: "plan", agentId: "agent-a" },
+        ],
+      });
+
+      await expect(
+        service.approveStep(pipeline.id, steps[0].id),
+      ).rejects.toThrow("Step is not awaiting verification");
+    });
   });
 
   describe("failStep", () => {
