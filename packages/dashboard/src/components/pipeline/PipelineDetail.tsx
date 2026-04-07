@@ -158,12 +158,14 @@ export function PipelineDetail({ pipelineId }: PipelineDetailProps) {
                   >
                     {approveMutation.isPending ? "Approving..." : "Approve"}
                   </button>
-                  <button
-                    onClick={() => setRejectingStepId(step.id)}
-                    className="rounded bg-red-800 px-3 py-1 text-xs text-red-200 hover:bg-red-700"
-                  >
-                    Reject
-                  </button>
+                  {step.order > 1 && (
+                    <button
+                      onClick={() => setRejectingStepId(step.id)}
+                      className="rounded bg-red-800 px-3 py-1 text-xs text-red-200 hover:bg-red-700"
+                    >
+                      Reject
+                    </button>
+                  )}
                 </div>
                 {rejectingStepId === step.id && step.order > 1 && (
                   <div className="space-y-2 rounded border border-zinc-700 bg-zinc-800/50 p-3">
