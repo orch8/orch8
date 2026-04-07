@@ -167,4 +167,41 @@ export async function pipelineRoutes(app: FastifyInstance) {
       }
     },
   );
+
+  // POST /api/pipelines/:id/steps/:stepId/approve — Approve a verification gate
+  app.post(
+    "/api/pipelines/:id/steps/:stepId/approve",
+    async (request: FastifyRequest<{ Params: { id: string; stepId: string } }>, reply: FastifyReply) => {
+      try {
+        const result = await app.pipelineService.approveStep(
+          request.params.id,
+          request.params.stepId,
+        );
+
+        // Wake the next step's agent if there is one
+        if (result.nextStep?.agentId && result.nextTask) {
+          await app.heartbeatService.enqueueWakeup(
+            result.nextStep.agentId,
+            result.pipeline.projectId,
+            {
+              source: "automation",
+              taskId: result.nextTask.id,
+              reason: "pipeline_step_ready",
+            },
+          );
+        }
+
+        return result;
+      } catch (err) {
+        const message = (err as Error).message;
+        if (message.includes("not found")) {
+          return reply.code(404).send({ error: "not_found", message });
+        }
+        if (message.includes("not awaiting verification")) {
+          return reply.code(400).send({ error: "bad_request", message });
+        }
+        throw err;
+      }
+    },
+  );
 }

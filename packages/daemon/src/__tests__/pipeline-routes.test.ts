@@ -180,5 +180,63 @@ describe("Pipeline API routes", () => {
       expect(res.statusCode).toBe(200);
       expect(res.json().status).toBe("skipped");
     });
+
+    it("POST /api/pipelines/:id/steps/:stepId/approve approves a verification step", async () => {
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/api/pipelines",
+        payload: {
+          projectId,
+          name: "Approve route test",
+          steps: [
+            { label: "plan", agentId: "route-agent-a", requiresVerification: true },
+            { label: "implement", agentId: "route-agent-a" },
+          ],
+        },
+      });
+      const created = createRes.json();
+      const planStep = created.steps[0];
+
+      // Complete the step (agent finishes work) — will pause at awaiting_verification
+      // We need to complete via the task route, but for simplicity we'll use the service directly
+      await app.pipelineService.completeStep(
+        created.pipeline.id,
+        planStep.id,
+        "Plan output",
+        ".orch8/pipelines/test/plan.md",
+      );
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/pipelines/${created.pipeline.id}/steps/${planStep.id}/approve`,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.approvedStep.status).toBe("completed");
+      expect(body.nextStep).not.toBeNull();
+      expect(body.nextTask).not.toBeNull();
+      expect(body.pipeline.currentStep).toBe(2);
+    });
+
+    it("POST /api/pipelines/:id/steps/:stepId/approve returns 400 for non-verification step", async () => {
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/api/pipelines",
+        payload: {
+          projectId,
+          name: "Bad approve route",
+          steps: [{ label: "work", agentId: "route-agent-a" }],
+        },
+      });
+      const created = createRes.json();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/pipelines/${created.pipeline.id}/steps/${created.steps[0].id}/approve`,
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
   });
 });
