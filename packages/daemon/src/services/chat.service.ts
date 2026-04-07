@@ -12,6 +12,7 @@ import type { SchemaDb } from "../db/client.js";
 import type { ClaudeLocalAdapter } from "../adapter/claude-local-adapter.js";
 import type { SessionManager } from "../adapter/session-manager.js";
 import type { BroadcastService } from "./broadcast.service.js";
+import { extractCards } from "./chat-card-parser.js";
 
 type Chat = typeof chats.$inferSelect;
 type ChatMessage = typeof chatMessages.$inferSelect;
@@ -167,44 +168,48 @@ export class ChatService {
     chat: Chat,
     userMessageForPrompt: string,
   ): Promise<void> {
-    const project = await this.getProject(chat.projectId);
-    if (!project) throw new Error("Project not found");
-
-    const agent = await this.getAgent(chat.agentId, chat.projectId);
-    if (!agent) throw new Error(`Chat agent ${chat.agentId} not found`);
-
-    // 1. Insert placeholder assistant message row (status=streaming)
-    const [assistantRow] = await this.db
-      .insert(chatMessages)
-      .values({
-        chatId: chat.id,
-        role: "assistant",
-        content: "",
-        status: "streaming",
-      })
-      .returning();
-
-    this.broadcast.chatMessageStarted(chat.projectId, {
-      chatId: chat.id,
-      messageId: assistantRow.id,
-    });
-
-    // 2. Insert a heartbeatRuns row so the run appears in the runs viewer.
-    const [runRow] = await this.db
-      .insert(heartbeatRuns)
-      .values({
-        agentId: agent.id,
-        projectId: chat.projectId,
-        taskId: null,
-        invocationSource: "on_demand",
-        status: "running",
-        startedAt: new Date(),
-      })
-      .returning();
-
+    let assistantRowId: string | null = null;
+    let runRowId: string | null = null;
     let accumulated = "";
 
     try {
+      const project = await this.getProject(chat.projectId);
+      if (!project) throw new Error("Project not found");
+
+      const agent = await this.getAgent(chat.agentId, chat.projectId);
+      if (!agent) throw new Error(`Chat agent ${chat.agentId} not found`);
+
+      // 1. Insert placeholder assistant message row (status=streaming)
+      const [assistantRow] = await this.db
+        .insert(chatMessages)
+        .values({
+          chatId: chat.id,
+          role: "assistant",
+          content: "",
+          status: "streaming",
+        })
+        .returning();
+      assistantRowId = assistantRow.id;
+
+      this.broadcast.chatMessageStarted(chat.projectId, {
+        chatId: chat.id,
+        messageId: assistantRow.id,
+      });
+
+      // 2. Insert a heartbeatRuns row so the run appears in the runs viewer.
+      const [runRow] = await this.db
+        .insert(heartbeatRuns)
+        .values({
+          agentId: agent.id,
+          projectId: chat.projectId,
+          taskId: null,
+          invocationSource: "on_demand",
+          status: "running",
+          startedAt: new Date(),
+        })
+        .returning();
+      runRowId = runRow.id;
+
       // 3. Build RunContext. Note the sessionKey=chatId pin.
       const ctx = {
         agentId: agent.id,
@@ -264,7 +269,6 @@ export class ChatService {
       // 6. Parse cards out of the accumulated output (fall back to
       //    result.result if the stream never emitted assistant text).
       const rawOutput = accumulated.length > 0 ? accumulated : (result.result ?? "");
-      const { extractCards } = await import("./chat-card-parser.js");
       const { cards } = extractCards(rawOutput);
 
       // 7. Update the assistant row.
@@ -328,23 +332,28 @@ export class ChatService {
       }
     } catch (err) {
       const message = (err as Error).message ?? "unknown error";
-      await this.db
-        .update(chatMessages)
-        .set({ status: "error", content: accumulated + `\n[error: ${message}]` })
-        .where(eq(chatMessages.id, assistantRow.id));
 
-      await this.db
-        .update(heartbeatRuns)
-        .set({
-          status: "failed",
-          error: message,
-          finishedAt: new Date(),
-        })
-        .where(eq(heartbeatRuns.id, runRow.id));
+      if (assistantRowId) {
+        await this.db
+          .update(chatMessages)
+          .set({ status: "error", content: accumulated + `\n[error: ${message}]` })
+          .where(eq(chatMessages.id, assistantRowId));
+      }
+
+      if (runRowId) {
+        await this.db
+          .update(heartbeatRuns)
+          .set({
+            status: "failed",
+            error: message,
+            finishedAt: new Date(),
+          })
+          .where(eq(heartbeatRuns.id, runRowId));
+      }
 
       this.broadcast.chatMessageError(chat.projectId, {
         chatId: chat.id,
-        messageId: assistantRow.id,
+        messageId: assistantRowId,
         error: message,
       });
     }
@@ -411,8 +420,8 @@ export class ChatService {
 
     // Write a synthetic system message the agent will see on its next turn.
     const systemContent = decision === "approved"
-      ? `User approved card_${cardId}: ${card.summary}`
-      : `User cancelled card_${cardId}: ${card.summary}`;
+      ? `User approved ${cardId}: ${card.summary}`
+      : `User cancelled ${cardId}: ${card.summary}`;
 
     await this.db.insert(chatMessages).values({
       chatId,

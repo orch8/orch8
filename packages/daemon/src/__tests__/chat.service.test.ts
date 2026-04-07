@@ -250,6 +250,7 @@ describe("ChatService", () => {
     expect(systemMsgs).toHaveLength(1);
     expect(systemMsgs[0].content).toContain("approved");
     expect(systemMsgs[0].content).toContain(card.id);
+    expect(systemMsgs[0].content).not.toMatch(/card_card_/);
 
     // Card status should now be approved
     const updatedAssistant = refreshedMsgs.find((m) => m.id === assistant.id)!;
@@ -286,9 +287,14 @@ describe("ChatService", () => {
 
     // Second call should be a no-op (same decidedAt preserved)
     await service.decideCard(chat.id, card.id, "approved", "user-2");
+    await new Promise((r) => setTimeout(r, 100));
     const secondDecision = (await testDb.db.select().from(chatMessages).where(eq(chatMessages.id, assistant.id)))[0];
     expect((secondDecision.cards as ExtractedCard[])[0].decidedAt).toBe(firstDecidedAt);
     expect((secondDecision.cards as ExtractedCard[])[0].decidedBy).toBe("user-1");
+
+    // The replayed decideCard should not have triggered another assistant turn.
+    // 2 calls = 1 for initial user message + 1 for the first approval follow-up.
+    expect(adapter.runAgent).toHaveBeenCalledTimes(2);
   });
 
   // ─── Session Invalidation ──────────────────────

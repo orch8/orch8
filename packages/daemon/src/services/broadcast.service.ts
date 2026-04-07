@@ -132,7 +132,7 @@ export interface ChatMessageCompletePayload {
 
 export interface ChatMessageErrorPayload {
   chatId: string;
-  messageId: string;
+  messageId: string | null;
   error: string;
 }
 

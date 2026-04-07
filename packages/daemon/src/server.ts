@@ -216,12 +216,19 @@ export function buildServer(options: ServerOptions = {}) {
         // Chat-agent backfill: ensure every project has a chat agent.
         let provisionedCount = 0;
         for (const project of allProjects) {
-          const created = await seedingService.provisionChatAgent(
-            dbClient.db,
-            project.id,
-          );
-          if (created) provisionedCount++;
-          await seedingService.ensureInitialChat(dbClient.db, project.id);
+          try {
+            const created = await seedingService.provisionChatAgent(
+              dbClient.db,
+              project.id,
+            );
+            if (created) provisionedCount++;
+            await seedingService.ensureInitialChat(dbClient.db, project.id);
+          } catch (err) {
+            app.log.error(
+              { err, projectId: project.id },
+              "Failed to provision chat agent for project",
+            );
+          }
         }
         app.log.info(
           { scanned: allProjects.length, provisioned: provisionedCount },
