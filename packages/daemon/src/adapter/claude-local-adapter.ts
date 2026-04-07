@@ -57,7 +57,7 @@ export class ClaudeLocalAdapter {
     ctx: RunContext,
     prompts: RunAgentPrompts,
   ): Promise<RunResult> {
-    const taskKey = ctx.taskId ?? ctx.runId;
+    const taskKey = ctx.sessionKey ?? ctx.taskId ?? ctx.runId;
     const adapterType = "claude_local";
     const cwd = config.cwd ?? ctx.cwd;
 

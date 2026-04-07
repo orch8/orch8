@@ -73,6 +73,11 @@ export interface RunContext {
   projectId: string;
   runId: string;
   taskId?: string;
+  /**
+   * Overrides `taskId ?? runId` as the session lookup key. Used by chat turns
+   * where the entity owning the session is a `chat`, not a task.
+   */
+  sessionKey?: string;
 
   wakeReason: "timer" | "assignment" | "on_demand" | "automation";
   apiUrl: string;
