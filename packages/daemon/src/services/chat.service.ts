@@ -302,6 +302,15 @@ export class ChatService {
         .set({ lastMessageAt: new Date(), updatedAt: new Date() })
         .where(eq(chats.id, chat.id));
 
+      // 9b. Auto-title on first assistant turn if still the default.
+      if (chat.title === "New chat") {
+        const newTitle = deriveChatTitle(userMessageForPrompt);
+        await this.db
+          .update(chats)
+          .set({ title: newTitle, updatedAt: new Date() })
+          .where(eq(chats.id, chat.id));
+      }
+
       // 10. Broadcast completion.
       if (result.error) {
         this.broadcast.chatMessageError(chat.projectId, {
@@ -489,4 +498,18 @@ function extractStreamText(event: unknown): string | null {
     }
   }
   return out.length > 0 ? out : null;
+}
+
+/**
+ * Produces a short title from the user's first message. Keeps the
+ * first line, strips leading markdown punctuation, truncates, and
+ * capitalises. Pure — trivial to unit test.
+ */
+export function deriveChatTitle(raw: string): string {
+  const firstLine = raw.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
+  const stripped = firstLine.replace(/^[#>\-*\s]+/, "");
+  const truncated = stripped.slice(0, 60).trim();
+  if (truncated.length === 0) return "New chat";
+  const capitalised = truncated[0].toUpperCase() + truncated.slice(1);
+  return capitalised.length === 60 ? capitalised + "…" : capitalised;
 }
