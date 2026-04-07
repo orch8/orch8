@@ -34,6 +34,7 @@ declare module "fastify" {
     seedingService: SeedingService;
     pipelineService: import("./services/pipeline.service.js").PipelineService;
     pipelineTemplateService: import("./services/pipeline-template.service.js").PipelineTemplateService;
+    chatService: import("./services/chat.service.js").ChatService;
   }
   interface FastifyRequest {
     agent?: typeof schema.agents.$inferSelect;
