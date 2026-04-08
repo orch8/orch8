@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "../../api/client.js";
 import { useRuns } from "../../hooks/useRuns.js";
 import { RunViewer } from "./RunViewer.js";
@@ -26,11 +26,31 @@ export function RunInspector({ projectId, defaultAgentId }: RunInspectorProps) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const { data: runs, isLoading } = useRuns(projectId, {
+  const { data: rawRuns, isLoading } = useRuns(projectId, {
     status: statusFilter || undefined,
     agentId: agentFilter || undefined,
     limit: 100,
   });
+
+  // TODO: Push startDate/endDate to the server once GET /api/runs accepts
+  // them. Applying client-side here keeps the UI controls live without
+  // changing the shared useRuns hook signature.
+  const runs = useMemo(() => {
+    if (!rawRuns) return rawRuns;
+    if (!startDate && !endDate) return rawRuns;
+    const startMs = startDate ? new Date(startDate).getTime() : null;
+    // End of day for endDate so the chosen date is inclusive.
+    const endMs = endDate
+      ? new Date(endDate).getTime() + 24 * 60 * 60 * 1000 - 1
+      : null;
+    return rawRuns.filter((r) => {
+      if (!r.startedAt) return true;
+      const t = new Date(r.startedAt).getTime();
+      if (startMs != null && t < startMs) return false;
+      if (endMs != null && t > endMs) return false;
+      return true;
+    });
+  }, [rawRuns, startDate, endDate]);
 
   return (
     <div className="flex flex-col gap-3">
