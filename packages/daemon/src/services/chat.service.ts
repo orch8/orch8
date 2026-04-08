@@ -53,6 +53,24 @@ export class ChatService {
     return rows[0] ?? null;
   }
 
+  /**
+   * Loads a chat only if it belongs to `projectId`. Used by callers
+   * that must enforce project isolation (e.g. decideCard). Returns
+   * null for both "chat does not exist" and "chat belongs to another
+   * project" so callers cannot distinguish the two via the response,
+   * avoiding existence leaks across project boundaries.
+   */
+  async getChatForProject(
+    chatId: string,
+    projectId: string,
+  ): Promise<Chat | null> {
+    const rows = await this.db
+      .select()
+      .from(chats)
+      .where(and(eq(chats.id, chatId), eq(chats.projectId, projectId)));
+    return rows[0] ?? null;
+  }
+
   async createChat(input: {
     projectId: string;
     agentId: string;
@@ -365,14 +383,21 @@ export class ChatService {
    * Approves or cancels a card that was previously emitted by the
    * assistant. Idempotent: re-calling with the same decision returns
    * the existing state without re-triggering a run.
+   *
+   * `projectId` is REQUIRED and must match the chat's project —
+   * otherwise the call fails with "Chat not found" (same error as a
+   * genuinely missing chat, to avoid leaking cross-project existence).
+   * This plugs an authorization hole where any localhost caller could
+   * approve cards in arbitrary projects by guessing chat/card IDs.
    */
   async decideCard(
     chatId: string,
     cardId: string,
     decision: "approved" | "cancelled",
     actor: string,
+    projectId: string,
   ): Promise<ChatMessage> {
-    const chat = await this.getChat(chatId);
+    const chat = await this.getChatForProject(chatId, projectId);
     if (!chat) throw new Error("Chat not found");
 
     // Find the assistant message that contains this card.

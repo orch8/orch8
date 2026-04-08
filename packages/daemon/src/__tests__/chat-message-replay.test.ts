@@ -114,7 +114,7 @@ describe("Chat message replay (end-to-end)", () => {
     expect(cards1[0].status).toBe("pending");
 
     // Turn 2: user approves the card
-    await service.decideCard(chat.id, cards1[0].id, "approved", "tester");
+    await service.decideCard(chat.id, cards1[0].id, "approved", "tester", projectId);
     await new Promise((r) => setTimeout(r, 150));
 
     msgs = await service.listMessages(chat.id);
