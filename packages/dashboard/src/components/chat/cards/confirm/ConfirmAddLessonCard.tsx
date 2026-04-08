@@ -5,6 +5,7 @@ export function ConfirmAddLessonCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_add_lesson">) {
   const { title, body, tags } = card.payload;
   return (
@@ -13,6 +14,7 @@ export function ConfirmAddLessonCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <p className="whitespace-pre-wrap text-xs text-zinc-300">{body}</p>
       {tags && tags.length > 0 && (

@@ -5,6 +5,7 @@ export function ConfirmCreatePipelineCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_create_pipeline">) {
   const p = card.payload;
   return (
@@ -13,6 +14,7 @@ export function ConfirmCreatePipelineCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       {p.templateId && (
         <p className="text-xs text-zinc-400">

@@ -7,6 +7,7 @@ interface BaseConfirmCardProps {
   summary: string;
   extracted: ExtractedCard;
   chatId: string;
+  projectId: string;
   children: ReactNode;
 }
 
@@ -15,6 +16,7 @@ export function BaseConfirmCard({
   summary,
   extracted,
   chatId,
+  projectId,
   children,
 }: BaseConfirmCardProps) {
   const decision = useCardDecision();
@@ -24,12 +26,12 @@ export function BaseConfirmCard({
 
   const onApprove = () => {
     if (!isPending) return;
-    decision.mutate({ chatId, cardId: extracted.id, decision: "approved" });
+    decision.mutate({ chatId, projectId, cardId: extracted.id, decision: "approved" });
   };
 
   const onCancel = () => {
     if (!isPending) return;
-    decision.mutate({ chatId, cardId: extracted.id, decision: "cancelled" });
+    decision.mutate({ chatId, projectId, cardId: extracted.id, decision: "cancelled" });
   };
 
   return (

@@ -48,6 +48,7 @@ describe("Confirm card interactions", () => {
     await user.click(screen.getByRole("button", { name: /approve/i }));
     expect(mockMutate).toHaveBeenCalledWith({
       chatId: "chat_a",
+      projectId: "proj_a",
       cardId: "card_42",
       decision: "approved",
     });
@@ -64,6 +65,7 @@ describe("Confirm card interactions", () => {
     await user.click(screen.getByRole("button", { name: /cancel/i }));
     expect(mockMutate).toHaveBeenCalledWith({
       chatId: "chat_a",
+      projectId: "proj_a",
       cardId: "card_42",
       decision: "cancelled",
     });

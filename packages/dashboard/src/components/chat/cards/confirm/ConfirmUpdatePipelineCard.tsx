@@ -6,6 +6,7 @@ export function ConfirmUpdatePipelineCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_update_pipeline">) {
   const { pipelineId, current, proposed } = card.payload;
   return (
@@ -14,6 +15,7 @@ export function ConfirmUpdatePipelineCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <DiffTable
         current={current as Record<string, unknown>}

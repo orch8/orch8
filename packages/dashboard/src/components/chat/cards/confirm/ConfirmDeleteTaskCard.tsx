@@ -5,6 +5,7 @@ export function ConfirmDeleteTaskCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_delete_task">) {
   const { taskId, title } = card.payload;
   return (
@@ -13,6 +14,7 @@ export function ConfirmDeleteTaskCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <p className="text-xs text-red-300">
         Permanently delete <span className="font-semibold">{title}</span>?

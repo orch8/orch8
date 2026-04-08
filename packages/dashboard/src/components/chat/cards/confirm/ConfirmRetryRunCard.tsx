@@ -5,6 +5,7 @@ export function ConfirmRetryRunCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_retry_run">) {
   const { runId, agentName, failureReason } = card.payload;
   return (
@@ -13,6 +14,7 @@ export function ConfirmRetryRunCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <p className="text-xs text-zinc-300">
         Re-run <span className="font-mono">{runId}</span> for agent {agentName}.

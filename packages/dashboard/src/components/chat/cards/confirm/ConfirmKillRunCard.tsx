@@ -5,6 +5,7 @@ export function ConfirmKillRunCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_kill_run">) {
   const { runId, agentName, taskTitle, runningSinceSec } = card.payload;
   return (
@@ -13,6 +14,7 @@ export function ConfirmKillRunCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-xs">
         <dt className="text-zinc-500">agent</dt>

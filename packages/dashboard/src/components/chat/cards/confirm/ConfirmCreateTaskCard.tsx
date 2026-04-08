@@ -5,6 +5,7 @@ export function ConfirmCreateTaskCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_create_task">) {
   const p = card.payload;
   return (
@@ -13,6 +14,7 @@ export function ConfirmCreateTaskCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-xs">
         <dt className="text-zinc-500">title</dt>

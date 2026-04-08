@@ -5,6 +5,7 @@ export function ConfirmPauseAgentCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_pause_agent">) {
   const { agentId, name, reason } = card.payload;
   return (
@@ -13,6 +14,7 @@ export function ConfirmPauseAgentCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <p className="text-xs text-zinc-300">
         Pauses agent <span className="font-mono">{agentId}</span>. The agent stops running but

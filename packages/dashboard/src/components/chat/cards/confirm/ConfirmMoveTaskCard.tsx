@@ -5,6 +5,7 @@ export function ConfirmMoveTaskCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_move_task">) {
   const { taskId, from, to } = card.payload;
   return (
@@ -13,6 +14,7 @@ export function ConfirmMoveTaskCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <p className="text-xs">
         <span className="text-zinc-500">{from}</span>

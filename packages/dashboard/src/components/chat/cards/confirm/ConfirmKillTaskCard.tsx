@@ -5,6 +5,7 @@ export function ConfirmKillTaskCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_kill_task">) {
   const { taskId, currentRunId } = card.payload;
   return (
@@ -13,6 +14,7 @@ export function ConfirmKillTaskCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <p className="text-xs text-zinc-300">
         Stops the in-flight execution.

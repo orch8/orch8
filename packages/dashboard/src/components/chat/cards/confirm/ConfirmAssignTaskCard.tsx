@@ -5,6 +5,7 @@ export function ConfirmAssignTaskCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_assign_task">) {
   const { taskId, currentAssignee, proposedAssignee } = card.payload;
   return (
@@ -13,6 +14,7 @@ export function ConfirmAssignTaskCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <p className="text-xs">
         <span className="text-zinc-500">{currentAssignee ?? "(unassigned)"}</span>

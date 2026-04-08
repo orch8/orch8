@@ -5,6 +5,7 @@ export function ConfirmDeletePipelineCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_delete_pipeline">) {
   const { pipelineId, name } = card.payload;
   return (
@@ -13,6 +14,7 @@ export function ConfirmDeletePipelineCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <p className="text-xs text-red-300">
         Permanently delete pipeline <span className="font-mono">{pipelineId}</span>?

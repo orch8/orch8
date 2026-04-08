@@ -6,6 +6,7 @@ export function ConfirmSetBudgetCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_set_budget">) {
   const { scope, entityId, current, proposed } = card.payload;
   return (
@@ -14,6 +15,7 @@ export function ConfirmSetBudgetCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <p className="mb-2 text-xs text-zinc-400">
         Entity: <span className="font-mono">{entityId}</span>

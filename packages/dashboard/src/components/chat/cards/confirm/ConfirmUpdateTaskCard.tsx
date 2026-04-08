@@ -6,6 +6,7 @@ export function ConfirmUpdateTaskCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_update_task">) {
   const { taskId, current, proposed } = card.payload;
   return (
@@ -14,6 +15,7 @@ export function ConfirmUpdateTaskCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <DiffTable
         current={current as Record<string, unknown>}

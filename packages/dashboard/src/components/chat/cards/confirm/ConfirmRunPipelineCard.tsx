@@ -5,6 +5,7 @@ export function ConfirmRunPipelineCard({
   card,
   extracted,
   chatId,
+  projectId,
 }: CardComponentProps<"confirm_run_pipeline">) {
   const { pipelineId, name, inputs } = card.payload;
   return (
@@ -13,6 +14,7 @@ export function ConfirmRunPipelineCard({
       summary={card.summary}
       extracted={extracted}
       chatId={chatId}
+      projectId={projectId}
     >
       <p className="text-xs text-zinc-300">
         Pipeline <span className="font-mono">{pipelineId}</span>
