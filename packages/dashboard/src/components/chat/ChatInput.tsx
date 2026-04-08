@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { useSendChatMessage } from "../../hooks/useChatMessages.js";
+import { Button } from "../ui/Button.js";
 
 interface ChatInputProps {
   chatId: string;
@@ -31,7 +32,7 @@ export function ChatInput({ chatId }: ChatInputProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-t border-zinc-800 bg-zinc-950 px-4 py-3"
+      className="border-t border-edge-soft bg-canvas px-4 py-3"
     >
       <div className="mx-auto flex max-w-3xl items-end gap-2">
         <textarea
@@ -40,16 +41,17 @@ export function ChatInput({ chatId }: ChatInputProps) {
           onKeyDown={handleKeyDown}
           placeholder="Send a message…"
           rows={1}
-          className="flex-1 resize-none rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
+          aria-label="Message"
+          className="focus-ring flex-1 resize-none rounded-sm border border-edge bg-surface px-3 py-2 type-body text-ink placeholder:text-whisper"
         />
-        <button
+        <Button
           type="submit"
+          variant="primary"
           disabled={!canSend}
           aria-label="Send"
-          className="rounded-md bg-sky-700 px-4 py-2 text-sm font-medium text-zinc-100 hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600"
         >
           Send
-        </button>
+        </Button>
       </div>
     </form>
   );
