@@ -7,19 +7,18 @@ import { useUiStore } from "../stores/ui.js";
 function RootLayout() {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
 
-  // WsEventsProvider is mounted here (inside the RouterProvider) rather than
-  // in main.tsx so it can read the current projectId from the router state and
-  // scope the /ws connection to one project at a time.
+  // WsEventsProvider is mounted here (inside the RouterProvider) so it can read
+  // the current projectId from the router state and scope /ws per project.
   return (
     <WsEventsProvider>
-      <div className="flex h-screen bg-zinc-950 text-zinc-100">
+      <div className="flex h-screen bg-canvas text-ink">
         <ToastContainer />
         <Sidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
-          <header className="flex items-center gap-3 border-b border-zinc-800 px-6 py-3">
+          <header className="flex items-center gap-3 border-b border-edge-soft px-6 py-3">
             <button
               onClick={toggleSidebar}
-              className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+              className="focus-ring rounded-sm p-1 text-mute hover:bg-surface-2 hover:text-ink"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path
@@ -30,7 +29,7 @@ function RootLayout() {
                 />
               </svg>
             </button>
-            <h1 className="text-lg font-semibold">orch8</h1>
+            <h1 className="type-section">orch8</h1>
           </header>
           <main className="flex-1 overflow-auto p-6">
             <Outlet />
