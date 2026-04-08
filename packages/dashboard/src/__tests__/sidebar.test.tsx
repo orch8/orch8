@@ -28,12 +28,32 @@ describe("Sidebar", () => {
     });
   });
 
-  it("renders WORK section first with Board and Pipelines", () => {
+  it("renders Chat at the top of the nav with no glyph or star", () => {
+    renderWithProviders(<Sidebar />);
+    const chat = screen.getByText("Chat");
+    expect(chat).toBeInTheDocument();
+    // No leading star/glyph — textContent must be exactly "Chat"
+    expect(chat.textContent).toBe("Chat");
+  });
+
+  it("renders Briefing in the top nav, pointing at the briefing route", () => {
+    renderWithProviders(<Sidebar />);
+    const briefing = screen.getByText("Briefing").closest("a");
+    expect(briefing).toBeInTheDocument();
+    expect(briefing?.getAttribute("href")).toBe("/projects/proj_1/briefing");
+  });
+
+  it("does NOT render a Home nav entry", () => {
+    renderWithProviders(<Sidebar />);
+    // Chat is the project landing; Briefing is its own page. There is no "Home" item.
+    expect(screen.queryByText("Home")).not.toBeInTheDocument();
+  });
+
+  it("renders WORK section with Board and Pipelines", () => {
     renderWithProviders(<Sidebar />);
     expect(screen.getByText("WORK")).toBeInTheDocument();
     expect(screen.getByText("Board")).toBeInTheDocument();
     expect(screen.getByText("Pipelines")).toBeInTheDocument();
-    expect(screen.queryByText("Brainstorm")).not.toBeInTheDocument();
   });
 
   it("renders SETUP section with Agents and Settings", () => {
@@ -41,15 +61,6 @@ describe("Sidebar", () => {
     expect(screen.getByText("SETUP")).toBeInTheDocument();
     expect(screen.getByText("Agents")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
-  });
-
-  it("does NOT render Projects nav item (replaced by switcher)", () => {
-    renderWithProviders(<Sidebar />);
-    const allLinks = screen.getAllByRole("link");
-    const projectsNavLink = allLinks.find(
-      (link) => link.getAttribute("href") === "/projects"
-    );
-    expect(projectsNavLink).toBeUndefined();
   });
 
   it("renders MONITOR section with Runs, Cost, Memory, Activity", () => {
@@ -61,21 +72,26 @@ describe("Sidebar", () => {
     expect(screen.getByText("Activity")).toBeInTheDocument();
   });
 
-  it("renders SYSTEM section with Daemon link", () => {
+  it("removes the SYSTEM nav section", () => {
     renderWithProviders(<Sidebar />);
-    expect(screen.getByText("SYSTEM")).toBeInTheDocument();
-    expect(screen.getByText("Daemon")).toBeInTheDocument();
+    expect(screen.queryByText("SYSTEM")).not.toBeInTheDocument();
+  });
+
+  it("renders the Daemon link in the sidebar footer, not in nav", () => {
+    renderWithProviders(<Sidebar />);
+    const daemonLink = screen.getByText(/daemon/i).closest("a");
+    expect(daemonLink?.getAttribute("href")).toBe("/daemon");
+  });
+
+  it("does NOT render Brainstorms or Skills nav items", () => {
+    renderWithProviders(<Sidebar />);
+    expect(screen.queryByText("Brainstorms")).not.toBeInTheDocument();
+    expect(screen.queryByText("Skills")).not.toBeInTheDocument();
   });
 
   it("generates project-scoped links for project pages", () => {
     renderWithProviders(<Sidebar />);
     const boardLink = screen.getByText("Board").closest("a");
     expect(boardLink?.getAttribute("href")).toBe("/projects/proj_1/board");
-  });
-
-  it("generates global links for system pages", () => {
-    renderWithProviders(<Sidebar />);
-    const daemonLink = screen.getByText("Daemon").closest("a");
-    expect(daemonLink?.getAttribute("href")).toBe("/daemon");
   });
 });
