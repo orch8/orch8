@@ -7,7 +7,7 @@ import {
   createMemoryHistory,
 } from "@tanstack/react-router";
 import { CardRegistry } from "../components/chat/cards/CardRegistry.js";
-import type { ChatCard as ExtractedCard } from "../hooks/useChatMessages.js";
+import type { ExtractedCard } from "@orch/shared";
 
 const INFO_FIXTURES: ExtractedCard[] = [
   {

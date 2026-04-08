@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
+import type { ExtractedCard } from "@orch/shared";
 import { useCardDecision } from "../../../hooks/useCardDecision.js";
-import type { ChatCard as ExtractedCard } from "../../../hooks/useChatMessages.js";
 
 interface BaseConfirmCardProps {
   title: string;

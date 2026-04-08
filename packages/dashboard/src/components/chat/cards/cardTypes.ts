@@ -1,5 +1,4 @@
-import type { ChatCard, ChatCardKind } from "@orch/shared";
-import type { ChatCard as ExtractedCard } from "../../../hooks/useChatMessages.js";
+import type { ChatCard, ChatCardKind, ExtractedCard } from "@orch/shared";
 
 /**
  * Props every card component receives. The validated discriminated-union

@@ -1,7 +1,6 @@
 import type { ComponentType } from "react";
 import { parseStrictCard } from "@orch/shared";
-import type { ChatCardKind } from "@orch/shared";
-import type { ChatCard as ExtractedCard } from "../../../hooks/useChatMessages.js";
+import type { ChatCardKind, ExtractedCard } from "@orch/shared";
 import type { CardComponentProps } from "./cardTypes.js";
 
 import { ConfirmCreateTaskCard } from "./confirm/ConfirmCreateTaskCard.js";
