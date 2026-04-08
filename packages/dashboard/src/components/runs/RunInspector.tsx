@@ -125,7 +125,7 @@ export function RunInspector({ projectId, defaultAgentId }: RunInspectorProps) {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          api.post(`/runs/${run.id}/retry`, { projectId }).catch(() => {});
+                          api.post(`/runs/${run.id}/retry`, {}, { projectId }).catch(() => {});
                         }}
                         className="rounded bg-blue-900/30 px-2 py-0.5 text-xs text-blue-300 hover:bg-blue-900/50"
                       >

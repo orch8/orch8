@@ -97,6 +97,55 @@ describe("Run Cancel + Log Routes", () => {
     });
   });
 
+  describe("POST /api/runs/:id/retry", () => {
+    it("enqueues a wakeup for a failed run", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1", projectId, invocationSource: "on_demand",
+        status: "failed", finishedAt: new Date(),
+      }).returning();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/runs/${run.id}/retry`,
+        headers: { "x-project-id": projectId },
+      });
+
+      expect(res.statusCode).toBe(202);
+      expect(["queued", "coalesced", "skipped"]).toContain(res.json().status);
+    });
+
+    it("returns 409 for a succeeded run", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1", projectId, invocationSource: "on_demand",
+        status: "succeeded", finishedAt: new Date(),
+      }).returning();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/runs/${run.id}/retry`,
+        headers: { "x-project-id": projectId },
+      });
+
+      expect(res.statusCode).toBe(409);
+    });
+
+    it("returns 404 for nonexistent run", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/runs/run_nonexistent/retry",
+        headers: { "x-project-id": projectId },
+      });
+
+      expect(res.statusCode).toBe(404);
+    });
+  });
+
   describe("GET /api/runs/:id/log", () => {
     it("returns log content for a run", async () => {
       const logDir = join(tmpdir(), `orch8-test-${randomUUID()}`);

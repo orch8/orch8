@@ -129,6 +129,59 @@ export async function runRoutes(app: FastifyInstance) {
     });
   });
 
+  // POST /api/runs/:id/retry — Re-dispatch a failed or cancelled run for the same
+  // agent/task. Uses the standard heartbeat wakeup machinery so budget checks,
+  // pause state, and queue coalescing all apply.
+  app.post("/api/runs/:id/retry", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const projectId = request.projectId;
+    if (!projectId) {
+      return reply.code(400).send({ error: "validation_error", message: "projectId is required" });
+    }
+
+    const [run] = await app.db
+      .select()
+      .from(heartbeatRuns)
+      .where(
+        and(
+          eq(heartbeatRuns.id, request.params.id),
+          eq(heartbeatRuns.projectId, projectId),
+        ),
+      );
+
+    if (!run) {
+      return reply.code(404).send({ error: "not_found", message: "Run not found" });
+    }
+
+    if (run.status !== "failed" && run.status !== "cancelled") {
+      return reply.code(409).send({
+        error: "conflict",
+        message: `Cannot retry run with status '${run.status}' — only failed or cancelled runs are retryable`,
+      });
+    }
+
+    try {
+      const wakeup = await app.heartbeatService.enqueueWakeup(run.agentId, projectId, {
+        source: "on_demand",
+        taskId: run.taskId ?? undefined,
+        reason: `retry of run ${run.id}`,
+      });
+      return reply.code(202).send({
+        status: wakeup.status,
+        wakeupId: wakeup.id,
+        newRunId: wakeup.runId,
+      });
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message === "Agent not found") {
+        return reply.code(404).send({ error: "not_found", message });
+      }
+      if (message === "Cannot wake a paused agent" || message.toLowerCase().includes("paused")) {
+        return reply.code(409).send({ error: "conflict", message });
+      }
+      throw err;
+    }
+  });
+
   // GET /api/runs/:id/log — Get run log content
   app.get("/api/runs/:id/log", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const projectId = request.projectId;
