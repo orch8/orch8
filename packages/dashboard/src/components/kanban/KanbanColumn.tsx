@@ -2,11 +2,18 @@ import { useDroppable } from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,
+  useSortable,
 } from "@dnd-kit/sortable";
-import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "../../types.js";
 import { TaskCard } from "./TaskCard.js";
+
+const COLUMN_STRIPE: Record<string, string> = {
+  backlog: "bg-whisper",
+  blocked: "bg-amber",
+  in_progress: "bg-accent",
+  done: "bg-blue/60",
+};
 
 interface SortableTaskCardProps {
   task: Task;
@@ -45,17 +52,23 @@ export function KanbanColumn({
   const { setNodeRef } = useDroppable({ id: column });
 
   return (
-    <div className="flex w-72 shrink-0 flex-col">
-      <div className="mb-3 flex items-center justify-between px-1">
-        <h3 className="text-sm font-semibold text-zinc-300">{label}</h3>
-        <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-500">
+    <div className="flex h-full flex-col bg-surface">
+      {/* Column header: stripe + mono label + serif count */}
+      <div className="flex items-center gap-2 border-b border-edge-soft px-3 py-3">
+        <span
+          aria-hidden
+          className={`inline-block h-3 w-[3px] ${COLUMN_STRIPE[column] ?? "bg-whisper"}`}
+        />
+        <span className="type-label text-mute">{label}</span>
+        <span className="ml-auto type-numeral text-ink" style={{ fontSize: "16px" }}>
           {tasks.length}
         </span>
       </div>
 
+      {/* Task list */}
       <div
         ref={setNodeRef}
-        className="flex flex-1 flex-col gap-2 rounded-lg bg-zinc-900/30 p-2"
+        className="flex flex-1 flex-col gap-2 overflow-y-auto p-3"
       >
         <SortableContext
           items={tasks.map((t) => t.id)}
@@ -71,7 +84,7 @@ export function KanbanColumn({
         </SortableContext>
 
         {tasks.length === 0 && (
-          <p className="py-8 text-center text-xs text-zinc-700">No tasks</p>
+          <p className="py-8 text-center type-micro text-whisper">No tasks</p>
         )}
       </div>
     </div>
