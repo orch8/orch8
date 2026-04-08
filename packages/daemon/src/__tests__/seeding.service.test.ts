@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { mkdtemp, rm, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SeedingService } from "../services/seeding.service.js";
+import { and, eq } from "drizzle-orm";
+import { projects, agents } from "@orch/shared/db";
+import { SeedingService, CHAT_AGENT_DEFAULTS } from "../services/seeding.service.js";
+import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 
 let tempDir: string;
 
@@ -162,6 +165,100 @@ describe("SeedingService", () => {
       await service.populateGlobalSkills(globalDir);
       const entries2 = await readdir(globalDir);
       expect(entries2).toContain("tdd");
+    });
+  });
+
+  describe("provisionChatAgent", () => {
+    let testDb: TestDb;
+    let projectId: string;
+
+    beforeAll(async () => {
+      testDb = await setupTestDb();
+    }, 60_000);
+
+    afterAll(async () => {
+      await teardownTestDb(testDb);
+    });
+
+    beforeEach(async () => {
+      await testDb.db.delete(agents);
+      await testDb.db.delete(projects);
+
+      const [project] = await testDb.db.insert(projects).values({
+        name: "Chat Perms Test",
+        slug: `chat-perms-${Date.now()}`,
+        homeDir: "/tmp/chat-perms",
+        worktreeDir: "/tmp/chat-perms-wt",
+      }).returning();
+      projectId = project.id;
+    });
+
+    async function getChatRow() {
+      const [row] = await testDb.db
+        .select()
+        .from(agents)
+        .where(
+          and(
+            eq(agents.id, CHAT_AGENT_DEFAULTS.id),
+            eq(agents.projectId, projectId),
+          ),
+        );
+      return row;
+    }
+
+    it("creates a new chat agent with admin-level permissions", async () => {
+      const service = new SeedingService();
+      const created = await service.provisionChatAgent(testDb.db, projectId);
+      expect(created).toBe(true);
+
+      const row = await getChatRow();
+      expect(row).toBeDefined();
+      expect(row.canCreateTasks).toBe(true);
+      expect(row.canAssignTo).toEqual(["*"]);
+      expect(row.canMoveTo).toEqual(["backlog", "blocked", "in_progress", "done"]);
+    });
+
+    it("backfills permissions on an existing chat agent with empty permissions", async () => {
+      // Simulate a pre-fix row: chat agent exists but has no permissions.
+      await testDb.db.insert(agents).values({
+        id: CHAT_AGENT_DEFAULTS.id,
+        projectId,
+        name: CHAT_AGENT_DEFAULTS.name,
+        role: CHAT_AGENT_DEFAULTS.role,
+        canCreateTasks: false,
+        canAssignTo: [],
+        canMoveTo: [],
+      });
+
+      const service = new SeedingService();
+      const created = await service.provisionChatAgent(testDb.db, projectId);
+      expect(created).toBe(false);
+
+      const row = await getChatRow();
+      expect(row.canCreateTasks).toBe(true);
+      expect(row.canAssignTo).toEqual(["*"]);
+      expect(row.canMoveTo).toEqual(["backlog", "blocked", "in_progress", "done"]);
+    });
+
+    it("preserves non-empty user-edited permissions on an existing chat agent", async () => {
+      // User has narrowed permissions intentionally — backfill must not overwrite them.
+      await testDb.db.insert(agents).values({
+        id: CHAT_AGENT_DEFAULTS.id,
+        projectId,
+        name: CHAT_AGENT_DEFAULTS.name,
+        role: CHAT_AGENT_DEFAULTS.role,
+        canCreateTasks: true,
+        canAssignTo: ["qa-bot"],
+        canMoveTo: ["in_progress"],
+      });
+
+      const service = new SeedingService();
+      await service.provisionChatAgent(testDb.db, projectId);
+
+      const row = await getChatRow();
+      expect(row.canCreateTasks).toBe(true);
+      expect(row.canAssignTo).toEqual(["qa-bot"]);
+      expect(row.canMoveTo).toEqual(["in_progress"]);
     });
   });
 

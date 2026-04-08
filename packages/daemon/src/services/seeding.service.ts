@@ -14,8 +14,8 @@ import {
   DEFAULT_AGENTS_DIR,
   GLOBAL_SKILLS_DIR,
   type ParsedAgentsMd,
-  type BundledAgent,
-} from "@orch/shared";
+} from "@orch/shared/defaults";
+import type { BundledAgent } from "@orch/shared";
 import { agents, chats } from "@orch/shared/db";
 import { eq, and } from "drizzle-orm";
 import type { SchemaDb } from "../db/client.js";
@@ -78,7 +78,12 @@ export const CHAT_AGENT_DEFAULTS = {
   wakeOnAssignment: false,
   wakeOnOnDemand: true,
   wakeOnAutomation: false,
+  // The chat agent is the user's conversational entry point and acts
+  // with admin-level authority by default: it can create tasks, assign
+  // to any agent ("*" wildcard), and move tasks through every column.
   canCreateTasks: true,
+  canAssignTo: ["*"] as string[],
+  canMoveTo: ["backlog", "blocked", "in_progress", "done"] as const,
   allowedTools: ["Bash", "Read", "Edit", "Write", "Grep", "Glob"],
   // Note: the `orch8` skill is ALWAYS auto-injected by claude-local-adapter
   // (see ORCH8_SKILL_PATH in claude-local-adapter.ts). We don't list it here
@@ -243,6 +248,12 @@ export class SeedingService {
    * Creates the default chat agent for a project if it doesn't exist.
    * Idempotent — safe to call on every daemon startup. Returns true if
    * a new row was inserted, false if the agent was already present.
+   *
+   * For pre-existing chat agents, this also backfills admin-level
+   * permissions (canCreateTasks / canAssignTo / canMoveTo) when those
+   * fields are still at their empty defaults. Non-empty values set by
+   * the user are preserved — this only fills in gaps for rows that
+   * predate the chat-agent-as-admin defaults.
    */
   async provisionChatAgent(db: SchemaDb, projectId: string): Promise<boolean> {
     const existing = await db
@@ -254,7 +265,31 @@ export class SeedingService {
           eq(agents.projectId, projectId),
         ),
       );
-    if (existing.length > 0) return false;
+    if (existing.length > 0) {
+      const row = existing[0];
+      const patch: Partial<typeof agents.$inferInsert> = {};
+      if (!row.canCreateTasks) {
+        patch.canCreateTasks = CHAT_AGENT_DEFAULTS.canCreateTasks;
+      }
+      if (!row.canAssignTo || row.canAssignTo.length === 0) {
+        patch.canAssignTo = CHAT_AGENT_DEFAULTS.canAssignTo;
+      }
+      if (!row.canMoveTo || row.canMoveTo.length === 0) {
+        patch.canMoveTo = CHAT_AGENT_DEFAULTS.canMoveTo as unknown as typeof row.canMoveTo;
+      }
+      if (Object.keys(patch).length > 0) {
+        await db
+          .update(agents)
+          .set(patch)
+          .where(
+            and(
+              eq(agents.id, CHAT_AGENT_DEFAULTS.id),
+              eq(agents.projectId, projectId),
+            ),
+          );
+      }
+      return false;
+    }
 
     await db.insert(agents).values({
       id: CHAT_AGENT_DEFAULTS.id,
@@ -270,6 +305,8 @@ export class SeedingService {
       wakeOnOnDemand: CHAT_AGENT_DEFAULTS.wakeOnOnDemand,
       wakeOnAutomation: CHAT_AGENT_DEFAULTS.wakeOnAutomation,
       canCreateTasks: CHAT_AGENT_DEFAULTS.canCreateTasks,
+      canAssignTo: CHAT_AGENT_DEFAULTS.canAssignTo,
+      canMoveTo: CHAT_AGENT_DEFAULTS.canMoveTo as unknown as typeof agents.$inferInsert.canMoveTo,
       allowedTools: CHAT_AGENT_DEFAULTS.allowedTools as unknown as string[],
       desiredSkills: CHAT_AGENT_DEFAULTS.desiredSkills as unknown as string[],
       systemPrompt: CHAT_AGENT_DEFAULTS.systemPrompt,

@@ -38,7 +38,9 @@ export function requirePermission(permission: Permission) {
       case "assign_task": {
         const body = request.body as Record<string, unknown> | null;
         const targetAgent = body?.assignee as string | undefined;
-        if (targetAgent && !(agent.canAssignTo ?? []).includes(targetAgent)) {
+        const allowed = agent.canAssignTo ?? [];
+        // "*" acts as a wildcard — grants assignment to any agent ID.
+        if (targetAgent && !allowed.includes("*") && !allowed.includes(targetAgent)) {
           return reply.code(403).send({
             error: "forbidden",
             message: `Agent '${agent.id}' cannot assign tasks to '${targetAgent}'`,

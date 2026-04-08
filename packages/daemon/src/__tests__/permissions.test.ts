@@ -207,5 +207,43 @@ describe("Permission Middleware", () => {
       expect(response.statusCode).toBe(403);
       await app.close();
     });
+
+    it("allows agent with wildcard '*' to assign to any target", async () => {
+      await testDb.db.insert(agents).values({
+        id: "super-assigner",
+        projectId,
+        name: "Super",
+        role: "custom",
+        canAssignTo: ["*"],
+      });
+
+      const app = buildApp("assign_task");
+
+      // First target
+      const r1 = await app.inject({
+        method: "POST",
+        url: "/test",
+        headers: {
+          "x-agent-id": "super-assigner",
+          "x-project-id": projectId,
+        },
+        payload: { assignee: "implementer" },
+      });
+      expect(r1.statusCode).toBe(200);
+
+      // Arbitrary target — wildcard should allow it regardless
+      const r2 = await app.inject({
+        method: "POST",
+        url: "/test",
+        headers: {
+          "x-agent-id": "super-assigner",
+          "x-project-id": projectId,
+        },
+        payload: { assignee: "some-agent-that-does-not-exist" },
+      });
+      expect(r2.statusCode).toBe(200);
+
+      await app.close();
+    });
   });
 });
