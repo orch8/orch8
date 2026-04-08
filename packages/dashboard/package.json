@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsr generate && tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "tsc --noEmit",
+    "typecheck": "tsr generate && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
