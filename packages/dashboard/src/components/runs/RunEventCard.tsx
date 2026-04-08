@@ -67,7 +67,7 @@ export function RunEventCard({ event, baseTimestamp }: RunEventCardProps) {
           </span>
         </div>
 
-        {expanded && event.payload && (
+        {expanded && event.payload != null && (
           <pre className="mt-2 max-h-64 overflow-auto rounded bg-zinc-950 p-2 font-mono text-xs text-zinc-400">
             {JSON.stringify(event.payload, null, 2)}
           </pre>

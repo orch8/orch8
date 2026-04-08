@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import type { ChatCardKind } from "@orch/shared";
+import type { ChatCard } from "@orch/shared";
 import { BaseResultCard } from "../BaseResultCard.js";
 import type { CardComponentProps } from "../cardTypes.js";
 
@@ -13,8 +13,10 @@ type ResultSuccessKind =
   | "result_set_budget"
   | "result_add_lesson" | "result_update_memory_entity";
 
-interface ResultGenericCardProps<K extends ResultSuccessKind>
-  extends CardComponentProps<K> {}
+interface ResultGenericCardProps
+  extends Omit<CardComponentProps<ResultSuccessKind>, "card"> {
+  card: Extract<ChatCard, { kind: ResultSuccessKind }>;
+}
 
 /**
  * One component handles all result_<verb>_<entity> success kinds. The
@@ -22,10 +24,10 @@ interface ResultGenericCardProps<K extends ResultSuccessKind>
  * variation is the title text and the deep-link route, both derived
  * from `kind` and `entityKind`.
  */
-export function ResultGenericCard<K extends ResultSuccessKind>({
+export function ResultGenericCard({
   card,
   projectId,
-}: ResultGenericCardProps<K>) {
+}: ResultGenericCardProps) {
   const payload = card.payload;
   const entityId = payload.entityId;
   const entityKind = payload.entityKind ?? deriveEntityKind(card.kind);
