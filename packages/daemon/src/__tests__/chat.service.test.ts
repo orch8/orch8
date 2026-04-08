@@ -242,7 +242,7 @@ describe("ChatService", () => {
     const assistant = msgs.find((m) => m.role === "assistant")!;
     const card = (assistant.cards as ExtractedCard[])[0];
 
-    await service.decideCard(chat.id, card.id, "approved", "test-user");
+    await service.decideCard(chat.id, card.id, "approved", "test-user", projectId);
     await new Promise((r) => setTimeout(r, 100));
 
     const refreshedMsgs = await service.listMessages(chat.id);
@@ -281,12 +281,12 @@ describe("ChatService", () => {
     const assistant = msgs.find((m) => m.role === "assistant")!;
     const card = (assistant.cards as ExtractedCard[])[0];
 
-    await service.decideCard(chat.id, card.id, "approved", "user-1");
+    await service.decideCard(chat.id, card.id, "approved", "user-1", projectId);
     const firstDecision = (await testDb.db.select().from(chatMessages).where(eq(chatMessages.id, assistant.id)))[0];
     const firstDecidedAt = (firstDecision.cards as ExtractedCard[])[0].decidedAt;
 
     // Second call should be a no-op (same decidedAt preserved)
-    await service.decideCard(chat.id, card.id, "approved", "user-2");
+    await service.decideCard(chat.id, card.id, "approved", "user-2", projectId);
     await new Promise((r) => setTimeout(r, 100));
     const secondDecision = (await testDb.db.select().from(chatMessages).where(eq(chatMessages.id, assistant.id)))[0];
     expect((secondDecision.cards as ExtractedCard[])[0].decidedAt).toBe(firstDecidedAt);
@@ -295,6 +295,142 @@ describe("ChatService", () => {
     // The replayed decideCard should not have triggered another assistant turn.
     // 2 calls = 1 for initial user message + 1 for the first approval follow-up.
     expect(adapter.runAgent).toHaveBeenCalledTimes(2);
+  });
+
+  it("decideCard refuses to touch a card in a chat owned by another project", async () => {
+    // Set up a second project (B) with its own chat agent and chat.
+    const [projectB] = await testDb.db
+      .insert(projects)
+      .values({
+        name: "tB",
+        slug: `tB-${Date.now()}`,
+        homeDir: "/tmp/orch8-chat-test-b",
+        worktreeDir: "/tmp/orch8-chat-test-b/worktrees",
+      })
+      .returning();
+    await testDb.db.insert(agents).values({
+      id: "chat",
+      projectId: projectB.id,
+      name: "Project Chat",
+      role: "custom",
+      model: "claude-sonnet-4-6",
+      promptTemplate: "{{context.userMessage}}",
+      wakeOnOnDemand: true,
+    });
+
+    const fenced = [
+      "```orch8-card",
+      '{"kind":"confirm_create_task","summary":"Create T","payload":{"title":"T"}}',
+      "```",
+    ].join("\n");
+    const adapter = makeMockAdapter(fenced);
+    service = new ChatService(
+      testDb.db,
+      adapter as any,
+      sessionMgr,
+      broadcast,
+      TEST_API_URL,
+    );
+
+    // Project A chat with a pending card.
+    const chatA = await service.createChat({ projectId, agentId });
+    await service.sendUserMessage(chatA.id, "make a task");
+    await new Promise((r) => setTimeout(r, 100));
+    const msgsA = await service.listMessages(chatA.id);
+    const cardA = ((msgsA.find((m) => m.role === "assistant")!).cards as ExtractedCard[])[0];
+
+    // Project B chat with its own pending card.
+    const chatB = await service.createChat({ projectId: projectB.id, agentId: "chat" });
+    await service.sendUserMessage(chatB.id, "make another task");
+    await new Promise((r) => setTimeout(r, 100));
+    const msgsB = await service.listMessages(chatB.id);
+    const cardB = ((msgsB.find((m) => m.role === "assistant")!).cards as ExtractedCard[])[0];
+
+    // Caller is authenticated for project A. Trying to decide a card
+    // in project B's chat must fail as "not found" — NOT as an
+    // auth error, to avoid leaking chat existence across projects.
+    await expect(
+      service.decideCard(chatB.id, cardB.id, "approved", "attacker", projectId),
+    ).rejects.toThrow(/not found/i);
+
+    // Also: trying to decide chat A's card while passing project B's
+    // projectId must fail for the same reason.
+    await expect(
+      service.decideCard(chatA.id, cardA.id, "approved", "attacker", projectB.id),
+    ).rejects.toThrow(/not found/i);
+
+    // Project B's card must still be pending — untouched by the failed call.
+    const msgsBAfter = await service.listMessages(chatB.id);
+    const cardBAfter = ((msgsBAfter.find((m) => m.role === "assistant")!).cards as ExtractedCard[])[0];
+    expect(cardBAfter.status).toBe("pending");
+    expect(cardBAfter.decidedBy ?? null).toBeNull();
+  });
+
+  // ─── Startup recovery ─────────────────────────
+
+  it("reapOrphanedChatMessages marks stuck streaming rows as error", async () => {
+    service = new ChatService(
+      testDb.db,
+      makeMockAdapter("ok") as any,
+      sessionMgr,
+      broadcast,
+      TEST_API_URL,
+    );
+    const chat = await service.createChat({ projectId, agentId });
+
+    // Insert a row as if a prior daemon instance crashed mid-turn.
+    const [stuck] = await testDb.db
+      .insert(chatMessages)
+      .values({
+        chatId: chat.id,
+        role: "assistant",
+        content: "partial output so far",
+        status: "streaming",
+      })
+      .returning();
+
+    // Also insert a normal `complete` row to confirm it is NOT touched.
+    const [ok] = await testDb.db
+      .insert(chatMessages)
+      .values({
+        chatId: chat.id,
+        role: "assistant",
+        content: "fine",
+        status: "complete",
+      })
+      .returning();
+
+    const reaped = await service.reapOrphanedChatMessages();
+    expect(reaped).toContain(stuck.id);
+    expect(reaped).not.toContain(ok.id);
+
+    const after = await testDb.db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.id, stuck.id));
+    expect(after[0].status).toBe("error");
+    expect(after[0].content).toContain("partial output so far");
+    expect(after[0].content).toContain("interrupted");
+
+    // Untouched row remains complete.
+    const okAfter = await testDb.db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.id, ok.id));
+    expect(okAfter[0].status).toBe("complete");
+    expect(okAfter[0].content).toBe("fine");
+  });
+
+  it("reapOrphanedChatMessages is a no-op when no rows are stuck", async () => {
+    service = new ChatService(
+      testDb.db,
+      makeMockAdapter("ok") as any,
+      sessionMgr,
+      broadcast,
+      TEST_API_URL,
+    );
+    const reaped = await service.reapOrphanedChatMessages();
+    expect(reaped).toEqual([]);
   });
 
   // ─── Session Invalidation ──────────────────────

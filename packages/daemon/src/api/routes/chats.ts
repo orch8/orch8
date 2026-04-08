@@ -173,12 +173,22 @@ export async function chatsRoutes(app: FastifyInstance) {
           .code(400)
           .send({ error: "validation_error", details: parsed.error.issues });
       }
+      // Project scoping is required — decideCard mutates chat state,
+      // so we must know which project the caller is acting in to
+      // prevent cross-project approval of cards (issue 2.5).
+      const projectId = request.projectId;
+      if (!projectId) {
+        return reply
+          .code(400)
+          .send({ error: "project_required", message: "x-project-id header is required" });
+      }
       try {
         const updated = await app.chatService.decideCard(
           request.params.chatId,
           request.params.cardId,
           parsed.data.decision,
           parsed.data.actor ?? "user",
+          projectId,
         );
         return updated;
       } catch (err) {

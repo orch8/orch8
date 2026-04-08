@@ -180,6 +180,16 @@ export function buildServer(options: ServerOptions = {}) {
       app.log.error({ err }, "Failed to resume interrupted runs on startup");
     });
 
+    // 7b. Reap chat assistant rows stuck in `streaming` from a prior
+    // crashed daemon instance. Mirrors reapOrphanedRuns but targets
+    // the chat pipeline, which was previously uncovered (issue 2.4).
+    chatService.reapOrphanedChatMessages().catch((err) => {
+      app.log.error(
+        { err },
+        "Failed to reap orphaned streaming chat messages on startup",
+      );
+    });
+
     // Populate global skills directory and sync all projects
     (async () => {
       try {

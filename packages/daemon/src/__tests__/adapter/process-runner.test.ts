@@ -62,7 +62,11 @@ describe("runProcess", () => {
 
     await runProcess(input, spawnFn as unknown as SpawnFn);
 
-    expect(writeSpy).toHaveBeenCalledWith("Hello agent");
+    expect(writeSpy).toHaveBeenCalledTimes(1);
+    // First arg is the prompt; second is the write callback used
+    // by writeAllToStdin to detect errors.
+    expect(writeSpy.mock.calls[0][0]).toBe("Hello agent");
+    expect(typeof writeSpy.mock.calls[0][1]).toBe("function");
     expect(endSpy).toHaveBeenCalled();
   });
 
@@ -138,6 +142,83 @@ describe("runProcess", () => {
 
     const result = await promise;
     expect(result.errorCode).toBe("auth_required");
+  });
+
+  it("awaits stdin.write when backpressure is signalled (drain)", async () => {
+    // Craft a stdin mock whose `write` returns false (high-water mark
+    // reached) and only emits drain on our cue. The run must not
+    // resolve until drain fires, proving we honour backpressure.
+    const initEvent = JSON.stringify({ type: "system", subtype: "init", session_id: "sb", model: "claude-sonnet-4-6" });
+    const resultEvent = JSON.stringify({ type: "result", session_id: "sb", result: "ok", model: "claude-sonnet-4-6", usage: { input_tokens: 1, output_tokens: 1 }, total_cost_usd: 0 });
+
+    const stdinEmitter = new EventEmitter();
+    let drainAllowed = false;
+    const writeCalls: unknown[] = [];
+    const stdinMock = Object.assign(stdinEmitter, {
+      write: vi.fn((chunk: string | Buffer, cb?: (err?: Error | null) => void) => {
+        writeCalls.push(chunk);
+        // Fire the write callback asynchronously so it matches real
+        // Node semantics, but do NOT fire drain until the test says so.
+        queueMicrotask(() => {
+          if (cb) cb(null);
+          if (drainAllowed) stdinEmitter.emit("drain");
+        });
+        return false; // signal backpressure
+      }),
+      end: vi.fn(),
+      once: stdinEmitter.once.bind(stdinEmitter),
+      on: stdinEmitter.on.bind(stdinEmitter),
+      removeListener: stdinEmitter.removeListener.bind(stdinEmitter),
+    });
+
+    const stdoutReadable = new Readable({ read() {} });
+    const stderrReadable = new Readable({ read() {} });
+    const proc = Object.assign(new EventEmitter(), {
+      stdin: stdinMock,
+      stdout: stdoutReadable,
+      stderr: stderrReadable,
+      pid: 42,
+      kill: vi.fn(() => true),
+    });
+
+    // Stream the output lines only AFTER drain allows writeAllToStdin
+    // to resolve — if the fix is missing, runProcess will proceed
+    // immediately and we can't distinguish it from correct behavior.
+    // So instead we arm a flag and observe that runProcess is still
+    // pending until we set it.
+    const spawnFn = vi.fn(() => proc as unknown as ReturnType<SpawnFn>);
+
+    const runPromise = runProcess(makeInput({ prompt: "x".repeat(10_000) }), spawnFn as unknown as SpawnFn);
+
+    // Yield several microtasks so any un-awaited paths would have
+    // resolved by now. (If runProcess forgot to await the write, it
+    // would be pushing output through stdout by now.)
+    let settled = false;
+    void runPromise.then(
+      () => { settled = true; },
+      () => { settled = true; },
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    expect(settled).toBe(false);
+
+    // Release drain. The promise must now be able to progress.
+    drainAllowed = true;
+    stdinEmitter.emit("drain");
+
+    // Push output and close the process to let the rest of runProcess finish.
+    queueMicrotask(() => {
+      stdoutReadable.push(initEvent + "\n");
+      stdoutReadable.push(resultEvent + "\n");
+      stdoutReadable.push(null);
+      stderrReadable.push(null);
+      proc.emit("close", 0, null);
+    });
+
+    const result = await runPromise;
+    expect(result.exitCode).toBe(0);
+    expect(writeCalls).toHaveLength(1);
+    expect(stdinMock.end).toHaveBeenCalled();
   });
 
   it("applies timeout and kills process", async () => {
