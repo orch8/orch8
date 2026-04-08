@@ -1,24 +1,14 @@
 // packages/dashboard/src/hooks/useChatMessages.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { ExtractedCard } from "@orch/shared";
 import { api } from "../api/client.js";
-
-export interface ChatCard {
-  id: string;
-  kind: string;
-  summary: string;
-  payload: unknown;
-  status: "pending" | "approved" | "cancelled" | "executed" | "error";
-  decidedAt: string | null;
-  decidedBy: string | null;
-  resultRunId: string | null;
-}
 
 export interface ChatMessage {
   id: string;
   chatId: string;
   role: "user" | "assistant" | "system";
   content: string;
-  cards: ChatCard[];
+  cards: ExtractedCard[];
   skillInvoked: string | null;
   runId: string | null;
   status: "streaming" | "complete" | "error";

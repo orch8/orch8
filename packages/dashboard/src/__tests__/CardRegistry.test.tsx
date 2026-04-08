@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 import { renderWithProviders, screen } from "../test-utils.js";
 import {
   RouterContextProvider,
@@ -7,7 +7,7 @@ import {
   createMemoryHistory,
 } from "@tanstack/react-router";
 import { CardRegistry } from "../components/chat/cards/CardRegistry.js";
-import type { ChatCard as ExtractedCard } from "../hooks/useChatMessages.js";
+import type { ChatCard, ExtractedCard } from "@orch/shared";
 
 const router = createRouter({
   routeTree: createRootRoute({ component: () => <div /> }),
@@ -37,6 +37,26 @@ function renderCard(extracted: ExtractedCard) {
 }
 
 describe("CardRegistry", () => {
+  it("Extract<ChatCard, { kind }> resolves to a concrete variant (not never)", () => {
+    // Guards against type-level drift between the @orch/shared ChatCard
+    // discriminated union and the card components that Extract from it.
+    // If either side diverges (e.g. a component imports a local ChatCard
+    // shadowing the shared one), the Extract collapses to `never` and the
+    // components silently lose their prop typing.
+    expectTypeOf<
+      Extract<ChatCard, { kind: "result_create_task" }>
+    >().not.toBeNever();
+    expectTypeOf<
+      Extract<ChatCard, { kind: "confirm_create_task" }>
+    >().not.toBeNever();
+    expectTypeOf<
+      Extract<ChatCard, { kind: "info_task_list" }>
+    >().not.toBeNever();
+    expectTypeOf<
+      Extract<ChatCard, { kind: "result_error" }>
+    >().not.toBeNever();
+  });
+
   it("renders an info card from a valid extracted payload", () => {
     renderCard(
       makeExtracted({

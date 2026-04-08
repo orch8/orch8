@@ -3,14 +3,14 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { autoLinkIds } from "./IdAutoLinker.js";
-import type { ChatCard } from "../../hooks/useChatMessages.js";
+import type { ExtractedCard } from "@orch/shared";
 import { CardRegistry } from "./cards/CardRegistry.js";
 
 export interface ChatMessageRendererProps {
   projectId: string;
   chatId: string;
   content: string;
-  cards: ChatCard[];
+  cards: ExtractedCard[];
 }
 
 interface Segment {

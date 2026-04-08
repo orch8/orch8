@@ -7,14 +7,14 @@ import {
   createMemoryHistory,
 } from "@tanstack/react-router";
 import { ChatMessageRenderer } from "../components/chat/ChatMessageRenderer.js";
-import type { ChatCard } from "../hooks/useChatMessages.js";
+import type { ExtractedCard } from "@orch/shared";
 
 const router = createRouter({
   routeTree: createRootRoute({ component: () => <div /> }),
   history: createMemoryHistory({ initialEntries: ["/"] }),
 });
 
-function renderMsg(content: string, cards: ChatCard[] = []) {
+function renderMsg(content: string, cards: ExtractedCard[] = []) {
   return render(
     <RouterContextProvider router={router}>
       <ChatMessageRenderer projectId="proj_a" chatId="chat_a" content={content} cards={cards} />
@@ -77,7 +77,7 @@ describe("ChatMessageRenderer", () => {
       '{"kind":"b"}',
       "```",
     ].join("\n");
-    const cards: ChatCard[] = [
+    const cards: ExtractedCard[] = [
       { id: "c1", kind: "a", summary: "", payload: {}, status: "pending", decidedAt: null, decidedBy: null, resultRunId: null },
       { id: "c2", kind: "b", summary: "", payload: {}, status: "pending", decidedAt: null, decidedBy: null, resultRunId: null },
     ];
