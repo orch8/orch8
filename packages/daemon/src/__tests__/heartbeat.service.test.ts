@@ -130,6 +130,23 @@ describe("HeartbeatService", () => {
   });
 
   describe("enqueueWakeup — task-scoped wakeup", () => {
+    // Each test in this describe exercises enqueueWakeup's coalesce path,
+    // which must observe the first run while it is still in `queued` or
+    // `running` status. Without a mock adapter, the background executeRun
+    // fired by startNextQueuedRunForAgent would immediately hit the
+    // "No adapter configured" failRun path and transition the run to
+    // `failed` — racing the second enqueueWakeup call and making these
+    // tests flaky under load. A mock adapter whose runAgent never resolves
+    // keeps the run in `running` state so every coalesce check is
+    // deterministic. The pending promise is harmless: it's fire-and-forget
+    // and the next test's beforeEach replaces the service instance.
+    beforeEach(() => {
+      const hangingAdapter = {
+        runAgent: () => new Promise<never>(() => {}),
+      };
+      service.setAdapter(hangingAdapter as unknown as Parameters<typeof service.setAdapter>[0]);
+    });
+
     it("creates a queued run for the task without setting execution lock", async () => {
       await testDb.db.insert(agents).values({
         id: "eng-1", projectId, name: "Eng", role: "engineer",
@@ -443,6 +460,29 @@ describe("HeartbeatService", () => {
         invocationSource: "on_demand",
         status: "queued",
       }).returning();
+
+      // Install a mock adapter so executeRun actually exercises its happy
+      // path. Without a mock, this.adapter is null and the service bails out
+      // via failRun("No adapter configured") — that's the error path, not
+      // the happy path the test name advertises, and it races the subsequent
+      // DB read because the 2.1 budget transaction added BEGIN/COMMIT
+      // round-trips between the run's terminal-status update and the moment
+      // executeRun returns.
+      service.setAdapter({
+        runAgent: async () => ({
+          sessionId: null,
+          model: null,
+          result: "ok",
+          usage: null,
+          costUsd: null,
+          billingType: "api" as const,
+          exitCode: 0,
+          signal: null,
+          error: null,
+          errorCode: null,
+          events: [],
+        }),
+      } as unknown as Parameters<typeof service.setAdapter>[0]);
 
       await service.executeRun(run.id);
 

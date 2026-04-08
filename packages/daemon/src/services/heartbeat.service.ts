@@ -674,46 +674,41 @@ export class HeartbeatService {
 
       const result = await this.adapter.runAgent(adapterConfig, ctx, prompts);
 
-      // 8. Record results
+      // 8. Record results AND update budget atomically.
+      //
+      // These writes must be committed together so any observer waiting on
+      // the run's status transition (e.g. `waitForRunComplete` polling in
+      // tests, or the dashboard via broadcast) sees the budget update at the
+      // same moment as the terminal status. Previously the budget lived in
+      // a separate follow-up transaction, which opened a window where the
+      // run looked "succeeded" but the agent/project budget counters hadn't
+      // incremented yet — reproducible under full-suite load and surfaced
+      // as flaky integration tests.
+      //
+      // autoPauseIfExhausted also reads and possibly writes agent/project
+      // rows and must see the just-incremented budget; it is therefore
+      // called inside the same transaction with the tx handle.
       const terminalStatus = this.resolveTerminalStatus(result);
-      await this.db
-        .update(heartbeatRuns)
-        .set({
-          status: terminalStatus,
-          exitCode: result.exitCode,
-          signal: result.signal,
-          error: result.error,
-          errorCode: result.errorCode,
-          usageJson: result.usage,
-          resultJson: result.result ? { text: result.result } : null,
-          costUsd: result.costUsd,
-          billingType: result.billingType,
-          model: result.model,
-          sessionIdAfter: result.sessionId,
-          finishedAt: new Date(),
-        })
-        .where(eq(heartbeatRuns.id, runId));
+      await this.db.transaction(async (tx) => {
+        await tx
+          .update(heartbeatRuns)
+          .set({
+            status: terminalStatus,
+            exitCode: result.exitCode,
+            signal: result.signal,
+            error: result.error,
+            errorCode: result.errorCode,
+            usageJson: result.usage,
+            resultJson: result.result ? { text: result.result } : null,
+            costUsd: result.costUsd,
+            billingType: result.billingType,
+            model: result.model,
+            sessionIdAfter: result.sessionId,
+            finishedAt: new Date(),
+          })
+          .where(eq(heartbeatRuns.id, runId));
 
-      // 8b. Finalize run log (spec §14 §2.2)
-      const logResult = await runLogger.finalize(logHandle);
-      logHandle = undefined; // Prevent double-finalize in finally
-      await this.db
-        .update(heartbeatRuns)
-        .set({
-          logStore: logResult.logStore,
-          logRef: logResult.logRef,
-          logBytes: logResult.logBytes,
-        })
-        .where(eq(heartbeatRuns.id, runId));
-
-      // 9. Update agent budget spent
-      if (result.costUsd && result.costUsd > 0) {
-        // Incrementing the agent and project budget counters and evaluating
-        // auto-pause must be atomic. A crash between the agent update and the
-        // project update would under-count project spend; a crash between the
-        // project update and autoPauseIfExhausted could skip the auto-pause
-        // check for a run whose cost we already recorded.
-        await this.db.transaction(async (tx) => {
+        if (result.costUsd && result.costUsd > 0) {
           await tx
             .update(agents)
             .set({
@@ -737,11 +732,24 @@ export class HeartbeatService {
             .where(eq(projects.id, claimedRun.projectId));
 
           // Auto-pause if budget exhausted (spec §9.2.4).
-          // Passes the tx handle so every pause read/write participates in
-          // the same transaction as the counter increments.
           await autoPauseIfExhausted(tx, agent.id, claimedRun.projectId, this.broadcastService);
-        });
-      }
+        }
+      });
+
+      // 8b. Finalize run log (spec §14 §2.2). Outside the transaction above
+      // because the log metadata is not atomicity-critical — a crash here
+      // leaves logStore/logRef null but the run itself is already marked
+      // terminal with the correct cost, which is the important invariant.
+      const logResult = await runLogger.finalize(logHandle);
+      logHandle = undefined; // Prevent double-finalize in finally
+      await this.db
+        .update(heartbeatRuns)
+        .set({
+          logStore: logResult.logStore,
+          logRef: logResult.logRef,
+          logBytes: logResult.logBytes,
+        })
+        .where(eq(heartbeatRuns.id, runId));
 
       // 10. Broadcast completion
       if (terminalStatus === "succeeded") {
