@@ -35,21 +35,21 @@ export function ChatMessageStream({
     : messages;
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6">
+    <div className="flex-1 overflow-y-auto bg-canvas px-4 py-6">
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
         {displayMessages.map((m) => (
           <ChatMessage key={m.id} projectId={projectId} message={m} />
         ))}
         {streaming && (
           <div className="flex justify-start">
-            <div className="w-full max-w-[90%] rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
+            <div className="w-full max-w-[90%] rounded-md border border-edge-soft bg-surface px-4 py-3">
               <ChatMessageRenderer
                 projectId={projectId}
                 chatId={chatId}
                 content={streaming.buffer}
                 cards={[]}
               />
-              <div className="mt-2 text-xs text-zinc-500">Streaming…</div>
+              <div className="mt-2 type-micro text-whisper">Streaming…</div>
             </div>
           </div>
         )}

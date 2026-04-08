@@ -30,7 +30,7 @@ export function ChatHeader({ projectId, chat }: ChatHeaderProps) {
   }
 
   return (
-    <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 py-3">
+    <div className="flex items-center justify-between border-b border-edge-soft bg-canvas px-4 py-3">
       <div className="flex items-center gap-3">
         {editing ? (
           <input
@@ -45,12 +45,12 @@ export function ChatHeader({ projectId, chat }: ChatHeaderProps) {
                 setDraftTitle(chat.title);
               }
             }}
-            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 focus:outline-none"
+            className="focus-ring rounded-sm border border-edge bg-surface px-2 py-1 type-section text-ink"
           />
         ) : (
           <button
             onClick={() => setEditing(true)}
-            className="text-sm font-semibold text-zinc-200 hover:text-zinc-50"
+            className="focus-ring type-section text-ink hover:text-accent"
             title="Click to rename"
           >
             {chat.title}
@@ -59,7 +59,7 @@ export function ChatHeader({ projectId, chat }: ChatHeaderProps) {
         <Link
           to="/projects/$projectId/agents/$agentId"
           params={{ projectId, agentId: chat.agentId }}
-          className="text-xs text-zinc-500 hover:text-zinc-300"
+          className="focus-ring type-mono text-blue underline decoration-blue/40 decoration-dotted underline-offset-2 hover:decoration-blue"
         >
           {chat.agentId}
         </Link>
@@ -69,27 +69,33 @@ export function ChatHeader({ projectId, chat }: ChatHeaderProps) {
         <button
           aria-label="Thread menu"
           onClick={() => setMenuOpen((o) => !o)}
-          className="rounded px-2 py-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+          className="focus-ring rounded-sm px-2 py-1 text-mute hover:bg-surface-2 hover:text-ink"
         >
           ⋯
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-full z-10 mt-1 w-40 overflow-hidden rounded-md border border-zinc-800 bg-zinc-950 text-sm shadow-lg">
+          <div className="absolute right-0 top-full z-10 mt-1 w-40 overflow-hidden rounded-md border border-edge-soft bg-surface shadow-lg">
             <button
               onClick={() => {
-                updateChat.mutate({ chatId: chat.id, patch: { pinned: !chat.pinned } });
+                updateChat.mutate({
+                  chatId: chat.id,
+                  patch: { pinned: !chat.pinned },
+                });
                 setMenuOpen(false);
               }}
-              className="block w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-900"
+              className="block w-full px-3 py-2 text-left type-body text-ink hover:bg-surface-2"
             >
               {chat.pinned ? "Unpin" : "Pin"}
             </button>
             <button
               onClick={() => {
-                updateChat.mutate({ chatId: chat.id, patch: { archived: true } });
+                updateChat.mutate({
+                  chatId: chat.id,
+                  patch: { archived: true },
+                });
                 setMenuOpen(false);
               }}
-              className="block w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-900"
+              className="block w-full px-3 py-2 text-left type-body text-ink hover:bg-surface-2"
             >
               Archive
             </button>
@@ -100,7 +106,7 @@ export function ChatHeader({ projectId, chat }: ChatHeaderProps) {
                 }
                 setMenuOpen(false);
               }}
-              className="block w-full px-3 py-2 text-left text-red-400 hover:bg-zinc-900"
+              className="block w-full px-3 py-2 text-left type-body text-red hover:bg-surface-2"
             >
               Delete
             </button>
