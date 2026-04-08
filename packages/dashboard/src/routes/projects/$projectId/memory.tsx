@@ -1,12 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { MemoryBrowser } from "../../../components/memory/MemoryBrowser.js";
+import { PageHeader } from "../../../components/ui/PageHeader.js";
 
 function MemoryPage() {
   const { projectId } = Route.useParams();
 
   return (
     <div className="h-full">
-      <h2 className="mb-4 text-lg font-semibold">Memory</h2>
+      <PageHeader
+        title="Memory"
+        subtitle="Knowledge entities and facts the agents have learned"
+      />
       <MemoryBrowser projectId={projectId} />
     </div>
   );

@@ -1,12 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { RunInspector } from "../../../components/runs/RunInspector.js";
+import { PageHeader } from "../../../components/ui/PageHeader.js";
 
 function RunsPage() {
   const { projectId } = Route.useParams();
 
   return (
     <div className="h-full">
-      <h2 className="text-lg font-semibold mb-4">Runs</h2>
+      <PageHeader
+        title="Runs"
+        subtitle="Inspect every heartbeat run, with logs and events"
+      />
       <RunInspector projectId={projectId} />
     </div>
   );

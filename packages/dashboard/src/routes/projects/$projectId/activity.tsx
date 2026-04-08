@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useActivity } from "../../../hooks/useActivity.js";
+import { PageHeader } from "../../../components/ui/PageHeader.js";
 
 const LEVEL_COLORS: Record<string, string> = {
   info: "bg-blue-500",
@@ -25,7 +26,10 @@ function ActivityPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">Activity Log</h2>
+      <PageHeader
+        title="Activity"
+        subtitle="Every recorded action across this project"
+      />
 
       {/* Filters */}
       <div className="flex gap-2">

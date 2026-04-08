@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useProject, useArchiveProject } from "../../../hooks/useProjects.js";
 import { ProjectForm } from "../../../components/project/ProjectForm.js";
+import { PageHeader } from "../../../components/ui/PageHeader.js";
 import type { Project } from "../../../types.js";
 
 function ProjectSettingsPage() {
@@ -33,9 +34,7 @@ function ProjectSettingsPage() {
 
   return (
     <div className="mx-auto max-w-lg p-8">
-      <h1 className="mb-6 text-xl font-semibold text-zinc-100">
-        Project Settings — {project.name}
-      </h1>
+      <PageHeader title="Settings" subtitle={`Project-level configuration — ${project.name}`} />
 
       <ProjectForm project={project} onSuccess={handleSuccess} />
 
