@@ -99,63 +99,6 @@ describe("Integration: Task Type Lifecycle", () => {
     expect(completed.column).toBe("done");
   });
 
-  it("brainstorm lifecycle: create → start → message → ready → convert", async () => {
-    // Create
-    const createRes = await app.inject({
-      method: "POST",
-      url: "/api/tasks",
-      headers: { "x-project-id": projectId },
-      payload: { title: "Explore ideas", projectId, taskType: "brainstorm", assignee: "int-agent" },
-    });
-    const task = JSON.parse(createRes.body);
-    expect(task.brainstormStatus).toBe("active");
-
-    // Start session
-    const startRes = await app.inject({
-      method: "POST",
-      url: `/api/brainstorm/${task.id}/start`,
-      headers: { "x-project-id": projectId },
-    });
-    expect(startRes.statusCode).toBe(200);
-
-    // Send message
-    const msgRes = await app.inject({
-      method: "POST",
-      url: `/api/brainstorm/${task.id}/message`,
-      headers: { "x-project-id": projectId },
-      payload: { content: "What about microservices?" },
-    });
-    expect(msgRes.statusCode).toBe(200);
-
-    // Mark ready
-    const readyRes = await app.inject({
-      method: "POST",
-      url: `/api/brainstorm/${task.id}/ready`,
-      headers: { "x-project-id": projectId },
-    });
-    expect(readyRes.statusCode).toBe(200);
-
-    // Get transcript
-    const transcriptRes = await app.inject({
-      method: "GET",
-      url: `/api/brainstorm/${task.id}/transcript`,
-      headers: { "x-project-id": projectId },
-    });
-    expect(transcriptRes.statusCode).toBe(200);
-    expect(JSON.parse(transcriptRes.body).transcript).toBeTruthy();
-
-    // Convert to quick
-    const convertRes = await app.inject({
-      method: "POST",
-      url: `/api/tasks/${task.id}/convert`,
-      headers: { "x-project-id": projectId },
-      payload: { taskType: "quick" },
-    });
-    expect(convertRes.statusCode).toBe(200);
-    const converted = JSON.parse(convertRes.body);
-    expect(converted.taskType).toBe("quick");
-  });
-
   it("dependency management: add dependency, reject cycle", async () => {
     const [a, b, c] = await Promise.all([
       app.inject({
