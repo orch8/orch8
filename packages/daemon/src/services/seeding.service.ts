@@ -6,8 +6,10 @@ import {
   appendFile,
   writeFile,
 } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
+import type { FastifyBaseLogger } from "fastify";
 import {
   parseAgentsMd,
   DEFAULT_SKILLS_DIR,
@@ -19,6 +21,16 @@ import type { BundledAgent } from "@orch/shared";
 import { agents, chats } from "@orch/shared/db";
 import { eq, and } from "drizzle-orm";
 import type { SchemaDb } from "../db/client.js";
+
+/**
+ * Filename used inside each bundled-skill destination directory to record
+ * which bundled-version was last copied there. Used by populateGlobalSkills
+ * to decide whether a re-copy is needed (fresh install or bundled version
+ * bump) vs. whether a destination already contains the current bundled
+ * version (no-op fast path) vs. whether user customizations may exist and
+ * we should refuse to overwrite.
+ */
+const VERSION_MARKER_FILE = ".orch8-version";
 
 /**
  * System prompt for the project chat agent. The agent is the user's
@@ -114,16 +126,98 @@ export interface ParsedAgentWithPaths extends ParsedAgentsMd {
 }
 
 export class SeedingService {
+  private logger?: FastifyBaseLogger;
+
+  setLogger(logger: FastifyBaseLogger) {
+    this.logger = logger;
+  }
+
   /**
    * Copies all bundled skills from the package defaults to the global
-   * skills directory (~/.orch8/skills/). Always overwrites to keep
-   * global skills in sync with the installed orch8 version.
+   * skills directory (~/.orch8/skills/).
+   *
+   * Each bundled skill is version-stamped with a content hash written to
+   * `<skill>/.orch8-version`. On startup we compare that marker against
+   * the current bundled source hash and decide per-skill:
+   *
+   *   - destination missing              → fresh copy, write marker
+   *   - marker present and matches hash  → fast-path no-op
+   *   - marker present but differs       → WARN and leave untouched
+   *     (user may have customized; do not clobber silently — the bundled
+   *     version will be re-synced once we have an admin "force resync"
+   *     endpoint or the user deletes the directory)
+   *   - marker missing but dir exists    → WARN and leave untouched
+   *     (same rationale — we cannot tell whether this directory was
+   *     hand-edited by the user or left over from a prior orch8 version)
+   *
+   * Non-directory entries under DEFAULT_SKILLS_DIR (rare, but possible)
+   * are copied unconditionally as before.
+   *
+   * TODO(admin): expose a "force resync" operation that blows away the
+   * destination and re-copies. For now users can delete the directory
+   * manually to opt into a fresh copy.
    *
    * @param targetDir — override for testing (defaults to ~/.orch8/skills/)
    */
   async populateGlobalSkills(targetDir: string = GLOBAL_SKILLS_DIR): Promise<void> {
     await mkdir(targetDir, { recursive: true });
-    await copyDirRecursive(DEFAULT_SKILLS_DIR, targetDir);
+
+    const entries = await readdir(DEFAULT_SKILLS_DIR, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = join(DEFAULT_SKILLS_DIR, entry.name);
+      const destPath = join(targetDir, entry.name);
+
+      if (!entry.isDirectory()) {
+        // Non-directory sibling (rare) — copy unconditionally; version
+        // markers only make sense for skill directories.
+        await copyFile(srcPath, destPath);
+        continue;
+      }
+
+      const bundledVersion = await hashDirContents(srcPath);
+
+      if (!existsSync(destPath)) {
+        // Fresh install for this skill — copy and stamp.
+        await mkdir(destPath, { recursive: true });
+        await copyDirRecursive(srcPath, destPath);
+        await writeFile(join(destPath, VERSION_MARKER_FILE), bundledVersion, "utf-8");
+        continue;
+      }
+
+      // Destination exists — check for a version marker.
+      const markerPath = join(destPath, VERSION_MARKER_FILE);
+      let existingVersion: string | null = null;
+      if (existsSync(markerPath)) {
+        try {
+          existingVersion = (await readFile(markerPath, "utf-8")).trim();
+        } catch {
+          existingVersion = null;
+        }
+      }
+
+      if (existingVersion === bundledVersion) {
+        // Fast path — already in sync.
+        continue;
+      }
+
+      // Either the marker is missing (legacy install, possibly
+      // user-edited) or it records a different version (bundled update
+      // after user may have edited files). Either way we refuse to
+      // clobber. Warn loudly so the operator knows their skill
+      // directory is out of sync.
+      this.logger?.warn(
+        {
+          skill: entry.name,
+          destPath,
+          existingVersion,
+          bundledVersion,
+        },
+        existingVersion === null
+          ? "Skipping skill sync: destination exists without version marker. User customizations may exist. Delete the directory to force a fresh copy."
+          : "Skipping skill sync: bundled version changed but user customizations may exist. Delete the directory to force a fresh copy.",
+      );
+    }
   }
 
   /**
@@ -356,3 +450,49 @@ async function copyDirRecursive(src: string, dest: string): Promise<void> {
     }
   }
 }
+
+/**
+ * Computes a stable content hash over all files in a directory (recursive).
+ * Used as the bundled-skill version marker: identical source trees always
+ * produce the same hash, so we can cheaply detect whether the bundled
+ * skill changed between orch8 releases without requiring a manual
+ * version bump.
+ *
+ * The hash hashes the sorted list of relative file paths plus each
+ * file's content, ignoring any existing `.orch8-version` marker so the
+ * destination's own marker never feeds back into the computation.
+ */
+async function hashDirContents(dir: string): Promise<string> {
+  const hash = createHash("sha256");
+  const files: string[] = [];
+
+  async function walk(current: string, rel: string): Promise<void> {
+    const entries = await readdir(current, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name === VERSION_MARKER_FILE) continue;
+      const relPath = rel ? `${rel}/${entry.name}` : entry.name;
+      const absPath = join(current, entry.name);
+      if (entry.isDirectory()) {
+        await walk(absPath, relPath);
+      } else if (entry.isFile()) {
+        files.push(relPath);
+      }
+    }
+  }
+
+  await walk(dir, "");
+  files.sort();
+
+  for (const rel of files) {
+    hash.update(rel);
+    hash.update("\0");
+    const content = await readFile(join(dir, rel));
+    hash.update(content);
+    hash.update("\0");
+  }
+
+  // Prefix with a short version tag so we can evolve the hash scheme
+  // without colliding with raw sha256 digests on disk.
+  return `v1:${hash.digest("hex")}`;
+}
+

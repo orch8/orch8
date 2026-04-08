@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
-import { mkdtemp, rm, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, readdir, readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { and, eq } from "drizzle-orm";
@@ -146,7 +146,7 @@ describe("SeedingService", () => {
   });
 
   describe("populateGlobalSkills", () => {
-    it("copies bundled skills to target directory, overwriting existing", async () => {
+    it("copies bundled skills to target directory on a fresh install", async () => {
       const globalDir = join(tempDir, "global-skills");
       const service = new SeedingService();
       await service.populateGlobalSkills(globalDir);
@@ -161,10 +161,93 @@ describe("SeedingService", () => {
       const tddContent = await readFile(join(globalDir, "tdd", "SKILL.md"), "utf-8");
       expect(tddContent).toContain("name: tdd");
 
-      // Run again — should overwrite without error
+      // Version marker was written.
+      const marker = await readFile(join(globalDir, "tdd", ".orch8-version"), "utf-8");
+      expect(marker).toMatch(/^v1:[0-9a-f]{64}$/);
+    });
+
+    it("is a no-op fast path when version marker matches bundled version", async () => {
+      const globalDir = join(tempDir, "global-skills");
+      const service = new SeedingService();
+
+      // First call seeds + stamps.
       await service.populateGlobalSkills(globalDir);
-      const entries2 = await readdir(globalDir);
-      expect(entries2).toContain("tdd");
+      const marker1 = await readFile(join(globalDir, "tdd", ".orch8-version"), "utf-8");
+
+      // Manually append a trailing line to the file so that, if we re-
+      // copied, our change would be lost. Because the marker matches,
+      // the re-copy should skip.
+      const skillPath = join(globalDir, "tdd", "SKILL.md");
+      const original = await readFile(skillPath, "utf-8");
+      await writeFile(skillPath, original + "\n<!-- user edit -->\n");
+
+      await service.populateGlobalSkills(globalDir);
+
+      const after = await readFile(skillPath, "utf-8");
+      expect(after).toContain("<!-- user edit -->");
+      const marker2 = await readFile(join(globalDir, "tdd", ".orch8-version"), "utf-8");
+      expect(marker2).toBe(marker1);
+    });
+
+    it("does not overwrite user customizations when version marker is missing", async () => {
+      const globalDir = join(tempDir, "global-skills");
+      const customSkillDir = join(globalDir, "tdd");
+      await mkdir(customSkillDir, { recursive: true });
+      const customPath = join(customSkillDir, "SKILL.md");
+      await writeFile(customPath, "my custom edit — do not touch");
+
+      const service = new SeedingService();
+      const warnings: unknown[] = [];
+      service.setLogger({
+        warn: (...args: unknown[]) => warnings.push(args),
+        info: () => {},
+        error: () => {},
+        debug: () => {},
+        trace: () => {},
+        fatal: () => {},
+        child: () => service["logger"],
+        level: "warn",
+      } as unknown as Parameters<SeedingService["setLogger"]>[0]);
+
+      await service.populateGlobalSkills(globalDir);
+
+      // User's file was not clobbered.
+      const after = await readFile(customPath, "utf-8");
+      expect(after).toBe("my custom edit — do not touch");
+
+      // And a warning was logged mentioning the skill name.
+      const flattened = JSON.stringify(warnings);
+      expect(flattened).toContain("tdd");
+      expect(flattened.toLowerCase()).toContain("user customizations");
+    });
+
+    it("does not overwrite when bundled version differs from marker", async () => {
+      const globalDir = join(tempDir, "global-skills");
+      const customSkillDir = join(globalDir, "tdd");
+      await mkdir(customSkillDir, { recursive: true });
+      const customPath = join(customSkillDir, "SKILL.md");
+      await writeFile(customPath, "my custom edit");
+      // Stamp with a stale (wrong) version.
+      await writeFile(join(customSkillDir, ".orch8-version"), "v1:stale");
+
+      const service = new SeedingService();
+      const warnings: unknown[] = [];
+      service.setLogger({
+        warn: (...args: unknown[]) => warnings.push(args),
+        info: () => {},
+        error: () => {},
+        debug: () => {},
+        trace: () => {},
+        fatal: () => {},
+        child: () => service["logger"],
+        level: "warn",
+      } as unknown as Parameters<SeedingService["setLogger"]>[0]);
+
+      await service.populateGlobalSkills(globalDir);
+
+      const after = await readFile(customPath, "utf-8");
+      expect(after).toBe("my custom edit");
+      expect(warnings.length).toBeGreaterThan(0);
     });
   });
 
