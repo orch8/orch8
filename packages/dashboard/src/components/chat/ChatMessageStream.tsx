@@ -22,10 +22,22 @@ export function ChatMessageStream({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming?.buffer]);
 
+  // The daemon inserts the assistant row in the DB as `status: "streaming"`
+  // BEFORE the first chunk goes out (chat.service.ts runAssistantTurn).
+  // `useSendChatMessage.onSuccess` then invalidates the chatMessages query,
+  // so that placeholder row lands in `messages` while the live WS buffer is
+  // simultaneously active. Rendering both would produce two "Streaming…"
+  // boxes for the same logical message. Suppress the persisted row while
+  // the live stream owns it; the WsEventsProvider invalidation on
+  // chat_message_complete swaps in the final row once streaming ends.
+  const displayMessages = streaming
+    ? messages.filter((m) => m.id !== streaming.messageId)
+    : messages;
+
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6">
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
-        {messages.map((m) => (
+        {displayMessages.map((m) => (
           <ChatMessage key={m.id} projectId={projectId} message={m} />
         ))}
         {streaming && (
