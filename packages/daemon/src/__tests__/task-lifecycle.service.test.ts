@@ -100,6 +100,36 @@ describe("TaskLifecycleService", () => {
       expect(execFn).not.toHaveBeenCalled();
     });
 
+    it("leaves no dangling execution lock if worktree creation fails", async () => {
+      // Force the worktree create step to throw. Because worktree creation runs
+      // BEFORE the DB update, a failure here must leave the task with no
+      // execution lock and no worktree path / branch.
+      (execFn as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error("git worktree add failed"),
+      );
+
+      const task = await taskService.create({
+        title: "Worktree will fail",
+        projectId,
+        taskType: "quick",
+      });
+
+      await expect(
+        lifecycleService.transition(task.id, "in_progress", {
+          agentId: "agent-1",
+          runId: "run-1",
+        }),
+      ).rejects.toThrow("git worktree add failed");
+
+      const reloaded = await taskService.getById(task.id);
+      expect(reloaded!.column).toBe("backlog");
+      expect(reloaded!.executionAgentId).toBeNull();
+      expect(reloaded!.executionRunId).toBeNull();
+      expect(reloaded!.executionLockedAt).toBeNull();
+      expect(reloaded!.worktreePath).toBeNull();
+      expect(reloaded!.branch).toBeNull();
+    });
+
     it("skips worktree creation if task already has a worktree path", async () => {
       const [task] = await testDb.db.insert(tasks).values({
         projectId,

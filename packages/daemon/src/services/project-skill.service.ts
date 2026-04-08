@@ -91,24 +91,26 @@ export class ProjectSkillService {
     const skill = await this.get(projectId, slugOrId);
     if (!skill) return;
 
-    // Remove DB row
-    await this.db.delete(projectSkills).where(eq(projectSkills.id, skill.id));
+    // Removing the skill row and stripping it from every agent's desiredSkills
+    // must be atomic — otherwise a crash leaves dangling slug references.
+    await this.db.transaction(async (tx) => {
+      await tx.delete(projectSkills).where(eq(projectSkills.id, skill.id));
 
-    // Strip slug from all agents' desiredSkills in this project
-    const projectAgents = await this.db
-      .select()
-      .from(agents)
-      .where(eq(agents.projectId, projectId));
+      const projectAgents = await tx
+        .select()
+        .from(agents)
+        .where(eq(agents.projectId, projectId));
 
-    for (const agent of projectAgents) {
-      if (agent.desiredSkills?.includes(skill.slug)) {
-        const updated = agent.desiredSkills.filter((s) => s !== skill.slug);
-        await this.db
-          .update(agents)
-          .set({ desiredSkills: updated, updatedAt: new Date() })
-          .where(and(eq(agents.id, agent.id), eq(agents.projectId, projectId)));
+      for (const agent of projectAgents) {
+        if (agent.desiredSkills?.includes(skill.slug)) {
+          const updated = agent.desiredSkills.filter((s) => s !== skill.slug);
+          await tx
+            .update(agents)
+            .set({ desiredSkills: updated, updatedAt: new Date() })
+            .where(and(eq(agents.id, agent.id), eq(agents.projectId, projectId)));
+        }
       }
-    }
+    });
   }
 
   async syncFromDisk(
@@ -151,46 +153,98 @@ export class ProjectSkillService {
       effective.set(slug, { sourceLocator: loc, sourceType: "local_path" });
     }
 
-    // 4. Upsert each effective skill
+    // Read SKILL.md contents and directory inventories up front.
+    // FS reads must happen outside the transaction so the tx body stays tight
+    // and does not block on I/O while holding DB locks.
+    interface SkillPayload {
+      slug: string;
+      sourceLocator: string;
+      sourceType: string;
+      name: string;
+      description: string | null;
+      content: string;
+      fileInventory: Array<{ path: string; kind: string }>;
+      trustLevel: TrustLevel;
+    }
+    const payloads: SkillPayload[] = [];
     for (const [slug, { sourceLocator, sourceType }] of effective) {
-      const existing = await this.get(projectId, slug);
-      if (existing) {
-        const content = await readFile(join(sourceLocator, "SKILL.md"), "utf-8");
-        const { data: fm } = matter(content);
-        const files = await readdir(sourceLocator);
-        const fileInventory = files.map((f) => ({
-          path: f,
-          kind: extname(f).toLowerCase().replace(".", "") || "unknown",
-        }));
-
-        await this.db
-          .update(projectSkills)
-          .set({
-            name: (fm.name as string) ?? slug,
-            description: (fm.description as string) ?? null,
-            markdown: content,
-            sourceType,
-            sourceLocator,
-            trustLevel: deriveTrustLevel(files),
-            fileInventory,
-            updatedAt: new Date(),
-          })
-          .where(eq(projectSkills.id, existing.id));
-      } else {
-        await this.create(projectId, { slug, sourceLocator, sourceType });
-      }
+      const content = await readFile(join(sourceLocator, "SKILL.md"), "utf-8");
+      const { data: fm } = matter(content);
+      const files = await readdir(sourceLocator);
+      const fileInventory = files.map((f) => ({
+        path: f,
+        kind: extname(f).toLowerCase().replace(".", "") || "unknown",
+      }));
+      payloads.push({
+        slug,
+        sourceLocator,
+        sourceType,
+        name: (fm.name as string) ?? slug,
+        description: (fm.description as string) ?? null,
+        content,
+        fileInventory,
+        trustLevel: deriveTrustLevel(files),
+      });
     }
 
-    // 5. Prune rows not in effective set
-    const allRows = await this.db
-      .select()
-      .from(projectSkills)
-      .where(eq(projectSkills.projectId, projectId));
+    // 4+5. Atomically upsert each effective skill and prune rows that are no
+    // longer present on disk. Reconciliation must be all-or-nothing so a
+    // crash mid-sync cannot leave the project with a half-pruned skill set.
+    await this.db.transaction(async (tx) => {
+      // 4. Upsert each effective skill
+      for (const p of payloads) {
+        const [existing] = await tx
+          .select()
+          .from(projectSkills)
+          .where(
+            and(
+              eq(projectSkills.projectId, projectId),
+              eq(projectSkills.slug, p.slug),
+            ),
+          );
 
-    for (const row of allRows) {
-      if (!effective.has(row.slug)) {
-        await this.db.delete(projectSkills).where(eq(projectSkills.id, row.id));
+        if (existing) {
+          await tx
+            .update(projectSkills)
+            .set({
+              name: p.name,
+              description: p.description,
+              markdown: p.content,
+              sourceType: p.sourceType,
+              sourceLocator: p.sourceLocator,
+              trustLevel: p.trustLevel,
+              fileInventory: p.fileInventory,
+              updatedAt: new Date(),
+            })
+            .where(eq(projectSkills.id, existing.id));
+        } else {
+          await tx
+            .insert(projectSkills)
+            .values({
+              projectId,
+              slug: p.slug,
+              name: p.name,
+              description: p.description,
+              markdown: p.content,
+              sourceType: p.sourceType,
+              sourceLocator: p.sourceLocator,
+              trustLevel: p.trustLevel,
+              fileInventory: p.fileInventory,
+            });
+        }
       }
-    }
+
+      // 5. Prune rows not in effective set
+      const allRows = await tx
+        .select()
+        .from(projectSkills)
+        .where(eq(projectSkills.projectId, projectId));
+
+      for (const row of allRows) {
+        if (!effective.has(row.slug)) {
+          await tx.delete(projectSkills).where(eq(projectSkills.id, row.id));
+        }
+      }
+    });
   }
 }

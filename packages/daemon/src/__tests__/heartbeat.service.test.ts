@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { makeFailingTxDb } from "./helpers/failing-tx.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
 
@@ -743,6 +744,82 @@ describe("HeartbeatService", () => {
         { runCount: 100, totalInputTokens: 1_000_000, sessionAgeHours: 36 },
       );
       expect(result.needsRotation).toBe(false);
+    });
+  });
+
+  describe("budget update transaction (2.1)", () => {
+    it("rolls back agent + project increments when the project update fails mid-transaction", async () => {
+      await testDb.db.update(projects).set({
+        budgetLimitUsd: 10,
+        budgetSpentUsd: 0,
+      });
+      await testDb.db.insert(agents).values({
+        id: "eng-1",
+        projectId,
+        name: "Eng",
+        role: "engineer",
+        adapterType: "claude_local",
+        adapterConfig: {},
+        budgetSpentUsd: 5,
+        budgetLimitUsd: 20,
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      // Adapter returns a non-zero cost so the budget transaction runs
+      const mockAdapter = {
+        runAgent: async () => ({
+          sessionId: null, model: null, result: "done",
+          usage: null, costUsd: 6, billingType: "api" as const,
+          exitCode: 0, signal: null, error: null, errorCode: null, events: [],
+        }),
+      };
+
+      // Build a HeartbeatService with a db whose transaction tx throws on
+      // the projects UPDATE. The agent increment happens first inside the
+      // transaction callback and must roll back.
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const failingDb = makeFailingTxDb(testDb.db, {
+        failUpdateOnTable: projects,
+        onlyInTransaction: true,
+        error: new Error("simulated project update failure"),
+      });
+      const failingService = new HeartbeatService(failingDb, broadcastService);
+      failingService.setAdapter(mockAdapter as any);
+
+      try {
+        await failingService.executeRun(run.id);
+      } finally {
+        failingService.shutdown();
+      }
+
+      // Run ends in a failed state — the execution_error from the transaction
+      // propagates through the run's catch block.
+      const [finished] = await testDb.db
+        .select()
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.id, run.id));
+      expect(finished.status).toBe("failed");
+
+      // Agent budgetSpentUsd must NOT have been incremented — the transaction
+      // rolled back the agent update when the project update failed.
+      const [agent] = await testDb.db
+        .select()
+        .from(agents)
+        .where(eq(agents.id, "eng-1"));
+      expect(agent.budgetSpentUsd).toBe(5);
+
+      const [proj] = await testDb.db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, projectId));
+      expect(proj.budgetSpentUsd).toBe(0);
     });
   });
 });

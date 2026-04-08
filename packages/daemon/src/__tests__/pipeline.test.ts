@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { projects, tasks, agents, pipelineTemplates, pipelines, pipelineSteps } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { makeFailingTxDb } from "./helpers/failing-tx.js";
 import { PipelineService } from "../services/pipeline.service.js";
 import { PipelineTemplateService } from "../services/pipeline-template.service.js";
 
@@ -487,6 +489,92 @@ describe("PipelineService", () => {
       await expect(
         service.rejectStep(pipeline.id, steps[0].id, steps[1].id, "nope"),
       ).rejects.toThrow("Target step must have a lower order");
+    });
+  });
+
+  describe("transactional atomicity (2.1)", () => {
+    it("create rolls back pipeline + step + task rows when a later write fails", async () => {
+      const pipelinesBefore = await testDb.db.select().from(pipelines);
+      const stepsBefore = await testDb.db.select().from(pipelineSteps);
+      const tasksBefore = await testDb.db.select().from(tasks);
+
+      // Fail on the tasks insert inside the create() transaction — i.e. the
+      // write that happens AFTER the pipeline row and the step rows have
+      // already been inserted. Those must roll back.
+      const failingDb = makeFailingTxDb(testDb.db, {
+        failInsertOnTable: tasks,
+        error: new Error("simulated task insert failure"),
+      });
+      const failingService = new PipelineService(failingDb, templateService);
+
+      await expect(
+        failingService.create({
+          projectId,
+          name: "Will rollback",
+          steps: [
+            { label: "research", agentId: "agent-a" },
+            { label: "implement", agentId: "agent-b" },
+          ],
+        }),
+      ).rejects.toThrow("simulated task insert failure");
+
+      const pipelinesAfter = await testDb.db.select().from(pipelines);
+      const stepsAfter = await testDb.db.select().from(pipelineSteps);
+      const tasksAfter = await testDb.db.select().from(tasks);
+      expect(pipelinesAfter).toHaveLength(pipelinesBefore.length);
+      expect(stepsAfter).toHaveLength(stepsBefore.length);
+      expect(tasksAfter).toHaveLength(tasksBefore.length);
+    });
+
+    it("rejectStep rolls back all writes when a later write fails", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId,
+        name: "Reject rollback",
+        steps: [
+          { label: "research", agentId: "agent-a" },
+          { label: "implement", agentId: "agent-b" },
+          { label: "review", agentId: "agent-a" },
+        ],
+      });
+
+      // Advance to review step so rejectStep has a real target.
+      await service.completeStep(pipeline.id, steps[0].id, "r", "/tmp/r.md");
+      const step2Result = await service.completeStep(pipeline.id, steps[1].id, "i", "/tmp/i.md");
+      const reviewStep = step2Result.nextStep!;
+
+      // Snapshot state before reject
+      const before = await testDb.db.select().from(pipelineSteps).where(
+        eq(pipelineSteps.pipelineId, pipeline.id),
+      );
+
+      // Fail on the tasks insert — this is step 5 of rejectStep, so steps
+      // 1-4 (updating the rejecting step, resetting intermediates, updating
+      // the pipeline) will have already happened within the tx. All of them
+      // must roll back.
+      const failingDb = makeFailingTxDb(testDb.db, {
+        failInsertOnTable: tasks,
+        error: new Error("simulated reject task insert failure"),
+      });
+      const failingService = new PipelineService(failingDb, templateService);
+
+      await expect(
+        failingService.rejectStep(
+          pipeline.id,
+          reviewStep.id,
+          steps[0].id,
+          "needs more",
+        ),
+      ).rejects.toThrow("simulated reject task insert failure");
+
+      // review step must NOT be marked failed, and the rejection feedback
+      // summary must not be persisted, because the whole rejectStep rolled back.
+      const after = await testDb.db.select().from(pipelineSteps).where(
+        eq(pipelineSteps.pipelineId, pipeline.id),
+      );
+      const reviewAfter = after.find((s) => s.id === reviewStep.id)!;
+      const reviewBefore = before.find((s) => s.id === reviewStep.id)!;
+      expect(reviewAfter.status).toBe(reviewBefore.status);
+      expect(reviewAfter.outputSummary).toBe(reviewBefore.outputSummary);
     });
   });
 });

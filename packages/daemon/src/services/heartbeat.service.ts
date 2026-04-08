@@ -697,30 +697,39 @@ export class HeartbeatService {
 
       // 9. Update agent budget spent
       if (result.costUsd && result.costUsd > 0) {
-        await this.db
-          .update(agents)
-          .set({
-            budgetSpentUsd: sql`${agents.budgetSpentUsd} + ${result.costUsd}`,
-            lastHeartbeat: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(agents.id, agent.id),
-              eq(agents.projectId, claimedRun.projectId),
-            ),
-          );
+        // Incrementing the agent and project budget counters and evaluating
+        // auto-pause must be atomic. A crash between the agent update and the
+        // project update would under-count project spend; a crash between the
+        // project update and autoPauseIfExhausted could skip the auto-pause
+        // check for a run whose cost we already recorded.
+        await this.db.transaction(async (tx) => {
+          await tx
+            .update(agents)
+            .set({
+              budgetSpentUsd: sql`${agents.budgetSpentUsd} + ${result.costUsd}`,
+              lastHeartbeat: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(agents.id, agent.id),
+                eq(agents.projectId, claimedRun.projectId),
+              ),
+            );
 
-        await this.db
-          .update(projects)
-          .set({
-            budgetSpentUsd: sql`${projects.budgetSpentUsd} + ${result.costUsd}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(projects.id, claimedRun.projectId));
+          await tx
+            .update(projects)
+            .set({
+              budgetSpentUsd: sql`${projects.budgetSpentUsd} + ${result.costUsd}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(projects.id, claimedRun.projectId));
 
-        // Auto-pause if budget exhausted (spec §9.2.4)
-        await autoPauseIfExhausted(this.db, agent.id, claimedRun.projectId, this.broadcastService);
+          // Auto-pause if budget exhausted (spec §9.2.4).
+          // Passes the tx handle so every pause read/write participates in
+          // the same transaction as the counter increments.
+          await autoPauseIfExhausted(tx, agent.id, claimedRun.projectId, this.broadcastService);
+        });
       }
 
       // 10. Broadcast completion

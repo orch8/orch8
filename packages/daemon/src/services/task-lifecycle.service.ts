@@ -39,6 +39,16 @@ export class TaskLifecycleService {
       updatedAt: new Date(),
     };
 
+    // Track a newly-created worktree so we can clean it up if the DB write fails.
+    // Ordering: we create the worktree *before* the DB update. The filesystem is
+    // the side effect that cannot participate in the DB transaction, so it must
+    // be set up first; if the DB write then fails, we best-effort remove the
+    // worktree to keep DB state and filesystem state in sync. A DB transaction
+    // cannot roll back a worktree, so explicit compensation is the only option.
+    let createdWorktree:
+      | { homeDir: string; worktreeDir: string; taskId: string; slug: string }
+      | null = null;
+
     // ── Side effects by target state ──
 
     if (to === "in_progress") {
@@ -62,6 +72,12 @@ export class TaskLifecycleService {
         });
         updateValues.worktreePath = worktreePath;
         updateValues.branch = `task/${task.id}/${slug}`;
+        createdWorktree = {
+          homeDir: project.homeDir,
+          worktreeDir: project.worktreeDir,
+          taskId: task.id,
+          slug,
+        };
       }
     }
 
@@ -94,12 +110,26 @@ export class TaskLifecycleService {
       }
     }
 
-    // Apply the transition
-    const [updated] = await this.db
-      .update(tasks)
-      .set(updateValues)
-      .where(eq(tasks.id, taskId))
-      .returning();
+    // Apply the transition. If the DB write fails after we created a worktree,
+    // best-effort remove the worktree so we don't leave a dangling filesystem
+    // artifact linked to a task row that still points at "no worktree".
+    let updated: Task;
+    try {
+      [updated] = await this.db
+        .update(tasks)
+        .set(updateValues)
+        .where(eq(tasks.id, taskId))
+        .returning();
+    } catch (err) {
+      if (createdWorktree) {
+        try {
+          await this.worktreeService.remove(createdWorktree);
+        } catch {
+          // Compensation is best-effort — surface the original DB error.
+        }
+      }
+      throw err;
+    }
 
     // Broadcast task_transitioned event (spec §14 §2.1)
     this.broadcastService?.taskTransitioned(task.projectId, {

@@ -66,42 +66,55 @@ export class PipelineService {
       throw new Error("Either steps or templateId must be provided");
     }
 
-    const [pipeline] = await this.db.insert(pipelines).values({
-      projectId: input.projectId,
-      name: input.name,
-      templateId: input.templateId,
-      status: "pending",
-      currentStep: 1,
-      createdBy: input.createdBy ?? "user",
-    }).returning();
-
-    const stepRows: PipelineStep[] = [];
-    for (let i = 0; i < stepDefs.length; i++) {
-      const def = stepDefs[i];
-      const [step] = await this.db.insert(pipelineSteps).values({
-        pipelineId: pipeline.id,
-        order: i + 1,
-        label: def.label,
-        agentId: def.agentId,
-        promptOverride: def.promptOverride,
-        requiresVerification: def.requiresVerification ?? false,
-        outputFilePath: `.orch8/pipelines/${pipeline.id}/${def.label}.md`,
+    // Create the pipeline, all step rows, the first task, and the first
+    // step's taskId backlink atomically — a crash mid-sequence would otherwise
+    // leave a pipeline without steps or a step pointing at a nonexistent task.
+    return this.db.transaction(async (tx) => {
+      const [pipeline] = await tx.insert(pipelines).values({
+        projectId: input.projectId,
+        name: input.name,
+        templateId: input.templateId,
         status: "pending",
+        currentStep: 1,
+        createdBy: input.createdBy ?? "user",
       }).returning();
-      stepRows.push(step);
-    }
 
-    const firstStep = stepRows[0];
-    const firstTask = await this.createTaskForStep(input.projectId, pipeline, firstStep);
+      const stepRows: PipelineStep[] = [];
+      for (let i = 0; i < stepDefs.length; i++) {
+        const def = stepDefs[i];
+        const [step] = await tx.insert(pipelineSteps).values({
+          pipelineId: pipeline.id,
+          order: i + 1,
+          label: def.label,
+          agentId: def.agentId,
+          promptOverride: def.promptOverride,
+          requiresVerification: def.requiresVerification ?? false,
+          outputFilePath: `.orch8/pipelines/${pipeline.id}/${def.label}.md`,
+          status: "pending",
+        }).returning();
+        stepRows.push(step);
+      }
 
-    const [updatedFirstStep] = await this.db
-      .update(pipelineSteps)
-      .set({ taskId: firstTask.id, updatedAt: new Date() })
-      .where(eq(pipelineSteps.id, firstStep.id))
-      .returning();
-    stepRows[0] = updatedFirstStep;
+      const firstStep = stepRows[0];
+      const [firstTask] = await tx.insert(tasks).values({
+        projectId: input.projectId,
+        title: `[${pipeline.name}] ${firstStep.label}`,
+        description: firstStep.promptOverride ?? `Pipeline step: ${firstStep.label}`,
+        taskType: "quick",
+        assignee: firstStep.agentId,
+        pipelineId: pipeline.id,
+        pipelineStepId: firstStep.id,
+      }).returning();
 
-    return { pipeline, steps: stepRows, firstTask };
+      const [updatedFirstStep] = await tx
+        .update(pipelineSteps)
+        .set({ taskId: firstTask.id, updatedAt: new Date() })
+        .where(eq(pipelineSteps.id, firstStep.id))
+        .returning();
+      stepRows[0] = updatedFirstStep;
+
+      return { pipeline, steps: stepRows, firstTask };
+    });
   }
 
   async list(filter: PipelineFilter): Promise<Pipeline[]> {
@@ -373,66 +386,71 @@ export class PipelineService {
       throw new Error("Target step must have a lower order than the rejecting step");
     }
 
-    // 1. Mark rejecting step as failed with rejection feedback
-    const [updatedRejectingStep] = await this.db
-      .update(pipelineSteps)
-      .set({
-        status: "failed",
-        outputSummary: `[REJECTED] ${feedback}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(pipelineSteps.id, rejectingStepId))
-      .returning();
+    // The reject flow does 5+ sequential writes across pipeline_steps, pipelines,
+    // and tasks. They must succeed or fail together so we don't end up with e.g.
+    // a rejecting step marked "failed" but no new task created for the target.
+    return this.db.transaction(async (tx) => {
+      // 1. Mark rejecting step as failed with rejection feedback
+      const [updatedRejectingStep] = await tx
+        .update(pipelineSteps)
+        .set({
+          status: "failed",
+          outputSummary: `[REJECTED] ${feedback}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(pipelineSteps.id, rejectingStepId))
+        .returning();
 
-    // 2. Reset intermediate steps (target.order <= order < rejecting.order) to pending
-    for (const step of data.steps) {
-      if (step.order >= targetStep.order && step.order < rejectingStep.order) {
-        await this.db
-          .update(pipelineSteps)
-          .set({ status: "pending", taskId: null, updatedAt: new Date() })
-          .where(eq(pipelineSteps.id, step.id));
+      // 2. Reset intermediate steps (target.order <= order < rejecting.order) to pending
+      for (const step of data.steps) {
+        if (step.order >= targetStep.order && step.order < rejectingStep.order) {
+          await tx
+            .update(pipelineSteps)
+            .set({ status: "pending", taskId: null, updatedAt: new Date() })
+            .where(eq(pipelineSteps.id, step.id));
+        }
       }
-    }
 
-    // 3. Update pipeline status and currentStep
-    const [updatedPipeline] = await this.db
-      .update(pipelines)
-      .set({
-        status: "running",
-        currentStep: targetStep.order,
-        updatedAt: new Date(),
-      })
-      .where(eq(pipelines.id, pipelineId))
-      .returning();
+      // 3. Update pipeline status and currentStep
+      const [updatedPipeline] = await tx
+        .update(pipelines)
+        .set({
+          status: "running",
+          currentStep: targetStep.order,
+          updatedAt: new Date(),
+        })
+        .where(eq(pipelines.id, pipelineId))
+        .returning();
 
-    // 4. Build task description with rejection feedback
-    const originalPrompt = targetStep.promptOverride ?? `Pipeline step: ${targetStep.label}`;
-    const taskDescription = `${originalPrompt}\n\n---\n\n**Rejection feedback from ${rejectingStep.label} step:**\n${feedback}`;
+      // 4. Build task description with rejection feedback
+      const originalPrompt = targetStep.promptOverride ?? `Pipeline step: ${targetStep.label}`;
+      const taskDescription = `${originalPrompt}\n\n---\n\n**Rejection feedback from ${rejectingStep.label} step:**\n${feedback}`;
 
-    // 5. Create new task for target step
-    const [newTask] = await this.db.insert(tasks).values({
-      projectId: updatedPipeline.projectId,
-      title: `[${updatedPipeline.name}] ${targetStep.label}`,
-      description: taskDescription,
-      taskType: "quick",
-      assignee: targetStep.agentId,
-      pipelineId: updatedPipeline.id,
-      pipelineStepId: targetStep.id,
-    }).returning();
+      // 5. Create new task for target step
+      const [newTask] = await tx.insert(tasks).values({
+        projectId: updatedPipeline.projectId,
+        title: `[${updatedPipeline.name}] ${targetStep.label}`,
+        description: taskDescription,
+        taskType: "quick",
+        assignee: targetStep.agentId,
+        pipelineId: updatedPipeline.id,
+        pipelineStepId: targetStep.id,
+      }).returning();
 
-    // 6. Link task to target step
-    const [updatedTargetStep] = await this.db
-      .update(pipelineSteps)
-      .set({ taskId: newTask.id, status: "pending", updatedAt: new Date() })
-      .where(eq(pipelineSteps.id, targetStepId))
-      .returning();
+      // 6. Link task to target step
+      const [updatedTargetStep] = await tx
+        .update(pipelineSteps)
+        .set({ taskId: newTask.id, status: "pending", updatedAt: new Date() })
+        .where(eq(pipelineSteps.id, targetStepId))
+        .returning();
 
-    return {
-      pipeline: updatedPipeline,
-      rejectedStep: updatedRejectingStep,
-      targetStep: updatedTargetStep,
-      newTask,
-    };
+      return {
+        pipeline: updatedPipeline,
+        rejectedStep: updatedRejectingStep,
+        targetStep: updatedTargetStep,
+        newTask,
+      };
+    });
   }
 
   async updateStep(pipelineId: string, stepId: string, input: UpdatePipelineStep): Promise<PipelineStep> {
