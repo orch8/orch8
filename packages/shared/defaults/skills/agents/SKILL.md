@@ -47,31 +47,192 @@ See the `orch8` skill for the full request body shapes.
 | `result_resume_agent` | none | `agentId`, `name` |
 | `result_delete_agent` | none | `agentId`, `name` |
 
+## Interactive brainstorm mode (for create only)
+
+Creating an agent is the highest-stakes operation in this skill: you
+are provisioning a new worker with its own budget, permissions, wake
+schedule, and system prompt. Before emitting a `confirm_create_agent`
+card, walk the user through a short structured brainstorm — one
+clarifying question at a time — even when the initial request looks
+concrete. One round of clarification is cheap insurance against
+regret.
+
+This mode is for CREATE only. For update / pause / resume / delete,
+go straight to the appropriate confirm card as documented elsewhere
+in this skill. Those operations are reversible (pause, update) or
+low-stakes (a deleted agent can be re-added from a bundled template),
+so the brainstorm overhead is not justified.
+
+### Step 0 — Fetch live context
+
+Before asking any brainstorm questions, silently fetch two pieces of
+project context in parallel via Bash and curl:
+
+1. `GET /api/bundled-agents` — returns the bundled template
+   archetypes (`cto`, `implementer`, `planner`, `qa`, `researcher`,
+   `reviewer`) with pre-wired model, skills, heartbeat, and effort
+   presets. These are the starting points for any new agent: do NOT
+   propose role config from scratch when a template matches.
+2. `GET /api/agents?projectId=${ORCH_PROJECT_ID}` — returns the agents
+   that already exist in this project, so the brainstorm can avoid
+   duplication, populate `canAssignTo` with real IDs, and describe
+   how the new agent complements the existing fleet.
+
+```bash
+curl -s "${ORCH_API_URL}/api/bundled-agents" \
+  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
+  -H "X-Project-Id: ${ORCH_PROJECT_ID}" &
+curl -s "${ORCH_API_URL}/api/agents?projectId=${ORCH_PROJECT_ID}" \
+  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
+  -H "X-Project-Id: ${ORCH_PROJECT_ID}" &
+wait
+```
+
+These fetches are internal reconnaissance. Do NOT emit an `info_*`
+card for them — they exist only to inform the brainstorm.
+
+### Step 1 — Restate and clarify
+
+Restate the user's apparent goal in one sentence, then ask ONE
+clarifying question at a time (multiple choice preferred), covering
+these four dimensions in roughly this order:
+
+1. **Purpose** — what problem does this agent solve? What is the
+   one-sentence job description?
+2. **Autonomy** — execute-only (only runs when assigned), or allowed
+   to create tasks and assign to other agents?
+3. **Wake trigger** — on assignment only, on a heartbeat timer, or
+   on automation events? If heartbeat, how often?
+4. **Model/budget tradeoff** — opus (deep, expensive), sonnet
+   (balanced, default), or haiku (fast, cheap)?
+
+**One question per message.** Three questions in a single message is
+a failure mode. If the user's initial request already pins one of
+these dimensions, skip it and move to the next. If all four are
+already pinned, still ask one confirming question — pick the
+dimension most at risk of regret (usually autonomy or budget) and
+verify the user's choice before proposing a config. The minimum for
+a create flow is always at least one clarifying round.
+
+### Step 2 — Consider existing agents
+
+Using the `GET /api/agents` result from Step 0:
+
+- Flag any existing agent that overlaps with the proposed new one —
+  matching on `role` enum (e.g., a `qa` agent already exists in the
+  project) or on obvious purpose overlap visible in the existing
+  agent's `name` / `systemPrompt` — and ask whether the user wants to
+  extend that agent instead of creating a new one.
+- Propose `canAssignTo` values only from IDs that actually exist.
+- Note in one line how the new agent complements the fleet.
+
+### Step 3 — Propose 2-3 approaches
+
+Once there is enough information to sketch options, lay out 2-3
+configurations side by side in prose. Each option should start from
+a bundled template where possible (e.g., "Option A: start from the
+`qa` template, bump heartbeat to 2h, switch to sonnet"). List
+trade-offs. Lead with the recommended option and explain why.
+
+Still no card at this point. Brainstorming is for thought.
+
+### Step 4 — Converge and emit the confirm card
+
+When the user picks an option (or defers to the recommendation), stop
+brainstorming and emit a single `confirm_create_agent` card with the
+full config. If the chosen option started from a bundled template,
+inherit every field from the template and override only what the
+conversation specifically changed — never re-propose fields the
+template already pins.
+
 ## Required and optional fields
 
-When creating an agent the user must give you, or you must propose
-sensible defaults for:
+The full `CreateAgentSchema` accepts these fields, grouped by concern.
+For each one, propose a sensible default rather than pestering the
+user about every field — and prefer inheriting from a bundled
+template (fetched in Step 0 of the brainstorm) over proposing role
+config from scratch.
 
+**Identity**
 - `id` — short slug, lowercase, e.g. `qa-bot`. Required.
+- `projectId` — auto-filled from `ORCH_PROJECT_ID`. Do not ask.
 - `name` — display name, e.g. `"QA Bot"`. Required.
 - `role` — one of `cto`, `engineer`, `qa`, `researcher`, `planner`,
   `implementer`, `reviewer`, `verifier`, `referee`, `custom`. Default
   to `custom` if unsure.
-- `model` — `claude-opus-4-6` (default), `claude-sonnet-4-6`, or
-  `claude-haiku-4-5-20251001`. Sonnet is the right pick for most agents.
-- `maxTurns` — usually 25.
-- `heartbeatEnabled` + `heartbeatIntervalSec` — only if the user wants
-  the agent to wake up on a timer. The interval is in seconds.
-- `desiredSkills` — list of skill slugs to load. Default to none unless
-  the user names specific skills.
+- `icon` — optional emoji or icon identifier shown in the dashboard.
+- `color` — optional hex color string for the dashboard chip.
+
+**LLM config**
+- `model` — `claude-opus-4-6`, `claude-sonnet-4-6` (right pick for
+  most agents), or `claude-haiku-4-5-20251001`.
+- `effort` — reasoning effort hint for models that support it
+  (`low`, `medium`, `high`). Bundled templates use `high`.
+- `maxTurns` — per-run turn budget. Usually 25.
+- `systemPrompt` — the agent's persona and operating instructions.
+  Propose one if the user does not supply one.
+- `promptTemplate` — per-turn prompt scaffold with `{{variable}}`
+  placeholders. Optional.
+- `bootstrapPromptTemplate` — one-time first-run prompt. Optional.
+- `instructionsFilePath` — path to an external instructions file
+  loaded on every turn. Optional.
+
+**Tools & skills**
 - `allowedTools` — usually `["Bash","Read","Edit","Write","Grep","Glob"]`.
   Restrict only if the user explicitly wants a locked-down agent.
-- `systemPrompt` — propose one if the user doesn't supply one.
+- `mcpTools` — list of MCP tool IDs. Default to empty unless the user
+  names specific MCP servers.
+- `skillPaths` — raw filesystem skill paths. Rare and DB-only; prefer
+  `desiredSkills`.
+- `desiredSkills` — list of skill slugs to load on every turn. Default
+  to none unless the user names specific skills, or inherit from the
+  chosen bundled template.
 
-If the user gives you a vague request ("create a QA agent that runs
-every 6 hours"), propose a reasonable config and emit the confirm card.
-Do not pepper them with questions about every field — they can edit
-the proposal in the dashboard.
+**Wake triggers**
+- `wakeOnAssignment` — wake when a task is assigned. Usually `true`.
+- `wakeOnOnDemand` — allow manual `/wake` triggers. Usually `true`.
+- `wakeOnAutomation` — wake on automation events (phase transitions,
+  dependency unblocks). Usually `true`.
+- `heartbeatEnabled` + `heartbeatIntervalSec` — only set if the user
+  wants the agent to wake on a timer. The interval is in seconds.
+
+**Concurrency**
+- `maxConcurrentRuns` — how many runs of this agent can overlap.
+  Default 1.
+- `maxConcurrentTasks` — how many tasks this agent can own at once.
+  Default 1.
+- `maxConcurrentSubagents` — how many subagents this agent can spawn
+  in parallel. Default 0.
+
+**Permissions**
+- `canCreateTasks` — whether this agent can create new tasks. Default
+  `false` for execute-only agents.
+- `canAssignTo` — list of agent IDs this agent may assign tasks to.
+  Populate only from IDs that actually exist in the project (from
+  the Step 0 fetch).
+- `canMoveTo` — list of allowed task columns, drawn from: `backlog`,
+  `blocked`, `in_progress`, `review`, `verification`, `done`.
+
+**Budget**
+- `budgetLimitUsd` — hard spending cap for this agent in USD. Optional.
+- `autoPauseThreshold` — percent (0-100) of budget at which the agent
+  auto-pauses. Optional.
+- `workingHours` — cron-style string restricting when the agent can
+  run. Optional.
+
+**Adapter**
+- `adapterType` — which runtime adapter to use. Default `claude-local`.
+- `adapterConfig` — adapter-specific configuration object.
+- `envVars` — extra environment variables to inject into the agent's
+  spawn environment.
+
+For CREATE requests, always walk the user through the interactive
+brainstorm mode above — even when the request looks concrete.
+Creating an agent provisions a new worker with its own budget and
+permissions; one round of clarification is cheap insurance against
+regret. For UPDATE / pause / resume / delete requests, go straight
+to the appropriate confirm card — those operations do not need
+brainstorming.
 
 ## Diff display for updates
 
