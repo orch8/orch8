@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { useChats, useCreateChat } from "../../../../hooks/useChats.js";
+import { EmptyState } from "../../../../components/ui/EmptyState.js";
 
 function ChatIndexPage() {
   const { projectId } = Route.useParams();
@@ -51,8 +52,11 @@ function ChatIndexPage() {
   }, [isLoading, chats, projectId]);
 
   return (
-    <div className="flex h-full items-center justify-center">
-      <p className="text-sm text-zinc-600">Opening chat…</p>
+    <div className="flex h-full items-center justify-center px-6">
+      <EmptyState
+        title="Opening chat"
+        body="Starting a fresh conversation for this project."
+      />
     </div>
   );
 }
