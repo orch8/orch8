@@ -26,15 +26,16 @@ describe("TaskCard", () => {
     );
 
     expect(screen.getByText("Implement login")).toBeInTheDocument();
-    expect(screen.getByText("Quick")).toBeInTheDocument();
+    expect(screen.getByText("QUICK")).toBeInTheDocument();
   });
 
-  it("renders priority indicator", () => {
+  it("renders priority indicator as P0/P1/P2", () => {
     renderWithProviders(
       <TaskCard task={mockTask as Task} onClick={() => {}} />,
     );
 
-    expect(screen.getByText("High")).toBeInTheDocument();
+    // high → P0, medium → P1, low → P2 (display-only mapping; data model unchanged)
+    expect(screen.getByText("P0")).toBeInTheDocument();
   });
 
   it("renders assignee when present", () => {

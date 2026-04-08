@@ -1,26 +1,30 @@
 import type { Task } from "../../types.js";
 
-const TYPE_COLORS: Record<string, string> = {
-  quick: "bg-blue-900/50 text-blue-300",
-  brainstorm: "bg-amber-900/50 text-amber-300",
+const PRIORITY_TAG_COLOR: Record<string, string> = {
+  high: "text-red border-red",
+  medium: "text-amber border-amber",
+  low: "text-whisper border-edge",
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  quick: "Quick",
-  brainstorm: "Brainstorm",
+// Spec maps the data-model priority values to displayed P0/P1/P2 labels.
+const PRIORITY_LABEL: Record<string, string> = {
+  high: "P0",
+  medium: "P1",
+  low: "P2",
 };
 
-const PRIORITY_COLORS: Record<string, string> = {
-  high: "text-red-400",
-  medium: "text-yellow-400",
-  low: "text-zinc-500",
+const TYPE_LABEL: Record<string, string> = {
+  quick: "QUICK",
+  brainstorm: "BRAINSTORM",
 };
 
-const PRIORITY_LABELS: Record<string, string> = {
-  high: "High",
-  medium: "Medium",
-  low: "Low",
-};
+// Left-edge state stripe. Only `blocked` column lights up today —
+// sage (verifying) and red (failed) stripes are reserved for future
+// status fields on Task but aren't represented in the current data model.
+function stripeFor(task: Task): string | null {
+  if (task.column === "blocked") return "bg-amber";
+  return null;
+}
 
 interface TaskCardProps {
   task: Task;
@@ -28,33 +32,55 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, onClick }: TaskCardProps) {
+  const stripe = stripeFor(task);
   return (
     <button
       onClick={onClick}
-      className="w-full cursor-pointer rounded-lg border border-zinc-800 bg-zinc-900 p-3 text-left transition-colors hover:border-zinc-700 hover:bg-zinc-800/80"
+      className="focus-ring relative w-full cursor-pointer overflow-hidden rounded-md border border-edge-soft bg-surface px-3 py-3 text-left transition-colors hover:border-edge hover:bg-surface-2"
     >
-      <p className="mb-2 text-sm font-medium text-zinc-100">{task.title}</p>
-
-      <div className="flex flex-wrap items-center gap-1.5">
+      {stripe && (
         <span
-          className={`rounded px-1.5 py-0.5 text-xs font-medium ${TYPE_COLORS[task.taskType] ?? ""}`}
-        >
-          {TYPE_LABELS[task.taskType] ?? task.taskType}
-        </span>
+          aria-hidden
+          className={`absolute left-0 top-0 h-full w-[3px] ${stripe}`}
+        />
+      )}
 
+      {/* Top row: task ID + priority tag */}
+      <div className="mb-2 flex items-center justify-between">
+        <span className="type-mono text-whisper">{task.id}</span>
         {task.priority && (
           <span
-            className={`text-xs font-medium ${PRIORITY_COLORS[task.priority] ?? ""}`}
+            className={`rounded-xs border px-1.5 py-0.5 type-label ${
+              PRIORITY_TAG_COLOR[task.priority] ?? "text-whisper border-edge"
+            }`}
           >
-            {PRIORITY_LABELS[task.priority] ?? task.priority}
+            {PRIORITY_LABEL[task.priority] ?? task.priority}
           </span>
         )}
-
       </div>
 
-      {task.assignee && (
-        <p className="mt-2 text-xs text-zinc-500">{task.assignee}</p>
-      )}
+      {/* Middle: serif title */}
+      <p className="type-section text-ink" style={{ lineHeight: 1.25 }}>
+        {task.title}
+      </p>
+
+      {/* Foot row: assignee + type tag */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {task.assignee && (
+          <span className="inline-flex items-center gap-1.5 type-label text-mute">
+            <span
+              aria-hidden
+              className="inline-block h-1.5 w-1.5 rounded-full bg-accent"
+            />
+            {task.assignee}
+          </span>
+        )}
+        {task.taskType && (
+          <span className="rounded-xs border border-edge-soft px-1.5 py-0.5 type-label text-whisper">
+            {TYPE_LABEL[task.taskType] ?? task.taskType.toUpperCase()}
+          </span>
+        )}
+      </div>
     </button>
   );
 }
