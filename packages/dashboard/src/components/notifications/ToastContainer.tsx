@@ -1,15 +1,15 @@
 import { useEffect } from "react";
 import { useToastStore, type Toast } from "../../stores/toast.js";
 
-const TYPE_COLORS: Record<string, string> = {
-  verification_failed: "border-l-red-500",
-  verification_passed: "border-l-emerald-500",
-  agent_failure: "border-l-red-500",
-  budget_exceeded: "border-l-red-500",
-  budget_warning: "border-l-yellow-500",
-  task_completed: "border-l-emerald-500",
-  stuck_task: "border-l-yellow-500",
-  brainstorm_ready: "border-l-blue-500",
+const TYPE_STRIPE: Record<string, string> = {
+  verification_failed: "bg-red",
+  verification_passed: "bg-accent",
+  agent_failure: "bg-red",
+  budget_exceeded: "bg-red",
+  budget_warning: "bg-amber",
+  task_completed: "bg-accent",
+  stuck_task: "bg-amber",
+  brainstorm_ready: "bg-blue",
 };
 
 const AUTO_DISMISS_MS = 5000;
@@ -26,17 +26,21 @@ function ToastItem({ toast }: { toast: Toast }) {
     <div
       data-testid="toast-item"
       data-toast
-      className={`rounded-lg border border-zinc-800 border-l-4 bg-zinc-900 p-3 shadow-lg ${TYPE_COLORS[toast.type] ?? "border-l-zinc-500"}`}
+      className="relative overflow-hidden rounded-md border border-edge-soft bg-surface px-4 py-3 shadow-lg"
     >
+      <span
+        aria-hidden
+        className={`absolute left-0 top-0 h-full w-[3px] ${TYPE_STRIPE[toast.type] ?? "bg-whisper"}`}
+      />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-zinc-100">{toast.title}</p>
-          <p className="truncate text-xs text-zinc-400">{toast.message}</p>
+          <p className="type-label text-mute">{toast.title}</p>
+          <p className="mt-1 truncate type-body text-ink">{toast.message}</p>
         </div>
         <button
           onClick={() => remove(toast.id)}
           aria-label="Dismiss"
-          className="shrink-0 text-zinc-600 hover:text-zinc-400"
+          className="focus-ring shrink-0 type-mono text-whisper hover:text-mute"
         >
           ×
         </button>
