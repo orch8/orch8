@@ -123,7 +123,7 @@ export class AgentService {
         .where(eq(projects.id, input.projectId));
 
       if (project) {
-        const memoryBase = path.join(project.homeDir, ".orch", "memory");
+        const memoryBase = path.join(project.homeDir, ".orch8", "memory");
         if (!values.workLogDir) {
           values.workLogDir = path.join(memoryBase, "logs", input.id);
         }

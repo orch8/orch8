@@ -252,7 +252,7 @@ export class SchedulerService {
       .where(eq(projects.active, true));
 
     for (const project of activeProjects) {
-      const summaryDir = `${project.homeDir}/.orch/memory/summaries`;
+      const summaryDir = `${project.homeDir}/.orch8/memory/summaries`;
       await this.summaryService.regenerateAllSummaries(project.id, summaryDir);
     }
   }

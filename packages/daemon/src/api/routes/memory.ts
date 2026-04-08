@@ -140,7 +140,7 @@ export async function memoryRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: "not_found", message: "Project not found" });
     }
 
-    const summaryDir = `${project.homeDir}/.orch/memory/summaries`;
+    const summaryDir = `${project.homeDir}/.orch8/memory/summaries`;
     const result = await app.summaryService.generateEntitySummary(entity.id, summaryDir);
     return reply.code(200).send(result);
   });
