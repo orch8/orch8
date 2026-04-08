@@ -17,13 +17,6 @@ function AgentsListPage() {
         <h2 className="text-lg font-semibold">Agents</h2>
         <div className="flex gap-2">
           <Link
-            to="/projects/$projectId/agents/create-ai"
-            params={{ projectId }}
-            className="rounded-md bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
-          >
-            Create with AI
-          </Link>
-          <Link
             to="/projects/$projectId/agents/new"
             params={{ projectId }}
             className="rounded-md bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600"
