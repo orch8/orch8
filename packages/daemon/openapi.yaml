@@ -34,8 +34,6 @@ tags:
     description: Agent management and control
   - name: Runs
     description: Heartbeat execution runs
-  - name: Verification
-    description: Task verification pipeline
   - name: Memory
     description: Knowledge graph, work logs, and lessons
   - name: Cost
@@ -46,6 +44,18 @@ tags:
     description: Daemon lifecycle and configuration
   - name: Notifications
     description: In-app notification system
+  - name: Chats
+    description: Project-scoped conversational chats with agents
+  - name: Pipelines
+    description: Multi-step orchestration pipelines
+  - name: Pipeline Templates
+    description: Reusable pipeline step definitions
+  - name: Project Skills
+    description: Per-project skill registry and sync
+  - name: Instruction Bundles
+    description: Per-agent instruction file bundles
+  - name: Bundled Agents
+    description: Built-in agent templates that can be added to a project
 
 components:
   securitySchemes:
@@ -133,8 +143,6 @@ components:
         defaultMaxTurns:
           type: integer
           nullable: true
-        verificationRequired:
-          type: boolean
         budgetLimitUsd:
           type: number
           nullable: true
@@ -182,9 +190,6 @@ components:
         defaultMaxTurns:
           type: integer
           minimum: 1
-        verificationRequired:
-          type: boolean
-          default: true
         budgetLimitUsd:
           type: number
           minimum: 0
@@ -211,8 +216,6 @@ components:
           type: integer
           minimum: 1
           nullable: true
-        verificationRequired:
-          type: boolean
         budgetLimitUsd:
           type: number
           minimum: 0
@@ -346,6 +349,20 @@ components:
         assignee:
           type: string
           nullable: true
+        autoCommit:
+          type: boolean
+        autoPr:
+          type: boolean
+        branch:
+          type: string
+          nullable: true
+        worktreePath:
+          type: string
+          nullable: true
+        mcpTools:
+          type: array
+          items:
+            type: string
 
     # --- Agent ---
     Agent:
@@ -506,6 +523,18 @@ components:
         budgetLimitUsd:
           type: number
           minimum: 0
+        autoPauseThreshold:
+          type: integer
+          minimum: 0
+          maximum: 100
+        maxConcurrentTasks:
+          type: integer
+          minimum: 1
+        maxConcurrentSubagents:
+          type: integer
+          minimum: 0
+        workingHours:
+          type: string
 
     UpdateAgent:
       type: object
@@ -587,6 +616,20 @@ components:
         budgetLimitUsd:
           type: number
           minimum: 0
+          nullable: true
+        autoPauseThreshold:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+        maxConcurrentTasks:
+          type: integer
+          minimum: 1
+        maxConcurrentSubagents:
+          type: integer
+          minimum: 0
+        workingHours:
+          type: string
           nullable: true
 
     CloneAgent:
@@ -861,6 +904,519 @@ components:
           maxLength: 5000
         level:
           $ref: "#/components/schemas/LogLevel"
+
+    # --- Chat ---
+    Chat:
+      type: object
+      properties:
+        id:
+          type: string
+          example: chat_abc123
+        projectId:
+          type: string
+        agentId:
+          type: string
+        title:
+          type: string
+        pinned:
+          type: boolean
+        archived:
+          type: boolean
+        lastMessageAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateChat:
+      type: object
+      properties:
+        agentId:
+          type: string
+          minLength: 1
+          description: Defaults to the project's chat agent if omitted.
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+    UpdateChat:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        pinned:
+          type: boolean
+        archived:
+          type: boolean
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          example: msg_abc123
+        chatId:
+          type: string
+        role:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtractedCard"
+        skillInvoked:
+          type: string
+          nullable: true
+        runId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [streaming, complete, error]
+        createdAt:
+          type: string
+          format: date-time
+
+    ExtractedCard:
+      type: object
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+        summary:
+          type: string
+        payload: {}
+        status:
+          type: string
+          enum: [pending, approved, cancelled, executed, error]
+        decidedAt:
+          type: string
+          nullable: true
+        decidedBy:
+          type: string
+          nullable: true
+        resultRunId:
+          type: string
+          nullable: true
+
+    # --- Pipeline ---
+    Pipeline:
+      type: object
+      properties:
+        id:
+          type: string
+          example: pipe_abc123
+        projectId:
+          type: string
+        templateId:
+          type: string
+          nullable: true
+        name:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed, cancelled]
+        currentStep:
+          type: integer
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PipelineStep:
+      type: object
+      properties:
+        id:
+          type: string
+          example: pstep_abc123
+        pipelineId:
+          type: string
+        order:
+          type: integer
+        label:
+          type: string
+        taskId:
+          type: string
+          nullable: true
+        agentId:
+          type: string
+          nullable: true
+        promptOverride:
+          type: string
+          nullable: true
+        requiresVerification:
+          type: boolean
+        outputFilePath:
+          type: string
+          nullable: true
+        outputSummary:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, running, completed, skipped, failed, awaiting_verification]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PipelineWithSteps:
+      allOf:
+        - $ref: "#/components/schemas/Pipeline"
+        - type: object
+          properties:
+            steps:
+              type: array
+              items:
+                $ref: "#/components/schemas/PipelineStep"
+
+    CreatePipeline:
+      type: object
+      required: [projectId, name]
+      description: Provide either `templateId` or inline `steps`.
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 500
+        templateId:
+          type: string
+        steps:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [label]
+            properties:
+              label:
+                type: string
+                minLength: 1
+                maxLength: 100
+              agentId:
+                type: string
+              promptOverride:
+                type: string
+              requiresVerification:
+                type: boolean
+        createdBy:
+          type: string
+          default: user
+
+    UpdatePipelineStep:
+      type: object
+      properties:
+        agentId:
+          type: string
+          nullable: true
+        promptOverride:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [skipped]
+        requiresVerification:
+          type: boolean
+
+    RejectPipelineStep:
+      type: object
+      required: [targetStepId, feedback]
+      properties:
+        targetStepId:
+          type: string
+          minLength: 1
+        feedback:
+          type: string
+          minLength: 1
+          maxLength: 5000
+
+    # --- Pipeline Template ---
+    PipelineTemplateStep:
+      type: object
+      required: [order, label]
+      properties:
+        order:
+          type: integer
+          minimum: 1
+        label:
+          type: string
+          minLength: 1
+          maxLength: 100
+        defaultAgentId:
+          type: string
+        promptTemplate:
+          type: string
+        requiresVerification:
+          type: boolean
+
+    PipelineTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          example: ptpl_abc123
+        projectId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        isDefault:
+          type: boolean
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/PipelineTemplateStep"
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreatePipelineTemplate:
+      type: object
+      required: [projectId, name, steps]
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+          default: ""
+        isDefault:
+          type: boolean
+          default: false
+        steps:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/PipelineTemplateStep"
+
+    UpdatePipelineTemplate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        isDefault:
+          type: boolean
+        steps:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/PipelineTemplateStep"
+
+    # --- Project Skill ---
+    ProjectSkill:
+      type: object
+      properties:
+        id:
+          type: string
+          example: skill_abc123
+        projectId:
+          type: string
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        markdown:
+          type: string
+        sourceType:
+          type: string
+          description: e.g. "local_path", "global"
+        sourceLocator:
+          type: string
+          nullable: true
+        trustLevel:
+          type: string
+          example: markdown_only
+        fileInventory:
+          type: array
+          items:
+            type: object
+        metadata:
+          type: object
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateProjectSkill:
+      type: object
+      required: [slug, sourceLocator]
+      properties:
+        slug:
+          type: string
+          minLength: 1
+        sourceLocator:
+          type: string
+          minLength: 1
+
+    # --- Instruction Bundle ---
+    InstructionBundle:
+      type: object
+      properties:
+        id:
+          type: string
+          example: ibun_abc123
+        agentId:
+          type: string
+        projectId:
+          type: string
+        mode:
+          type: string
+          enum: [managed, external]
+        rootPath:
+          type: string
+        entryFile:
+          type: string
+          example: AGENTS.md
+        fileInventory:
+          type: array
+          items:
+            type: object
+        metadata:
+          type: object
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UpdateInstructionBundle:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [managed, external]
+        rootPath:
+          type: string
+          description: Must resolve under ~/.orch8/projects/
+        entryFile:
+          type: string
+          description: Relative path; must not contain '..' or start with '/'
+
+    InstructionBundleFile:
+      type: object
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+
+    # --- Bundled Agent ---
+    BundledAgent:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        model:
+          type: string
+        effort:
+          type: string
+        maxTurns:
+          type: integer
+        skills:
+          type: array
+          items:
+            type: string
+        heartbeatEnabled:
+          type: boolean
+        heartbeatIntervalSec:
+          type: integer
+        systemPrompt:
+          type: string
+        promptTemplate:
+          type: string
+        bootstrapPromptTemplate:
+          type: string
+
+    AddBundledAgents:
+      type: object
+      required: [projectId, agentIds]
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+        agentIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+
+    # --- Run Events ---
+    RunEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          example: evt_abc123
+        runId:
+          type: string
+        projectId:
+          type: string
+        seq:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        eventType:
+          type: string
+        toolName:
+          type: string
+          nullable: true
+        summary:
+          type: string
+        payload:
+          type: object
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
 
     # --- Enums ---
     TaskType:
@@ -1542,6 +2098,90 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/tasks/{id}/checkout:
+    post:
+      tags: [Tasks]
+      summary: Atomic task claim
+      description: |
+        Agent-driven atomic checkout. Claims the task for the calling agent's
+        current run. Agent authentication is required.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Task claimed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          description: Cannot checkout in current state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Agent authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Checkout conflict (already held by another run)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/{id}/release:
+    post:
+      tags: [Tasks]
+      summary: Release execution lock
+      description: |
+        Releases the task's execution lock without completing it. Only the
+        agent currently holding the lock may release.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Released
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "401":
+          description: Agent authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Caller does not hold this task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   # ============================================================
   # Comments
   # ============================================================
@@ -2040,17 +2680,98 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/runs/{id}/log:
-    get:
+  /api/runs/{id}/retry:
+    post:
       tags: [Runs]
-      summary: Get run log
-      description: Requires projectId.
+      summary: Retry a failed or cancelled run
+      description: |
+        Re-dispatches a failed or cancelled run for the same agent and task
+        using the heartbeat wakeup machinery (so budget checks, pause state,
+        and queue coalescing all apply). Requires projectId.
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: string
+      responses:
+        "202":
+          description: Retry wakeup enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  wakeupId:
+                    type: string
+                  newRunId:
+                    type: string
+                    nullable: true
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Run or agent not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Run not in a retryable state or agent is paused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/runs/{id}/events:
+    get:
+      tags: [Runs]
+      summary: Get structured events for a run
+      description: Returns events ordered by sequence number. Requires projectId.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RunEvent"
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/runs/{id}/log:
+    get:
+      tags: [Runs]
+      summary: Get run log
+      description: Requires projectId. Returns the full log content unless `tail` is provided.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tail
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: If provided, returns only the last N non-empty lines.
       responses:
         "200":
           description: Log content
@@ -2059,12 +2780,16 @@ paths:
               schema:
                 type: object
                 properties:
-                  log:
+                  content:
                     type: string
-                    description: Log reference path
+                    description: Log file content (optionally tailed)
                   store:
                     type: string
-                    description: Log storage backend
+                    nullable: true
+                    description: Log storage backend identifier
+                  bytes:
+                    type: integer
+                    description: Total byte length of the full log file
         "400":
           description: Missing projectId
           content:
@@ -2073,221 +2798,6 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Not found or no log available
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  # ============================================================
-  # Verification
-  # ============================================================
-  /api/tasks/{id}/verify:
-    post:
-      tags: [Verification]
-      summary: Submit verifier verdict
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [result, report]
-              properties:
-                result:
-                  type: string
-                  enum: [pass, fail, partial]
-                report:
-                  type: string
-                  minLength: 1
-      responses:
-        "200":
-          description: Verdict submitted
-          content:
-            application/json:
-              schema:
-                type: object
-        "400":
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ValidationError"
-        "404":
-          description: Task not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /api/tasks/{id}/implementer-response:
-    post:
-      tags: [Verification]
-      summary: Implementer responds to verdict
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [agrees]
-              properties:
-                agrees:
-                  type: boolean
-                response:
-                  type: string
-      responses:
-        "200":
-          description: Response submitted
-          content:
-            application/json:
-              schema:
-                type: object
-        "400":
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ValidationError"
-        "404":
-          description: Task not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /api/tasks/{id}/referee-verdict:
-    post:
-      tags: [Verification]
-      summary: Referee final verdict
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [result, report]
-              properties:
-                result:
-                  type: string
-                  enum: [pass, fail, partial]
-                report:
-                  type: string
-                  minLength: 1
-      responses:
-        "200":
-          description: Verdict submitted
-          content:
-            application/json:
-              schema:
-                type: object
-        "400":
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ValidationError"
-        "404":
-          description: Task not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /api/tasks/{id}/spawn-verifier:
-    post:
-      tags: [Verification]
-      summary: Trigger verification run
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [verifierAgentId]
-              properties:
-                verifierAgentId:
-                  type: string
-                  minLength: 1
-      responses:
-        "200":
-          description: Verifier spawned
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/OkResponse"
-        "400":
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ValidationError"
-        "404":
-          description: Task not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /api/tasks/{id}/spawn-referee:
-    post:
-      tags: [Verification]
-      summary: Trigger referee
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [refereeAgentId]
-              properties:
-                refereeAgentId:
-                  type: string
-                  minLength: 1
-      responses:
-        "200":
-          description: Referee spawned
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/OkResponse"
-        "400":
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ValidationError"
-        "404":
-          description: Task not found
           content:
             application/json:
               schema:
@@ -3160,6 +3670,1054 @@ paths:
                 $ref: "#/components/schemas/OkResponse"
         "400":
           description: Validation error or missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Chats
+  # ============================================================
+  /api/projects/{projectId}/chats:
+    get:
+      tags: [Chats]
+      summary: List chats for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: includeArchived
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Chat list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Chat"
+    post:
+      tags: [Chats]
+      summary: Create chat
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChat"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+        "400":
+          description: Validation or creation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/chats/{chatId}:
+    get:
+      tags: [Chats]
+      summary: Get chat
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Chat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags: [Chats]
+      summary: Update chat
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateChat"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      tags: [Chats]
+      summary: Soft-delete chat
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /api/chats/{chatId}/messages:
+    get:
+      tags: [Chats]
+      summary: List messages in a chat
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: before
+          in: query
+          schema:
+            type: string
+          description: Return messages strictly before this message ID
+      responses:
+        "200":
+          description: Message list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+    post:
+      tags: [Chats]
+      summary: Send a user message
+      description: Returns 202 with the persisted user message; the assistant run is spawned asynchronously.
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 100000
+      responses:
+        "202":
+          description: User message accepted; assistant run spawning
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Chat not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Chat is archived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/chats/{chatId}/cards/{cardId}/decision:
+    post:
+      tags: [Chats]
+      summary: Decide an extracted chat card
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [approved, cancelled]
+                actor:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  default: user
+      responses:
+        "200":
+          description: Updated message with new card state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Chat or card not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Pipelines
+  # ============================================================
+  /api/pipelines:
+    post:
+      tags: [Pipelines]
+      summary: Create pipeline
+      description: |
+        Creates a pipeline from a template (`templateId`) or inline step
+        definitions (`steps`). The first step's agent is woken automatically
+        if assigned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePipeline"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PipelineWithSteps"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      tags: [Pipelines]
+      summary: List pipelines
+      parameters:
+        - name: projectId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, completed, failed, cancelled]
+      responses:
+        "200":
+          description: Pipeline list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pipeline"
+
+  /api/pipelines/{id}:
+    get:
+      tags: [Pipelines]
+      summary: Get pipeline with steps
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pipeline with steps
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PipelineWithSteps"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/pipelines/{id}/cancel:
+    post:
+      tags: [Pipelines]
+      summary: Cancel pipeline
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pipeline"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/pipelines/{id}/retry:
+    post:
+      tags: [Pipelines]
+      summary: Retry a failed pipeline step
+      description: Re-dispatches the failed step and wakes its agent.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Retried
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pipeline:
+                    $ref: "#/components/schemas/Pipeline"
+                  nextStep:
+                    $ref: "#/components/schemas/PipelineStep"
+                  nextTask:
+                    $ref: "#/components/schemas/Task"
+        "400":
+          description: No failed step to retry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/pipelines/{id}/steps/{stepId}:
+    patch:
+      tags: [Pipelines]
+      summary: Update pipeline step
+      description: Cannot modify completed steps.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: stepId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePipelineStep"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PipelineStep"
+        "400":
+          description: Validation error or completed step
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/pipelines/{id}/steps/{stepId}/reject:
+    post:
+      tags: [Pipelines]
+      summary: Reject a step back to an earlier step
+      description: Creates a new task for the target (earlier) step and wakes its agent.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: stepId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectPipelineStep"
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pipeline:
+                    $ref: "#/components/schemas/Pipeline"
+                  targetStep:
+                    $ref: "#/components/schemas/PipelineStep"
+                  newTask:
+                    $ref: "#/components/schemas/Task"
+        "400":
+          description: Validation error or target step has lower order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/pipelines/{id}/steps/{stepId}/approve:
+    post:
+      tags: [Pipelines]
+      summary: Approve a verification gate step
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: stepId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pipeline:
+                    $ref: "#/components/schemas/Pipeline"
+                  nextStep:
+                    $ref: "#/components/schemas/PipelineStep"
+                  nextTask:
+                    $ref: "#/components/schemas/Task"
+        "400":
+          description: Step is not awaiting verification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Pipeline Templates
+  # ============================================================
+  /api/pipeline-templates:
+    post:
+      tags: [Pipeline Templates]
+      summary: Create pipeline template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePipelineTemplate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PipelineTemplate"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+    get:
+      tags: [Pipeline Templates]
+      summary: List pipeline templates
+      parameters:
+        - name: projectId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pipeline template list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PipelineTemplate"
+
+  /api/pipeline-templates/{id}:
+    get:
+      tags: [Pipeline Templates]
+      summary: Get pipeline template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pipeline template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PipelineTemplate"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags: [Pipeline Templates]
+      summary: Update pipeline template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePipelineTemplate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PipelineTemplate"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      tags: [Pipeline Templates]
+      summary: Delete pipeline template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Project Skills
+  # ============================================================
+  /api/projects/{projectId}/skills:
+    get:
+      tags: [Project Skills]
+      summary: List project skills
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Skill list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectSkill"
+    post:
+      tags: [Project Skills]
+      summary: Register project skill
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectSkill"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectSkill"
+
+  /api/projects/{projectId}/skills/sync:
+    post:
+      tags: [Project Skills]
+      summary: Sync skills from disk
+      description: Re-reads the project's home directory and re-registers global and local skills.
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  synced:
+                    type: integer
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/projects/{projectId}/skills/{idOrSlug}:
+    get:
+      tags: [Project Skills]
+      summary: Get project skill by ID or slug
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: idOrSlug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Skill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectSkill"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      tags: [Project Skills]
+      summary: Delete project skill
+      description: Global skills cannot be deleted — create a project-local override instead.
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: idOrSlug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Cannot delete global skill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Instruction Bundles
+  # ============================================================
+  /api/agents/{id}/instructions:
+    get:
+      tags: [Instruction Bundles]
+      summary: Get instruction bundle for agent
+      description: Requires X-Project-Id header.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bundle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstructionBundle"
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No bundle found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags: [Instruction Bundles]
+      summary: Update instruction bundle mode
+      description: Requires X-Project-Id header. `rootPath` must resolve under `~/.orch8/projects/`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateInstructionBundle"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Validation error or missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/agents/{id}/instructions/files:
+    get:
+      tags: [Instruction Bundles]
+      summary: List files in instruction bundle
+      description: Requires X-Project-Id header.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File inventory
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/agents/{id}/instructions/files/{path}:
+    get:
+      tags: [Instruction Bundles]
+      summary: Read a file from instruction bundle
+      description: Requires X-Project-Id header.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstructionBundleFile"
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      tags: [Instruction Bundles]
+      summary: Write a file in instruction bundle
+      description: Requires X-Project-Id header. Blocked for external-mode bundles and on path traversal.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+      responses:
+        "200":
+          description: Written
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: External bundle, path traversal, or missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      tags: [Instruction Bundles]
+      summary: Delete a file from instruction bundle
+      description: |
+        Requires X-Project-Id header. Cannot delete the entry file, files in
+        external-mode bundles, or traverse outside the bundle root.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "400":
+          description: External bundle, entry file, path traversal, or missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================
+  # Bundled Agents
+  # ============================================================
+  /api/bundled-agents:
+    get:
+      tags: [Bundled Agents]
+      summary: List available bundled agent templates
+      responses:
+        "200":
+          description: Bundled agent list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BundledAgent"
+
+  /api/bundled-agents/add:
+    post:
+      tags: [Bundled Agents]
+      summary: Add bundled agents to a project
+      description: |
+        Copies bundled agent template directories into the project's
+        `.orch8/`, syncs project skills, and creates agent rows. Agents that
+        already exist in the project are skipped.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddBundledAgents"
+      responses:
+        "201":
+          description: Agents created (may be empty if all were duplicates)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Agent"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Project not found
           content:
             application/json:
               schema:
