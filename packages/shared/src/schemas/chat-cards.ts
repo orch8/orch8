@@ -481,3 +481,58 @@ export const InfoMemorySearchCardSchema = envelope(
     results: z.array(MemorySearchResultSchema),
   }),
 );
+
+// ─── Result cards (success) ─────────────────────────────
+
+const RESULT_KINDS = [
+  "result_create_task",
+  "result_update_task",
+  "result_delete_task",
+  "result_create_agent",
+  "result_update_agent",
+  "result_pause_agent",
+  "result_resume_agent",
+  "result_delete_agent",
+  "result_create_pipeline",
+  "result_update_pipeline",
+  "result_run_pipeline",
+  "result_delete_pipeline",
+  "result_kill_run",
+  "result_retry_run",
+  "result_set_budget",
+  "result_add_lesson",
+  "result_update_memory_entity",
+] as const;
+export type ResultCardKind = (typeof RESULT_KINDS)[number];
+
+// One schema per kind so the discriminated union has a unique literal
+// per entry. The payload schema is identical (`ResultEntityPayloadSchema`).
+export const ResultCreateTaskCardSchema     = envelope("result_create_task",     ResultEntityPayloadSchema);
+export const ResultUpdateTaskCardSchema     = envelope("result_update_task",     ResultEntityPayloadSchema);
+export const ResultDeleteTaskCardSchema     = envelope("result_delete_task",     ResultEntityPayloadSchema);
+export const ResultCreateAgentCardSchema    = envelope("result_create_agent",    ResultEntityPayloadSchema);
+export const ResultUpdateAgentCardSchema    = envelope("result_update_agent",    ResultEntityPayloadSchema);
+export const ResultPauseAgentCardSchema     = envelope("result_pause_agent",     ResultEntityPayloadSchema);
+export const ResultResumeAgentCardSchema    = envelope("result_resume_agent",    ResultEntityPayloadSchema);
+export const ResultDeleteAgentCardSchema    = envelope("result_delete_agent",    ResultEntityPayloadSchema);
+export const ResultCreatePipelineCardSchema = envelope("result_create_pipeline", ResultEntityPayloadSchema);
+export const ResultUpdatePipelineCardSchema = envelope("result_update_pipeline", ResultEntityPayloadSchema);
+export const ResultRunPipelineCardSchema    = envelope("result_run_pipeline",    ResultEntityPayloadSchema);
+export const ResultDeletePipelineCardSchema = envelope("result_delete_pipeline", ResultEntityPayloadSchema);
+export const ResultKillRunCardSchema        = envelope("result_kill_run",        ResultEntityPayloadSchema);
+export const ResultRetryRunCardSchema       = envelope("result_retry_run",       ResultEntityPayloadSchema);
+export const ResultSetBudgetCardSchema      = envelope("result_set_budget",      ResultEntityPayloadSchema);
+export const ResultAddLessonCardSchema      = envelope("result_add_lesson",      ResultEntityPayloadSchema);
+export const ResultUpdateMemoryEntityCardSchema = envelope("result_update_memory_entity", ResultEntityPayloadSchema);
+
+// ─── Result cards (error) ───────────────────────────────
+
+export const ResultErrorCardSchema = envelope(
+  "result_error",
+  z.object({
+    reason: z.string(),
+    httpStatus: z.number().int().optional(),
+    endpoint: z.string().optional(),
+    rawResponse: z.string().optional(),
+  }),
+);
