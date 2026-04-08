@@ -448,6 +448,9 @@ export class HeartbeatService {
 
     let logHandle: LogHandle | undefined;
     let runLogger: RunLogger | undefined;
+    // Buffered run_events inserts, flushed in the finally block below.
+    type RunEventInsert = typeof runEvents.$inferInsert;
+    const pendingRunEventInserts: RunEventInsert[] = [];
 
     try {
       // 4. Fetch agent configuration
@@ -509,7 +512,19 @@ export class HeartbeatService {
         },
       };
 
-      // Real-time event emission (run viewer spec)
+      // Real-time event emission (run viewer spec).
+      //
+      // The dashboard listens to the WebSocket broadcast for live streaming,
+      // so broadcasts still fire synchronously per event. DB inserts, however,
+      // used to be unawaited fire-and-forget `.catch(console.error)` — under a
+      // fast token stream hundreds of promises piled up with no backpressure,
+      // and a DB outage silently dropped events through console.error instead
+      // of the structured logger.
+      //
+      // We now buffer InsertRunEvent rows in memory and flush them with a
+      // single multi-row insert in the run-cleanup finally block below. This
+      // bounds promise accumulation, provides backpressure naturally, and
+      // funnels any insert failure through the structured logger.
       let eventSeq = 0;
       const onEvent = (rawEvent: import("../adapter/types.js").StreamEvent): void => {
         const mapped = mapStreamEvent(rawEvent);
@@ -517,20 +532,16 @@ export class HeartbeatService {
           const seq = eventSeq++;
           const timestamp = new Date().toISOString();
 
-          // Fire-and-forget: DB insert + WebSocket broadcast
-          this.db
-            .insert(runEvents)
-            .values({
-              runId,
-              projectId: claimedRun.projectId,
-              seq,
-              timestamp: new Date(),
-              eventType: m.eventType,
-              toolName: m.toolName,
-              summary: m.summary,
-              payload: rawEvent,
-            })
-            .catch((err) => console.error(`[heartbeat] run_event insert failed: ${err}`));
+          pendingRunEventInserts.push({
+            runId,
+            projectId: claimedRun.projectId,
+            seq,
+            timestamp: new Date(),
+            eventType: m.eventType,
+            toolName: m.toolName,
+            summary: m.summary,
+            payload: rawEvent,
+          });
 
           this.broadcastService.runEvent(claimedRun.projectId, {
             runId,
@@ -777,6 +788,24 @@ export class HeartbeatService {
         "execution_error",
       );
     } finally {
+      // Flush buffered run_events in a single multi-row insert. Failures are
+      // logged through the structured logger so a DB outage during streaming
+      // no longer silently drops events or terminates the run.
+      if (pendingRunEventInserts.length > 0) {
+        try {
+          await this.db.insert(runEvents).values(pendingRunEventInserts);
+        } catch (eventsErr) {
+          this.logger?.error(
+            {
+              err: eventsErr,
+              runId,
+              count: pendingRunEventInserts.length,
+            },
+            "Failed to flush buffered run_events at stream end",
+          );
+        }
+      }
+
       // Clean up log stream if it was opened but not finalized
       if (logHandle && runLogger) {
         try {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/shared/db";
+import { projects, agents, heartbeatRuns, wakeupRequests, tasks, runEvents } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { makeFailingTxDb } from "./helpers/failing-tx.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
@@ -29,6 +29,7 @@ describe("HeartbeatService", () => {
   });
 
   beforeEach(async () => {
+    await testDb.db.delete(runEvents);
     await testDb.db.delete(wakeupRequests);
     await testDb.db.delete(heartbeatRuns);
     await testDb.db.delete(tasks);
@@ -891,4 +892,84 @@ describe("HeartbeatService", () => {
     });
   });
 
+  describe("run_events insert failure handling (2.16)", () => {
+    it("logs via structured logger and still terminates the run", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1",
+        projectId,
+        name: "Eng",
+        role: "engineer",
+        adapterType: "claude_local",
+        adapterConfig: {},
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      // Adapter that emits two events through onEvent then returns success.
+      // mapStreamEvent returns mapped records for "system/init" and "result"
+      // events — use those so pendingRunEventInserts has something to flush.
+      const mockAdapter = {
+        runAgent: async (_cfg: any, ctx: any) => {
+          if (ctx?.onEvent) {
+            ctx.onEvent({ type: "system", subtype: "init", model: "claude-4" });
+            ctx.onEvent({ type: "result", total_cost_usd: 0.01 });
+          }
+          return {
+            sessionId: null, model: null, result: "done",
+            usage: null, costUsd: null, billingType: "api" as const,
+            exitCode: 0, signal: null, error: null, errorCode: null, events: [],
+          };
+        },
+      };
+
+      // Fresh service with a failing db so the runEvents flush at stream end
+      // rejects. The service must still drive the run to a terminal state
+      // and report the failure through the structured logger.
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const failingDb = makeFailingTxDb(testDb.db, {
+        failInsertOnTable: runEvents,
+        error: new Error("simulated run_events outage"),
+      });
+      const failingService = new HeartbeatService(failingDb, broadcastService);
+      failingService.setAdapter(mockAdapter as any);
+
+      const errorLogs: Array<[unknown, string]> = [];
+      failingService.setLogger({
+        info: () => {},
+        warn: () => {},
+        error: (ctx: unknown, msg: string) => { errorLogs.push([ctx, msg]); },
+        debug: () => {},
+        fatal: () => {},
+        trace: () => {},
+        child() { return this; },
+        level: "info",
+      } as any);
+
+      try {
+        await failingService.executeRun(run.id);
+      } finally {
+        failingService.shutdown();
+      }
+
+      // Run still reaches a terminal state despite the insert failure.
+      const [finished] = await testDb.db
+        .select()
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.id, run.id));
+      expect(["succeeded", "failed"]).toContain(finished.status);
+      expect(finished.finishedAt).toBeTruthy();
+
+      // The structured logger captured the failure (not console.error).
+      const flushFailure = errorLogs.find(([, msg]) =>
+        typeof msg === "string" && msg.includes("run_events"),
+      );
+      expect(flushFailure).toBeTruthy();
+    });
+  });
 });
