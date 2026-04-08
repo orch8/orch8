@@ -232,3 +232,72 @@ export const ConfirmDeleteTaskCardSchema = envelope(
     title: z.string(),
   }),
 );
+
+// ─── Confirm cards: agents ──────────────────────────────
+
+const AgentCreateInputSchema = z.object({
+  id: z.string().min(1).max(100),
+  name: z.string().min(1).max(200),
+  role: AgentRoleEnum,
+  model: z.string(),
+  effort: z.string().optional(),
+  maxTurns: z.number().int().min(1).optional(),
+  heartbeatEnabled: z.boolean().optional(),
+  heartbeatIntervalSec: z.number().int().min(0).optional(),
+  desiredSkills: z.array(z.string()).optional(),
+  allowedTools: z.array(z.string()).optional(),
+  systemPrompt: z.string().optional(),
+  budgetLimitUsd: z.number().nonnegative().optional(),
+});
+
+const AgentPatchSchema = z.object({
+  name: z.string().optional(),
+  model: z.string().optional(),
+  effort: z.string().nullable().optional(),
+  maxTurns: z.number().int().min(1).optional(),
+  heartbeatEnabled: z.boolean().optional(),
+  heartbeatIntervalSec: z.number().int().min(0).optional(),
+  desiredSkills: z.array(z.string()).optional(),
+  allowedTools: z.array(z.string()).optional(),
+  systemPrompt: z.string().optional(),
+  budgetLimitUsd: z.number().nullable().optional(),
+});
+
+export const ConfirmCreateAgentCardSchema = envelope(
+  "confirm_create_agent",
+  AgentCreateInputSchema,
+);
+
+export const ConfirmUpdateAgentCardSchema = envelope(
+  "confirm_update_agent",
+  z.object({
+    agentId: z.string(),
+    current: AgentPatchSchema,
+    proposed: AgentPatchSchema,
+  }),
+);
+
+export const ConfirmPauseAgentCardSchema = envelope(
+  "confirm_pause_agent",
+  z.object({
+    agentId: z.string(),
+    name: z.string(),
+    reason: z.string().optional(),
+  }),
+);
+
+export const ConfirmResumeAgentCardSchema = envelope(
+  "confirm_resume_agent",
+  z.object({
+    agentId: z.string(),
+    name: z.string(),
+  }),
+);
+
+export const ConfirmDeleteAgentCardSchema = envelope(
+  "confirm_delete_agent",
+  z.object({
+    agentId: z.string(),
+    name: z.string(),
+  }),
+);
