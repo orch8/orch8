@@ -664,9 +664,15 @@ export const ALL_CARD_KINDS = [
 /**
  * Type-level guard: every kind in the discriminated union appears in
  * ALL_CARD_KINDS, and vice versa. If anyone adds a new schema entry to
- * the union but forgets ALL_CARD_KINDS (or vice versa) this constant
- * fails to compile.
+ * the union but forgets ALL_CARD_KINDS (or vice versa) the `_exhaustive`
+ * assignment below fails to compile.
+ *
+ * Direction 1 (kinds missing from ALL_CARD_KINDS) is caught by this
+ * assertion collapsing to `never` when the `Exclude<>` is non-empty.
+ * Direction 2 (extras in ALL_CARD_KINDS not in the union) is ALSO caught
+ * by the `satisfies readonly ChatCardKind[]` clause on the array above.
  */
 type _ExhaustiveCheck =
-  | (Exclude<ChatCardKind, (typeof ALL_CARD_KINDS)[number]> extends never ? true : never)
-  | (Exclude<(typeof ALL_CARD_KINDS)[number], ChatCardKind> extends never ? true : never);
+  (Exclude<ChatCardKind, (typeof ALL_CARD_KINDS)[number]> extends never ? true : false) &
+  (Exclude<(typeof ALL_CARD_KINDS)[number], ChatCardKind> extends never ? true : false);
+const _exhaustive: _ExhaustiveCheck = true;
