@@ -41,7 +41,7 @@ describe("ChatMessageRenderer", () => {
     expect(code.closest("a")).toBeNull();
   });
 
-  it("renders an orch8-card fence as a placeholder block (Plan 04)", () => {
+  it("renders an orch8-card fence via CardRegistry (Plan 05)", () => {
     const fenced = [
       "Here is a card:",
       "```orch8-card",
@@ -60,8 +60,9 @@ describe("ChatMessageRenderer", () => {
         resultRunId: null,
       },
     ]);
-    // Plan 04 renders the raw kind label until Plan 05 swaps in the registry.
-    expect(screen.getByText(/info_task_list/)).toBeInTheDocument();
+    // CardRegistry dispatches to InfoTaskListCard which renders the title
+    // AND the summary, both "0 tasks".
+    expect(screen.getAllByText("0 tasks").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Here is a card:")).toBeInTheDocument();
   });
 
@@ -81,9 +82,8 @@ describe("ChatMessageRenderer", () => {
       { id: "c2", kind: "b", summary: "", payload: {}, status: "pending", decidedAt: null, decidedBy: null, resultRunId: null },
     ];
     renderMsg(fenced, cards);
-    const a = screen.getByText(/kind: a/);
-    const b = screen.getByText(/kind: b/);
-    expect(a).toBeInTheDocument();
-    expect(b).toBeInTheDocument();
+    // Unknown kinds fall back to ResultErrorCard via CardRegistry's validation guard.
+    const errors = screen.getAllByText(/payload failed validation/i);
+    expect(errors).toHaveLength(2);
   });
 });
