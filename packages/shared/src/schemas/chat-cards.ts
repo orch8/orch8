@@ -404,3 +404,80 @@ export const ConfirmAddLessonCardSchema = envelope(
     tags: z.array(z.string()).optional(),
   }),
 );
+
+// ─── Info cards ─────────────────────────────────────────
+
+export const InfoTaskListCardSchema = envelope(
+  "info_task_list",
+  z.object({
+    tasks: z.array(TaskSummarySchema),
+    groupedBy: z.enum(["column", "priority", "assignee"]).optional(),
+  }),
+);
+
+export const InfoTaskDetailCardSchema = envelope(
+  "info_task_detail",
+  z.object({ task: TaskDetailSchema }),
+);
+
+export const InfoAgentListCardSchema = envelope(
+  "info_agent_list",
+  z.object({ agents: z.array(AgentSummarySchema) }),
+);
+
+export const InfoAgentDetailCardSchema = envelope(
+  "info_agent_detail",
+  z.object({ agent: AgentDetailSchema }),
+);
+
+export const InfoRunListCardSchema = envelope(
+  "info_run_list",
+  z.object({ runs: z.array(RunSummarySchema) }),
+);
+
+export const InfoRunDetailCardSchema = envelope(
+  "info_run_detail",
+  z.object({ run: RunDetailSchema }),
+);
+
+export const InfoCostSummaryCardSchema = envelope(
+  "info_cost_summary",
+  z.object({
+    projectId: z.string(),
+    period: z.enum(["day", "week", "month"]).optional(),
+    totalSpentUsd: z.number(),
+    byAgent: z.array(
+      z.object({
+        agentId: z.string(),
+        name: z.string(),
+        spentUsd: z.number(),
+      }),
+    ),
+  }),
+);
+
+export const InfoBudgetStatusCardSchema = envelope(
+  "info_budget_status",
+  z.object({ entries: z.array(BudgetEntrySchema) }),
+);
+
+export const InfoPipelineListCardSchema = envelope(
+  "info_pipeline_list",
+  z.object({ pipelines: z.array(PipelineSummarySchema) }),
+);
+
+export const InfoPipelineRunHistoryCardSchema = envelope(
+  "info_pipeline_run_history",
+  z.object({
+    pipelineId: z.string(),
+    runs: z.array(PipelineRunSummarySchema),
+  }),
+);
+
+export const InfoMemorySearchCardSchema = envelope(
+  "info_memory_search",
+  z.object({
+    query: z.string(),
+    results: z.array(MemorySearchResultSchema),
+  }),
+);
