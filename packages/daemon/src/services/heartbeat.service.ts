@@ -957,26 +957,38 @@ export class HeartbeatService {
     });
   }
 
+  /**
+   * Serialize async work per agentId. Callers queue by chaining their "next"
+   * promise onto the current tail — the previous busy-wait loop allowed two
+   * concurrent callers to race past the `has()` check and run `fn` in parallel.
+   * Here we always chain: the tail in the map is the promise that the *next*
+   * caller must await before running, guaranteeing strict FIFO ordering.
+   */
   private async withAgentLock<T>(
     agentId: string,
     fn: () => Promise<T>,
   ): Promise<T> {
-    // Wait for any existing lock on this agent
-    while (this.agentStartLocks.has(agentId)) {
-      await this.agentStartLocks.get(agentId);
-    }
+    const prev = this.agentStartLocks.get(agentId) ?? Promise.resolve();
 
-    let resolve!: () => void;
-    const promise = new Promise<void>((r) => {
-      resolve = r;
-    });
-    this.agentStartLocks.set(agentId, promise);
+    let release!: () => void;
+    const next = new Promise<void>((r) => { release = r; });
+
+    // Publish the new tail atomically with the read of `prev` above — since
+    // this whole method is sync up to the first await, interleaving cannot
+    // happen here.
+    const tail = prev.then(() => next);
+    this.agentStartLocks.set(agentId, tail);
 
     try {
+      await prev;
       return await fn();
     } finally {
-      this.agentStartLocks.delete(agentId);
-      resolve();
+      release();
+      // Only clear the map entry if nobody else queued behind us. If another
+      // caller has already replaced the tail, leaving it alone is correct.
+      if (this.agentStartLocks.get(agentId) === tail) {
+        this.agentStartLocks.delete(agentId);
+      }
     }
   }
 

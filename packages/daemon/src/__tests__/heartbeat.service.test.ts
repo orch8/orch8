@@ -822,4 +822,73 @@ describe("HeartbeatService", () => {
       expect(proj.budgetSpentUsd).toBe(0);
     });
   });
+
+  describe("withAgentLock serialization (2.6)", () => {
+    it("serializes concurrent calls so fn bodies never overlap", async () => {
+      // Use the public surface: startNextQueuedRunForAgent wraps its body in
+      // withAgentLock. We insert a queued run to make the body do observable
+      // work, and track ordering via shared counters.
+      await testDb.db.insert(agents).values({
+        id: "lock-agent",
+        projectId,
+        name: "Locker",
+        role: "engineer",
+        maxConcurrentRuns: 1,
+      });
+
+      let inside = 0;
+      let maxInside = 0;
+      const overlaps: number[] = [];
+
+      const withLock = (service as unknown as {
+        withAgentLock<T>(id: string, fn: () => Promise<T>): Promise<T>;
+      }).withAgentLock.bind(service);
+
+      const body = async (delay: number): Promise<void> => {
+        inside++;
+        overlaps.push(inside);
+        if (inside > maxInside) maxInside = inside;
+        await new Promise((r) => setTimeout(r, delay));
+        inside--;
+      };
+
+      await Promise.all([
+        withLock("lock-agent", () => body(30)),
+        withLock("lock-agent", () => body(10)),
+        withLock("lock-agent", () => body(5)),
+      ]);
+
+      expect(maxInside).toBe(1);
+      // Every observed concurrency count should be exactly 1.
+      expect(overlaps.every((n) => n === 1)).toBe(true);
+    });
+
+    it("allows different agents to run concurrently", async () => {
+      let aInside = false;
+      let bInside = false;
+      let overlapped = false;
+
+      const withLock = (service as unknown as {
+        withAgentLock<T>(id: string, fn: () => Promise<T>): Promise<T>;
+      }).withAgentLock.bind(service);
+
+      await Promise.all([
+        withLock("agent-a", async () => {
+          aInside = true;
+          await new Promise((r) => setTimeout(r, 20));
+          if (bInside) overlapped = true;
+          aInside = false;
+        }),
+        withLock("agent-b", async () => {
+          bInside = true;
+          await new Promise((r) => setTimeout(r, 20));
+          if (aInside) overlapped = true;
+          bInside = false;
+        }),
+      ]);
+
+      expect(overlapped).toBe(true);
+    });
+  });
+
 });
