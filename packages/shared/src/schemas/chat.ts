@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ChatCardSchema } from "./chat-cards.js";
 
 // ─── Chat CRUD ────────────────────────────────────────────
 
@@ -49,3 +50,23 @@ export const ExtractedCardSchema = z.object({
   resultRunId: z.string().nullable().default(null),
 });
 export type ExtractedCard = z.infer<typeof ExtractedCardSchema>;
+
+/**
+ * Strict variant: parses an ExtractedCard, then additionally validates
+ * that the (kind, payload) pair matches the discriminated union. Used by
+ * the dashboard to gate rendering — invalid cards fall back to the
+ * error-card component.
+ *
+ * The daemon parser intentionally does NOT use this, because the daemon
+ * must accept-and-store malformed LLM output (turning it into a
+ * `result_error` card) rather than rejecting the whole message.
+ */
+export function parseStrictCard(
+  raw: unknown,
+):
+  | { ok: true; card: import("./chat-cards.js").ChatCard }
+  | { ok: false; issues: import("zod").z.ZodIssue[] } {
+  const enveloped = ChatCardSchema.safeParse(raw);
+  if (enveloped.success) return { ok: true, card: enveloped.data };
+  return { ok: false, issues: enveloped.error.issues };
+}

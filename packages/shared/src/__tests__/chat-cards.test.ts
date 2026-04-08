@@ -4,6 +4,7 @@ import {
   ALL_CARD_KINDS,
   type ChatCardKind,
 } from "../schemas/chat-cards.js";
+import { parseStrictCard } from "../schemas/chat.js";
 
 /**
  * Fixture generator: returns one valid card for each kind. Edit this
@@ -319,5 +320,27 @@ describe("ChatCardSchema", () => {
       payload: { tasks: [] },
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("parseStrictCard", () => {
+  it("returns ok=true for a valid card", () => {
+    const result = parseStrictCard({
+      kind: "info_task_list",
+      summary: "0 tasks",
+      payload: { tasks: [] },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("returns ok=false with issues for an invalid card", () => {
+    const result = parseStrictCard({
+      kind: "info_task_list",
+      summary: "missing payload",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.length).toBeGreaterThan(0);
+    }
   });
 });
