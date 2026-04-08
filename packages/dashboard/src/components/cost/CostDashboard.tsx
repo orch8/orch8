@@ -28,9 +28,9 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
     <div className="flex flex-col gap-6">
       {/* Top row: total + gauge */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-          <span className="text-xs text-zinc-500">Total Spend</span>
-          <p className="mt-1 text-2xl font-semibold text-zinc-100">
+        <div className="rounded-md border border-edge-soft bg-surface p-4">
+          <span className="text-xs text-whisper">Total Spend</span>
+          <p className="mt-1 text-2xl font-semibold text-ink">
             ${summary?.total.toFixed(2) ?? "\u2014"}
           </p>
         </div>
@@ -46,19 +46,19 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
 
       {/* Per-agent spend (bar chart) */}
       {summary && summary.byAgent.length > 0 && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-zinc-300">Per-Agent Spend</h3>
+        <div className="rounded-md border border-edge-soft bg-surface p-4">
+          <h3 className="mb-3 text-sm font-semibold text-ink">Per-Agent Spend</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={summary.byAgent}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                <XAxis dataKey="agentId" tick={{ fill: "#71717a", fontSize: 12 }} />
-                <YAxis tick={{ fill: "#71717a", fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(2)}`} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-edge)" />
+                <XAxis dataKey="agentId" tick={{ fill: "var(--color-mute)", fontSize: 12 }} />
+                <YAxis tick={{ fill: "var(--color-mute)", fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(2)}`} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "6px" }}
-                  labelStyle={{ color: "#a1a1aa" }}
+                  contentStyle={{ backgroundColor: "var(--color-surface)", border: "1px solid var(--color-edge)", borderRadius: "6px" }}
+                  labelStyle={{ color: "var(--color-mute)" }}
                 />
-                <Bar dataKey="totalCost" fill="#059669" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="totalCost" fill="var(--color-accent)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -66,7 +66,7 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
           {/* Agent table */}
           <table className="mt-3 w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-zinc-500">
+              <tr className="text-left text-xs text-whisper">
                 <th className="pb-2">Agent</th>
                 <th className="pb-2 text-right">Runs</th>
                 <th className="pb-2 text-right">Cost</th>
@@ -74,10 +74,10 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
             </thead>
             <tbody>
               {summary.byAgent.map((row) => (
-                <tr key={row.agentId} className="border-t border-zinc-800">
-                  <td className="py-1.5 text-zinc-300">{row.agentId}</td>
-                  <td className="py-1.5 text-right text-zinc-400">{row.runCount}</td>
-                  <td className="py-1.5 text-right text-zinc-300">${row.totalCost.toFixed(4)}</td>
+                <tr key={row.agentId} className="border-t border-dashed border-edge-soft">
+                  <td className="py-1.5 text-ink">{row.agentId}</td>
+                  <td className="py-1.5 text-right text-mute">{row.runCount}</td>
+                  <td className="py-1.5 text-right text-ink">${row.totalCost.toFixed(4)}</td>
                 </tr>
               ))}
             </tbody>
@@ -86,23 +86,23 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
       )}
 
       {/* Time-series spend */}
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <div className="rounded-md border border-edge-soft bg-surface p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-zinc-300">Spend Over Time</h3>
+          <h3 className="text-sm font-semibold text-ink">Spend Over Time</h3>
           <div className="flex gap-1">
             {[7, 14, 30, 90].map((d) => (
               <button
                 key={d}
                 onClick={() => setDays(d)}
                 className={`rounded px-2 py-1 text-xs ${
-                  days === d ? "bg-zinc-700 text-zinc-200" : "text-zinc-500 hover:text-zinc-300"
+                  days === d ? "bg-surface-3 text-ink" : "text-whisper hover:text-ink"
                 }`}
               >
                 {d}d
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2 text-xs text-zinc-500">
+          <div className="flex items-center gap-2 text-xs text-whisper">
             <span>or</span>
             <input
               type="date"
@@ -113,7 +113,7 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
                   setDays(Math.max(1, diff));
                 }
               }}
-              className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-sm text-zinc-300"
+              className="rounded border border-edge-soft bg-surface px-2 py-1 text-sm text-ink"
               aria-label="Start date for cost"
             />
             <span>to today</span>
@@ -123,14 +123,14 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={timeseries ?? []}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-              <XAxis dataKey="date" tick={{ fill: "#71717a", fontSize: 12 }} />
-              <YAxis tick={{ fill: "#71717a", fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(2)}`} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-edge)" />
+              <XAxis dataKey="date" tick={{ fill: "var(--color-mute)", fontSize: 12 }} />
+              <YAxis tick={{ fill: "var(--color-mute)", fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(2)}`} />
               <Tooltip
-                contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "6px" }}
-                labelStyle={{ color: "#a1a1aa" }}
+                contentStyle={{ backgroundColor: "var(--color-surface)", border: "1px solid var(--color-edge)", borderRadius: "6px" }}
+                labelStyle={{ color: "var(--color-mute)" }}
               />
-              <Line type="monotone" dataKey="totalCost" stroke="#059669" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="totalCost" stroke="var(--color-accent)" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
