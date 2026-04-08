@@ -77,6 +77,21 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
+        {/* Chat — top of nav */}
+        {params.projectId && (
+          <Link
+            to={"/projects/$projectId/chat" as any}
+            params={{ projectId: params.projectId } as any}
+            className={`mb-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+              pathname.startsWith(`/projects/${params.projectId}/chat`)
+                ? "bg-sky-700/30 text-sky-200"
+                : "bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+            }`}
+          >
+            <span className="mr-1">★</span> Chat
+          </Link>
+        )}
+
         {/* Home */}
         <Link
           to={(params.projectId ? `/projects/${params.projectId}` : "/") as any}
