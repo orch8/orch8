@@ -465,6 +465,75 @@ export class ChatService {
     });
   }
 
+  // ─── Startup recovery ─────────────────────────────────
+
+  /**
+   * Finds chat assistant messages left in the `streaming` terminal-limbo
+   * state — e.g. the daemon crashed mid-turn — and marks them as
+   * `error` with a clear message. Safe to run on every startup
+   * (idempotent: only touches rows whose status is still streaming).
+   *
+   * Also broadcasts a `chat_message_error` event per reaped row so any
+   * already-connected dashboard sees the status change without needing
+   * a page reload.
+   *
+   * Returns the list of reaped row IDs (useful for tests and logs).
+   */
+  async reapOrphanedChatMessages(): Promise<string[]> {
+    const orphaned = await this.db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.status, "streaming"));
+
+    if (orphaned.length === 0) return [];
+
+    const errorNote = "[error: interrupted — daemon restarted mid-turn]";
+    const reapedIds: string[] = [];
+
+    for (const row of orphaned) {
+      const newContent = row.content && row.content.length > 0
+        ? `${row.content}\n${errorNote}`
+        : errorNote;
+
+      await this.db
+        .update(chatMessages)
+        .set({ status: "error", content: newContent })
+        .where(eq(chatMessages.id, row.id));
+
+      reapedIds.push(row.id);
+
+      // Broadcast so any live dashboard sees the status flip.
+      try {
+        const [chat] = await this.db
+          .select()
+          .from(chats)
+          .where(eq(chats.id, row.chatId));
+        if (chat) {
+          this.broadcast.chatMessageError(chat.projectId, {
+            chatId: chat.id,
+            messageId: row.id,
+            error: "interrupted: daemon restarted mid-turn",
+          });
+        }
+      } catch (err) {
+        // Broadcast failures must not block reaping — the DB row is
+        // already in the correct terminal state, which is the source
+        // of truth. Log and move on.
+        this.logger?.warn(
+          { err, messageId: row.id },
+          "Failed to broadcast reaped chat message",
+        );
+      }
+    }
+
+    this.logger?.info(
+      { count: reapedIds.length },
+      "Reaped orphaned streaming chat messages on startup",
+    );
+
+    return reapedIds;
+  }
+
   // ─── Internal helpers ─────────────────────────────────
 
   private async getProject(projectId: string) {

@@ -297,6 +297,73 @@ describe("ChatService", () => {
     expect(adapter.runAgent).toHaveBeenCalledTimes(2);
   });
 
+  // ─── Startup recovery ─────────────────────────
+
+  it("reapOrphanedChatMessages marks stuck streaming rows as error", async () => {
+    service = new ChatService(
+      testDb.db,
+      makeMockAdapter("ok") as any,
+      sessionMgr,
+      broadcast,
+      TEST_API_URL,
+    );
+    const chat = await service.createChat({ projectId, agentId });
+
+    // Insert a row as if a prior daemon instance crashed mid-turn.
+    const [stuck] = await testDb.db
+      .insert(chatMessages)
+      .values({
+        chatId: chat.id,
+        role: "assistant",
+        content: "partial output so far",
+        status: "streaming",
+      })
+      .returning();
+
+    // Also insert a normal `complete` row to confirm it is NOT touched.
+    const [ok] = await testDb.db
+      .insert(chatMessages)
+      .values({
+        chatId: chat.id,
+        role: "assistant",
+        content: "fine",
+        status: "complete",
+      })
+      .returning();
+
+    const reaped = await service.reapOrphanedChatMessages();
+    expect(reaped).toContain(stuck.id);
+    expect(reaped).not.toContain(ok.id);
+
+    const after = await testDb.db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.id, stuck.id));
+    expect(after[0].status).toBe("error");
+    expect(after[0].content).toContain("partial output so far");
+    expect(after[0].content).toContain("interrupted");
+
+    // Untouched row remains complete.
+    const okAfter = await testDb.db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.id, ok.id));
+    expect(okAfter[0].status).toBe("complete");
+    expect(okAfter[0].content).toBe("fine");
+  });
+
+  it("reapOrphanedChatMessages is a no-op when no rows are stuck", async () => {
+    service = new ChatService(
+      testDb.db,
+      makeMockAdapter("ok") as any,
+      sessionMgr,
+      broadcast,
+      TEST_API_URL,
+    );
+    const reaped = await service.reapOrphanedChatMessages();
+    expect(reaped).toEqual([]);
+  });
+
   // ─── Session Invalidation ──────────────────────
 
   it("invalidateSession clears the taskSessions row for this chat", async () => {
