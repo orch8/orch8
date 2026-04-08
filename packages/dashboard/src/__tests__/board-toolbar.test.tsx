@@ -8,14 +8,14 @@ describe("BoardToolbar", () => {
     renderWithProviders(
       <BoardToolbar projectId="proj_1" onFilterChange={() => {}} />,
     );
-    expect(screen.getByText("+ New Task")).toBeInTheDocument();
+    expect(screen.getByText("+ New task")).toBeInTheDocument();
   });
 
   it("opens task creation modal on click", async () => {
     renderWithProviders(
       <BoardToolbar projectId="proj_1" onFilterChange={() => {}} />,
     );
-    await userEvent.click(screen.getByText("+ New Task"));
+    await userEvent.click(screen.getByText("+ New task"));
     expect(screen.getByText("Create Task")).toBeInTheDocument();
   });
 

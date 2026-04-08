@@ -13,10 +13,39 @@ import { KANBAN_COLUMNS, COLUMN_LABELS, type Task } from "../../types.js";
 import { KanbanColumn } from "./KanbanColumn.js";
 import { TaskCard } from "./TaskCard.js";
 import { BoardToolbar, type BoardFilters } from "./BoardToolbar.js";
+import { PageHeader } from "../ui/PageHeader.js";
 
 interface KanbanBoardProps {
   projectId: string;
   onTaskSelect?: (taskId: string) => void;
+}
+
+function countByColumn(tasks: Task[] | undefined): Record<string, number> {
+  const counts: Record<string, number> = {
+    backlog: 0,
+    blocked: 0,
+    in_progress: 0,
+    done: 0,
+  };
+  for (const t of tasks ?? []) {
+    counts[t.column] = (counts[t.column] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function buildSubtitle(tasks: Task[] | undefined): string {
+  const total = tasks?.length ?? 0;
+  const counts = countByColumn(tasks);
+  const pieces: string[] = [
+    `${total} ${total === 1 ? "task" : "tasks"} across ${KANBAN_COLUMNS.length} columns`,
+  ];
+  if (counts.blocked > 0) {
+    pieces.push(`${counts.blocked} blocked`);
+  }
+  if (counts.in_progress > 0) {
+    pieces.push(`${counts.in_progress} in progress`);
+  }
+  return pieces.join(" · ");
 }
 
 export function KanbanBoard({ projectId, onTaskSelect }: KanbanBoardProps) {
@@ -59,7 +88,6 @@ export function KanbanBoard({ projectId, onTaskSelect }: KanbanBoardProps) {
     const taskId = active.id as string;
     const targetColumn = over.id as string;
 
-    // Only transition if dropping into a different column
     const task = tasks?.find((t) => t.id === taskId);
     if (
       task &&
@@ -71,30 +99,37 @@ export function KanbanBoard({ projectId, onTaskSelect }: KanbanBoardProps) {
   }
 
   return (
-    <>
-    <BoardToolbar projectId={projectId} onFilterChange={setFilters} />
-    <DndContext
-      sensors={sensors}
-      collisionDetection={pointerWithin}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {KANBAN_COLUMNS.map((col) => (
-          <KanbanColumn
-            key={col}
-            column={col}
-            label={COLUMN_LABELS[col]}
-            tasks={tasksByColumn[col] ?? []}
-            onTaskClick={onTaskSelect ?? (() => {})}
-          />
-        ))}
-      </div>
+    <div>
+      <PageHeader
+        title="Board"
+        subtitle={buildSubtitle(tasks)}
+        actions={
+          <BoardToolbar projectId={projectId} onFilterChange={setFilters} />
+        }
+      />
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        {/* etched-plate grid: 1px gap on edge-soft */}
+        <div className="grid grid-cols-4 gap-px overflow-hidden rounded-md bg-edge-soft">
+          {KANBAN_COLUMNS.map((col) => (
+            <KanbanColumn
+              key={col}
+              column={col}
+              label={COLUMN_LABELS[col]}
+              tasks={tasksByColumn[col] ?? []}
+              onTaskClick={onTaskSelect ?? (() => {})}
+            />
+          ))}
+        </div>
 
-      <DragOverlay>
-        {activeTask && <TaskCard task={activeTask} onClick={() => {}} />}
-      </DragOverlay>
-    </DndContext>
-    </>
+        <DragOverlay>
+          {activeTask && <TaskCard task={activeTask} onClick={() => {}} />}
+        </DragOverlay>
+      </DndContext>
+    </div>
   );
 }

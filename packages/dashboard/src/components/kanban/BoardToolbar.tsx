@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAgents } from "../../hooks/useAgents.js";
 import { TaskCreateModal } from "./TaskCreateModal.js";
+import { Button } from "../ui/Button.js";
 
 export interface BoardFilters {
   assignee?: string;
@@ -12,6 +13,9 @@ interface BoardToolbarProps {
   projectId: string;
   onFilterChange: (filters: BoardFilters) => void;
 }
+
+const SELECT_CLASS =
+  "focus-ring rounded-sm border border-edge bg-surface px-2 py-1 type-ui text-ink";
 
 export function BoardToolbar({ projectId, onFilterChange }: BoardToolbarProps) {
   const [showCreate, setShowCreate] = useState(false);
@@ -26,23 +30,18 @@ export function BoardToolbar({ projectId, onFilterChange }: BoardToolbarProps) {
 
   return (
     <>
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => setShowCreate(true)}
-          className="rounded-md bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600"
-        >
-          + New Task
-        </button>
-
+      <div className="flex items-center gap-2">
         <select
           value={filters.assignee ?? ""}
           onChange={(e) => updateFilter("assignee", e.target.value)}
           aria-label="Filter by assignee"
-          className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-300"
+          className={SELECT_CLASS}
         >
           <option value="">All assignees</option>
           {agents?.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
           ))}
         </select>
 
@@ -50,7 +49,7 @@ export function BoardToolbar({ projectId, onFilterChange }: BoardToolbarProps) {
           value={filters.priority ?? ""}
           onChange={(e) => updateFilter("priority", e.target.value)}
           aria-label="Filter by priority"
-          className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-300"
+          className={SELECT_CLASS}
         >
           <option value="">All priorities</option>
           <option value="high">High</option>
@@ -62,12 +61,16 @@ export function BoardToolbar({ projectId, onFilterChange }: BoardToolbarProps) {
           value={filters.taskType ?? ""}
           onChange={(e) => updateFilter("taskType", e.target.value)}
           aria-label="Filter by type"
-          className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-300"
+          className={SELECT_CLASS}
         >
           <option value="">All types</option>
           <option value="quick">Quick</option>
           <option value="brainstorm">Brainstorm</option>
         </select>
+
+        <Button variant="primary" onClick={() => setShowCreate(true)}>
+          + New task
+        </Button>
       </div>
 
       <TaskCreateModal
