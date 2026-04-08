@@ -18,4 +18,27 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // After chunking we expect the largest chunk to be ~450kB uncompressed.
+    // Leave a small cushion above 500kB so minor dep bumps don't trip the
+    // warning, but keep it below the default Netlify/Vercel recommendations.
+    chunkSizeWarningLimit: 550,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          tanstack: [
+            "@tanstack/react-query",
+            "@tanstack/react-router",
+          ],
+          recharts: ["recharts"],
+          markdown: ["react-markdown", "remark-gfm", "rehype-highlight"],
+          dnd: [
+            "@dnd-kit/core",
+            "@dnd-kit/sortable",
+            "@dnd-kit/utilities",
+          ],
+        },
+      },
+    },
+  },
 });
