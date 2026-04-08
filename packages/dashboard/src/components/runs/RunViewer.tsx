@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRun, useRunLog } from "../../hooks/useRuns.js";
 import { useRunEvents, useRunEventStream } from "../../hooks/useRunEvents.js";
+import { useModalA11y } from "../../hooks/useModalA11y.js";
 import { RunEventCard } from "./RunEventCard.js";
 import type { RunEvent } from "../../types.js";
 
@@ -27,9 +28,14 @@ export function RunViewer({ runId, projectId, onClose }: RunViewerProps) {
   const { data: events } = useRunEvents(runId, projectId);
   const { data: logData } = useRunLog(runId, projectId);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to live event stream
   useRunEventStream(runId, run?.status);
+
+  // The dialog is only "mounted" once we have a run, but we want a11y
+  // behavior active whenever the component renders its content.
+  useModalA11y(dialogRef, !!run, onClose);
 
   const isLive = run?.status === "running" || run?.status === "queued";
 
@@ -54,17 +60,24 @@ export function RunViewer({ runId, projectId, onClose }: RunViewerProps) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
 
       {/* Slide-over panel */}
-      <div className="relative z-10 flex h-full w-full max-w-2xl flex-col border-l border-zinc-800 bg-zinc-950">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="run-viewer-title"
+        onClick={(e) => e.stopPropagation()}
+        className="relative z-10 flex h-full w-full max-w-2xl flex-col border-l border-zinc-800 bg-zinc-950"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
           <div className="flex items-center gap-3">
             {isLive && (
               <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
             )}
-            <h2 className="font-mono text-sm font-semibold text-zinc-200">
+            <h2 id="run-viewer-title" className="font-mono text-sm font-semibold text-zinc-200">
               {run.id}
             </h2>
             <span className={`rounded px-2 py-0.5 text-xs ${STATUS_COLORS[run.status] ?? ""}`}>
