@@ -3,7 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { existsSync } from "node:fs";
 import { projectSkills, agents } from "@orch/shared/db";
-import { GLOBAL_SKILLS_DIR } from "@orch/shared";
+import { GLOBAL_SKILLS_DIR } from "@orch/shared/defaults";
 import type { SchemaDb } from "../db/client.js";
 import matter from "gray-matter";
 

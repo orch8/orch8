@@ -11,7 +11,7 @@ import type {
   pipelines,
   pipelineSteps,
   pipelineTemplates,
-} from "@orch/shared";
+} from "@orch/shared/db";
 
 // Row types inferred from Drizzle schema
 export type Project = typeof projects.$inferSelect;

@@ -9,7 +9,7 @@ import { buildEnv } from "./env-builder.js";
 import { buildPrompt } from "./prompt-builder.js";
 import { dirname, join } from "node:path";
 import { createSkillsDir, createInstructionsFile, cleanupTempPath } from "./file-injector.js";
-import { DEFAULT_SKILLS_DIR, GLOBAL_SKILLS_DIR } from "@orch/shared";
+import { DEFAULT_SKILLS_DIR, GLOBAL_SKILLS_DIR } from "@orch/shared/defaults";
 import { SessionManager } from "./session-manager.js";
 import { runProcess } from "./process-runner.js";
 import { resolveClaudePath } from "./resolve-claude-path.js";
