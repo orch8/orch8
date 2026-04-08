@@ -6,13 +6,17 @@ import { useWsEvents } from "./WsEventsProvider.js";
 
 export function useRunEvents(runId: string | null, projectId: string) {
   return useQuery<RunEvent[]>({
-    queryKey: ["run-events", runId],
+    queryKey: ["run-events", runId, projectId],
     queryFn: () => api.get(`/runs/${runId}/events`, { projectId }),
     enabled: !!runId,
   });
 }
 
-export function useRunEventStream(runId: string | null, runStatus?: string) {
+export function useRunEventStream(
+  runId: string | null,
+  projectId: string,
+  runStatus?: string,
+) {
   const qc = useQueryClient();
   const { subscribe } = useWsEvents();
 
@@ -24,7 +28,7 @@ export function useRunEventStream(runId: string | null, runStatus?: string) {
     const unsub = subscribe("run_event", (event) => {
       if (event.runId !== runId) return;
 
-      qc.setQueryData<RunEvent[]>(["run-events", runId], (old) => {
+      qc.setQueryData<RunEvent[]>(["run-events", runId, projectId], (old) => {
         if (!old) return [event as unknown as RunEvent];
 
         // Deduplicate by seq
@@ -38,5 +42,5 @@ export function useRunEventStream(runId: string | null, runStatus?: string) {
     });
 
     return unsub;
-  }, [runId, isLive, qc, subscribe]);
+  }, [runId, projectId, isLive, qc, subscribe]);
 }

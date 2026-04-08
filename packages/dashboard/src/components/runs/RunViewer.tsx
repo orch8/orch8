@@ -31,7 +31,7 @@ export function RunViewer({ runId, projectId, onClose }: RunViewerProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to live event stream
-  useRunEventStream(runId, run?.status);
+  useRunEventStream(runId, projectId, run?.status);
 
   // The dialog is only "mounted" once we have a run, but we want a11y
   // behavior active whenever the component renders its content.
