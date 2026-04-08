@@ -80,6 +80,7 @@ export type StreamEvent = StreamInitEvent | StreamAssistantEvent | StreamResultE
 export interface RunContext {
   agentId: string;
   agentName: string;
+  agentRole?: string;
   projectId: string;
   runId: string;
   taskId?: string;

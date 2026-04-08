@@ -559,6 +559,7 @@ export class HeartbeatService {
       const ctx: RunContext = {
         agentId: agent.id,
         agentName: agent.name,
+        agentRole: agent.role,
         projectId: claimedRun.projectId,
         runId,
         taskId: claimedRun.taskId ?? undefined,

@@ -96,7 +96,7 @@ export class ClaudeLocalAdapter {
 
       // Stale recovery: if instructionsFilePath is set but the file is missing, attempt recovery
       if (config.instructionsFilePath && !existsSync(config.instructionsFilePath) && this.bundleService) {
-        const agentRole = (ctx as any).agentRole ?? "engineer";
+        const agentRole = ctx.agentRole ?? "engineer";
         await this.bundleService.recover(ctx.agentId, ctx.projectId, agentRole);
       }
 
