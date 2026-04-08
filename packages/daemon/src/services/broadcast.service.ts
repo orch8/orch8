@@ -229,11 +229,6 @@ export class BroadcastService {
     this.send(projectId, { type: "chat_card_decision", ...payload });
   }
 
-  /** Raw send for backward compat (brainstorm_output, etc.) */
-  raw(projectId: string, message: unknown): void {
-    this.send(projectId, message);
-  }
-
   private send(_projectId: string, message: unknown): void {
     const data = JSON.stringify(message);
     for (const socket of this.sockets) {

@@ -1,7 +1,7 @@
 // packages/daemon/src/adapter/claude-local-adapter.ts
 import { spawn as nodeSpawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import type { SpawnFn } from "../services/brainstorm.service.js";
+import type { SpawnFn } from "./types.js";
 import type { SchemaDb } from "../db/client.js";
 import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "./types.js";
 import { buildArgs } from "./args-builder.js";

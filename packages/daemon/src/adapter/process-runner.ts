@@ -1,6 +1,6 @@
 // packages/daemon/src/adapter/process-runner.ts
 import type { ChildProcess } from "node:child_process";
-import type { SpawnFn } from "../services/brainstorm.service.js";
+import type { SpawnFn } from "./types.js";
 import { parseOutputStream, detectError } from "./output-parser.js";
 import { resolveBillingType } from "./env-builder.js";
 import type { RunResult, RunErrorCode } from "./types.js";

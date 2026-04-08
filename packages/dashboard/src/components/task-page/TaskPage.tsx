@@ -130,10 +130,36 @@ export function TaskPage({ task, projectId }: TaskPageProps) {
           {activeTab === "Runs" && <RunsTab taskId={task.id} projectId={projectId} />}
           {activeTab === "Settings" && <SettingsTab task={task} />}
         </div>
+
+        {task.taskType === "brainstorm" && (
+          <LegacyBrainstormTranscript transcript={task.brainstormTranscript} />
+        )}
       </div>
 
       {/* Right sidebar */}
       <TaskSidebar task={task} projectId={projectId} allTasks={allTasks ?? []} />
     </div>
+  );
+}
+
+interface LegacyBrainstormTranscriptProps {
+  transcript: string | null | undefined;
+}
+
+function LegacyBrainstormTranscript({ transcript }: LegacyBrainstormTranscriptProps) {
+  if (!transcript || transcript.trim().length === 0) return null;
+  return (
+    <section className="mt-6 rounded-md border border-zinc-800 bg-zinc-950 p-4">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-zinc-500">
+        Legacy brainstorm transcript
+      </h3>
+      <p className="mb-3 text-[11px] text-zinc-500">
+        This conversation predates the unified chat. New brainstorms happen in
+        chat — see the “Chat” entry in the sidebar.
+      </p>
+      <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded border border-zinc-800 bg-zinc-900 p-3 text-xs text-zinc-300">
+        {transcript}
+      </pre>
+    </section>
   );
 }

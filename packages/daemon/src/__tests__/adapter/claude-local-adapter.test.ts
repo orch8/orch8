@@ -5,8 +5,7 @@ import { Writable, Readable } from "node:stream";
 import { projects, agents, taskSessions } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "../helpers/test-db.js";
 import { ClaudeLocalAdapter } from "../../adapter/claude-local-adapter.js";
-import type { RunContext, ClaudeLocalAdapterConfig } from "../../adapter/types.js";
-import type { SpawnFn } from "../../services/brainstorm.service.js";
+import type { RunContext, ClaudeLocalAdapterConfig, SpawnFn } from "../../adapter/types.js";
 
 function createMockProcess(lines: string[], exitCode = 0) {
   const stdin = new Writable({
