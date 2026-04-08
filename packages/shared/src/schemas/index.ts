@@ -88,6 +88,7 @@ export {
   CardDecisionSchema,
   CardStatusSchema,
   ExtractedCardSchema,
+  parseStrictCard,
 } from "./chat.js";
 export type {
   CreateChat,

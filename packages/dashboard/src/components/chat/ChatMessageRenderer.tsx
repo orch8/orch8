@@ -4,9 +4,11 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { autoLinkIds } from "./IdAutoLinker.js";
 import type { ChatCard } from "../../hooks/useChatMessages.js";
+import { CardRegistry } from "./cards/CardRegistry.js";
 
 export interface ChatMessageRendererProps {
   projectId: string;
+  chatId: string;
   content: string;
   cards: ChatCard[];
 }
@@ -59,6 +61,7 @@ export function splitMessageSegments(content: string): Segment[] {
 
 export function ChatMessageRenderer({
   projectId,
+  chatId,
   content,
   cards,
 }: ChatMessageRendererProps) {
@@ -90,17 +93,14 @@ export function ChatMessageRenderer({
           );
         }
         const card = cards[seg.cardIndex!];
-        // Plan 04 placeholder: Plan 05 will swap this for <CardRegistry card={...} />.
+        if (!card) return null;
         return (
-          <pre
-            key={`card-${i}`}
-            className="rounded-md border border-amber-700/50 bg-amber-950/30 p-3 text-xs text-amber-200"
-          >
-            {`[orch8-card placeholder]
-kind: ${card?.kind ?? "(unknown)"}
-status: ${card?.status ?? "(unknown)"}
-${seg.content}`}
-          </pre>
+          <CardRegistry
+            key={`card-${card.id}`}
+            extracted={card}
+            chatId={chatId}
+            projectId={projectId}
+          />
         );
       })}
     </div>

@@ -33,6 +33,7 @@ export function ChatMessage({ projectId, message }: ChatMessageProps) {
       <div className="w-full max-w-[90%] rounded-lg bg-zinc-900 px-4 py-3">
         <ChatMessageRenderer
           projectId={projectId}
+          chatId={message.chatId}
           content={message.content}
           cards={message.cards}
         />

@@ -17,7 +17,7 @@ const router = createRouter({
 function renderMsg(content: string, cards: ChatCard[] = []) {
   return render(
     <RouterContextProvider router={router}>
-      <ChatMessageRenderer projectId="proj_a" content={content} cards={cards} />
+      <ChatMessageRenderer projectId="proj_a" chatId="chat_a" content={content} cards={cards} />
     </RouterContextProvider>,
   );
 }

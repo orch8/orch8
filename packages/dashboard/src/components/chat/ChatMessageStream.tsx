@@ -33,6 +33,7 @@ export function ChatMessageStream({
             <div className="w-full max-w-[90%] rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
               <ChatMessageRenderer
                 projectId={projectId}
+                chatId={chatId}
                 content={streaming.buffer}
                 cards={[]}
               />
