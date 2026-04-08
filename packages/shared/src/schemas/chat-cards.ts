@@ -155,3 +155,80 @@ export const ResultEntityPayloadSchema = z.object({
   fieldsChanged: z.array(z.string()).optional(),
 });
 export type ResultEntityPayload = z.infer<typeof ResultEntityPayloadSchema>;
+
+// ─── Confirm cards: tasks ───────────────────────────────
+
+const TaskCreateInputSchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.string().optional(),
+  column: TaskColumnEnum.optional(),
+  taskType: TaskTypeEnum.optional(),
+  priority: TaskPriorityEnum.optional(),
+  assignee: z.string().optional(),
+});
+
+const TaskPatchSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  column: TaskColumnEnum.optional(),
+  taskType: TaskTypeEnum.optional(),
+  priority: TaskPriorityEnum.optional(),
+  assignee: z.string().nullable().optional(),
+});
+
+export const ConfirmCreateTaskCardSchema = envelope(
+  "confirm_create_task",
+  TaskCreateInputSchema,
+);
+
+export const ConfirmUpdateTaskCardSchema = envelope(
+  "confirm_update_task",
+  z.object({
+    taskId: z.string(),
+    current: TaskPatchSchema,
+    proposed: TaskPatchSchema,
+  }),
+);
+
+export const ConfirmAssignTaskCardSchema = envelope(
+  "confirm_assign_task",
+  z.object({
+    taskId: z.string(),
+    currentAssignee: z.string().nullable().optional(),
+    proposedAssignee: z.string(),
+  }),
+);
+
+export const ConfirmMoveTaskCardSchema = envelope(
+  "confirm_move_task",
+  z.object({
+    taskId: z.string(),
+    from: TaskColumnEnum,
+    to: TaskColumnEnum,
+  }),
+);
+
+export const ConfirmConvertTaskCardSchema = envelope(
+  "confirm_convert_task",
+  z.object({
+    taskId: z.string(),
+    from: TaskTypeEnum,
+    to: TaskTypeEnum,
+  }),
+);
+
+export const ConfirmKillTaskCardSchema = envelope(
+  "confirm_kill_task",
+  z.object({
+    taskId: z.string(),
+    currentRunId: z.string().nullable().optional(),
+  }),
+);
+
+export const ConfirmDeleteTaskCardSchema = envelope(
+  "confirm_delete_task",
+  z.object({
+    taskId: z.string(),
+    title: z.string(),
+  }),
+);
