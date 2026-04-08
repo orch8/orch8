@@ -1,5 +1,15 @@
 // packages/daemon/src/adapter/types.ts
 
+import type { spawn as nodeSpawn } from "node:child_process";
+
+/**
+ * The Node child_process spawn function. Defined here as a neutral
+ * location so the adapter and the (future) chat-spawning code don't
+ * have to import it from a service module. Replaces the previous home
+ * in `services/brainstorm.service.ts`, which was deleted in Plan 06.
+ */
+export type SpawnFn = typeof nodeSpawn;
+
 // ─── Adapter Configuration (spec §9) ─────────────────────
 
 export interface ClaudeLocalAdapterConfig {

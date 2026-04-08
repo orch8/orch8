@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { EventEmitter } from "node:events";
 import { Writable, Readable } from "node:stream";
 import { runProcess, type ProcessRunInput } from "../../adapter/process-runner.js";
-import type { SpawnFn } from "../../services/brainstorm.service.js";
+import type { SpawnFn } from "../../adapter/types.js";
 
 function createMockProcess(lines: string[] = [], exitCode = 0) {
   const stdin = new Writable({
