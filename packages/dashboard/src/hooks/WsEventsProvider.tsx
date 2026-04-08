@@ -9,6 +9,9 @@ export interface WsEvent {
   taskId?: string;
   agentId?: string;
   runId?: string;
+  chatId?: string;
+  messageId?: string;
+  cardId?: string;
   chunk?: string;
   [key: string]: unknown;
 }
@@ -115,6 +118,28 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
           break;
         case "run_event":
           // Handled by useRunEventStream subscribers — no invalidation needed.
+          break;
+        case "chat_message_started":
+          // No invalidation needed; subscribers handle live streaming.
+          break;
+        case "chat_message_chunk":
+          // Same — pure live event.
+          break;
+        case "chat_message_complete":
+          if (event.chatId) {
+            qc.invalidateQueries({ queryKey: ["chatMessages", event.chatId] });
+            qc.invalidateQueries({ queryKey: ["chats"] });
+          }
+          break;
+        case "chat_message_error":
+          if (event.chatId) {
+            qc.invalidateQueries({ queryKey: ["chatMessages", event.chatId] });
+          }
+          break;
+        case "chat_card_decision":
+          if (event.chatId) {
+            qc.invalidateQueries({ queryKey: ["chatMessages", event.chatId] });
+          }
           break;
       }
     },
