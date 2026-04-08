@@ -536,3 +536,137 @@ export const ResultErrorCardSchema = envelope(
     rawResponse: z.string().optional(),
   }),
 );
+
+// ─── Discriminated union of all card kinds ──────────────
+
+export const ChatCardSchema = z.discriminatedUnion("kind", [
+  // confirm: tasks
+  ConfirmCreateTaskCardSchema,
+  ConfirmUpdateTaskCardSchema,
+  ConfirmAssignTaskCardSchema,
+  ConfirmMoveTaskCardSchema,
+  ConfirmConvertTaskCardSchema,
+  ConfirmKillTaskCardSchema,
+  ConfirmDeleteTaskCardSchema,
+  // confirm: agents
+  ConfirmCreateAgentCardSchema,
+  ConfirmUpdateAgentCardSchema,
+  ConfirmPauseAgentCardSchema,
+  ConfirmResumeAgentCardSchema,
+  ConfirmDeleteAgentCardSchema,
+  // confirm: pipelines
+  ConfirmCreatePipelineCardSchema,
+  ConfirmUpdatePipelineCardSchema,
+  ConfirmRunPipelineCardSchema,
+  ConfirmDeletePipelineCardSchema,
+  // confirm: runs
+  ConfirmKillRunCardSchema,
+  ConfirmRetryRunCardSchema,
+  // confirm: cost / memory
+  ConfirmSetBudgetCardSchema,
+  ConfirmUpdateMemoryEntityCardSchema,
+  ConfirmAddLessonCardSchema,
+  // info
+  InfoTaskListCardSchema,
+  InfoTaskDetailCardSchema,
+  InfoAgentListCardSchema,
+  InfoAgentDetailCardSchema,
+  InfoRunListCardSchema,
+  InfoRunDetailCardSchema,
+  InfoCostSummaryCardSchema,
+  InfoBudgetStatusCardSchema,
+  InfoPipelineListCardSchema,
+  InfoPipelineRunHistoryCardSchema,
+  InfoMemorySearchCardSchema,
+  // result: success
+  ResultCreateTaskCardSchema,
+  ResultUpdateTaskCardSchema,
+  ResultDeleteTaskCardSchema,
+  ResultCreateAgentCardSchema,
+  ResultUpdateAgentCardSchema,
+  ResultPauseAgentCardSchema,
+  ResultResumeAgentCardSchema,
+  ResultDeleteAgentCardSchema,
+  ResultCreatePipelineCardSchema,
+  ResultUpdatePipelineCardSchema,
+  ResultRunPipelineCardSchema,
+  ResultDeletePipelineCardSchema,
+  ResultKillRunCardSchema,
+  ResultRetryRunCardSchema,
+  ResultSetBudgetCardSchema,
+  ResultAddLessonCardSchema,
+  ResultUpdateMemoryEntityCardSchema,
+  // result: error
+  ResultErrorCardSchema,
+]);
+
+export type ChatCard = z.infer<typeof ChatCardSchema>;
+export type ChatCardKind = ChatCard["kind"];
+
+/**
+ * Returns the array of all known card kinds at runtime. Useful for the
+ * dashboard CardRegistry's exhaustive check and for fixture generation
+ * in tests. Stays in sync with the union via type-level extraction.
+ */
+export const ALL_CARD_KINDS = [
+  "confirm_create_task",
+  "confirm_update_task",
+  "confirm_assign_task",
+  "confirm_move_task",
+  "confirm_convert_task",
+  "confirm_kill_task",
+  "confirm_delete_task",
+  "confirm_create_agent",
+  "confirm_update_agent",
+  "confirm_pause_agent",
+  "confirm_resume_agent",
+  "confirm_delete_agent",
+  "confirm_create_pipeline",
+  "confirm_update_pipeline",
+  "confirm_run_pipeline",
+  "confirm_delete_pipeline",
+  "confirm_kill_run",
+  "confirm_retry_run",
+  "confirm_set_budget",
+  "confirm_update_memory_entity",
+  "confirm_add_lesson",
+  "info_task_list",
+  "info_task_detail",
+  "info_agent_list",
+  "info_agent_detail",
+  "info_run_list",
+  "info_run_detail",
+  "info_cost_summary",
+  "info_budget_status",
+  "info_pipeline_list",
+  "info_pipeline_run_history",
+  "info_memory_search",
+  "result_create_task",
+  "result_update_task",
+  "result_delete_task",
+  "result_create_agent",
+  "result_update_agent",
+  "result_pause_agent",
+  "result_resume_agent",
+  "result_delete_agent",
+  "result_create_pipeline",
+  "result_update_pipeline",
+  "result_run_pipeline",
+  "result_delete_pipeline",
+  "result_kill_run",
+  "result_retry_run",
+  "result_set_budget",
+  "result_add_lesson",
+  "result_update_memory_entity",
+  "result_error",
+] as const satisfies readonly ChatCardKind[];
+
+/**
+ * Type-level guard: every kind in the discriminated union appears in
+ * ALL_CARD_KINDS, and vice versa. If anyone adds a new schema entry to
+ * the union but forgets ALL_CARD_KINDS (or vice versa) this constant
+ * fails to compile.
+ */
+type _ExhaustiveCheck =
+  | (Exclude<ChatCardKind, (typeof ALL_CARD_KINDS)[number]> extends never ? true : never)
+  | (Exclude<(typeof ALL_CARD_KINDS)[number], ChatCardKind> extends never ? true : never);
