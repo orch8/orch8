@@ -301,3 +301,106 @@ export const ConfirmDeleteAgentCardSchema = envelope(
     name: z.string(),
   }),
 );
+
+// ─── Confirm cards: pipelines ───────────────────────────
+
+export const ConfirmCreatePipelineCardSchema = envelope(
+  "confirm_create_pipeline",
+  z.object({
+    name: z.string(),
+    templateId: z.string().optional(),
+    steps: z.array(PipelineStepInputSchema).optional(),
+  }),
+);
+
+export const ConfirmUpdatePipelineCardSchema = envelope(
+  "confirm_update_pipeline",
+  z.object({
+    pipelineId: z.string(),
+    current: z.record(z.unknown()),
+    proposed: z.record(z.unknown()),
+  }),
+);
+
+export const ConfirmRunPipelineCardSchema = envelope(
+  "confirm_run_pipeline",
+  z.object({
+    pipelineId: z.string(),
+    name: z.string(),
+    inputs: z.record(z.unknown()).optional(),
+  }),
+);
+
+export const ConfirmDeletePipelineCardSchema = envelope(
+  "confirm_delete_pipeline",
+  z.object({
+    pipelineId: z.string(),
+    name: z.string(),
+  }),
+);
+
+// ─── Confirm cards: runs ────────────────────────────────
+
+export const ConfirmKillRunCardSchema = envelope(
+  "confirm_kill_run",
+  z.object({
+    runId: z.string(),
+    agentName: z.string(),
+    taskTitle: z.string().optional(),
+    runningSinceSec: z.number().int().nonnegative().optional(),
+  }),
+);
+
+export const ConfirmRetryRunCardSchema = envelope(
+  "confirm_retry_run",
+  z.object({
+    runId: z.string(),
+    agentName: z.string(),
+    failureReason: z.string().optional(),
+  }),
+);
+
+// ─── Confirm cards: cost-and-budget ─────────────────────
+
+const BudgetPatchSchema = z.object({
+  budgetLimitUsd: z.number().nullable().optional(),
+  budgetSpentUsd: z.number().optional(),
+  budgetPaused: z.boolean().optional(),
+  autoPauseThreshold: z.number().int().min(0).max(100).nullable().optional(),
+});
+
+export const ConfirmSetBudgetCardSchema = envelope(
+  "confirm_set_budget",
+  z.object({
+    scope: z.enum(["agent", "project"]),
+    entityId: z.string(),
+    current: BudgetPatchSchema,
+    proposed: BudgetPatchSchema,
+  }),
+);
+
+// ─── Confirm cards: memory ──────────────────────────────
+
+const MemoryEntityPatchSchema = z.object({
+  name: z.string().optional(),
+  description: z.string().optional(),
+  entityType: z.enum(["project", "area", "archive"]).optional(),
+});
+
+export const ConfirmUpdateMemoryEntityCardSchema = envelope(
+  "confirm_update_memory_entity",
+  z.object({
+    entityId: z.string(),
+    current: MemoryEntityPatchSchema,
+    proposed: MemoryEntityPatchSchema,
+  }),
+);
+
+export const ConfirmAddLessonCardSchema = envelope(
+  "confirm_add_lesson",
+  z.object({
+    title: z.string().min(1).max(200),
+    body: z.string().min(1).max(20_000),
+    tags: z.array(z.string()).optional(),
+  }),
+);
