@@ -62,6 +62,10 @@ const fixtures: Record<ChatCardKind, unknown> = {
       model: "claude-sonnet-4-6",
       heartbeatEnabled: true,
       heartbeatIntervalSec: 21600,
+      // null (not undefined) — LLMs naturally emit JSON null for
+      // unset numeric fields. AgentPatchSchema already accepts null,
+      // so keep AgentCreateInputSchema consistent.
+      budgetLimitUsd: null,
     },
   },
   confirm_update_agent: {

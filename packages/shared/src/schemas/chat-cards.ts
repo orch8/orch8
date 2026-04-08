@@ -247,7 +247,7 @@ const AgentCreateInputSchema = z.object({
   desiredSkills: z.array(z.string()).optional(),
   allowedTools: z.array(z.string()).optional(),
   systemPrompt: z.string().optional(),
-  budgetLimitUsd: z.number().nonnegative().optional(),
+  budgetLimitUsd: z.number().nonnegative().nullable().optional(),
 });
 
 const AgentPatchSchema = z.object({
