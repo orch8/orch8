@@ -118,6 +118,60 @@ describe("BroadcastService", () => {
     expect(payload.entityId).toBe("eng");
   });
 
+  it("filters events by socket projectId scope (tenant isolation)", () => {
+    const socketA = createMockSocket();
+    const socketB = createMockSocket();
+    const bs = new BroadcastService();
+
+    bs.register(socketA as unknown as WebSocket, { projectId: "proj_a" });
+    bs.register(socketB as unknown as WebSocket, { projectId: "proj_b" });
+
+    bs.taskTransitioned("proj_a", { taskId: "t1", from: "backlog", to: "in_progress" });
+
+    expect(socketA.send).toHaveBeenCalledOnce();
+    expect(socketB.send).not.toHaveBeenCalled();
+
+    bs.taskTransitioned("proj_b", { taskId: "t2", from: "backlog", to: "in_progress" });
+
+    expect(socketA.send).toHaveBeenCalledOnce(); // still just the first
+    expect(socketB.send).toHaveBeenCalledOnce();
+  });
+
+  it("delivers system events (daemon:log, daemon:stats) to every scoped socket", () => {
+    const socketA = createMockSocket();
+    const socketB = createMockSocket();
+    const bs = new BroadcastService();
+    bs.register(socketA as unknown as WebSocket, { projectId: "proj_a" });
+    bs.register(socketB as unknown as WebSocket, { projectId: "proj_b" });
+
+    bs.daemonLog({ level: "info", message: "hi", timestamp: "2026-04-08T00:00:00Z" });
+
+    expect(socketA.send).toHaveBeenCalledOnce();
+    expect(socketB.send).toHaveBeenCalledOnce();
+  });
+
+  it("admin-scoped sockets receive all project events", () => {
+    const adminSocket = createMockSocket();
+    const bs = new BroadcastService();
+    bs.register(adminSocket as unknown as WebSocket, { isAdmin: true });
+
+    bs.taskTransitioned("proj_a", { taskId: "t1", from: "backlog", to: "in_progress" });
+    bs.taskTransitioned("proj_b", { taskId: "t2", from: "backlog", to: "in_progress" });
+
+    expect(adminSocket.send).toHaveBeenCalledTimes(2);
+  });
+
+  it("unregister stops delivery to a socket", () => {
+    const socket = createMockSocket();
+    const bs = new BroadcastService();
+    bs.register(socket as unknown as WebSocket, { projectId: "proj_a" });
+    bs.unregister(socket as unknown as WebSocket);
+
+    bs.taskTransitioned("proj_a", { taskId: "t1", from: "backlog", to: "in_progress" });
+
+    expect(socket.send).not.toHaveBeenCalled();
+  });
+
   it("broadcasts run_event to all connected sockets", () => {
     const s1 = createMockSocket();
     const s2 = createMockSocket();

@@ -1,8 +1,26 @@
 import { createContext, useContext, useCallback, useRef, useMemo } from "react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouterState } from "@tanstack/react-router";
 import { useWebSocket } from "./useWebSocket.js";
 import { useToastStore } from "../stores/toast.js";
+
+/**
+ * Extract the current projectId from the URL pathname. Returns null for routes
+ * that don't live under /projects/:projectId (e.g. /daemon, /settings).
+ *
+ * We need this so the /ws socket can be scoped to a single project — the daemon
+ * filters broadcasts by socket scope to prevent cross-tenant event leakage
+ * (release blocker 1.1).
+ */
+function extractProjectIdFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/projects\/([^/]+)/);
+  if (!match) return null;
+  // Guard against the literal "/projects/new" route — that's project creation,
+  // not a specific project scope.
+  if (match[1] === "new") return null;
+  return match[1] ?? null;
+}
 
 export interface WsEvent {
   type: string;
@@ -146,8 +164,15 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
     [qc, addToast],
   );
 
+  // Current projectId drives the WebSocket scope. When the user navigates
+  // between projects, the URL changes, this re-renders, and useWebSocket closes
+  // the old socket + opens a new one scoped to the new project.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const projectId = extractProjectIdFromPath(pathname);
+  const wsUrl = projectId ? `/ws?projectId=${encodeURIComponent(projectId)}` : "/ws";
+
   const { connected, send } = useWebSocket({
-    url: "/ws",
+    url: wsUrl,
     onMessage,
   });
 

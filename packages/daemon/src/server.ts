@@ -78,10 +78,8 @@ export function buildServer(options: ServerOptions = {}) {
       await dbClient.close();
     });
 
-    // WebSocket broadcast service
-    const connectedSockets = new Set<import("ws").WebSocket>();
-    const broadcastService = new BroadcastService(connectedSockets);
-    app.decorate("connectedSockets", connectedSockets);
+    // WebSocket broadcast service (owns its own socket registry — see /ws handler)
+    const broadcastService = new BroadcastService();
     app.decorate("broadcastService", broadcastService);
 
     // Core services

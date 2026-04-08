@@ -142,8 +142,34 @@ export interface ChatCardDecisionPayload {
   status: "approved" | "cancelled";
 }
 
+export interface SocketScope {
+  /** Project scope this socket subscribes to. If absent, socket sees only system events. */
+  projectId?: string;
+  /** Admin sockets receive all project events regardless of projectId scope. */
+  isAdmin?: boolean;
+}
+
 export class BroadcastService {
-  constructor(private sockets: Set<WebSocket>) {}
+  /** Metadata for scoped sockets. Sockets present in {@link sockets} but NOT in this map
+   *  are treated as "unscoped" — they receive every event. This exists purely for test
+   *  ergonomics: tests construct the service with a pre-populated Set of mock sockets
+   *  and expect every broadcast to reach them without calling {@link register}. */
+  private scopes: WeakMap<WebSocket, SocketScope> = new WeakMap();
+
+  constructor(private sockets: Set<WebSocket> = new Set()) {}
+
+  /** Attach a WebSocket with a project/admin scope. Production code path — call this
+   *  from the /ws route handler so broadcasts get correctly filtered. */
+  register(socket: WebSocket, scope: SocketScope): void {
+    this.sockets.add(socket);
+    this.scopes.set(socket, scope);
+  }
+
+  /** Remove a WebSocket (on close). */
+  unregister(socket: WebSocket): void {
+    this.sockets.delete(socket);
+    this.scopes.delete(socket);
+  }
 
   taskTransitioned(projectId: string, payload: TaskTransitionedPayload): void {
     this.send(projectId, { type: "task_transitioned", ...payload });
@@ -229,10 +255,29 @@ export class BroadcastService {
     this.send(projectId, { type: "chat_card_decision", ...payload });
   }
 
-  private send(_projectId: string, message: unknown): void {
+  private send(projectId: string, message: unknown): void {
     const data = JSON.stringify(message);
+    const isSystem = projectId === "__system__";
     for (const socket of this.sockets) {
-      if (socket.readyState === 1) {
+      if (socket.readyState !== 1) continue;
+      const scope = this.scopes.get(socket);
+      // Unscoped sockets (no metadata): test-compat path, receive everything.
+      if (!scope) {
+        socket.send(data);
+        continue;
+      }
+      // System-level events (daemon:log, daemon:stats) fan out to every scoped socket.
+      if (isSystem) {
+        socket.send(data);
+        continue;
+      }
+      // Admin sockets receive all project events.
+      if (scope.isAdmin) {
+        socket.send(data);
+        continue;
+      }
+      // Scoped project sockets only receive their own project's events.
+      if (scope.projectId === projectId) {
         socket.send(data);
       }
     }

@@ -2,7 +2,6 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
-import { WsEventsProvider } from "./hooks/WsEventsProvider.js";
 import { routeTree } from "./routeTree.gen.js";
 import "./index.css";
 
@@ -26,9 +25,7 @@ declare module "@tanstack/react-router" {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <WsEventsProvider>
-        <RouterProvider router={router} />
-      </WsEventsProvider>
+      <RouterProvider router={router} />
     </QueryClientProvider>
   </StrictMode>,
 );
