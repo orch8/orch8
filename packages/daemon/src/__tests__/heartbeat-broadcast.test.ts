@@ -57,7 +57,7 @@ describe("HeartbeatService broadcast", () => {
     });
 
     const calls = mockSocket.send.mock.calls.map(
-      (c: [string]) => JSON.parse(c[0]),
+      (c) => JSON.parse(c[0] as string),
     );
     const runCreatedEvent = calls.find(
       (e: { type: string }) => e.type === "run_created",
@@ -79,7 +79,7 @@ describe("HeartbeatService broadcast", () => {
     await heartbeat.claimQueuedRun(run.id);
 
     const calls = mockSocket.send.mock.calls.map(
-      (c: [string]) => JSON.parse(c[0]),
+      (c) => JSON.parse(c[0] as string),
     );
     // claimQueuedRun should broadcast that the run is now running
     expect(mockSocket.send).toHaveBeenCalled();

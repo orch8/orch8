@@ -53,9 +53,9 @@ export async function taskRoutes(app: FastifyInstance) {
   });
 
   // PATCH /api/tasks/:id — Update task (non-state fields only)
-  app.patch("/api/tasks/:id", {
+  app.patch<{ Params: { id: string } }>("/api/tasks/:id", {
     preHandler: requirePermission("assign_task"),
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  }, async (request, reply: FastifyReply) => {
     const parsed = UpdateTaskSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({
@@ -110,12 +110,12 @@ export async function taskRoutes(app: FastifyInstance) {
   });
 
   // POST /api/tasks/:id/transition — Explicit lifecycle transition
-  app.post(
+  app.post<{ Params: { id: string } }>(
     "/api/tasks/:id/transition",
     {
       preHandler: requirePermission("move_task"),
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply: FastifyReply) => {
       const body = request.body as { column?: string; agentId?: string; runId?: string };
       if (!body.column) {
         return reply.code(400).send({ error: "validation_error", message: "column is required" });

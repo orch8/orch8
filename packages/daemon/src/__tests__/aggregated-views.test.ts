@@ -84,8 +84,8 @@ describe("Aggregated Cross-Project Views", () => {
 
     it("filters by projectId when admin provides header", async () => {
       await testDb.db.insert(heartbeatRuns).values([
-        { agentId: "eng-a", projectId: projAId, status: "succeeded", costUsd: "1.00", invocationSource: "on_demand" },
-        { agentId: "eng-b", projectId: projBId, status: "succeeded", costUsd: "2.00", invocationSource: "on_demand" },
+        { agentId: "eng-a", projectId: projAId, status: "succeeded", costUsd: 1.00, invocationSource: "on_demand" },
+        { agentId: "eng-b", projectId: projBId, status: "succeeded", costUsd: 2.00, invocationSource: "on_demand" },
       ]);
 
       const res = await app.inject({

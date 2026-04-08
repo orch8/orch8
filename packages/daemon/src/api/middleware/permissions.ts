@@ -26,7 +26,9 @@ export function requirePermission(permission: Permission) {
       case "move_task": {
         const body = request.body as Record<string, unknown> | null;
         const targetColumn = body?.column as string | undefined;
-        if (targetColumn && !(agent.canMoveTo ?? []).includes(targetColumn as typeof agent.canMoveTo[number])) {
+        const allowedColumns = agent.canMoveTo ?? [];
+        type TaskColumn = NonNullable<typeof agent.canMoveTo>[number];
+        if (targetColumn && !allowedColumns.includes(targetColumn as TaskColumn)) {
           return reply.code(403).send({
             error: "forbidden",
             message: `Agent '${agent.id}' cannot move tasks to '${targetColumn}'`,

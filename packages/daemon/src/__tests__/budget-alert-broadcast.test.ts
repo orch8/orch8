@@ -48,7 +48,7 @@ describe("autoPauseIfExhausted broadcast", () => {
     await autoPauseIfExhausted(testDb.db, "eng", projectId, broadcastService);
 
     const calls = mockSocket.send.mock.calls.map(
-      (c: [string]) => JSON.parse(c[0]),
+      (c) => JSON.parse(c[0] as string),
     );
     const alert = calls.find(
       (e: { type: string; level?: string }) =>
@@ -76,7 +76,7 @@ describe("autoPauseIfExhausted broadcast", () => {
     await autoPauseIfExhausted(testDb.db, "eng", projectId, broadcastService);
 
     const calls = mockSocket.send.mock.calls.map(
-      (c: [string]) => JSON.parse(c[0]),
+      (c) => JSON.parse(c[0] as string),
     );
     const alert = calls.find(
       (e: { type: string; level?: string }) =>

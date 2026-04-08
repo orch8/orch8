@@ -30,7 +30,8 @@ import type {
   ProjectFilterSchema,
 } from "../schemas/index.js";
 
-export type CreateProject = z.infer<typeof CreateProjectSchema>;
+// z.input lets callers omit fields with zod defaults (description, defaultBranch).
+export type CreateProject = z.input<typeof CreateProjectSchema>;
 export type UpdateProject = z.infer<typeof UpdateProjectSchema>;
 export type ProjectFilter = z.infer<typeof ProjectFilterSchema>;
 

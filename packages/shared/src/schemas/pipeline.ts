@@ -71,10 +71,14 @@ export const RejectPipelineStepSchema = z.object({
 
 // ─── Types ──────────────────────────────────────────────
 
-export type CreatePipelineTemplate = z.infer<typeof CreatePipelineTemplateSchema>;
+// Create* types use z.input so callers can omit fields that have zod
+// defaults (e.g. description, isDefault, createdBy). Services either
+// re-parse the input or handle undefined explicitly — the defaults are
+// still applied at parse time.
+export type CreatePipelineTemplate = z.input<typeof CreatePipelineTemplateSchema>;
 export type UpdatePipelineTemplate = z.infer<typeof UpdatePipelineTemplateSchema>;
 export type PipelineTemplateFilter = z.infer<typeof PipelineTemplateFilterSchema>;
-export type CreatePipeline = z.infer<typeof CreatePipelineSchema>;
+export type CreatePipeline = z.input<typeof CreatePipelineSchema>;
 export type PipelineFilter = z.infer<typeof PipelineFilterSchema>;
 export type UpdatePipelineStep = z.infer<typeof UpdatePipelineStepSchema>;
 export type CompletePipelineStep = z.infer<typeof CompletePipelineStepSchema>;
