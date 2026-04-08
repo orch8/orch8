@@ -29,22 +29,12 @@ export class ProjectSkillService {
   constructor(private db: SchemaDb) {}
 
   async list(projectId: string): Promise<ProjectSkill[]> {
-    const rows = await this.db
+    // Side-effect free: reconciliation with disk happens in syncFromDisk.
+    // A transient FS blip must not delete real data on a read.
+    return this.db
       .select()
       .from(projectSkills)
       .where(eq(projectSkills.projectId, projectId));
-
-    // Auto-prune: remove rows whose local_path source directory is missing
-    const valid: ProjectSkill[] = [];
-    for (const row of rows) {
-      if (row.sourceLocator && !existsSync(row.sourceLocator)) {
-        await this.db.delete(projectSkills).where(eq(projectSkills.id, row.id));
-      } else {
-        valid.push(row);
-      }
-    }
-
-    return valid;
   }
 
   async get(projectId: string, slugOrId: string): Promise<ProjectSkill | null> {

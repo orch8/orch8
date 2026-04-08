@@ -154,15 +154,15 @@ describe("ProjectSkillService", () => {
   });
 
   describe("list", () => {
-    it("returns all skills and auto-prunes missing directories", async () => {
-      // Insert two skills: one with a valid dir, one with a missing dir
+    it("returns all skill rows without touching the filesystem (side-effect free)", async () => {
       const validDir = join(projectHomeDir, ".orch8", "skills", "valid");
       await mkdir(validDir, { recursive: true });
       await writeFile(join(validDir, "SKILL.md"), "---\nname: Valid\n---\n# V\nContent");
 
       await service.create(projectId, { slug: "valid", sourceLocator: validDir });
 
-      // Insert a stale skill pointing to a non-existent dir
+      // Insert a row whose sourceLocator does NOT exist on disk.
+      // list() must NOT delete it — reconciliation only happens in syncFromDisk.
       await testDb.db.insert(projectSkills).values({
         projectId,
         slug: "stale",
@@ -174,8 +174,16 @@ describe("ProjectSkillService", () => {
 
       const skills = await service.list(projectId);
 
-      expect(skills).toHaveLength(1);
-      expect(skills[0].slug).toBe("valid");
+      expect(skills).toHaveLength(2);
+      const slugs = skills.map((s) => s.slug).sort();
+      expect(slugs).toEqual(["stale", "valid"]);
+
+      // Confirm the row is still in the DB after list() — no destructive side effect.
+      const rowsAfter = await testDb.db
+        .select()
+        .from(projectSkills)
+        .where(eq(projectSkills.projectId, projectId));
+      expect(rowsAfter).toHaveLength(2);
     });
   });
 
