@@ -1,1 +1,2 @@
-export { useWsEvents, type WsEvent } from "./WsEventsProvider.js";
+export { useWsEvents } from "./WsEventsProvider.js";
+export type { WsEvent } from "@orch/shared";

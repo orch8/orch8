@@ -1,6 +1,6 @@
 // packages/dashboard/src/hooks/useChatStream.ts
 import { useEffect, useRef, useState } from "react";
-import { useWsEvents, type WsEvent } from "./WsEventsProvider.js";
+import { useWsEvents } from "./WsEventsProvider.js";
 
 interface StreamingMessage {
   messageId: string;
@@ -27,31 +27,28 @@ export function useChatStream(chatId: string): {
     messageIdRef.current = null;
     setStreaming(null);
 
-    const offStarted = subscribe("chat_message_started", (event: WsEvent) => {
+    const offStarted = subscribe("chat_message_started", (event) => {
       if (event.chatId !== chatId) return;
-      const messageId = event.messageId as string;
-      messageIdRef.current = messageId;
+      messageIdRef.current = event.messageId;
       bufferRef.current = "";
-      setStreaming({ messageId, buffer: "" });
+      setStreaming({ messageId: event.messageId, buffer: "" });
     });
 
-    const offChunk = subscribe("chat_message_chunk", (event: WsEvent) => {
+    const offChunk = subscribe("chat_message_chunk", (event) => {
       if (event.chatId !== chatId) return;
-      const messageId = event.messageId as string;
-      const chunk = event.chunk as string;
-      if (messageIdRef.current !== messageId) return;
-      bufferRef.current += chunk;
-      setStreaming({ messageId, buffer: bufferRef.current });
+      if (messageIdRef.current !== event.messageId) return;
+      bufferRef.current += event.chunk;
+      setStreaming({ messageId: event.messageId, buffer: bufferRef.current });
     });
 
-    const offComplete = subscribe("chat_message_complete", (event: WsEvent) => {
+    const offComplete = subscribe("chat_message_complete", (event) => {
       if (event.chatId !== chatId) return;
       bufferRef.current = "";
       messageIdRef.current = null;
       setStreaming(null);
     });
 
-    const offError = subscribe("chat_message_error", (event: WsEvent) => {
+    const offError = subscribe("chat_message_error", (event) => {
       if (event.chatId !== chatId) return;
       bufferRef.current = "";
       messageIdRef.current = null;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useDaemonStatus, useRestartDaemon } from "../../hooks/useDaemon.js";
-import { useWsEvents, type WsEvent } from "../../hooks/WsEventsProvider.js";
+import { useWsEvents } from "../../hooks/WsEventsProvider.js";
 import { ConfirmDialog } from "../shared/ConfirmDialog.js";
 
 const LOG_COLORS: Record<string, string> = {
@@ -29,13 +29,13 @@ export function DaemonPageComponent() {
 
   // Subscribe to daemon:log events
   useEffect(() => {
-    const unsub = subscribe("daemon:log", (event: WsEvent) => {
+    const unsub = subscribe("daemon:log", (event) => {
       setLogs((prev) => {
         const next = [...prev, {
           id: ++logIdRef.current,
-          level: (event as any).level ?? "info",
-          message: (event as any).message ?? "",
-          timestamp: (event as any).timestamp ?? new Date().toISOString(),
+          level: event.level,
+          message: event.message,
+          timestamp: event.timestamp,
         }];
         return next.slice(-500); // Keep last 500 lines
       });

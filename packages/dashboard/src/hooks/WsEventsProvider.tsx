@@ -2,6 +2,7 @@ import { createContext, useContext, useCallback, useRef, useMemo } from "react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
+import type { WsEvent, WsEventType, WsEventByType } from "@orch/shared";
 import { useWebSocket } from "./useWebSocket.js";
 import { useToastStore } from "../stores/toast.js";
 
@@ -22,24 +23,23 @@ function extractProjectIdFromPath(pathname: string): string | null {
   return match[1] ?? null;
 }
 
-export interface WsEvent {
-  type: string;
-  taskId?: string;
-  agentId?: string;
-  runId?: string;
-  chatId?: string;
-  messageId?: string;
-  cardId?: string;
-  chunk?: string;
-  [key: string]: unknown;
-}
-
-type EventHandler = (event: WsEvent) => void;
+/**
+ * Subscriber callback for a specific event type. The callback receives
+ * the exact variant selected by `eventType`, so e.g. subscribing to
+ * `"chat_message_chunk"` yields an event with `chatId`, `messageId`, and
+ * `chunk` as string fields — no runtime casts needed.
+ */
+type EventHandler<T extends WsEventType = WsEventType> = (
+  event: WsEventByType<T>,
+) => void;
 
 interface WsEventsContextValue {
   connected: boolean;
   send: (data: unknown) => void;
-  subscribe: (eventType: string, handler: EventHandler) => () => void;
+  subscribe: <T extends WsEventType>(
+    eventType: T,
+    handler: EventHandler<T>,
+  ) => () => void;
 }
 
 const WsEventsContext = createContext<WsEventsContextValue | null>(null);
@@ -52,16 +52,25 @@ const TOAST_TYPES = new Set([
 export function WsEventsProvider({ children }: { children: ReactNode }) {
   const addToast = useToastStore((s) => s.add);
   const qc = useQueryClient();
-  const handlersRef = useRef<Map<string, Set<EventHandler>>>(new Map());
+  // Typed as a loose handler set internally; `subscribe` gates insertion
+  // to the narrow generic signature so each call site remains type-safe.
+  const handlersRef = useRef<Map<string, Set<(event: WsEvent) => void>>>(new Map());
 
   const subscribe = useCallback(
-    (eventType: string, handler: EventHandler) => {
+    <T extends WsEventType>(
+      eventType: T,
+      handler: EventHandler<T>,
+    ) => {
       if (!handlersRef.current.has(eventType)) {
         handlersRef.current.set(eventType, new Set());
       }
-      handlersRef.current.get(eventType)!.add(handler);
+      // Safe narrowing: we only invoke this handler when dispatching an
+      // event whose `type` equals `eventType`, so the cast from
+      // `(WsEvent) => void` back to the narrow variant holds at runtime.
+      const loose = handler as (event: WsEvent) => void;
+      handlersRef.current.get(eventType)!.add(loose);
       return () => {
-        handlersRef.current.get(eventType)?.delete(handler);
+        handlersRef.current.get(eventType)?.delete(loose);
       };
     },
     [],
@@ -69,21 +78,19 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
 
   const onMessage = useCallback(
     (data: unknown) => {
+      // Treat incoming frames as WsEvent. The websocket is a trusted
+      // in-cluster channel; no runtime validation needed here, only
+      // discriminator narrowing below.
       const event = data as WsEvent;
-      if (!event.type) return;
+      if (!event || typeof event.type !== "string") return;
 
       handlersRef.current.get(event.type)?.forEach((h) => h(event));
 
       switch (event.type) {
-        case "task_updated":
-        case "task_created":
         case "task_transitioned":
           qc.invalidateQueries({ queryKey: ["tasks"] });
-          if (event.taskId) {
-            qc.invalidateQueries({ queryKey: ["task", event.taskId] });
-          }
+          qc.invalidateQueries({ queryKey: ["task", event.taskId] });
           break;
-        case "agent_updated":
         case "agent_paused":
         case "agent_resumed":
           qc.invalidateQueries({ queryKey: ["agents"] });
@@ -92,9 +99,7 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
         case "run_completed":
         case "run_failed":
           qc.invalidateQueries({ queryKey: ["runs"] });
-          if (event.runId) {
-            qc.invalidateQueries({ queryKey: ["run", event.runId] });
-          }
+          qc.invalidateQueries({ queryKey: ["run", event.runId] });
           break;
         case "budget_alert":
           qc.invalidateQueries({ queryKey: ["costSummary"] });
@@ -102,14 +107,13 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
           break;
         case "notification:new": {
           qc.invalidateQueries({ queryKey: ["notifications"] });
-          const notifType = (event as any).notificationType as string;
-          if (TOAST_TYPES.has(notifType)) {
+          if (TOAST_TYPES.has(event.notificationType)) {
             addToast({
-              id: (event as any).id ?? String(Date.now()),
-              type: notifType ?? "info",
-              title: (event as any).title ?? "Notification",
-              message: (event as any).message ?? "",
-              link: (event as any).link,
+              id: event.id,
+              type: event.notificationType,
+              title: event.title,
+              message: event.message,
+              link: event.link ?? undefined,
             });
           }
           break;
@@ -118,10 +122,8 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
         case "verification:response":
         case "verification:referee":
           qc.invalidateQueries({ queryKey: ["tasks"] });
-          if (event.taskId) {
-            qc.invalidateQueries({ queryKey: ["task", event.taskId] });
-            qc.invalidateQueries({ queryKey: ["comments", event.taskId] });
-          }
+          qc.invalidateQueries({ queryKey: ["task", event.taskId] });
+          qc.invalidateQueries({ queryKey: ["comments", event.taskId] });
           break;
         case "daemon:stats":
           qc.invalidateQueries({ queryKey: ["daemonStatus"] });
@@ -130,9 +132,7 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
           qc.invalidateQueries({ queryKey: ["activity"] });
           break;
         case "comment:new":
-          if (event.taskId) {
-            qc.invalidateQueries({ queryKey: ["comments", event.taskId] });
-          }
+          qc.invalidateQueries({ queryKey: ["comments", event.taskId] });
           break;
         case "run_event":
           // Handled by useRunEventStream subscribers — no invalidation needed.
@@ -144,20 +144,17 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
           // Same — pure live event.
           break;
         case "chat_message_complete":
-          if (event.chatId) {
-            qc.invalidateQueries({ queryKey: ["chatMessages", event.chatId] });
-            qc.invalidateQueries({ queryKey: ["chats"] });
-          }
+          qc.invalidateQueries({ queryKey: ["chatMessages", event.chatId] });
+          qc.invalidateQueries({ queryKey: ["chats"] });
           break;
         case "chat_message_error":
-          if (event.chatId) {
-            qc.invalidateQueries({ queryKey: ["chatMessages", event.chatId] });
-          }
+          qc.invalidateQueries({ queryKey: ["chatMessages", event.chatId] });
           break;
         case "chat_card_decision":
-          if (event.chatId) {
-            qc.invalidateQueries({ queryKey: ["chatMessages", event.chatId] });
-          }
+          qc.invalidateQueries({ queryKey: ["chatMessages", event.chatId] });
+          break;
+        case "daemon:log":
+          // Pure live log stream consumed by DaemonPage subscribers.
           break;
       }
     },

@@ -72,3 +72,6 @@ export type LogFilter = z.infer<typeof LogFilterSchema>;
 import type { AddBundledAgentsSchema } from "../schemas/index.js";
 
 export type AddBundledAgents = z.infer<typeof AddBundledAgentsSchema>;
+
+// WebSocket event discriminated union (daemon → dashboard).
+export * from "./ws-events.js";
