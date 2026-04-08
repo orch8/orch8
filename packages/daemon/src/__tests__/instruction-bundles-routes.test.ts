@@ -3,7 +3,7 @@ import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { projects, agents, instructionBundles } from "@orch/shared/db";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 import Fastify from "fastify";
 import { authPlugin } from "../api/middleware/auth.js";
 import { instructionBundleRoutes } from "../api/routes/instruction-bundles.js";
@@ -125,12 +125,47 @@ describe("instruction-bundles routes", () => {
   });
 
   it("PATCH /api/agents/:id/instructions updates mode", async () => {
+    const validRoot = join(homedir(), ".orch8", "projects", projectId, "agents", "agent-1", "instructions");
     const res = await app.inject({
       method: "PATCH",
       url: "/api/agents/agent-1/instructions",
       headers: { "x-project-id": projectId },
-      payload: { mode: "external", rootPath: "/some/path" },
+      payload: { mode: "external", rootPath: validRoot },
     });
     expect(res.statusCode).toBe(200);
+  });
+
+  it("PATCH /api/agents/:id/instructions rejects rootPath outside ~/.orch8/projects/", async () => {
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/agents/agent-1/instructions",
+      headers: { "x-project-id": projectId },
+      payload: { mode: "external", rootPath: "/etc" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe("validation_error");
+  });
+
+  it("PATCH /api/agents/:id/instructions rejects rootPath that escapes via ..", async () => {
+    const sneaky = join(homedir(), ".orch8", "projects", "..", "..", "etc");
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/agents/agent-1/instructions",
+      headers: { "x-project-id": projectId },
+      payload: { mode: "external", rootPath: sneaky },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe("validation_error");
+  });
+
+  it("PATCH /api/agents/:id/instructions rejects invalid mode enum", async () => {
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/agents/agent-1/instructions",
+      headers: { "x-project-id": projectId },
+      payload: { mode: "bogus" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe("validation_error");
   });
 });

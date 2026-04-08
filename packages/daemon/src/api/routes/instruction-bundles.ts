@@ -1,4 +1,18 @@
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+
+const UpdateInstructionBundleSchema = z.object({
+  mode: z.enum(["managed", "external"]),
+  rootPath: z.string().optional(),
+  entryFile: z
+    .string()
+    .refine((v) => !v.includes("..") && !v.startsWith("/"), {
+      message: "entryFile must be relative and must not contain '..'",
+    })
+    .optional(),
+});
 
 export async function instructionBundleRoutes(app: FastifyInstance) {
   // GET /api/agents/:id/instructions
@@ -20,9 +34,22 @@ export async function instructionBundleRoutes(app: FastifyInstance) {
     if (!projectId) {
       return reply.code(400).send({ error: "validation_error", message: "projectId is required" });
     }
-    const body = request.body as { mode?: string; rootPath?: string; entryFile?: string };
+    const parsed = UpdateInstructionBundleSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
+    }
+    if (parsed.data.rootPath !== undefined) {
+      const resolved = resolve(parsed.data.rootPath);
+      const allowedRoot = join(homedir(), ".orch8", "projects");
+      if (!resolved.startsWith(allowedRoot + "/") && resolved !== allowedRoot) {
+        return reply.code(400).send({
+          error: "validation_error",
+          message: "rootPath must be under ~/.orch8/projects/",
+        });
+      }
+    }
     try {
-      await app.instructionBundleService.updateMode(id, projectId, body as any);
+      await app.instructionBundleService.updateMode(id, projectId, parsed.data);
       return { ok: true };
     } catch (err: any) {
       if (err.message?.includes("not found")) return reply.code(404).send({ error: err.message });
