@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useCreateTask } from "../../hooks/useTasks.js";
 import { useCreatePipeline } from "../../hooks/usePipelines.js";
 import { usePipelineTemplates } from "../../hooks/usePipelineTemplates.js";
 import { useAgents } from "../../hooks/useAgents.js";
+import { useModalA11y } from "../../hooks/useModalA11y.js";
 import { FormField } from "../shared/FormField.js";
 import { MarkdownEditor } from "../shared/MarkdownEditor.js";
 
@@ -24,6 +25,9 @@ export function TaskCreateModal({ projectId, open, onClose }: TaskCreateModalPro
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [assignee, setAssignee] = useState("");
   const [templateId, setTemplateId] = useState("");
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useModalA11y(dialogRef, open, onClose);
 
   if (!open) return null;
 
@@ -63,9 +67,16 @@ export function TaskCreateModal({ projectId, open, onClose }: TaskCreateModalPro
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg rounded-lg border border-zinc-800 bg-zinc-900 p-6 shadow-xl">
-        <h3 className="mb-4 text-lg font-semibold text-zinc-100">Create Task</h3>
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} aria-hidden="true" />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="task-create-modal-title"
+        onClick={(e) => e.stopPropagation()}
+        className="relative z-10 w-full max-w-lg rounded-lg border border-zinc-800 bg-zinc-900 p-6 shadow-xl"
+      >
+        <h3 id="task-create-modal-title" className="mb-4 text-lg font-semibold text-zinc-100">Create Task</h3>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <FormField label="Title" required>
             <input

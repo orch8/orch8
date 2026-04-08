@@ -28,6 +28,11 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
   // First task
   const [taskTitle, setTaskTitle] = useState("");
 
+  // Surfaced error from mutations on the final step. Rendered near the
+  // complete button; on failure the wizard stays on its current step.
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
   function toggleAgent(agentId: string) {
     setSelectedAgentIds((prev) =>
       prev.includes(agentId)
@@ -135,37 +140,59 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
               className="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none"
             />
           </FormField>
+          {error && (
+            <div
+              role="alert"
+              className="rounded-md border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300"
+            >
+              {error}
+            </div>
+          )}
         </div>
       ),
     },
   ];
 
   async function handleComplete() {
+    if (submitting) return;
+    setError(null);
+    setSubmitting(true);
+
     // Create project
     const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const project = await createProject.mutateAsync({
-      name: projectName,
-      slug,
-      description: "",
-      homeDir: repoPath,
-      worktreeDir: `${repoPath}/.worktrees`,
-      defaultBranch,
-      budgetLimitUsd: dailyBudget ? parseFloat(dailyBudget) : undefined,
-    });
+    let project: { id: string };
+    try {
+      project = await createProject.mutateAsync({
+        name: projectName,
+        slug,
+        description: "",
+        homeDir: repoPath,
+        worktreeDir: `${repoPath}/.worktrees`,
+        defaultBranch,
+        budgetLimitUsd: dailyBudget ? parseFloat(dailyBudget) : undefined,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to create project");
+      setSubmitting(false);
+      return;
+    }
 
-    // Batch-create selected bundled agents
+    // Batch-create selected bundled agents. Surface failures so the user
+    // can retry instead of silently advancing to a broken project.
     if (selectedAgentIds.length > 0) {
       try {
         await addBundledAgents.mutateAsync({
           projectId: project.id,
           agentIds: selectedAgentIds,
         });
-      } catch {
-        // Agent creation failure should not block wizard completion
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to add agents");
+        setSubmitting(false);
+        return;
       }
     }
 
-    // Create task if title given
+    // Create task if title given.
     if (taskTitle.trim()) {
       try {
         await createTask.mutateAsync({
@@ -174,11 +201,14 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
           taskType: "quick",
           priority: "medium",
         } as any);
-      } catch {
-        // Task creation failure should not block wizard completion
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to create task");
+        setSubmitting(false);
+        return;
       }
     }
 
+    setSubmitting(false);
     onComplete(project.id);
   }
 
