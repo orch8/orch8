@@ -1,12 +1,13 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState, useParams } from "@tanstack/react-router";
 import { useUiStore } from "../../stores/ui.js";
+import { useDaemonStatus } from "../../hooks/useDaemon.js";
 import { ProjectSwitcher } from "./ProjectSwitcher.js";
 import { NotificationBell } from "./NotificationBell.js";
-import { useParams } from "@tanstack/react-router";
 
 interface NavItem {
   to: string;
   label: string;
+  count?: number;
 }
 
 interface NavSection {
@@ -43,13 +44,16 @@ function useProjectSections(): NavSection[] {
         { to: `${prefix}/activity`, label: "Activity" },
       ],
     },
-    {
-      title: "SYSTEM",
-      items: [
-        { to: "/daemon", label: "Daemon" },
-      ],
-    },
   ];
+}
+
+function navItemClass(active: boolean): string {
+  // 2px left stripe carries active state. No rounded-pill background.
+  const base =
+    "focus-ring relative flex items-center justify-between pl-3 pr-3 py-1.5 type-ui transition-colors";
+  return active
+    ? `${base} bg-surface text-ink before:absolute before:left-0 before:top-0 before:h-full before:w-[2px] before:bg-accent`
+    : `${base} text-mute hover:bg-surface-2 hover:text-ink`;
 }
 
 export function Sidebar() {
@@ -59,6 +63,7 @@ export function Sidebar() {
     select: (s) => s.location.pathname,
   });
   const sections = useProjectSections();
+  const { data: daemonStatus } = useDaemonStatus();
 
   if (!sidebarOpen) return null;
 
@@ -68,59 +73,53 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950">
+    <aside className="flex w-52 shrink-0 flex-col border-r border-edge-soft bg-sidebar">
       {/* Project Switcher */}
-      <div className="border-b border-zinc-800 p-4">
+      <div className="border-b border-edge-soft p-4">
         <ProjectSwitcher />
       </div>
 
       {/* Navigation */}
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
-        {/* Chat — top of nav */}
+      <nav className="flex flex-1 flex-col overflow-y-auto px-2 py-3">
+        {/* Chat + Briefing — top of nav, no group label, no glyph.
+            Chat is the project landing (routes/$projectId/index.tsx still
+            redirects to /chat). Briefing is a separate destination below it. */}
         {params.projectId && (
-          <Link
-            to={"/projects/$projectId/chat" as any}
-            params={{ projectId: params.projectId } as any}
-            className={`mb-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
-              pathname.startsWith(`/projects/${params.projectId}/chat`)
-                ? "bg-sky-700/30 text-sky-200"
-                : "bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
-            }`}
-          >
-            <span className="mr-1">★</span> Chat
-          </Link>
+          <>
+            <Link
+              to={`/projects/${params.projectId}/chat` as any}
+              className={navItemClass(
+                pathname.startsWith(`/projects/${params.projectId}/chat`),
+              )}
+            >
+              <span>Chat</span>
+            </Link>
+            <Link
+              to={`/projects/${params.projectId}/briefing` as any}
+              className={navItemClass(
+                pathname.startsWith(`/projects/${params.projectId}/briefing`),
+              )}
+            >
+              <span>Briefing</span>
+            </Link>
+          </>
         )}
 
-        {/* Home */}
-        <Link
-          to={(params.projectId ? `/projects/${params.projectId}` : "/") as any}
-          className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-            pathname === "/" || pathname === `/projects/${params.projectId}`
-              ? "bg-zinc-800 text-zinc-100"
-              : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
-          }`}
-        >
-          Home
-        </Link>
-
-        {/* Sections */}
+        {/* Grouped sections */}
         {sections.map((section) => (
-          <div key={section.title} className="mt-3">
-            <span className="px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
-              {section.title}
-            </span>
-            <div className="mt-1 flex flex-col gap-0.5">
+          <div key={section.title} className="mt-5">
+            <span className="px-3 type-label text-whisper">{section.title}</span>
+            <div className="mt-1 flex flex-col">
               {section.items.map((item) => (
                 <Link
                   key={item.to}
                   to={item.to as any}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    isActive(item.to)
-                      ? "bg-zinc-800 text-zinc-100"
-                      : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
-                  }`}
+                  className={navItemClass(isActive(item.to))}
                 >
-                  {item.label}
+                  <span>{item.label}</span>
+                  {item.count != null && (
+                    <span className="type-mono text-whisper">{item.count}</span>
+                  )}
                 </Link>
               ))}
             </div>
@@ -128,15 +127,24 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-zinc-800 p-3">
+      {/* Footer: daemon link (sage pulse) + notification bell */}
+      <div className="border-t border-edge-soft px-3 py-3">
         <div className="flex items-center justify-between">
+          <Link
+            to={"/daemon" as any}
+            className="focus-ring flex items-center gap-2 text-mute hover:text-ink"
+          >
+            <span
+              aria-hidden
+              className="inline-block h-1.5 w-1.5 rounded-full bg-accent"
+            />
+            <span className="type-mono">
+              daemon{daemonStatus?.uptimeFormatted ? ` ${daemonStatus.uptimeFormatted}` : ""}
+            </span>
+          </Link>
           {params.projectId ? (
             <NotificationBell projectId={params.projectId} />
-          ) : (
-            <span />
-          )}
-          <span className="text-[10px] text-zinc-600">orch8</span>
+          ) : null}
         </div>
       </div>
     </aside>
