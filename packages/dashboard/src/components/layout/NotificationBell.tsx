@@ -1,6 +1,9 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
-import { useNotifications, useMarkNotificationsRead } from "../../hooks/useNotifications.js";
+import {
+  useNotifications,
+  useMarkNotificationsRead,
+} from "../../hooks/useNotifications.js";
 
 interface NotificationBellProps {
   projectId: string;
@@ -16,17 +19,6 @@ function relativeTime(dateStr: string | Date): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  verification_failed: "❌",
-  verification_passed: "✅",
-  budget_warning: "⚠️",
-  budget_exceeded: "🚫",
-  agent_failure: "💥",
-  brainstorm_ready: "💡",
-  task_completed: "🎉",
-  stuck_task: "🔒",
-};
-
 export function NotificationBell({ projectId }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -38,7 +30,6 @@ export function NotificationBell({ projectId }: NotificationBellProps) {
     [notifications],
   );
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
@@ -56,9 +47,8 @@ export function NotificationBell({ projectId }: NotificationBellProps) {
         type="button"
         aria-label="Notifications"
         onClick={() => setOpen(!open)}
-        className="relative rounded p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+        className="focus-ring relative rounded-sm p-1.5 text-mute hover:bg-surface-2 hover:text-ink"
       >
-        {/* Bell SVG */}
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
           <path
             d="M9 2a5 5 0 0 0-5 5v2.5L3 11v1h12v-1l-1-1.5V7a5 5 0 0 0-5-5Z"
@@ -66,38 +56,41 @@ export function NotificationBell({ projectId }: NotificationBellProps) {
             strokeWidth="1.5"
             strokeLinejoin="round"
           />
-          <path d="M7 13a2 2 0 1 0 4 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <path
+            d="M7 13a2 2 0 1 0 4 0"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
         </svg>
 
-        {/* Unread badge */}
+        {/* Spec: amber dot for unread. No count, no filled red badge. */}
         {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-            {unreadCount}
-          </span>
+          <span
+            aria-label={`${unreadCount} unread`}
+            className="absolute -right-0.5 -top-0.5 inline-block h-2 w-2 rounded-full bg-amber"
+          />
         )}
       </button>
 
-      {/* Dropdown */}
       {open && (
-        <div className="absolute bottom-full right-0 mb-2 w-80 rounded-lg border border-zinc-800 bg-zinc-900 shadow-xl">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-2">
-            <span className="text-xs font-semibold text-zinc-300">Notifications</span>
+        <div className="absolute bottom-full right-0 mb-2 w-80 rounded-md border border-edge-soft bg-surface shadow-xl">
+          <div className="flex items-center justify-between border-b border-edge-soft px-3 py-2">
+            <span className="type-label text-mute">NOTIFICATIONS</span>
             {unreadCount > 0 && (
               <button
                 type="button"
                 onClick={() => markRead.mutate({ all: true })}
-                className="text-xs text-blue-400 hover:text-blue-300"
+                className="focus-ring type-ui text-accent hover:text-[color:var(--color-accent-hover)]"
               >
                 Mark all read
               </button>
             )}
           </div>
 
-          {/* List */}
           <div className="max-h-80 overflow-y-auto">
             {(!notifications || notifications.length === 0) && (
-              <p className="px-3 py-4 text-center text-xs text-zinc-600">
+              <p className="px-3 py-4 text-center type-micro text-whisper">
                 No notifications
               </p>
             )}
@@ -105,19 +98,16 @@ export function NotificationBell({ projectId }: NotificationBellProps) {
               <Link
                 key={ntf.id}
                 to={(ntf.link ?? "/") as any}
-                className={`flex gap-2 px-3 py-2 text-sm hover:bg-zinc-800 ${
-                  !ntf.read ? "bg-zinc-800/40" : ""
+                className={`flex flex-col gap-0.5 border-b border-dashed border-edge-soft px-3 py-2 last:border-0 hover:bg-surface-2 ${
+                  !ntf.read ? "bg-surface-2" : ""
                 }`}
                 onClick={() => setOpen(false)}
               >
-                <span className="shrink-0 text-sm">
-                  {TYPE_ICONS[ntf.type] ?? "📌"}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-zinc-200">{ntf.title}</p>
-                  <p className="truncate text-xs text-zinc-500">{ntf.message}</p>
-                  <p className="mt-0.5 text-xs text-zinc-600">{relativeTime(ntf.createdAt)}</p>
-                </div>
+                <p className="truncate type-body text-ink">{ntf.title}</p>
+                <p className="truncate type-micro text-mute">{ntf.message}</p>
+                <p className="type-mono text-whisper">
+                  {relativeTime(ntf.createdAt)}
+                </p>
               </Link>
             ))}
           </div>

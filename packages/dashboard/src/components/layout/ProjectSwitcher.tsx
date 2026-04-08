@@ -13,7 +13,6 @@ export function ProjectSwitcher() {
 
   const currentProject = projects?.find((p) => p.id === currentProjectId);
 
-  // Close popover on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -25,7 +24,6 @@ export function ProjectSwitcher() {
   }, []);
 
   function switchProject(newProjectId: string) {
-    // Preserve current page when switching projects
     const currentSuffix = currentProjectId
       ? pathname.replace(`/projects/${currentProjectId}`, "")
       : "";
@@ -36,57 +34,80 @@ export function ProjectSwitcher() {
 
   return (
     <div ref={ref} className="relative">
-      {/* Trigger */}
+      {/* Trigger: mono eyebrow + serif name + live meta */}
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-900"
+        className="focus-ring flex w-full flex-col items-start gap-1 rounded-sm px-2 py-1.5 text-left hover:bg-surface-2"
       >
-        <span className="truncate">
-          {isLoading ? "Loading..." : currentProject?.name ?? "Select Project"}
+        <span className="type-label text-whisper">PROJECT</span>
+        <span className="flex w-full items-center justify-between gap-2">
+          <span className="min-w-0 truncate type-section text-ink">
+            {isLoading ? "Loading…" : currentProject?.name ?? "Select Project"}
+          </span>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          >
+            <path
+              d="M3 4.5l3 3 3-3"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </span>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 12 12"
-          fill="none"
-          className={`ml-2 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-        >
-          <path d="M3 4.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        {currentProjectId && (
+          <span className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="inline-block h-1.5 w-1.5 rounded-full bg-accent"
+            />
+            <span className="type-mono text-mute">ready</span>
+          </span>
+        )}
       </button>
 
       {/* Popover */}
       {open && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-md border border-edge-soft bg-surface py-1 shadow-xl">
           {projects?.map((project) => (
             <div
               key={project.id}
               className={`flex items-center justify-between px-2 py-1.5 ${
                 project.id === currentProjectId
-                  ? "bg-zinc-800"
-                  : "hover:bg-zinc-800/50"
+                  ? "bg-surface-2"
+                  : "hover:bg-surface-2"
               }`}
             >
               <button
                 onClick={() => switchProject(project.id)}
-                className="flex-1 truncate text-left text-sm text-zinc-200"
+                className="focus-ring flex-1 truncate text-left type-body text-ink"
               >
                 {project.name}
               </button>
               <div className="flex items-center gap-1">
                 {!project.active && (
-                  <span className="text-xs text-zinc-600">archived</span>
+                  <span className="type-label text-whisper">archived</span>
                 )}
                 {project.id === currentProjectId && (
                   <Link
                     to={`/projects/${project.id}/settings` as any}
                     onClick={() => setOpen(false)}
-                    className="rounded p-0.5 text-zinc-600 hover:text-zinc-400"
+                    className="focus-ring rounded-sm p-0.5 text-whisper hover:text-mute"
                     title="Project settings"
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                       <circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2" />
-                      <path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.17 2.17l1.06 1.06M8.77 8.77l1.06 1.06M9.83 2.17l-1.06 1.06M3.23 8.77l-1.06 1.06" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                      <path
+                        d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.17 2.17l1.06 1.06M8.77 8.77l1.06 1.06M9.83 2.17l-1.06 1.06M3.23 8.77l-1.06 1.06"
+                        stroke="currentColor"
+                        strokeWidth="1.2"
+                        strokeLinecap="round"
+                      />
                     </svg>
                   </Link>
                 )}
@@ -94,12 +115,11 @@ export function ProjectSwitcher() {
             </div>
           ))}
 
-          {/* New Project link */}
-          <div className="border-t border-zinc-800 px-2 pt-1">
+          <div className="border-t border-edge-soft px-2 pt-1">
             <Link
               to="/projects/new"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-1 rounded px-1 py-1.5 text-sm text-zinc-500 hover:text-zinc-300"
+              className="focus-ring flex items-center gap-1 rounded-sm px-1 py-1.5 type-body text-mute hover:text-ink"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />

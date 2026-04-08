@@ -49,7 +49,7 @@ describe("NotificationBell", () => {
     renderWithProviders(<NotificationBell projectId="proj_1" />);
 
     await waitFor(() => {
-      expect(screen.getByText("1")).toBeInTheDocument(); // 1 unread
+      expect(screen.getByLabelText("1 unread")).toBeInTheDocument();
     });
   });
 
