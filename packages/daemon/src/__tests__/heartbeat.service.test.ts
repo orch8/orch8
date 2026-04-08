@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/shared/db";
+import { projects, agents, heartbeatRuns, wakeupRequests, tasks, runEvents } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { makeFailingTxDb } from "./helpers/failing-tx.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
 
@@ -28,6 +29,7 @@ describe("HeartbeatService", () => {
   });
 
   beforeEach(async () => {
+    await testDb.db.delete(runEvents);
     await testDb.db.delete(wakeupRequests);
     await testDb.db.delete(heartbeatRuns);
     await testDb.db.delete(tasks);
@@ -743,6 +745,231 @@ describe("HeartbeatService", () => {
         { runCount: 100, totalInputTokens: 1_000_000, sessionAgeHours: 36 },
       );
       expect(result.needsRotation).toBe(false);
+    });
+  });
+
+  describe("budget update transaction (2.1)", () => {
+    it("rolls back agent + project increments when the project update fails mid-transaction", async () => {
+      await testDb.db.update(projects).set({
+        budgetLimitUsd: 10,
+        budgetSpentUsd: 0,
+      });
+      await testDb.db.insert(agents).values({
+        id: "eng-1",
+        projectId,
+        name: "Eng",
+        role: "engineer",
+        adapterType: "claude_local",
+        adapterConfig: {},
+        budgetSpentUsd: 5,
+        budgetLimitUsd: 20,
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      // Adapter returns a non-zero cost so the budget transaction runs
+      const mockAdapter = {
+        runAgent: async () => ({
+          sessionId: null, model: null, result: "done",
+          usage: null, costUsd: 6, billingType: "api" as const,
+          exitCode: 0, signal: null, error: null, errorCode: null, events: [],
+        }),
+      };
+
+      // Build a HeartbeatService with a db whose transaction tx throws on
+      // the projects UPDATE. The agent increment happens first inside the
+      // transaction callback and must roll back.
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const failingDb = makeFailingTxDb(testDb.db, {
+        failUpdateOnTable: projects,
+        onlyInTransaction: true,
+        error: new Error("simulated project update failure"),
+      });
+      const failingService = new HeartbeatService(failingDb, broadcastService);
+      failingService.setAdapter(mockAdapter as any);
+
+      try {
+        await failingService.executeRun(run.id);
+      } finally {
+        failingService.shutdown();
+      }
+
+      // Run ends in a failed state — the execution_error from the transaction
+      // propagates through the run's catch block.
+      const [finished] = await testDb.db
+        .select()
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.id, run.id));
+      expect(finished.status).toBe("failed");
+
+      // Agent budgetSpentUsd must NOT have been incremented — the transaction
+      // rolled back the agent update when the project update failed.
+      const [agent] = await testDb.db
+        .select()
+        .from(agents)
+        .where(eq(agents.id, "eng-1"));
+      expect(agent.budgetSpentUsd).toBe(5);
+
+      const [proj] = await testDb.db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, projectId));
+      expect(proj.budgetSpentUsd).toBe(0);
+    });
+  });
+
+  describe("withAgentLock serialization (2.6)", () => {
+    it("serializes concurrent calls so fn bodies never overlap", async () => {
+      // Use the public surface: startNextQueuedRunForAgent wraps its body in
+      // withAgentLock. We insert a queued run to make the body do observable
+      // work, and track ordering via shared counters.
+      await testDb.db.insert(agents).values({
+        id: "lock-agent",
+        projectId,
+        name: "Locker",
+        role: "engineer",
+        maxConcurrentRuns: 1,
+      });
+
+      let inside = 0;
+      let maxInside = 0;
+      const overlaps: number[] = [];
+
+      const withLock = (service as unknown as {
+        withAgentLock<T>(id: string, fn: () => Promise<T>): Promise<T>;
+      }).withAgentLock.bind(service);
+
+      const body = async (delay: number): Promise<void> => {
+        inside++;
+        overlaps.push(inside);
+        if (inside > maxInside) maxInside = inside;
+        await new Promise((r) => setTimeout(r, delay));
+        inside--;
+      };
+
+      await Promise.all([
+        withLock("lock-agent", () => body(30)),
+        withLock("lock-agent", () => body(10)),
+        withLock("lock-agent", () => body(5)),
+      ]);
+
+      expect(maxInside).toBe(1);
+      // Every observed concurrency count should be exactly 1.
+      expect(overlaps.every((n) => n === 1)).toBe(true);
+    });
+
+    it("allows different agents to run concurrently", async () => {
+      let aInside = false;
+      let bInside = false;
+      let overlapped = false;
+
+      const withLock = (service as unknown as {
+        withAgentLock<T>(id: string, fn: () => Promise<T>): Promise<T>;
+      }).withAgentLock.bind(service);
+
+      await Promise.all([
+        withLock("agent-a", async () => {
+          aInside = true;
+          await new Promise((r) => setTimeout(r, 20));
+          if (bInside) overlapped = true;
+          aInside = false;
+        }),
+        withLock("agent-b", async () => {
+          bInside = true;
+          await new Promise((r) => setTimeout(r, 20));
+          if (aInside) overlapped = true;
+          bInside = false;
+        }),
+      ]);
+
+      expect(overlapped).toBe(true);
+    });
+  });
+
+  describe("run_events insert failure handling (2.16)", () => {
+    it("logs via structured logger and still terminates the run", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1",
+        projectId,
+        name: "Eng",
+        role: "engineer",
+        adapterType: "claude_local",
+        adapterConfig: {},
+      });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "running",
+        startedAt: new Date(),
+      }).returning();
+
+      // Adapter that emits two events through onEvent then returns success.
+      // mapStreamEvent returns mapped records for "system/init" and "result"
+      // events — use those so pendingRunEventInserts has something to flush.
+      const mockAdapter = {
+        runAgent: async (_cfg: any, ctx: any) => {
+          if (ctx?.onEvent) {
+            ctx.onEvent({ type: "system", subtype: "init", model: "claude-4" });
+            ctx.onEvent({ type: "result", total_cost_usd: 0.01 });
+          }
+          return {
+            sessionId: null, model: null, result: "done",
+            usage: null, costUsd: null, billingType: "api" as const,
+            exitCode: 0, signal: null, error: null, errorCode: null, events: [],
+          };
+        },
+      };
+
+      // Fresh service with a failing db so the runEvents flush at stream end
+      // rejects. The service must still drive the run to a terminal state
+      // and report the failure through the structured logger.
+      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
+      const broadcastService = new BroadcastService(sockets);
+      const failingDb = makeFailingTxDb(testDb.db, {
+        failInsertOnTable: runEvents,
+        error: new Error("simulated run_events outage"),
+      });
+      const failingService = new HeartbeatService(failingDb, broadcastService);
+      failingService.setAdapter(mockAdapter as any);
+
+      const errorLogs: Array<[unknown, string]> = [];
+      failingService.setLogger({
+        info: () => {},
+        warn: () => {},
+        error: (ctx: unknown, msg: string) => { errorLogs.push([ctx, msg]); },
+        debug: () => {},
+        fatal: () => {},
+        trace: () => {},
+        child() { return this; },
+        level: "info",
+      } as any);
+
+      try {
+        await failingService.executeRun(run.id);
+      } finally {
+        failingService.shutdown();
+      }
+
+      // Run still reaches a terminal state despite the insert failure.
+      const [finished] = await testDb.db
+        .select()
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.id, run.id));
+      expect(["succeeded", "failed"]).toContain(finished.status);
+      expect(finished.finishedAt).toBeTruthy();
+
+      // The structured logger captured the failure (not console.error).
+      const flushFailure = errorLogs.find(([, msg]) =>
+        typeof msg === "string" && msg.includes("run_events"),
+      );
+      expect(flushFailure).toBeTruthy();
     });
   });
 });

@@ -3,7 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { deriveTrustLevel, ProjectSkillService } from "../services/project-skill.service.js";
 import { SeedingService } from "../services/seeding.service.js";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
-import { projects, projectSkills } from "@orch/shared/db";
+import { makeFailingTxDb } from "./helpers/failing-tx.js";
+import { agents as agentsTable, projects, projectSkills } from "@orch/shared/db";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -154,15 +155,15 @@ describe("ProjectSkillService", () => {
   });
 
   describe("list", () => {
-    it("returns all skills and auto-prunes missing directories", async () => {
-      // Insert two skills: one with a valid dir, one with a missing dir
+    it("returns all skill rows without touching the filesystem (side-effect free)", async () => {
       const validDir = join(projectHomeDir, ".orch8", "skills", "valid");
       await mkdir(validDir, { recursive: true });
       await writeFile(join(validDir, "SKILL.md"), "---\nname: Valid\n---\n# V\nContent");
 
       await service.create(projectId, { slug: "valid", sourceLocator: validDir });
 
-      // Insert a stale skill pointing to a non-existent dir
+      // Insert a row whose sourceLocator does NOT exist on disk.
+      // list() must NOT delete it — reconciliation only happens in syncFromDisk.
       await testDb.db.insert(projectSkills).values({
         projectId,
         slug: "stale",
@@ -174,8 +175,16 @@ describe("ProjectSkillService", () => {
 
       const skills = await service.list(projectId);
 
-      expect(skills).toHaveLength(1);
-      expect(skills[0].slug).toBe("valid");
+      expect(skills).toHaveLength(2);
+      const slugs = skills.map((s) => s.slug).sort();
+      expect(slugs).toEqual(["stale", "valid"]);
+
+      // Confirm the row is still in the DB after list() — no destructive side effect.
+      const rowsAfter = await testDb.db
+        .select()
+        .from(projectSkills)
+        .where(eq(projectSkills.projectId, projectId));
+      expect(rowsAfter).toHaveLength(2);
     });
   });
 
@@ -219,7 +228,6 @@ describe("ProjectSkillService", () => {
       await service.create(projectId, { slug: "doomed", sourceLocator: skillDir });
 
       // Insert an agent that references this skill
-      const { agents: agentsTable } = await import("@orch/shared/db");
       await testDb.db.insert(agentsTable).values({
         id: "agent-1",
         projectId,
@@ -375,6 +383,108 @@ describe("ProjectSkillService", () => {
       skills = await service.list(projectId);
       expect(skills[0].name).toBe("TDD v2");
       expect(skills[0].markdown).toContain("New content");
+
+      await rm(globalDir, { recursive: true, force: true });
+    });
+  });
+
+  describe("transactional atomicity (2.1)", () => {
+    it("delete rolls back agent desiredSkills updates when a later write fails", async () => {
+      const skillDir = join(projectHomeDir, ".orch8", "skills", "doomed");
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, "SKILL.md"), "---\nname: Doomed\n---\n# D\nContent");
+      await service.create(projectId, { slug: "doomed", sourceLocator: skillDir });
+
+      // Two agents referencing "doomed" — delete() updates them in a loop.
+      await testDb.db.insert(agentsTable).values([
+        {
+          id: "a-1",
+          projectId,
+          name: "A1",
+          role: "engineer",
+          status: "active",
+          model: "opus",
+          desiredSkills: ["doomed", "other"],
+        },
+        {
+          id: "a-2",
+          projectId,
+          name: "A2",
+          role: "engineer",
+          status: "active",
+          model: "opus",
+          desiredSkills: ["doomed", "other"],
+        },
+      ]);
+
+      // Fail on the first agents update inside the delete transaction. The
+      // skill row has already been deleted by this point inside the tx; the
+      // rollback must restore it AND leave both agents' desiredSkills
+      // untouched.
+      const failingDb = makeFailingTxDb(testDb.db, {
+        failUpdateOnTable: agentsTable,
+        error: new Error("simulated agent update failure"),
+      });
+      const failingService = new ProjectSkillService(failingDb);
+
+      await expect(failingService.delete(projectId, "doomed")).rejects.toThrow(
+        "simulated agent update failure",
+      );
+
+      // Skill row still exists — delete was rolled back.
+      const stillThere = await service.get(projectId, "doomed");
+      expect(stillThere).not.toBeNull();
+
+      // Both agents still list "doomed" — agent update was rolled back.
+      const rows = await testDb.db
+        .select()
+        .from(agentsTable)
+        .where(eq(agentsTable.projectId, projectId));
+      for (const row of rows) {
+        expect(row.desiredSkills).toContain("doomed");
+      }
+    });
+
+    it("syncFromDisk rolls back the entire reconciliation when a write fails", async () => {
+      // Seed one stale skill that should be pruned on sync.
+      await testDb.db.insert(projectSkills).values({
+        projectId,
+        slug: "stale",
+        name: "Stale",
+        markdown: "old",
+        sourceType: "global",
+        sourceLocator: "/tmp/gone",
+        trustLevel: "markdown_only",
+      });
+
+      // Build a global dir with one skill so syncFromDisk has work to do:
+      // insert "tdd" and prune "stale".
+      const globalDir = await mkdtemp(join(tmpdir(), "orch-global-rb-"));
+      const tddDir = join(globalDir, "tdd");
+      await mkdir(tddDir, { recursive: true });
+      await writeFile(join(tddDir, "SKILL.md"), "---\nname: TDD\n---\n# TDD\nContent");
+
+      // Force the projectSkills insert (step 4 of syncFromDisk) to fail.
+      const failingDb = makeFailingTxDb(testDb.db, {
+        failInsertOnTable: projectSkills,
+        error: new Error("simulated skill insert failure"),
+      });
+      const failingService = new ProjectSkillService(failingDb);
+
+      await expect(
+        failingService.syncFromDisk(projectId, projectHomeDir, globalDir),
+      ).rejects.toThrow("simulated skill insert failure");
+
+      // The stale row must still be present — the prune step was rolled back
+      // together with the failed insert. The transaction keeps step 4 and
+      // step 5 atomic.
+      const rows = await testDb.db
+        .select()
+        .from(projectSkills)
+        .where(eq(projectSkills.projectId, projectId));
+      const slugs = rows.map((r) => r.slug).sort();
+      expect(slugs).toContain("stale");
+      expect(slugs).not.toContain("tdd");
 
       await rm(globalDir, { recursive: true, force: true });
     });

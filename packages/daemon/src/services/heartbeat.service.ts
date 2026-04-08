@@ -448,6 +448,9 @@ export class HeartbeatService {
 
     let logHandle: LogHandle | undefined;
     let runLogger: RunLogger | undefined;
+    // Buffered run_events inserts, flushed in the finally block below.
+    type RunEventInsert = typeof runEvents.$inferInsert;
+    const pendingRunEventInserts: RunEventInsert[] = [];
 
     try {
       // 4. Fetch agent configuration
@@ -509,7 +512,19 @@ export class HeartbeatService {
         },
       };
 
-      // Real-time event emission (run viewer spec)
+      // Real-time event emission (run viewer spec).
+      //
+      // The dashboard listens to the WebSocket broadcast for live streaming,
+      // so broadcasts still fire synchronously per event. DB inserts, however,
+      // used to be unawaited fire-and-forget `.catch(console.error)` — under a
+      // fast token stream hundreds of promises piled up with no backpressure,
+      // and a DB outage silently dropped events through console.error instead
+      // of the structured logger.
+      //
+      // We now buffer InsertRunEvent rows in memory and flush them with a
+      // single multi-row insert in the run-cleanup finally block below. This
+      // bounds promise accumulation, provides backpressure naturally, and
+      // funnels any insert failure through the structured logger.
       let eventSeq = 0;
       const onEvent = (rawEvent: import("../adapter/types.js").StreamEvent): void => {
         const mapped = mapStreamEvent(rawEvent);
@@ -517,20 +532,16 @@ export class HeartbeatService {
           const seq = eventSeq++;
           const timestamp = new Date().toISOString();
 
-          // Fire-and-forget: DB insert + WebSocket broadcast
-          this.db
-            .insert(runEvents)
-            .values({
-              runId,
-              projectId: claimedRun.projectId,
-              seq,
-              timestamp: new Date(),
-              eventType: m.eventType,
-              toolName: m.toolName,
-              summary: m.summary,
-              payload: rawEvent,
-            })
-            .catch((err) => console.error(`[heartbeat] run_event insert failed: ${err}`));
+          pendingRunEventInserts.push({
+            runId,
+            projectId: claimedRun.projectId,
+            seq,
+            timestamp: new Date(),
+            eventType: m.eventType,
+            toolName: m.toolName,
+            summary: m.summary,
+            payload: rawEvent,
+          });
 
           this.broadcastService.runEvent(claimedRun.projectId, {
             runId,
@@ -697,30 +708,39 @@ export class HeartbeatService {
 
       // 9. Update agent budget spent
       if (result.costUsd && result.costUsd > 0) {
-        await this.db
-          .update(agents)
-          .set({
-            budgetSpentUsd: sql`${agents.budgetSpentUsd} + ${result.costUsd}`,
-            lastHeartbeat: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(agents.id, agent.id),
-              eq(agents.projectId, claimedRun.projectId),
-            ),
-          );
+        // Incrementing the agent and project budget counters and evaluating
+        // auto-pause must be atomic. A crash between the agent update and the
+        // project update would under-count project spend; a crash between the
+        // project update and autoPauseIfExhausted could skip the auto-pause
+        // check for a run whose cost we already recorded.
+        await this.db.transaction(async (tx) => {
+          await tx
+            .update(agents)
+            .set({
+              budgetSpentUsd: sql`${agents.budgetSpentUsd} + ${result.costUsd}`,
+              lastHeartbeat: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(agents.id, agent.id),
+                eq(agents.projectId, claimedRun.projectId),
+              ),
+            );
 
-        await this.db
-          .update(projects)
-          .set({
-            budgetSpentUsd: sql`${projects.budgetSpentUsd} + ${result.costUsd}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(projects.id, claimedRun.projectId));
+          await tx
+            .update(projects)
+            .set({
+              budgetSpentUsd: sql`${projects.budgetSpentUsd} + ${result.costUsd}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(projects.id, claimedRun.projectId));
 
-        // Auto-pause if budget exhausted (spec §9.2.4)
-        await autoPauseIfExhausted(this.db, agent.id, claimedRun.projectId, this.broadcastService);
+          // Auto-pause if budget exhausted (spec §9.2.4).
+          // Passes the tx handle so every pause read/write participates in
+          // the same transaction as the counter increments.
+          await autoPauseIfExhausted(tx, agent.id, claimedRun.projectId, this.broadcastService);
+        });
       }
 
       // 10. Broadcast completion
@@ -768,6 +788,24 @@ export class HeartbeatService {
         "execution_error",
       );
     } finally {
+      // Flush buffered run_events in a single multi-row insert. Failures are
+      // logged through the structured logger so a DB outage during streaming
+      // no longer silently drops events or terminates the run.
+      if (pendingRunEventInserts.length > 0) {
+        try {
+          await this.db.insert(runEvents).values(pendingRunEventInserts);
+        } catch (eventsErr) {
+          this.logger?.error(
+            {
+              err: eventsErr,
+              runId,
+              count: pendingRunEventInserts.length,
+            },
+            "Failed to flush buffered run_events at stream end",
+          );
+        }
+      }
+
       // Clean up log stream if it was opened but not finalized
       if (logHandle && runLogger) {
         try {
@@ -948,26 +986,38 @@ export class HeartbeatService {
     });
   }
 
+  /**
+   * Serialize async work per agentId. Callers queue by chaining their "next"
+   * promise onto the current tail — the previous busy-wait loop allowed two
+   * concurrent callers to race past the `has()` check and run `fn` in parallel.
+   * Here we always chain: the tail in the map is the promise that the *next*
+   * caller must await before running, guaranteeing strict FIFO ordering.
+   */
   private async withAgentLock<T>(
     agentId: string,
     fn: () => Promise<T>,
   ): Promise<T> {
-    // Wait for any existing lock on this agent
-    while (this.agentStartLocks.has(agentId)) {
-      await this.agentStartLocks.get(agentId);
-    }
+    const prev = this.agentStartLocks.get(agentId) ?? Promise.resolve();
 
-    let resolve!: () => void;
-    const promise = new Promise<void>((r) => {
-      resolve = r;
-    });
-    this.agentStartLocks.set(agentId, promise);
+    let release!: () => void;
+    const next = new Promise<void>((r) => { release = r; });
+
+    // Publish the new tail atomically with the read of `prev` above — since
+    // this whole method is sync up to the first await, interleaving cannot
+    // happen here.
+    const tail = prev.then(() => next);
+    this.agentStartLocks.set(agentId, tail);
 
     try {
+      await prev;
       return await fn();
     } finally {
-      this.agentStartLocks.delete(agentId);
-      resolve();
+      release();
+      // Only clear the map entry if nobody else queued behind us. If another
+      // caller has already replaced the tail, leaving it alone is correct.
+      if (this.agentStartLocks.get(agentId) === tail) {
+        this.agentStartLocks.delete(agentId);
+      }
     }
   }
 
