@@ -28,11 +28,12 @@ describe("Sidebar", () => {
     });
   });
 
-  it("renders WORK section first with Board and Brainstorm", () => {
+  it("renders WORK section first with Board and Pipelines", () => {
     renderWithProviders(<Sidebar />);
     expect(screen.getByText("WORK")).toBeInTheDocument();
     expect(screen.getByText("Board")).toBeInTheDocument();
-    expect(screen.getByText("Brainstorm")).toBeInTheDocument();
+    expect(screen.getByText("Pipelines")).toBeInTheDocument();
+    expect(screen.queryByText("Brainstorm")).not.toBeInTheDocument();
   });
 
   it("renders SETUP section with Agents and Settings", () => {
