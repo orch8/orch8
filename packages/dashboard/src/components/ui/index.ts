@@ -13,3 +13,4 @@ export { TextLink } from "./TextLink.js";
 export { EntityLink } from "./EntityLink.js";
 export { PageHeader } from "./PageHeader.js";
 export { SectionLabel } from "./SectionLabel.js";
+export { Drawer } from "./Drawer.js";
