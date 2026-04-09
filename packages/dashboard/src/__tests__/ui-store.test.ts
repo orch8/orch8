@@ -41,4 +41,26 @@ describe("useUiStore (slimmed)", () => {
     const state = useUiStore.getState() as unknown as Record<string, unknown>;
     expect(state).not.toHaveProperty("selectedEntityId");
   });
+
+  it("has activeDrawer field (null by default)", () => {
+    const state = useUiStore.getState();
+    expect(state.activeDrawer).toBe(null);
+  });
+
+  it("openDrawer sets activeDrawer to the given name", () => {
+    useUiStore.getState().openDrawer("sidebar");
+    expect(useUiStore.getState().activeDrawer).toBe("sidebar");
+  });
+
+  it("openDrawer replaces the previous drawer (only one at a time)", () => {
+    useUiStore.getState().openDrawer("sidebar");
+    useUiStore.getState().openDrawer("threads");
+    expect(useUiStore.getState().activeDrawer).toBe("threads");
+  });
+
+  it("closeDrawer sets activeDrawer to null", () => {
+    useUiStore.getState().openDrawer("sidebar");
+    useUiStore.getState().closeDrawer();
+    expect(useUiStore.getState().activeDrawer).toBe(null);
+  });
 });
