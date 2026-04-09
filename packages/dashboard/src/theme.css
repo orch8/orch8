@@ -105,6 +105,29 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Mobile type overrides (<768px) ─────────────────────────────── */
+@media (max-width: 767px) {
+  .type-display {
+    font-size: 22px;
+    line-height: 1.15;
+  }
+  .type-numeral {
+    font-size: 20px;
+  }
+  .type-title {
+    font-size: 18px;
+  }
+  .type-section {
+    font-size: 15px;
+  }
+  .type-body {
+    font-size: 14px;
+  }
+  .type-mono {
+    font-size: 12px;
+  }
+}
+
 /* --- Default body styling: every page inherits canvas + ink + sans --- */
 html,
 body {
