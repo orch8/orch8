@@ -35,8 +35,8 @@ export function ConfirmDialog({
       />
 
       {/* Dialog */}
-      <div className="relative z-10 w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900 p-6 shadow-xl">
-        <h3 className="text-lg font-semibold text-zinc-100">{title}</h3>
+      <div className="relative z-10 w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900 p-[var(--gap-section)] shadow-xl">
+        <h3 className="type-section font-semibold text-zinc-100">{title}</h3>
         <p className="mt-2 text-sm text-zinc-400">{description}</p>
         <div className="mt-6 flex justify-end gap-3">
           <button

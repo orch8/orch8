@@ -33,7 +33,7 @@ export function BudgetTab({ agent, projectId, updateAgent }: BudgetTabProps) {
     "w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-600 focus:outline-none";
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       <FormField label="Budget Limit (USD)" description="Lifetime cap on agent spend">
         <input
           type="number"

@@ -32,13 +32,13 @@ export function AgentSettingsPage({ agent, projectId }: AgentSettingsPageProps) 
   const updateAgent = useUpdateAgent();
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-2xl">{agent.icon ?? "🤖"}</span>
           <div>
-            <h1 className="text-lg font-semibold text-zinc-100">{agent.name}</h1>
+            <h1 className="type-section font-semibold text-zinc-100">{agent.name}</h1>
             <p className="text-sm text-zinc-500">{agent.role} · {agent.model}</p>
           </div>
           <span

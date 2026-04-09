@@ -8,11 +8,11 @@ function TaskDetailRoute() {
   const { data: task, isLoading } = useTask(taskId);
 
   if (isLoading) {
-    return <p className="p-8 type-body text-whisper">Loading task...</p>;
+    return <p className="p-[var(--gap-section)] type-body text-whisper">Loading task...</p>;
   }
 
   if (!task) {
-    return <p className="p-8 type-body text-mute">Task not found.</p>;
+    return <p className="p-[var(--gap-section)] type-body text-mute">Task not found.</p>;
   }
 
   return (

@@ -25,15 +25,15 @@ function ProjectSettingsPage() {
   };
 
   if (isLoading) {
-    return <div className="p-8 text-zinc-500">Loading...</div>;
+    return <div className="p-[var(--gap-section)] text-zinc-500">Loading...</div>;
   }
 
   if (!project) {
-    return <div className="p-8 text-zinc-500">Project not found</div>;
+    return <div className="p-[var(--gap-section)] text-zinc-500">Project not found</div>;
   }
 
   return (
-    <div className="mx-auto max-w-lg p-8">
+    <div className="mx-auto max-w-lg p-[var(--gap-section)]">
       <PageHeader title="Settings" subtitle={`Project-level configuration — ${project.name}`} />
 
       <ProjectForm project={project} onSuccess={handleSuccess} />

@@ -46,7 +46,7 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
       label: "Welcome",
       content: (
         <div className="flex flex-col items-center gap-4 py-8 text-center">
-          <h2 className="text-2xl font-bold text-zinc-100">Welcome to orch8</h2>
+          <h2 className="type-title font-bold text-zinc-100">Welcome to orch8</h2>
           <p className="max-w-md text-sm text-zinc-400">
             orch8 orchestrates AI agents to work on your codebase. Create a project,
             configure agents, and let them handle tasks autonomously.
@@ -58,7 +58,7 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
       label: "Project",
       content: (
         <div className="flex flex-col gap-4">
-          <h3 className="text-lg font-semibold text-zinc-100">Create Project</h3>
+          <h3 className="type-section font-semibold text-zinc-100">Create Project</h3>
           <FormField label="Project Name" required>
             <input
               value={projectName}
@@ -100,7 +100,7 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
       label: "Settings",
       content: (
         <div className="flex flex-col gap-4">
-          <h3 className="text-lg font-semibold text-zinc-100">Review Settings</h3>
+          <h3 className="type-section font-semibold text-zinc-100">Review Settings</h3>
           <p className="text-xs text-zinc-500">These can be changed later in Settings.</p>
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-300">
             <div className="flex justify-between py-1"><span>Model</span><span>claude-opus-4-6</span></div>
@@ -115,7 +115,7 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
       label: "Agents",
       content: (
         <div className="flex flex-col gap-4">
-          <h3 className="text-lg font-semibold text-zinc-100">Add Agents</h3>
+          <h3 className="type-section font-semibold text-zinc-100">Add Agents</h3>
           <p className="text-xs text-zinc-500">
             Select agents to add to your project. You can skip this and add agents later.
           </p>
@@ -131,7 +131,7 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
       label: "First Task",
       content: (
         <div className="flex flex-col gap-4">
-          <h3 className="text-lg font-semibold text-zinc-100">Create Your First Task</h3>
+          <h3 className="type-section font-semibold text-zinc-100">Create Your First Task</h3>
           <FormField label="Task Title" description="Or skip this — you can create tasks from the Board later.">
             <input
               value={taskTitle}

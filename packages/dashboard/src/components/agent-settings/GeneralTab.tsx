@@ -82,7 +82,7 @@ export function GeneralTab({ agent, projectId, updateAgent }: GeneralTabProps) {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Name">
           <input

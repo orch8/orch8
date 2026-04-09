@@ -42,7 +42,7 @@ export function TaskPage({ task, projectId }: TaskPageProps) {
 
 
   return (
-    <div className="flex h-full gap-6">
+    <div className="flex h-full gap-[var(--gap-section)]">
       {/* Left panel */}
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
         {/* Editable title */}
@@ -56,12 +56,12 @@ export function TaskPage({ task, projectId }: TaskPageProps) {
               if (e.key === "Escape") { setTitleDraft(task.title); setEditingTitle(false); }
             }}
             autoFocus
-            className="text-xl font-semibold text-zinc-100 bg-transparent border-b border-zinc-700 focus:border-blue-500 focus:outline-none"
+            className="type-title font-semibold text-zinc-100 bg-transparent border-b border-zinc-700 focus:border-blue-500 focus:outline-none"
           />
         ) : (
           <h1
             onClick={() => { setEditingTitle(true); setTitleDraft(task.title); }}
-            className="cursor-pointer text-xl font-semibold text-zinc-100 hover:text-zinc-50"
+            className="cursor-pointer type-title font-semibold text-zinc-100 hover:text-zinc-50"
           >
             {task.title}
           </h1>

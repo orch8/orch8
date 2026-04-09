@@ -6,8 +6,8 @@ function NewAgentPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="mx-auto max-w-2xl p-6">
-      <h2 className="mb-6 text-lg font-semibold">Create Agent</h2>
+    <div className="mx-auto max-w-2xl p-[var(--gap-section)]">
+      <h2 className="mb-[var(--gap-section)] type-section font-semibold">Create Agent</h2>
       <AgentWizard
         projectId={projectId}
         onCreated={(agentId) =>

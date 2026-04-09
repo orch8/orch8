@@ -8,7 +8,7 @@ interface ActivityTabProps {
 
 export function ActivityTab({ taskId, projectId }: ActivityTabProps) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       <div>
         <h3 className="mb-3 text-sm font-semibold text-zinc-300">Timeline</h3>
         <ActivityTimeline projectId={projectId} taskId={taskId} />

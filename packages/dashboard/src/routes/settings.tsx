@@ -5,7 +5,7 @@ export const Route = createFileRoute("/settings")({
   component: function SettingsRoute() {
     return (
       <div className="h-full">
-        <h2 className="mb-4 text-lg font-semibold">Settings</h2>
+        <h2 className="mb-4 type-section font-semibold">Settings</h2>
         <SettingsPage />
       </div>
     );

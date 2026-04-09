@@ -24,8 +24,8 @@ function PipelinesActivePage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <h1 className="text-lg font-semibold text-zinc-100">Pipelines</h1>
+    <div className="flex flex-col gap-4 p-[var(--gap-section)]">
+      <h1 className="type-section font-semibold text-zinc-100">Pipelines</h1>
 
       <div className="flex gap-1 border-b border-zinc-800">
         {tabs.map((tab) => (

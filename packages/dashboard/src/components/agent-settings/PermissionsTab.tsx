@@ -47,7 +47,7 @@ export function PermissionsTab({ agent, projectId, updateAgent }: PermissionsTab
   const otherAgents = allAgents?.filter((a) => a.id !== agent.id) ?? [];
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       <label className="flex items-center gap-2 text-sm text-zinc-300">
         <input type="checkbox" checked={canCreateTasks} onChange={(e) => setCanCreateTasks(e.target.checked)} className="rounded border-zinc-700" />
         Can Create Tasks

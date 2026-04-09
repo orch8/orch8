@@ -14,8 +14,8 @@ function NewProjectPage() {
   };
 
   return (
-    <div className="mx-auto max-w-lg p-8">
-      <h1 className="mb-6 text-xl font-semibold text-zinc-100">
+    <div className="mx-auto max-w-lg p-[var(--gap-section)]">
+      <h1 className="mb-[var(--gap-section)] type-title font-semibold text-zinc-100">
         Create Project
       </h1>
       <ProjectForm onSuccess={handleSuccess} />

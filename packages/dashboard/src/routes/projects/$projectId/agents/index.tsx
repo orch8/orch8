@@ -14,7 +14,7 @@ function AgentsListPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Agents</h2>
+        <h2 className="type-section font-semibold">Agents</h2>
         <div className="flex gap-2">
           <Link
             to="/projects/$projectId/agents/new"

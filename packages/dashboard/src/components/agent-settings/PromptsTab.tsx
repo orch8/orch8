@@ -56,7 +56,7 @@ export function PromptsTab({ agent, projectId, updateAgent }: PromptsTabProps) {
     "w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-600 focus:outline-none";
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       <FormField label="System Prompt" description="Base system prompt for all runs">
         <MarkdownEditor value={systemPrompt} onChange={setSystemPrompt} placeholder="Enter system prompt..." />
       </FormField>

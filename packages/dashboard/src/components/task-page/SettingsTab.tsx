@@ -46,7 +46,7 @@ export function SettingsTab({ task }: SettingsTabProps) {
     "w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-600 focus:outline-none";
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       <h3 className="text-sm font-semibold text-zinc-300">Git Configuration</h3>
 
       <div className="grid grid-cols-2 gap-4">
@@ -59,7 +59,7 @@ export function SettingsTab({ task }: SettingsTabProps) {
         </FormField>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex gap-[var(--gap-section)]">
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           <input type="checkbox" checked={autoCommit} onChange={(e) => setAutoCommit(e.target.checked)} className="rounded border-zinc-700" />
           Auto Commit

@@ -109,7 +109,7 @@ export function SkillsToolsTab({ agent, projectId, updateAgent }: SkillsToolsTab
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       <FormField
         label="Project Skills"
         description="Select which skills this agent should use. Skills are managed at the project level."

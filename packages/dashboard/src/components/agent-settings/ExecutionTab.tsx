@@ -81,7 +81,7 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
     "w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-600 focus:outline-none";
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Max Turns" description="Maximum turns per run">
           <input type="number" min={1} value={maxTurns} onChange={(e) => setMaxTurns(e.target.value)} className={inputClass} />
