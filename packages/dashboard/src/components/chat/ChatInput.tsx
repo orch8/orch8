@@ -32,7 +32,7 @@ export function ChatInput({ chatId }: ChatInputProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-t border-edge-soft bg-canvas px-4 py-3"
+      className="border-t border-edge-soft bg-canvas px-[var(--pad-page)] py-3 max-sm:sticky max-sm:bottom-0 max-sm:py-0 max-sm:pb-[env(safe-area-inset-bottom)]"
     >
       <div className="mx-auto flex max-w-3xl items-end gap-2">
         <textarea

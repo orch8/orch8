@@ -3,6 +3,8 @@ import { useState } from "react";
 import type { Chat } from "../../hooks/useChats.js";
 import { useUpdateChat, useDeleteChat } from "../../hooks/useChats.js";
 import { Link } from "@tanstack/react-router";
+import { useBreakpoint } from "../../hooks/useBreakpoint.js";
+import { useUiStore } from "../../stores/ui.js";
 
 interface ChatHeaderProps {
   projectId: string;
@@ -15,6 +17,8 @@ export function ChatHeader({ projectId, chat }: ChatHeaderProps) {
   const updateChat = useUpdateChat();
   const deleteChat = useDeleteChat();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { isNarrow } = useBreakpoint();
+  const openDrawer = useUiStore((s) => s.openDrawer);
 
   function commitTitle() {
     const trimmed = draftTitle.trim();
@@ -32,6 +36,14 @@ export function ChatHeader({ projectId, chat }: ChatHeaderProps) {
   return (
     <div className="flex items-center justify-between border-b border-edge-soft bg-canvas px-4 py-3">
       <div className="flex items-center gap-3">
+        {isNarrow && (
+          <button
+            onClick={() => openDrawer("threads")}
+            className="focus-ring shrink-0 rounded-sm px-2 py-1 type-ui text-mute hover:text-ink"
+          >
+            Threads
+          </button>
+        )}
         {editing ? (
           <input
             autoFocus
