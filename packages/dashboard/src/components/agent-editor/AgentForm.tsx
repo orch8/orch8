@@ -37,7 +37,7 @@ export function AgentForm({ agent }: AgentFormProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-[var(--gap-block)]">
       {/* Status + controls */}
       <div className="flex items-center gap-2">
         <span
@@ -81,7 +81,7 @@ export function AgentForm({ agent }: AgentFormProps) {
       </div>
 
       {/* Identity */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-[var(--gap-block)]">
         <div>
           <label className="mb-1 block text-xs text-zinc-500">Role</label>
           <p className="text-sm text-zinc-300">{agent.role}</p>

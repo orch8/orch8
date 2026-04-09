@@ -24,7 +24,7 @@ export function AgentEditor({ projectId }: AgentEditorProps) {
   }
 
   return (
-    <div className="flex h-full gap-4">
+    <div className="flex h-full gap-[var(--gap-block)]">
       {/* Agent list */}
       <div className="w-64 shrink-0 space-y-1">
         {agents?.map((agent) => (

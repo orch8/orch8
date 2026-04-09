@@ -16,7 +16,7 @@ export function BudgetStep({ data, onChange }: BudgetStepProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-[var(--gap-block)]">
       <FormField label="Total Budget Limit ($)" description="Lifetime cap on agent spend">
         <input
           type="number"

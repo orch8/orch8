@@ -61,13 +61,13 @@ export function TemplateStep(props: TemplateStepProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 gap-[var(--gap-block)]">
       {bundledAgents.map((agent) => (
         <button
           key={agent.id}
           type="button"
           onClick={() => handleClick(agent)}
-          className={`rounded-lg border p-4 text-left transition-colors ${
+          className={`rounded-lg border p-[var(--gap-block)] text-left transition-colors ${
             isSelected(agent.id)
               ? "border-blue-500 bg-blue-950/30"
               : "border-zinc-800 bg-zinc-900 hover:border-zinc-700"
@@ -113,7 +113,7 @@ export function TemplateStep(props: TemplateStepProps) {
               systemPrompt: "",
             })
           }
-          className={`rounded-lg border p-4 text-left transition-colors ${
+          className={`rounded-lg border p-[var(--gap-block)] text-left transition-colors ${
             (props as TemplateStepSingleProps).selected === "blank"
               ? "border-blue-500 bg-blue-950/30"
               : "border-zinc-800 bg-zinc-900 hover:border-zinc-700"

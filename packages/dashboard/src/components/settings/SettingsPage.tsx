@@ -36,7 +36,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       {/* Tab navigation */}
       <div className="flex gap-1 border-b border-zinc-800">
         {TABS.map((tab) => (
@@ -58,7 +58,7 @@ export function SettingsPage() {
       {/* Tab content */}
       <div className="max-w-xl">
         {activeTab === "General" && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-[var(--gap-block)]">
             <FormField label="Default Model">
               <input
                 value={draft.defaults.model}
@@ -130,7 +130,7 @@ export function SettingsPage() {
         )}
 
         {activeTab === "Daemon" && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-[var(--gap-block)]">
             <FormField label="Tick Interval (ms)">
               <input
                 type="number"
@@ -159,7 +159,7 @@ export function SettingsPage() {
         )}
 
         {activeTab === "Concurrency" && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-[var(--gap-block)]">
             <FormField label="Max Concurrent Agents">
               <input
                 type="number"
@@ -208,7 +208,7 @@ export function SettingsPage() {
         )}
 
         {activeTab === "Database" && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-[var(--gap-block)]">
             <p className="text-xs text-zinc-500">Database connection info is read-only.</p>
             <FormField label="Host">
               <input value={draft.database.host} disabled className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-500" />
@@ -255,7 +255,7 @@ export function SettingsPage() {
         )}
 
         {activeTab === "Memory" && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-[var(--gap-block)]">
             <FormField label="Extraction on Session End">
               <label className="flex items-center gap-2 text-sm text-zinc-300">
                 <input
@@ -297,7 +297,7 @@ export function SettingsPage() {
       </div>
 
       {/* Action buttons */}
-      <div className="flex gap-3">
+      <div className="flex gap-[var(--gap-block)]">
         <button
           type="button"
           onClick={handleSave}

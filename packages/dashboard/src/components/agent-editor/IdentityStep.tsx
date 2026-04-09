@@ -34,7 +34,7 @@ export function IdentityStep({ data, onChange }: IdentityStepProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-[var(--gap-block)]">
       <FormField label="Name" description="Display name for this agent" required>
         <input
           value={data.name}

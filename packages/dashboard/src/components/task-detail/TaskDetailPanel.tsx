@@ -23,7 +23,7 @@ export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelP
 
   if (isLoading) {
     return (
-      <div className="w-96 shrink-0 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <div className="w-96 shrink-0 rounded-lg border border-zinc-800 bg-zinc-900 p-[var(--gap-block)]">
         <p className="text-sm text-zinc-600">Loading...</p>
       </div>
     );
@@ -32,7 +32,7 @@ export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelP
   if (!task) return null;
 
   return (
-    <div className="flex w-96 shrink-0 flex-col gap-4 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+    <div className="flex w-96 shrink-0 flex-col gap-[var(--gap-block)] overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900 p-[var(--gap-block)]">
       {/* Header */}
       <div className="flex items-start justify-between">
         <h2 className="text-base font-semibold text-zinc-100">{task.title}</h2>

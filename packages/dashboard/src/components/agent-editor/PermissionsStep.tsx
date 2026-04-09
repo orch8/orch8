@@ -32,7 +32,7 @@ export function PermissionsStep({ data, agentIds, onChange }: PermissionsStepPro
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       {/* Boolean toggles */}
       <div className="flex flex-col gap-2">
         <label className="flex items-center gap-2 text-sm text-zinc-300">
@@ -48,7 +48,7 @@ export function PermissionsStep({ data, agentIds, onChange }: PermissionsStepPro
 
       {/* Can move to columns */}
       <div>
-        <p className="mb-2 text-sm font-medium text-zinc-300">Can move tasks to</p>
+        <p className="mb-2 type-label text-zinc-300">Can move tasks to</p>
         <div className="flex flex-wrap gap-2">
           {KANBAN_COLUMNS.map((col) => (
             <button
@@ -70,7 +70,7 @@ export function PermissionsStep({ data, agentIds, onChange }: PermissionsStepPro
       {/* Can assign to agents */}
       {agentIds.length > 0 && (
         <div>
-          <p className="mb-2 text-sm font-medium text-zinc-300">Can assign tasks to</p>
+          <p className="mb-2 type-label text-zinc-300">Can assign tasks to</p>
           <div className="flex flex-wrap gap-2">
             {agentIds.map((id) => (
               <button

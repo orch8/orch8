@@ -20,7 +20,7 @@ export function PromptsStep({ data, onChange }: PromptsStepProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-[var(--gap-block)]">
       <FormField
         label="Instructions File Path"
         description="Path to AGENTS.md or similar markdown file appended to system prompt"
