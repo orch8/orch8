@@ -13,17 +13,32 @@ const SEGMENT_LABELS: Record<string, string> = {
   tasks: "Tasks",
   daemon: "Daemon",
   new: "New",
+  briefing: "Briefing",
 };
 
 function labelFor(segment: string): string {
   return SEGMENT_LABELS[segment] ?? segment;
 }
 
-export function Breadcrumbs() {
+interface BreadcrumbsProps {
+  compact?: boolean;
+}
+
+export function Breadcrumbs({ compact = false }: BreadcrumbsProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const parts = pathname.split("/").filter(Boolean);
 
-  // Always start with the orch8 root
+  if (compact) {
+    // Show only the current (last meaningful) segment.
+    const lastPart = [...parts].reverse().find((p) => p !== "projects") ?? "";
+    return (
+      <nav aria-label="Breadcrumb" className="flex items-center">
+        <span className="type-ui text-ink">{labelFor(lastPart)}</span>
+      </nav>
+    );
+  }
+
+  // Full breadcrumbs (desktop behavior — unchanged).
   const crumbs: Array<{ label: string; to: string; isCurrent: boolean }> = [
     { label: "orch8", to: "/", isCurrent: parts.length === 0 },
   ];
@@ -31,7 +46,6 @@ export function Breadcrumbs() {
   let acc = "";
   parts.forEach((part, i) => {
     acc += `/${part}`;
-    // Skip the literal "projects" segment — "orch8" already represents the root.
     if (part === "projects") return;
     crumbs.push({
       label: labelFor(part),

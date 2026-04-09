@@ -1,5 +1,4 @@
 import { Link, useRouterState, useParams } from "@tanstack/react-router";
-import { useUiStore } from "../../stores/ui.js";
 import { useDaemonStatus } from "../../hooks/useDaemon.js";
 import { ProjectSwitcher } from "./ProjectSwitcher.js";
 import { NotificationBell } from "./NotificationBell.js";
@@ -56,16 +55,17 @@ function navItemClass(active: boolean): string {
     : `${base} text-mute hover:bg-surface-2 hover:text-ink`;
 }
 
-export function Sidebar() {
-  const sidebarOpen = useUiStore((s) => s.sidebarOpen);
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+export function Sidebar({ onClose }: SidebarProps = {}) {
   const params = useParams({ strict: false }) as { projectId?: string };
   const pathname = useRouterState({
     select: (s) => s.location.pathname,
   });
   const sections = useProjectSections();
   const { data: daemonStatus } = useDaemonStatus();
-
-  if (!sidebarOpen) return null;
 
   function isActive(to: string) {
     if (to === "/") return pathname === "/";
