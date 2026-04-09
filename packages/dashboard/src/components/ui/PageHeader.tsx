@@ -14,12 +14,12 @@ export function PageHeader({
   className = "",
 }: PageHeaderProps) {
   return (
-    <div className={`mb-6 flex items-end justify-between gap-4 ${className}`}>
+    <div className={`mb-[var(--gap-section)] flex flex-col gap-[var(--gap-block)] md:flex-row md:items-end md:justify-between ${className}`}>
       <div className="min-w-0">
         <h2 className="type-title text-ink">{title}</h2>
         {subtitle && <p className="mt-1 type-body text-mute">{subtitle}</p>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex shrink-0 items-center gap-[var(--gap-inline)]">{actions}</div>}
     </div>
   );
 }
