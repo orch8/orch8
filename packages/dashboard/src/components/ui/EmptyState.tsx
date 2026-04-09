@@ -10,7 +10,7 @@ interface EmptyStateProps {
 export function EmptyState({ title, body, cta, className = "" }: EmptyStateProps) {
   return (
     <div
-      className={`flex flex-col items-center gap-3 rounded-md border border-edge-soft bg-surface px-6 py-12 text-center ${className}`}
+      className={`mx-auto flex max-w-[420px] flex-col items-center gap-[var(--gap-block)] rounded-md border border-edge-soft bg-surface px-[var(--pad-page)] py-12 text-center ${className}`}
     >
       <span className="type-display text-whisper" aria-hidden>
         —

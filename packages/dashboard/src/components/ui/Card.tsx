@@ -14,7 +14,7 @@ export function Card({ title, meta, actions, children, className = "" }: CardPro
       className={`rounded-md border border-edge-soft bg-surface transition-colors hover:border-edge ${className}`}
     >
       {(title || meta || actions) && (
-        <div className="flex items-start justify-between gap-4 border-b border-edge-soft px-4 py-3">
+        <div className="flex items-start justify-between gap-[var(--gap-inline)] border-b border-edge-soft px-[var(--gap-block)] py-[calc(var(--gap-block)*0.75)]">
           <div className="min-w-0">
             {title && <div className="type-section text-ink">{title}</div>}
             {meta && <div className="type-label text-whisper">{meta}</div>}
@@ -22,7 +22,7 @@ export function Card({ title, meta, actions, children, className = "" }: CardPro
           {actions && <div className="shrink-0">{actions}</div>}
         </div>
       )}
-      <div className="px-4 py-3 type-body text-ink">{children}</div>
+      <div className="p-[var(--gap-block)] type-body text-ink">{children}</div>
     </div>
   );
 }

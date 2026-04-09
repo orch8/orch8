@@ -8,7 +8,7 @@ export function Table({
   className?: string;
 }) {
   return (
-    <div className={`overflow-x-auto rounded-md border border-edge-soft ${className}`}>
+    <div className={`overflow-x-auto md:overflow-visible rounded-md border border-edge-soft ${className}`}>
       <table className="w-full border-collapse">{children}</table>
     </div>
   );
