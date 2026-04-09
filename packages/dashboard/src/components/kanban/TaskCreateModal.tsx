@@ -1,12 +1,12 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useCreateTask } from "../../hooks/useTasks.js";
 import { useCreatePipeline } from "../../hooks/usePipelines.js";
 import { usePipelineTemplates } from "../../hooks/usePipelineTemplates.js";
 import { useAgents } from "../../hooks/useAgents.js";
-import { useModalA11y } from "../../hooks/useModalA11y.js";
 import { FormField } from "../shared/FormField.js";
 import { MarkdownEditor } from "../shared/MarkdownEditor.js";
+import { Modal } from "../ui/Modal.js";
 
 interface TaskCreateModalProps {
   projectId: string;
@@ -25,9 +25,6 @@ export function TaskCreateModal({ projectId, open, onClose }: TaskCreateModalPro
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [assignee, setAssignee] = useState("");
   const [templateId, setTemplateId] = useState("");
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  useModalA11y(dialogRef, open, onClose);
 
   if (!open) return null;
 
@@ -66,143 +63,136 @@ export function TaskCreateModal({ projectId, open, onClose }: TaskCreateModalPro
   const isPending = createTask.isPending || createPipeline.isPending;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} aria-hidden="true" />
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="task-create-modal-title"
-        onClick={(e) => e.stopPropagation()}
-        className="relative z-10 w-full max-w-lg rounded-lg border border-zinc-800 bg-zinc-900 p-6 shadow-xl"
-      >
-        <h3 id="task-create-modal-title" className="mb-4 text-lg font-semibold text-zinc-100">Create Task</h3>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <FormField label="Title" required>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-600 focus:outline-none"
-            />
+    <Modal open={open} onClose={onClose} title="Create Task">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-[var(--gap-block)]">
+        <FormField label="Title" required>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            className="focus-ring rounded-sm border border-edge bg-surface px-3 py-2 type-body text-ink"
+          />
+        </FormField>
+
+        {taskType !== "pipeline" && (
+          <FormField label="Description">
+            <MarkdownEditor value={description} onChange={setDescription} placeholder="Task details..." />
           </FormField>
+        )}
 
+        <div className="grid grid-cols-1 gap-[var(--gap-block)] sm:grid-cols-3">
+          <FormField label="Type">
+            <select
+              value={taskType}
+              onChange={(e) => setTaskType(e.target.value as any)}
+              className="focus-ring rounded-sm border border-edge bg-surface px-3 py-2 type-body text-ink"
+            >
+              <option value="quick">Quick</option>
+              <option value="pipeline">Pipeline</option>
+              <option value="brainstorm">Brainstorm</option>
+            </select>
+          </FormField>
           {taskType !== "pipeline" && (
-            <FormField label="Description">
-              <MarkdownEditor value={description} onChange={setDescription} placeholder="Task details..." />
-            </FormField>
+            <>
+              <FormField label="Priority">
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as any)}
+                  className="focus-ring rounded-sm border border-edge bg-surface px-3 py-2 type-body text-ink"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </FormField>
+              <FormField label="Assignee">
+                <select
+                  value={assignee}
+                  onChange={(e) => setAssignee(e.target.value)}
+                  aria-label="Filter by assignee"
+                  className="focus-ring rounded-sm border border-edge bg-surface px-3 py-2 type-body text-ink"
+                >
+                  <option value="">Unassigned</option>
+                  {agents?.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </FormField>
+            </>
           )}
+        </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <FormField label="Type">
-              <select
-                value={taskType}
-                onChange={(e) => setTaskType(e.target.value as any)}
-                className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-              >
-                <option value="quick">Quick</option>
-                <option value="pipeline">Pipeline</option>
-                <option value="brainstorm">Brainstorm</option>
-              </select>
+        {taskType === "pipeline" && (
+          <div className="flex flex-col gap-[var(--gap-block)]">
+            <FormField label="Template" required>
+              {templates && templates.length > 0 ? (
+                <select
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                  className="focus-ring rounded-sm border border-edge bg-surface px-3 py-2 type-body text-ink"
+                >
+                  <option value="">Select a template...</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="type-micro text-mute">
+                  No pipeline templates yet.{" "}
+                  <Link
+                    to="/projects/$projectId/pipelines/templates"
+                    params={{ projectId }}
+                    className="text-blue underline decoration-blue/40 decoration-dotted underline-offset-2 hover:decoration-blue"
+                  >
+                    Create one
+                  </Link>
+                </p>
+              )}
             </FormField>
-            {taskType !== "pipeline" && (
-              <>
-                <FormField label="Priority">
-                  <select
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value as any)}
-                    className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
-                </FormField>
-                <FormField label="Assignee">
-                  <select
-                    value={assignee}
-                    onChange={(e) => setAssignee(e.target.value)}
-                    aria-label="Filter by assignee"
-                    className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-                  >
-                    <option value="">Unassigned</option>
-                    {agents?.map((a) => (
-                      <option key={a.id} value={a.id}>{a.name}</option>
-                    ))}
-                  </select>
-                </FormField>
-              </>
+
+            {selectedTemplate && (
+              <div className="rounded-sm border border-edge-soft bg-surface-2 p-[var(--gap-block)]">
+                <p className="mb-2 type-label text-whisper">STEPS</p>
+                <div className="flex flex-wrap items-center gap-1">
+                  {(selectedTemplate.steps as Array<{ label: string; defaultAgentId?: string }>).map(
+                    (step, i, arr) => (
+                      <span key={i} className="flex items-center gap-1">
+                        <span className="rounded-sm bg-surface-3 px-2 py-0.5 type-label text-mute">
+                          {step.label}
+                        </span>
+                        {i < arr.length - 1 && (
+                          <span className="type-label text-whisper">&rarr;</span>
+                        )}
+                      </span>
+                    ),
+                  )}
+                </div>
+              </div>
             )}
           </div>
+        )}
 
-          {taskType === "pipeline" && (
-            <div className="space-y-3">
-              <FormField label="Template" required>
-                {templates && templates.length > 0 ? (
-                  <select
-                    value={templateId}
-                    onChange={(e) => setTemplateId(e.target.value)}
-                    className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-                  >
-                    <option value="">Select a template...</option>
-                    {templates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="text-sm text-zinc-500">
-                    No pipeline templates yet.{" "}
-                    <Link
-                      to="/projects/$projectId/pipelines/templates"
-                      params={{ projectId }}
-                      className="text-blue-400 hover:text-blue-300"
-                    >
-                      Create one
-                    </Link>
-                  </p>
-                )}
-              </FormField>
-
-              {selectedTemplate && (
-                <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
-                  <p className="mb-2 text-xs font-medium text-zinc-400">Steps:</p>
-                  <div className="flex flex-wrap items-center gap-1">
-                    {(selectedTemplate.steps as Array<{ label: string; defaultAgentId?: string }>).map(
-                      (step, i, arr) => (
-                        <span key={i} className="flex items-center gap-1">
-                          <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
-                            {step.label}
-                          </span>
-                          {i < arr.length - 1 && (
-                            <span className="text-xs text-zinc-600">&rarr;</span>
-                          )}
-                        </span>
-                      ),
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="rounded-md px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={
-                !title.trim() ||
-                isPending ||
-                (taskType === "pipeline" && !templateId)
-              }
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40"
-            >
-              {isPending ? "Creating..." : "Create"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex justify-end gap-[var(--gap-inline)]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="focus-ring rounded-sm px-4 py-2 type-ui text-mute hover:text-ink"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={
+              !title.trim() ||
+              isPending ||
+              (taskType === "pipeline" && !templateId)
+            }
+            className="focus-ring rounded-sm bg-accent px-4 py-2 type-ui text-canvas hover:bg-[color:var(--color-accent-hover)] disabled:opacity-40"
+          >
+            {isPending ? "Creating..." : "Create"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

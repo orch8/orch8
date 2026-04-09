@@ -31,8 +31,8 @@ describe("TaskCreateModal a11y", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(dialog).toHaveAttribute("aria-labelledby", "task-create-modal-title");
-    expect(screen.getByText("Create Task").id).toBe("task-create-modal-title");
+    expect(dialog).toHaveAttribute("aria-labelledby", "modal-title");
+    expect(screen.getByText("Create Task").id).toBe("modal-title");
   });
 
   it("closes on Escape key", async () => {
