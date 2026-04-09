@@ -128,6 +128,37 @@
   }
 }
 
+/* ── Spacing rhythm tokens ──────────────────────────────────────── */
+:root {
+  --pad-page: 24px;
+  --gap-section: 32px;
+  --gap-block: 16px;
+  --gap-inline: 8px;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --pad-page: 16px;
+    --gap-section: 20px;
+    --gap-block: 12px;
+    --gap-inline: 6px;
+  }
+}
+
+/* Ergonomic utility classes for spacing tokens */
+@utility pad-page {
+  padding: var(--pad-page);
+}
+@utility gap-section {
+  gap: var(--gap-section);
+}
+@utility gap-block {
+  gap: var(--gap-block);
+}
+@utility gap-inline {
+  gap: var(--gap-inline);
+}
+
 /* --- Default body styling: every page inherits canvas + ink + sans --- */
 html,
 body {
