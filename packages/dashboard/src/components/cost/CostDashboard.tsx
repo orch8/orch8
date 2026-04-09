@@ -25,12 +25,12 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
   const { data: project } = useProject(projectId);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       {/* Top row: total + gauge */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-[var(--gap-block)] md:grid-cols-3">
         <div className="rounded-md border border-edge-soft bg-surface p-4">
-          <span className="text-xs text-whisper">Total Spend</span>
-          <p className="mt-1 text-2xl font-semibold text-ink">
+          <span className="type-micro text-whisper">Total Spend</span>
+          <p className="mt-1 type-numeral text-ink">
             ${summary?.total.toFixed(2) ?? "\u2014"}
           </p>
         </div>
@@ -47,7 +47,7 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
       {/* Per-agent spend (bar chart) */}
       {summary && summary.byAgent.length > 0 && (
         <div className="rounded-md border border-edge-soft bg-surface p-4">
-          <h3 className="mb-3 text-sm font-semibold text-ink">Per-Agent Spend</h3>
+          <h3 className="mb-3 type-section text-ink">Per-Agent Spend</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={summary.byAgent}>
@@ -66,7 +66,7 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
           {/* Agent table */}
           <table className="mt-3 w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-whisper">
+              <tr className="text-left type-label text-whisper">
                 <th className="pb-2">Agent</th>
                 <th className="pb-2 text-right">Runs</th>
                 <th className="pb-2 text-right">Cost</th>
@@ -88,13 +88,13 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
       {/* Time-series spend */}
       <div className="rounded-md border border-edge-soft bg-surface p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-ink">Spend Over Time</h3>
+          <h3 className="type-section text-ink">Spend Over Time</h3>
           <div className="flex gap-1">
             {[7, 14, 30, 90].map((d) => (
               <button
                 key={d}
                 onClick={() => setDays(d)}
-                className={`rounded px-2 py-1 text-xs ${
+                className={`rounded-sm px-2 py-1 type-label ${
                   days === d ? "bg-surface-3 text-ink" : "text-whisper hover:text-ink"
                 }`}
               >
