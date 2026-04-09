@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { Task } from "../../types.js";
 
 const PRIORITY_TAG_COLOR: Record<string, string> = {
@@ -29,13 +30,34 @@ function stripeFor(task: Task): string | null {
 interface TaskCardProps {
   task: Task;
   onClick: () => void;
+  onLongPress?: () => void;
 }
 
-export function TaskCard({ task, onClick }: TaskCardProps) {
+export function TaskCard({ task, onClick, onLongPress }: TaskCardProps) {
   const stripe = stripeFor(task);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handlePointerDown() {
+    if (!onLongPress) return;
+    longPressTimer.current = setTimeout(() => {
+      onLongPress();
+      longPressTimer.current = null;
+    }, 500);
+  }
+
+  function handlePointerUp() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
+
   return (
     <button
       onClick={onClick}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       className="focus-ring relative w-full cursor-pointer overflow-hidden rounded-md border border-edge-soft bg-surface px-3 py-3 text-left transition-colors hover:border-edge hover:bg-surface-2"
     >
       {stripe && (

@@ -14,6 +14,8 @@ import { KanbanColumn } from "./KanbanColumn.js";
 import { TaskCard } from "./TaskCard.js";
 import { BoardToolbar, type BoardFilters } from "./BoardToolbar.js";
 import { PageHeader } from "../ui/PageHeader.js";
+import { useBreakpoint } from "../../hooks/useBreakpoint.js";
+import { KanbanBoardTabs } from "./KanbanBoardTabs.js";
 
 interface KanbanBoardProps {
   projectId: string;
@@ -49,6 +51,7 @@ function buildSubtitle(tasks: Task[] | undefined): string {
 }
 
 export function KanbanBoard({ projectId, onTaskSelect }: KanbanBoardProps) {
+  const { isNarrow } = useBreakpoint();
   const { data: tasks } = useTasks(projectId);
   const transition = useTransitionTask();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -98,6 +101,25 @@ export function KanbanBoard({ projectId, onTaskSelect }: KanbanBoardProps) {
     }
   }
 
+  if (isNarrow) {
+    return (
+      <div>
+        <PageHeader
+          title="Board"
+          subtitle={buildSubtitle(tasks)}
+          actions={
+            <BoardToolbar projectId={projectId} onFilterChange={setFilters} />
+          }
+        />
+        <KanbanBoardTabs
+          projectId={projectId}
+          onTaskSelect={onTaskSelect}
+          filters={filters}
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader
@@ -113,7 +135,6 @@ export function KanbanBoard({ projectId, onTaskSelect }: KanbanBoardProps) {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        {/* etched-plate grid: 1px gap on edge-soft */}
         <div className="grid grid-cols-4 gap-px overflow-hidden rounded-md bg-edge-soft">
           {KANBAN_COLUMNS.map((col) => (
             <KanbanColumn
