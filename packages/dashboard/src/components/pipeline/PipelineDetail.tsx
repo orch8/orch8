@@ -43,7 +43,7 @@ export function PipelineDetail({ pipelineId }: PipelineDetailProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-[var(--gap-block)]">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-zinc-200">{pipeline.name}</h3>
         <span
@@ -64,7 +64,7 @@ export function PipelineDetail({ pipelineId }: PipelineDetailProps) {
       <PipelineStepper steps={steps} currentStep={pipeline.currentStep} />
 
       {/* Step details */}
-      <div className="space-y-2">
+      <div className="flex flex-col gap-[var(--gap-inline)]">
         {steps.map((step) => (
           <div key={step.id}>
             {step.outputSummary && (

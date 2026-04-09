@@ -31,7 +31,7 @@ export function RunDetail({ runId, projectId, onClose }: RunDetailProps) {
       : null;
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+    <div className="flex flex-col gap-[var(--gap-block)] rounded-lg border border-zinc-800 bg-zinc-900 p-[var(--gap-block)]">
       <div className="flex items-start justify-between">
         <div>
           <h3 className="font-mono text-sm font-semibold text-zinc-200">{run.id}</h3>

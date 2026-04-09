@@ -53,8 +53,8 @@ export function RunInspector({ projectId, defaultAgentId }: RunInspectorProps) {
   }, [rawRuns, startDate, endDate]);
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex gap-2">
+    <div className="flex flex-col gap-[var(--gap-block)]">
+      <div className="flex gap-[var(--gap-inline)]">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}

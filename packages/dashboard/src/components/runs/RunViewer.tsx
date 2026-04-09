@@ -112,7 +112,7 @@ export function RunViewer({ runId, projectId, onClose }: RunViewerProps) {
         </div>
 
         {/* Tab content */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-[var(--gap-block)]">
           {activeTab === "events" && (
             <EventsTab events={events ?? []} isLive={isLive} baseTimestamp={baseTimestamp} />
           )}
@@ -197,8 +197,8 @@ function DetailsTab({
   ];
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 text-sm">
+    <div className="flex flex-col gap-[var(--gap-block)]">
+      <div className="grid grid-cols-2 gap-[var(--gap-block)] text-sm">
         {fields.map((f) => (
           <div key={f.label}>
             <span className="text-zinc-600">{f.label}</span>

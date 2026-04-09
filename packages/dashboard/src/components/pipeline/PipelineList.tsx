@@ -18,7 +18,7 @@ export function PipelineList({ pipelines: items, showActions = false }: Pipeline
   }
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-[var(--gap-inline)]">
       {items.map((pipeline) => (
         <div
           key={pipeline.id}

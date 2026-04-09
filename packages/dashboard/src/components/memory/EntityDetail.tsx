@@ -36,7 +36,7 @@ export function EntityDetail({ entityId }: EntityDetailProps) {
   if (!entity) return null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-[var(--gap-block)]">
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-base font-semibold text-zinc-100">{entity.name}</h3>
@@ -61,7 +61,7 @@ export function EntityDetail({ entityId }: EntityDetailProps) {
           Facts ({facts?.length ?? 0})
         </h4>
         {isLoading && <p className="text-xs text-zinc-600">Loading facts...</p>}
-        <div className="space-y-2">
+        <div className="flex flex-col gap-[var(--gap-inline)]">
           {facts?.map((fact) => (
             <div key={fact.id} className="rounded border border-zinc-800 bg-zinc-900/50 p-3">
               <div className="mb-1 flex items-center justify-between">

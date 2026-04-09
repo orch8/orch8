@@ -111,7 +111,7 @@ export function PipelineTemplateEditor({
   const hasValidSteps = steps.every((s) => s.label.trim().length > 0);
 
   return (
-    <div className="space-y-4 rounded border border-zinc-700 bg-zinc-800/50 p-4">
+    <div className="flex flex-col gap-[var(--gap-block)] rounded border border-zinc-700 bg-zinc-800/50 p-[var(--gap-block)]">
       <h4 className="text-sm font-semibold text-zinc-200">
         {template ? "Edit Template" : "New Template"}
       </h4>
@@ -145,7 +145,7 @@ export function PipelineTemplateEditor({
         Default template
       </label>
 
-      <div className="space-y-2">
+      <div className="flex flex-col gap-[var(--gap-inline)]">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-zinc-400">Steps</span>
           <button

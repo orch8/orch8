@@ -51,34 +51,34 @@ export function DaemonPageComponent() {
   }, [logs, autoScroll]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--gap-section)]">
       {/* Status */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <div className="grid grid-cols-4 gap-[var(--gap-block)]">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-[var(--gap-block)]">
           <span className="text-xs text-zinc-500">Status</span>
           <div className="mt-1 flex items-center gap-2">
             <span className={`h-2 w-2 rounded-full ${status?.status === "running" ? "bg-emerald-500" : "bg-red-500"}`} />
-            <span className="text-lg font-semibold text-zinc-100">
+            <span className="type-section text-zinc-100">
               {status?.status === "running" ? "Running" : "Unknown"}
             </span>
           </div>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-[var(--gap-block)]">
           <span className="text-xs text-zinc-500">Uptime</span>
-          <p className="mt-1 text-lg font-semibold text-zinc-100">
+          <p className="mt-1 type-section text-zinc-100">
             {status?.uptimeFormatted ?? "—"}
           </p>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-[var(--gap-block)]">
           <span className="text-xs text-zinc-500">Active Processes</span>
-          <p className="mt-1 text-lg font-semibold text-zinc-100">
+          <p className="mt-1 type-section text-zinc-100">
             {status?.processCount ?? 0}
           </p>
           <p className="text-xs text-zinc-500">{status?.queueDepth ?? 0} queued</p>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-[var(--gap-block)]">
           <span className="text-xs text-zinc-500">Tick Interval</span>
-          <p className="mt-1 text-lg font-semibold text-zinc-100">
+          <p className="mt-1 type-section text-zinc-100">
             {status?.tickIntervalMs ?? "—"}ms
           </p>
           <button
@@ -93,7 +93,7 @@ export function DaemonPageComponent() {
       {/* Live Log */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-zinc-300">Live Log</h3>
+          <h3 className="type-section text-zinc-300">Live Log</h3>
           <div className="flex gap-2">
             <label className="flex items-center gap-1 text-xs text-zinc-500">
               <input

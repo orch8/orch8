@@ -34,9 +34,9 @@ export function MemoryBrowser({ projectId }: MemoryBrowserProps) {
   const { data: lessonsData } = useLessons(worklogAgentId || undefined);
 
   return (
-    <div className="flex h-full gap-4">
+    <div className="flex h-full gap-[var(--gap-block)]">
       {/* Entity list sidebar */}
-      <div className="flex w-72 shrink-0 flex-col gap-3">
+      <div className="flex w-72 shrink-0 flex-col gap-[var(--gap-block)]">
         {/* Search */}
         <input
           value={searchQuery}
@@ -164,7 +164,7 @@ export function MemoryBrowser({ projectId }: MemoryBrowserProps) {
 
       {/* Right panel */}
       <div className="flex-1 overflow-y-auto">
-        <div className="mb-4 flex gap-1 border-b border-zinc-800 pb-2">
+        <div className="mb-[var(--gap-block)] flex gap-1 border-b border-zinc-800 pb-2">
           {(["entities", "worklog", "lessons"] as const).map((tab) => (
             <button
               key={tab}
@@ -189,7 +189,7 @@ export function MemoryBrowser({ projectId }: MemoryBrowserProps) {
         )}
 
         {activeTab === "worklog" && (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-[var(--gap-block)]">
             <input
               value={worklogAgentId}
               onChange={(e) => setWorklogAgentId(e.target.value)}
@@ -208,7 +208,7 @@ export function MemoryBrowser({ projectId }: MemoryBrowserProps) {
         )}
 
         {activeTab === "lessons" && (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-[var(--gap-block)]">
             <input
               value={worklogAgentId}
               onChange={(e) => setWorklogAgentId(e.target.value)}
