@@ -23,7 +23,7 @@ export function BriefingHero({
 }: BriefingHeroProps) {
   return (
     <section
-      className="mb-8 rounded-lg border border-edge-soft px-8 py-10"
+      className="mb-[var(--gap-section)] rounded-lg border border-edge-soft px-[var(--pad-page)] py-[var(--gap-section)]"
       style={{
         background:
           "linear-gradient(180deg, var(--color-hero-top) 0%, var(--color-hero-bot) 100%)",
@@ -36,7 +36,7 @@ export function BriefingHero({
         />
         <span className="type-label text-mute">LIVE · {projectName}</span>
       </div>
-      <h1 className="mt-4 type-display text-ink">
+      <h1 className="mt-[var(--gap-block)] type-display text-ink">
         <span className="text-accent">{agentsWorking}</span>{" "}
         {agentsWorking === 1 ? "agent" : "agents"} working,{" "}
         <span className="text-accent">{tasksInFlight}</span>{" "}
@@ -50,7 +50,7 @@ export function BriefingHero({
           <>Nothing needs you right now.</>
         )}
       </h1>
-      <div className="mt-6 flex flex-wrap gap-2">
+      <div className="mt-[var(--gap-block)] flex flex-wrap gap-[var(--gap-inline)]">
         <Pill label="spend today" value={spend} />
         <Pill label="budget used" value={budgetUsed} />
         <Pill label="uptime" value={uptime} />

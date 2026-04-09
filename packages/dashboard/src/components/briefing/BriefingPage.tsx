@@ -25,7 +25,7 @@ export function BriefingPage({ projectId }: BriefingPageProps) {
         queueDepth={0}
       />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_1fr]">
+      <div className="grid grid-cols-1 gap-[var(--gap-section)] lg:grid-cols-[1.35fr_1fr]">
         {/* Activity column */}
         <section>
           <SectionLabel>ACTIVITY</SectionLabel>
