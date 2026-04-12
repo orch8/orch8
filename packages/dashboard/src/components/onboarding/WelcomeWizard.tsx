@@ -6,32 +6,38 @@ import { TemplateStep } from "../agent-editor/TemplateStep.js";
 import { useCreateProject } from "../../hooks/useProjects.js";
 import { useAddBundledAgents } from "../../hooks/useBundledAgents.js";
 import { useCreateTask } from "../../hooks/useTasks.js";
+import { useCreateChat } from "../../hooks/useChats.js";
 
 interface WelcomeWizardProps {
   onComplete: (projectId: string) => void;
+  /** Navigate to chat after conversational setup. */
+  onChatNavigate: (projectId: string, chatId: string) => void;
   /** Show the intro "Welcome" step (defaults to true). */
   showIntro?: boolean;
 }
 
-export function WelcomeWizard({ onComplete, showIntro = true }: WelcomeWizardProps) {
+export function WelcomeWizard({ onComplete, onChatNavigate, showIntro = true }: WelcomeWizardProps) {
   const [step, setStep] = useState(0);
   const createProject = useCreateProject();
   const addBundledAgents = useAddBundledAgents();
   const createTask = useCreateTask();
+  const createChat = useCreateChat();
+
   // Project fields
   const [projectName, setProjectName] = useState("");
   const [repoPath, setRepoPath] = useState("");
   const [defaultBranch, setDefaultBranch] = useState("main");
   const [dailyBudget, setDailyBudget] = useState("");
 
-  // Selected bundled agents (multi-select)
+  // Setup path: null until chosen, then "manual" or "conversational"
+  const [setupPath, setSetupPath] = useState<"manual" | "conversational" | null>(null);
+
+  // Selected bundled agents (multi-select) — manual path only
   const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
 
-  // First task
+  // First task — manual path only
   const [taskTitle, setTaskTitle] = useState("");
 
-  // Surfaced error from mutations on the final step. Rendered near the
-  // complete button; on failure the wizard stays on its current step.
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -41,6 +47,11 @@ export function WelcomeWizard({ onComplete, showIntro = true }: WelcomeWizardPro
         ? prev.filter((id) => id !== agentId)
         : [...prev, agentId],
     );
+  }
+
+  function selectPath(path: "manual" | "conversational") {
+    setSetupPath(path);
+    setStep(step + 1);
   }
 
   const steps = [
@@ -60,6 +71,39 @@ export function WelcomeWizard({ onComplete, showIntro = true }: WelcomeWizardPro
           },
         ]
       : []),
+    {
+      label: "Setup",
+      content: (
+        <div className="flex flex-col items-center gap-6 py-8">
+          <h2 className="type-title font-bold text-zinc-100">How would you like to get started?</h2>
+          <p className="max-w-md text-center text-sm text-zinc-400">
+            Choose how you'd like to set up your project.
+          </p>
+          <div className="grid grid-cols-2 gap-4 w-full max-w-lg">
+            <button
+              type="button"
+              onClick={() => selectPath("manual")}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 text-left hover:border-zinc-500 transition-colors"
+            >
+              <h3 className="font-semibold text-zinc-100">I know what I need</h3>
+              <p className="mt-1 text-xs text-zinc-400">
+                Pick agents and create your first task manually.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => selectPath("conversational")}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 text-left hover:border-zinc-500 transition-colors"
+            >
+              <h3 className="font-semibold text-zinc-100">Help me set up</h3>
+              <p className="mt-1 text-xs text-zinc-400">
+                Describe what you're building and I'll design a team for you.
+              </p>
+            </button>
+          </div>
+        </div>
+      ),
+    },
     {
       label: "Project",
       content: (
@@ -114,39 +158,7 @@ export function WelcomeWizard({ onComplete, showIntro = true }: WelcomeWizardPro
             <div className="flex justify-between py-1"><span>Max Concurrent Agents</span><span>5</span></div>
             <div className="flex justify-between py-1"><span>Tick Interval</span><span>5000ms</span></div>
           </div>
-        </div>
-      ),
-    },
-    {
-      label: "Agents",
-      content: (
-        <div className="flex flex-col gap-4">
-          <h3 className="type-section font-semibold text-zinc-100">Add Agents</h3>
-          <p className="text-xs text-zinc-500">
-            Select agents to add to your project. You can skip this and add agents later.
-          </p>
-          <TemplateStep
-            mode="multi"
-            selected={selectedAgentIds}
-            onToggle={toggleAgent}
-          />
-        </div>
-      ),
-    },
-    {
-      label: "First Task",
-      content: (
-        <div className="flex flex-col gap-4">
-          <h3 className="type-section font-semibold text-zinc-100">Create Your First Task</h3>
-          <FormField label="Task Title" description="Or skip this — you can create tasks from the Board later.">
-            <input
-              value={taskTitle}
-              onChange={(e) => setTaskTitle(e.target.value)}
-              placeholder="Build the authentication flow"
-              className="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none"
-            />
-          </FormField>
-          {error && (
+          {setupPath === "conversational" && error && (
             <div
               role="alert"
               className="rounded-md border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300"
@@ -157,6 +169,50 @@ export function WelcomeWizard({ onComplete, showIntro = true }: WelcomeWizardPro
         </div>
       ),
     },
+    ...(setupPath !== "conversational"
+      ? [
+          {
+            label: "Agents",
+            content: (
+              <div className="flex flex-col gap-4">
+                <h3 className="type-section font-semibold text-zinc-100">Add Agents</h3>
+                <p className="text-xs text-zinc-500">
+                  Select agents to add to your project. You can skip this and add agents later.
+                </p>
+                <TemplateStep
+                  mode="multi"
+                  selected={selectedAgentIds}
+                  onToggle={toggleAgent}
+                />
+              </div>
+            ),
+          },
+          {
+            label: "First Task",
+            content: (
+              <div className="flex flex-col gap-4">
+                <h3 className="type-section font-semibold text-zinc-100">Create Your First Task</h3>
+                <FormField label="Task Title" description="Or skip this — you can create tasks from the Board later.">
+                  <input
+                    value={taskTitle}
+                    onChange={(e) => setTaskTitle(e.target.value)}
+                    placeholder="Build the authentication flow"
+                    className="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none"
+                  />
+                </FormField>
+                {error && (
+                  <div
+                    role="alert"
+                    className="rounded-md border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300"
+                  >
+                    {error}
+                  </div>
+                )}
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   async function handleComplete() {

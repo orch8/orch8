@@ -10,22 +10,53 @@ beforeEach(() => mockFetch.mockReset());
 
 describe("WelcomeWizard", () => {
   it("renders welcome step first", () => {
-    renderWithProviders(<WelcomeWizard onComplete={(_projectId) => {}} />);
+    renderWithProviders(<WelcomeWizard onComplete={(_projectId) => {}} onChatNavigate={() => {}} />);
     expect(screen.getByText("Welcome to orch8")).toBeInTheDocument();
     expect(screen.getByText("Next")).toBeInTheDocument();
   });
 
-  it("advances to Create Project step", async () => {
-    renderWithProviders(<WelcomeWizard onComplete={(_projectId) => {}} />);
+  it("advances to path selection step after welcome", async () => {
+    renderWithProviders(<WelcomeWizard onComplete={(_projectId) => {}} onChatNavigate={() => {}} />);
     await userEvent.click(screen.getByText("Next"));
-    expect(screen.getByText("Create Project")).toBeInTheDocument();
+    expect(screen.getByText("How would you like to get started?")).toBeInTheDocument();
   });
 
-  it("shows all 5 step labels", () => {
-    renderWithProviders(<WelcomeWizard onComplete={(_projectId) => {}} />);
+  it("shows initial step labels including setup step", () => {
+    renderWithProviders(<WelcomeWizard onComplete={(_projectId) => {}} onChatNavigate={() => {}} />);
     expect(screen.getByText("Welcome")).toBeInTheDocument();
+    expect(screen.getByText("Setup")).toBeInTheDocument();
     expect(screen.getByText("Project")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
+    // Before path is chosen, setupPath is null so Agents/First Task are included
+    expect(screen.getByText("Agents")).toBeInTheDocument();
+    expect(screen.getByText("First Task")).toBeInTheDocument();
+  });
+
+  it("shows path selection step after welcome", async () => {
+    renderWithProviders(<WelcomeWizard onComplete={() => {}} onChatNavigate={() => {}} />);
+    await userEvent.click(screen.getByText("Next"));
+    expect(screen.getByText("How would you like to get started?")).toBeInTheDocument();
+    expect(screen.getByText("I know what I need")).toBeInTheDocument();
+    expect(screen.getByText("Help me set up")).toBeInTheDocument();
+  });
+
+  it("conversational path shows only 4 step labels", async () => {
+    renderWithProviders(<WelcomeWizard onComplete={() => {}} onChatNavigate={() => {}} />);
+    // Welcome → Next
+    await userEvent.click(screen.getByText("Next"));
+    // Click "Help me set up"
+    await userEvent.click(screen.getByText("Help me set up"));
+    // Should now be on Project step, with only 4 steps visible
+    expect(screen.getByText("Create Project")).toBeInTheDocument();
+    expect(screen.queryByText("Agents")).not.toBeInTheDocument();
+    expect(screen.queryByText("First Task")).not.toBeInTheDocument();
+  });
+
+  it("manual path shows all 6 step labels", async () => {
+    renderWithProviders(<WelcomeWizard onComplete={() => {}} onChatNavigate={() => {}} />);
+    await userEvent.click(screen.getByText("Next"));
+    await userEvent.click(screen.getByText("I know what I need"));
+    expect(screen.getByText("Create Project")).toBeInTheDocument();
     expect(screen.getByText("Agents")).toBeInTheDocument();
     expect(screen.getByText("First Task")).toBeInTheDocument();
   });
@@ -53,10 +84,12 @@ describe("WelcomeWizard", () => {
     });
 
     const onComplete = vi.fn();
-    renderWithProviders(<WelcomeWizard onComplete={onComplete} />);
+    renderWithProviders(<WelcomeWizard onComplete={onComplete} onChatNavigate={() => {}} />);
 
     // Welcome → Next
     await userEvent.click(screen.getByText("Next"));
+    // Setup → choose manual path
+    await userEvent.click(screen.getByText("I know what I need"));
     // Project step: fill the required fields.
     const nameInput = screen.getByPlaceholderText("My App");
     const pathInput = screen.getByPlaceholderText("/path/to/your/repo");

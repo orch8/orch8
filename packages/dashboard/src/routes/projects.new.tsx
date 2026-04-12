@@ -15,6 +15,7 @@ function NewProjectPage() {
         onComplete={(projectId) =>
           navigate({ to: "/projects/$projectId", params: { projectId } })
         }
+        onChatNavigate={() => {}}
       />
     </div>
   );
