@@ -54,6 +54,16 @@ export function WelcomeWizard({ onComplete, onChatNavigate, showIntro = true }: 
     setStep(step + 1);
   }
 
+  const setupStepIndex = showIntro ? 1 : 0;
+
+  function handleStepChange(newStep: number) {
+    // Prevent advancing past the Setup step without choosing a path
+    if (step === setupStepIndex && newStep > step && setupPath === null) {
+      return;
+    }
+    setStep(newStep);
+  }
+
   const steps = [
     ...(showIntro
       ? [
@@ -278,7 +288,7 @@ export function WelcomeWizard({ onComplete, onChatNavigate, showIntro = true }: 
     <WizardStepper
       steps={steps}
       currentStep={step}
-      onStepChange={setStep}
+      onStepChange={handleStepChange}
       onComplete={handleComplete}
       completeLabel="Finish Setup"
     />
