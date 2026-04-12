@@ -75,6 +75,7 @@ export class ChatService {
     projectId: string;
     agentId: string;
     title?: string;
+    seedMessage?: string;
   }): Promise<Chat> {
     const [row] = await this.db
       .insert(chats)
@@ -84,6 +85,16 @@ export class ChatService {
         title: input.title ?? "New chat",
       })
       .returning();
+
+    if (input.seedMessage) {
+      await this.db.insert(chatMessages).values({
+        chatId: row.id,
+        role: "assistant",
+        content: input.seedMessage,
+        status: "complete",
+      });
+    }
+
     return row;
   }
 

@@ -7,6 +7,7 @@ export const CreateChatSchema = z.object({
   projectId: z.string().min(1),
   agentId: z.string().min(1).optional(),
   title: z.string().min(1).max(200).optional(),
+  seedMessage: z.string().min(1).max(10_000).optional(),
 });
 export type CreateChat = z.infer<typeof CreateChatSchema>;
 

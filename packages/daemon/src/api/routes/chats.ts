@@ -52,6 +52,7 @@ export async function chatsRoutes(app: FastifyInstance) {
           projectId: parsed.data.projectId,
           agentId,
           title: parsed.data.title,
+          seedMessage: parsed.data.seedMessage,
         });
         return reply.code(201).send(chat);
       } catch (err) {

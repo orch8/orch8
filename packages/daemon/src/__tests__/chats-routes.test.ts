@@ -310,4 +310,27 @@ describe("Chat API Routes", () => {
 
     await localApp.close();
   });
+
+  it("POST /api/projects/:projectId/chats with seedMessage inserts assistant message", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/chats`,
+      headers: { "x-project-id": projectId },
+      payload: { projectId, title: "Setup", seedMessage: "Hello! Tell me what you're building." },
+    });
+    expect(res.statusCode).toBe(201);
+    const chat = JSON.parse(res.body);
+
+    const msgRes = await app.inject({
+      method: "GET",
+      url: `/api/chats/${chat.id}/messages`,
+      headers: { "x-project-id": projectId },
+    });
+    expect(msgRes.statusCode).toBe(200);
+    const messages = JSON.parse(msgRes.body);
+    expect(messages).toHaveLength(1);
+    expect(messages[0].role).toBe("assistant");
+    expect(messages[0].content).toBe("Hello! Tell me what you're building.");
+    expect(messages[0].status).toBe("complete");
+  });
 });
