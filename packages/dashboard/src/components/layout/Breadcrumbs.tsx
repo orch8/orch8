@@ -16,6 +16,12 @@ const SEGMENT_LABELS: Record<string, string> = {
   briefing: "Briefing",
 };
 
+// Segments that are path prefixes without their own route.
+// Map them to a sibling route the user should land on instead.
+const SEGMENT_REWRITE: Record<string, string> = {
+  tasks: "board",
+};
+
 function labelFor(segment: string): string {
   return SEGMENT_LABELS[segment] ?? segment;
 }
@@ -47,9 +53,14 @@ export function Breadcrumbs({ compact = false }: BreadcrumbsProps) {
   parts.forEach((part, i) => {
     acc += `/${part}`;
     if (part === "projects") return;
+
+    // Rewrite prefix-only segments to a sibling route that actually exists.
+    const rewrite = SEGMENT_REWRITE[part];
+    const to = rewrite ? acc.replace(/\/[^/]+$/, `/${rewrite}`) : acc;
+
     crumbs.push({
       label: labelFor(part),
-      to: acc,
+      to,
       isCurrent: i === parts.length - 1,
     });
   });
