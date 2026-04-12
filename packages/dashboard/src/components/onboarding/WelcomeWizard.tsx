@@ -9,9 +9,11 @@ import { useCreateTask } from "../../hooks/useTasks.js";
 
 interface WelcomeWizardProps {
   onComplete: (projectId: string) => void;
+  /** Show the intro "Welcome" step (defaults to true). */
+  showIntro?: boolean;
 }
 
-export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
+export function WelcomeWizard({ onComplete, showIntro = true }: WelcomeWizardProps) {
   const [step, setStep] = useState(0);
   const createProject = useCreateProject();
   const addBundledAgents = useAddBundledAgents();
@@ -42,18 +44,22 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
   }
 
   const steps = [
-    {
-      label: "Welcome",
-      content: (
-        <div className="flex flex-col items-center gap-4 py-8 text-center">
-          <h2 className="type-title font-bold text-zinc-100">Welcome to orch8</h2>
-          <p className="max-w-md text-sm text-zinc-400">
-            orch8 orchestrates AI agents to work on your codebase. Create a project,
-            configure agents, and let them handle tasks autonomously.
-          </p>
-        </div>
-      ),
-    },
+    ...(showIntro
+      ? [
+          {
+            label: "Welcome",
+            content: (
+              <div className="flex flex-col items-center gap-4 py-8 text-center">
+                <h2 className="type-title font-bold text-zinc-100">Welcome to orch8</h2>
+                <p className="max-w-md text-sm text-zinc-400">
+                  orch8 orchestrates AI agents to work on your codebase. Create a project,
+                  configure agents, and let them handle tasks autonomously.
+                </p>
+              </div>
+            ),
+          },
+        ]
+      : []),
     {
       label: "Project",
       content: (
