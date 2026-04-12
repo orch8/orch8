@@ -112,4 +112,62 @@ describe("WelcomeWizard", () => {
     // Still on the "First Task" step.
     expect(screen.getByText("Create Your First Task")).toBeInTheDocument();
   });
+
+  it("conversational path creates project and chat, then calls onChatNavigate", async () => {
+    const projectId = "proj_test123";
+    const chatId = "chat_test456";
+
+    mockFetch.mockImplementation((input: any, init?: RequestInit) => {
+      const url = String(input ?? "");
+      const method = (init?.method ?? "GET").toUpperCase();
+
+      // Chat creation — must be checked before project creation since the URL
+      // (/api/projects/:id/chats) also contains "/api/projects".
+      if (url.includes("/chats") && method === "POST") {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          text: () => Promise.resolve(JSON.stringify({ id: chatId, projectId })),
+          json: () => Promise.resolve({ id: chatId, projectId }),
+        });
+      }
+      if (url.includes("/api/projects") && method === "POST") {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          text: () => Promise.resolve(JSON.stringify({ id: projectId })),
+          json: () => Promise.resolve({ id: projectId }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve("[]"),
+        json: () => Promise.resolve([]),
+      });
+    });
+
+    const onComplete = vi.fn();
+    const onChatNavigate = vi.fn();
+    renderWithProviders(
+      <WelcomeWizard onComplete={onComplete} onChatNavigate={onChatNavigate} />,
+    );
+
+    // Welcome → Next
+    await userEvent.click(screen.getByText("Next"));
+    // Choose "Help me set up"
+    await userEvent.click(screen.getByText("Help me set up"));
+    // Project step: fill required fields
+    await userEvent.type(screen.getByPlaceholderText("My App"), "Test Project");
+    await userEvent.type(screen.getByPlaceholderText("/path/to/your/repo"), "/tmp/test");
+    await userEvent.click(screen.getByText("Next"));
+    // Settings step — this is the last step, click Finish Setup
+    await userEvent.click(screen.getByText("Finish Setup"));
+
+    await waitFor(() => {
+      expect(onChatNavigate).toHaveBeenCalledWith(projectId, chatId);
+    });
+    // onComplete should NOT be called for the conversational path
+    expect(onComplete).not.toHaveBeenCalled();
+  });
 });

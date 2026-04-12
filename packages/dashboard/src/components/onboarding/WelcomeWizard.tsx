@@ -225,13 +225,21 @@ export function WelcomeWizard({ onComplete, onChatNavigate, showIntro = true }: 
       : []),
   ];
 
+  const SEED_MESSAGE =
+    "Hi! Tell me what you're working on — what you're building, who it's for, " +
+    "and what you need to get it off the ground. I'll put together a team and " +
+    "a plan for you.";
+
   async function handleComplete() {
     if (submitting) return;
     setError(null);
     setSubmitting(true);
 
-    // Create project
-    const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    // ── Create project (both paths) ────────────────────────
+    const slug = projectName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
     let project: { id: string };
     try {
       project = await createProject.mutateAsync({
@@ -249,8 +257,24 @@ export function WelcomeWizard({ onComplete, onChatNavigate, showIntro = true }: 
       return;
     }
 
-    // Batch-create selected bundled agents. Surface failures so the user
-    // can retry instead of silently advancing to a broken project.
+    // ── Conversational path: create chat with seed message ─
+    if (setupPath === "conversational") {
+      try {
+        const chat = await createChat.mutateAsync({
+          projectId: project.id,
+          title: "Project Setup",
+          seedMessage: SEED_MESSAGE,
+        });
+        setSubmitting(false);
+        onChatNavigate(project.id, chat.id);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to create chat");
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // ── Manual path: agents + first task (existing flow) ───
     if (selectedAgentIds.length > 0) {
       try {
         await addBundledAgents.mutateAsync({
@@ -264,7 +288,6 @@ export function WelcomeWizard({ onComplete, onChatNavigate, showIntro = true }: 
       }
     }
 
-    // Create task if title given.
     if (taskTitle.trim()) {
       try {
         await createTask.mutateAsync({
