@@ -32,12 +32,13 @@ export function useChat(chatId: string) {
 
 export function useCreateChat() {
   const qc = useQueryClient();
-  return useMutation<Chat, Error, { projectId: string; agentId?: string; title?: string }>({
+  return useMutation<Chat, Error, { projectId: string; agentId?: string; title?: string; seedMessage?: string }>({
     mutationFn: (input) =>
       api.post<Chat>(`/projects/${input.projectId}/chats`, {
         projectId: input.projectId,
         agentId: input.agentId,
         title: input.title,
+        seedMessage: input.seedMessage,
       }),
     onSuccess: (chat) => {
       qc.invalidateQueries({ queryKey: ["chats", chat.projectId] });
