@@ -110,6 +110,7 @@ export const CHAT_AGENT_DEFAULTS = {
     "runs",
     "cost-and-budget",
     "memory",
+    "project-setup",
   ],
   systemPrompt: CHAT_AGENT_SYSTEM_PROMPT,
   promptTemplate: "{{context.userMessage}}",

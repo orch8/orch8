@@ -379,4 +379,8 @@ describe("SeedingService", () => {
       expect(matches).toHaveLength(1);
     });
   });
+
+  it("includes project-setup in CHAT_AGENT_DEFAULTS.desiredSkills", () => {
+    expect(CHAT_AGENT_DEFAULTS.desiredSkills).toContain("project-setup");
+  });
 });
