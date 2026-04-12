@@ -343,6 +343,37 @@ describe("SeedingService", () => {
       expect(row.canAssignTo).toEqual(["qa-bot"]);
       expect(row.canMoveTo).toEqual(["in_progress"]);
     });
+
+    it("backfills missing desiredSkills without removing user-added ones", async () => {
+      // Simulate a pre-existing agent with only some default skills + a custom one.
+      await testDb.db.insert(agents).values({
+        id: CHAT_AGENT_DEFAULTS.id,
+        projectId,
+        name: CHAT_AGENT_DEFAULTS.name,
+        role: CHAT_AGENT_DEFAULTS.role,
+        canCreateTasks: true,
+        canAssignTo: ["*"],
+        canMoveTo: ["backlog", "blocked", "in_progress", "done"],
+        desiredSkills: ["_card-protocol", "brainstorm", "tasks", "user-custom-skill"],
+      });
+
+      const service = new SeedingService();
+      await service.provisionChatAgent(testDb.db, projectId);
+
+      const row = await getChatRow();
+      // Should keep existing skills (including user-custom-skill)
+      expect(row.desiredSkills).toContain("_card-protocol");
+      expect(row.desiredSkills).toContain("brainstorm");
+      expect(row.desiredSkills).toContain("tasks");
+      expect(row.desiredSkills).toContain("user-custom-skill");
+      // Should have added the missing defaults
+      expect(row.desiredSkills).toContain("agents");
+      expect(row.desiredSkills).toContain("pipelines");
+      expect(row.desiredSkills).toContain("runs");
+      expect(row.desiredSkills).toContain("cost-and-budget");
+      expect(row.desiredSkills).toContain("memory");
+      expect(row.desiredSkills).toContain("project-setup");
+    });
   });
 
   describe("ensureGitignore", () => {

@@ -372,6 +372,14 @@ export class SeedingService {
       if (!row.canMoveTo || row.canMoveTo.length === 0) {
         patch.canMoveTo = CHAT_AGENT_DEFAULTS.canMoveTo as unknown as typeof row.canMoveTo;
       }
+      // Reconcile desiredSkills: merge in any new defaults without removing
+      // user-added skills. This ensures newly bundled skills reach existing agents.
+      const current = new Set(row.desiredSkills ?? []);
+      const defaults = CHAT_AGENT_DEFAULTS.desiredSkills as readonly string[];
+      const missing = defaults.filter((s) => !current.has(s));
+      if (missing.length > 0) {
+        patch.desiredSkills = [...current, ...missing];
+      }
       if (Object.keys(patch).length > 0) {
         await db
           .update(agents)

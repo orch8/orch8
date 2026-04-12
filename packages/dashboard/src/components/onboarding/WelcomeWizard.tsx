@@ -226,9 +226,9 @@ export function WelcomeWizard({ onComplete, onChatNavigate, showIntro = true }: 
   ];
 
   const SEED_MESSAGE =
-    "Hi! Tell me what you're working on — what you're building, who it's for, " +
-    "and what you need to get it off the ground. I'll put together a team and " +
-    "a plan for you.";
+    "Hi! Tell me what you're building and who it's for. " +
+    "I'll ask a few questions, then propose a team of AI agents and a roadmap " +
+    "of epics for them to work on. Once you approve, the agents get to work.";
 
   async function handleComplete() {
     if (submitting) return;
