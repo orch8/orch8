@@ -2,6 +2,11 @@ import type { ComponentType } from "react";
 import { parseStrictCard } from "@orch/shared";
 import type { ChatCardKind, ExtractedCard } from "@orch/shared";
 import type { CardComponentProps } from "./cardTypes.js";
+import {
+  GenericConfirmFallback,
+  GenericInfoFallback,
+  GenericResultFallback,
+} from "./GenericFallbackCard.js";
 
 import { ConfirmCreateTaskCard } from "./confirm/ConfirmCreateTaskCard.js";
 import { ConfirmUpdateTaskCard } from "./confirm/ConfirmUpdateTaskCard.js";
@@ -119,32 +124,20 @@ export function CardRegistry({ extracted, chatId, projectId }: CardRegistryProps
   });
 
   if (!parsed.ok) {
-    // Render an error fallback. The user sees the failure inline; the
-    // raw payload is exposed in the rawResponse field for debugging.
-    const fallback: ExtractedCard = {
-      ...extracted,
-      kind: "result_error",
-      payload: {
-        reason: "Card payload failed validation",
-        rawResponse: JSON.stringify(
-          { kind: extracted.kind, payload: extracted.payload, issues: parsed.issues },
-          null,
-          2,
-        ),
-      },
-    };
-    return (
-      <ResultErrorCard
-        card={{
-          kind: "result_error",
-          summary: extracted.summary || "Invalid card",
-          payload: fallback.payload as { reason: string; httpStatus?: number; endpoint?: string; rawResponse?: string },
-        }}
-        extracted={fallback}
-        chatId={chatId}
-        projectId={projectId}
-      />
-    );
+    // Unknown kind or payload mismatch — render a generic fallback so
+    // the user still sees the data and can approve/cancel if applicable.
+    const kind = extracted.kind;
+    if (kind.startsWith("confirm_")) {
+      return <GenericConfirmFallback extracted={extracted} chatId={chatId} projectId={projectId} />;
+    }
+    if (kind.startsWith("info_")) {
+      return <GenericInfoFallback extracted={extracted} chatId={chatId} projectId={projectId} />;
+    }
+    if (kind.startsWith("result_")) {
+      return <GenericResultFallback extracted={extracted} chatId={chatId} projectId={projectId} />;
+    }
+    // Truly unrecognizable kind — still show it generically as info
+    return <GenericInfoFallback extracted={extracted} chatId={chatId} projectId={projectId} />;
   }
 
   const Component = REGISTRY[parsed.card.kind] as ComponentType<CardComponentProps<typeof parsed.card.kind>>;
