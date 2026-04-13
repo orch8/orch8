@@ -3,7 +3,7 @@ name: cto
 role: cto
 model: opus
 effort: high
-maxTurns: 50
+maxTurns: 200
 skills:
   - orch8
   - verification

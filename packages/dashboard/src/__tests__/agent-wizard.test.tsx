@@ -19,7 +19,7 @@ const mockBundledAgents = [
     name: "Reviewer",
     role: "reviewer",
     model: "claude-sonnet-4-6",
-    maxTurns: 50,
+    maxTurns: 180,
     skills: [],
     heartbeatEnabled: false,
     systemPrompt: "You are a reviewer agent.",

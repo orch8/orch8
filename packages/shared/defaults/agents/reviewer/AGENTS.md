@@ -3,7 +3,7 @@ name: reviewer
 role: reviewer
 model: sonnet
 effort: high
-maxTurns: 20
+maxTurns: 180
 skills:
   - orch8
   - spec-compliance-review

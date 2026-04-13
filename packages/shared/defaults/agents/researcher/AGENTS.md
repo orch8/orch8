@@ -3,7 +3,7 @@ name: researcher
 role: researcher
 model: sonnet
 effort: high
-maxTurns: 40
+maxTurns: 180
 skills:
   - orch8
   - research-methodology

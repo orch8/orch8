@@ -12,7 +12,7 @@ const mockConfig = {
   orchestrator: { tick_interval_ms: 5000, log_level: "info" },
   api: { port: 3847, host: "localhost" },
   database: { host: "localhost", port: 5432, name: "orchestrator", user: "orchestrator", pool_min: 2, pool_max: 10, auto_migrate: true },
-  defaults: { model: "claude-opus-4-6", max_turns: 25, auto_commit: false, auto_pr: true, verification_required: true, brainstorm_idle_timeout_min: 30 },
+  defaults: { model: "claude-opus-4-6", max_turns: 180, auto_commit: false, auto_pr: true, verification_required: true, brainstorm_idle_timeout_min: 30 },
   limits: { max_concurrent_agents: 5, max_concurrent_per_project: 3, max_spawns_per_hour: 20, cooldown_on_failure: 300 },
   memory: { extraction_on_session_end: true, summary_rewrite_schedule: "weekly", fact_decay_days: 90 },
 };

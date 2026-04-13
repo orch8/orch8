@@ -15,7 +15,7 @@ const mockAgent = {
   color: "#888780",
   model: "claude-opus-4-6",
   effort: "medium",
-  maxTurns: 25,
+  maxTurns: 180,
   allowedTools: [],
   heartbeatEnabled: false,
   heartbeatIntervalSec: 0,

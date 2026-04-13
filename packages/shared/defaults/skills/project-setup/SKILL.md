@@ -139,7 +139,7 @@ config in the payload:
   for specialists
 - `model`: pick per the model-matches-role rule above
 - `effort`: `"high"` for lead and complex roles, `"medium"` for volume work
-- `maxTurns`: 25 (default)
+- `maxTurns`: 180 (default)
 - `systemPrompt`: a tailored persona and operating instructions specific
   to this agent's specialty. Be concrete — reference the technologies,
   patterns, and scope from the discovery conversation.
@@ -167,7 +167,7 @@ Example card:
     "role": "cto",
     "model": "claude-opus-4-6",
     "effort": "high",
-    "maxTurns": 25,
+    "maxTurns": 180,
     "systemPrompt": "You are the project lead for [project]. Your job is to...",
     "heartbeatEnabled": true,
     "heartbeatIntervalSec": 21600,

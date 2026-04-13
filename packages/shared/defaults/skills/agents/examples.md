@@ -11,7 +11,7 @@
     "name": "QA Bot",
     "role": "qa",
     "model": "claude-sonnet-4-6",
-    "maxTurns": 25,
+    "maxTurns": 180,
     "heartbeatEnabled": true,
     "heartbeatIntervalSec": 21600,
     "allowedTools": ["Bash", "Read", "Edit", "Write", "Grep", "Glob"],
@@ -35,11 +35,11 @@ After approval, call `POST /api/agents` with the same payload, then:
 ```orch8-card
 {
   "kind": "confirm_update_agent",
-  "summary": "Update qa-bot maxTurns 25 → 50",
+  "summary": "Update qa-bot maxTurns 180 → 250",
   "payload": {
     "agentId": "qa-bot",
-    "current": { "maxTurns": 25 },
-    "proposed": { "maxTurns": 50 }
+    "current": { "maxTurns": 180 },
+    "proposed": { "maxTurns": 250 }
   }
 }
 ```

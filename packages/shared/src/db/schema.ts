@@ -122,7 +122,7 @@ export const agents = pgTable("agents", {
 
   model: text("model").notNull().default("claude-opus-4-6"),
   effort: text("effort"),
-  maxTurns: integer("max_turns").notNull().default(25),
+  maxTurns: integer("max_turns").notNull().default(180),
   allowedTools: text("allowed_tools").array().default(sql`'{}'`),
 
   heartbeatEnabled: boolean("heartbeat_enabled").notNull().default(false),

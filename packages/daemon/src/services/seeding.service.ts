@@ -84,7 +84,7 @@ export const CHAT_AGENT_DEFAULTS = {
   role: "custom" as const,
   model: "claude-sonnet-4-6",
   effort: "medium" as const,
-  maxTurns: 30,
+  maxTurns: 180,
   heartbeatEnabled: false,
   heartbeatIntervalSec: 0,
   wakeOnAssignment: false,

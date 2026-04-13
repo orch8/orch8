@@ -74,7 +74,7 @@ export function SettingsPage() {
                 min={1}
                 value={draft.defaults.max_turns}
                 onChange={(e) =>
-                  setDraft({ ...draft, defaults: { ...draft.defaults, max_turns: parseInt(e.target.value) || 25 } })
+                  setDraft({ ...draft, defaults: { ...draft.defaults, max_turns: parseInt(e.target.value) || 180 } })
                 }
                 className="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-600 focus:outline-none"
               />

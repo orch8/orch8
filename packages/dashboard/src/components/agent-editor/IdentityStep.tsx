@@ -82,7 +82,7 @@ export function IdentityStep({ data, onChange }: IdentityStepProps) {
           type="number"
           min={1}
           value={data.maxTurns}
-          onChange={(e) => update({ maxTurns: parseInt(e.target.value) || 25 })}
+          onChange={(e) => update({ maxTurns: parseInt(e.target.value) || 180 })}
           className="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-600 focus:outline-none"
         />
       </FormField>

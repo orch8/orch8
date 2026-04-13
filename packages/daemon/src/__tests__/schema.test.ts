@@ -43,7 +43,7 @@ describe("Database Schema", () => {
 
     expect(agent.id).toBe("test-agent");
     expect(agent.role).toBe("engineer");
-    expect(agent.maxTurns).toBe(25);
+    expect(agent.maxTurns).toBe(180);
   });
 
   it("creates a quick task", async () => {

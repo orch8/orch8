@@ -168,7 +168,7 @@ config from scratch.
   most agents), or `claude-haiku-4-5-20251001`.
 - `effort` — reasoning effort hint for models that support it
   (`low`, `medium`, `high`). Bundled templates use `high`.
-- `maxTurns` — per-run turn budget. Usually 25.
+- `maxTurns` — per-run turn budget. Usually 180.
 - `systemPrompt` — the agent's persona and operating instructions.
   Propose one if the user does not supply one.
 - `promptTemplate` — per-turn prompt scaffold with `{{variable}}`

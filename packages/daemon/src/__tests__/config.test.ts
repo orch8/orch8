@@ -94,7 +94,7 @@ describe("mergeConfigs", () => {
     expect(merged.defaults.model).toBe("claude-sonnet-4-6");
     expect(merged.limits.max_concurrent_per_project).toBe(8);
     // Global defaults remain for fields not overridden
-    expect(merged.defaults.max_turns).toBe(25);
+    expect(merged.defaults.max_turns).toBe(180);
   });
 
   it("returns global config when project config is null", () => {

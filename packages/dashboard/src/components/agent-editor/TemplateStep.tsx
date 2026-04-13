@@ -107,7 +107,7 @@ export function TemplateStep(props: TemplateStepProps) {
               name: "Blank Agent",
               role: "custom",
               model: "claude-sonnet-4-6",
-              maxTurns: 25,
+              maxTurns: 180,
               skills: [],
               heartbeatEnabled: false,
               systemPrompt: "",

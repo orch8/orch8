@@ -23,7 +23,7 @@ export const databaseSectionSchema = z.object({
 
 export const defaultsSectionSchema = z.object({
   model: z.string().default("claude-opus-4-6"),
-  max_turns: z.number().int().positive().default(25),
+  max_turns: z.number().int().positive().default(180),
   auto_commit: z.boolean().default(false),
   auto_pr: z.boolean().default(true),
   verification_required: z.boolean().default(true),
