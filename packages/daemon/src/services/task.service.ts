@@ -74,6 +74,16 @@ export class TaskService {
     }
 
     await this.db.insert(taskDependencies).values({ taskId, dependsOnId });
+
+    // Auto-block: if the dependent task is in backlog, move it to blocked
+    // since it now has an unresolved dependency
+    const task = await this.getById(taskId);
+    if (task && task.column === "backlog") {
+      await this.db
+        .update(tasks)
+        .set({ column: "blocked", updatedAt: new Date() })
+        .where(eq(tasks.id, taskId));
+    }
   }
 
   async removeDependency(taskId: string, dependsOnId: string): Promise<void> {

@@ -140,6 +140,31 @@ describe("TaskService", () => {
         service.addDependency(task.id, task.id)
       ).rejects.toThrow();
     });
+
+    it("auto-blocks a backlog task when dependency is added", async () => {
+      const a = await service.create({ title: "Dep", projectId, taskType: "quick" });
+      const b = await service.create({ title: "Dependent", projectId, taskType: "quick" });
+
+      // b is in backlog by default
+      expect((await service.getById(b.id))!.column).toBe("backlog");
+
+      await service.addDependency(b.id, a.id);
+
+      const refreshed = await service.getById(b.id);
+      expect(refreshed!.column).toBe("blocked");
+    });
+
+    it("does not auto-block an in_progress task when dependency is added", async () => {
+      const a = await service.create({ title: "Dep", projectId, taskType: "quick" });
+      const b = await service.create({ title: "In Progress", projectId, taskType: "quick" });
+
+      await testDb.db.update(tasks).set({ column: "in_progress" }).where(eq(tasks.id, b.id));
+
+      await service.addDependency(b.id, a.id);
+
+      const refreshed = await service.getById(b.id);
+      expect(refreshed!.column).toBe("in_progress");
+    });
   });
 
   describe("convertBrainstorm", () => {
