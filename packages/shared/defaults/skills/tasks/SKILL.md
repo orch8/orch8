@@ -29,6 +29,8 @@ them via the orch8 REST API.
 | Convert type | PATCH | `/api/tasks/{taskId}` (set `taskType`) |
 | Kill in-flight | POST | `/api/tasks/{taskId}/kill` |
 | Delete task | DELETE | `/api/tasks/{taskId}` |
+| Add dependency | POST | `/api/tasks/{taskId}/dependencies` |
+| Remove dependency | DELETE | `/api/tasks/{taskId}/dependencies/{depId}` |
 
 The `orch8` skill has the full request/response shapes — read it for
 the exact JSON bodies and headers.
@@ -37,7 +39,7 @@ the exact JSON bodies and headers.
 
 | Kind | Buttons | Payload essentials |
 |---|---|---|
-| `confirm_create_task` | Approve / Cancel | `title`, `description?`, `column?`, `taskType?`, `priority?`, `assignee?` |
+| `confirm_create_task` | Approve / Cancel | `title`, `description?`, `column?`, `taskType?`, `priority?`, `assignee?`, `dependsOn?` (array of task IDs) |
 | `confirm_update_task` | Approve / Cancel | `taskId`, `current` (object), `proposed` (object) — use both for diff display |
 | `confirm_assign_task` | Approve / Cancel | `taskId`, `currentAssignee?`, `proposedAssignee` |
 | `confirm_move_task` | Approve / Cancel | `taskId`, `from`, `to` (column names) |
@@ -49,6 +51,62 @@ the exact JSON bodies and headers.
 | `result_create_task` | Open | `taskId`, `title`, `column` |
 | `result_update_task` | Open | `taskId`, fields changed |
 | `result_delete_task` | none | `taskId`, `title` |
+
+## Task Dependencies
+
+Tasks can depend on other tasks. A task with unresolved dependencies is
+automatically moved to `blocked` and cannot be checked out. When all
+dependencies complete (`done`), the system automatically moves the task
+back to `backlog` and wakes the assigned agent.
+
+### Setting dependencies at creation time
+
+Include a `dependsOn` array of task IDs in the create payload:
+
+```orch8-card
+{
+  "kind": "confirm_create_task",
+  "summary": "Create task: Implement payments (depends on auth)",
+  "payload": {
+    "title": "Implement payments",
+    "description": "Add Stripe billing integration.",
+    "taskType": "quick",
+    "priority": "high",
+    "assignee": "billing-engineer",
+    "dependsOn": ["task_abc123"]
+  }
+}
+```
+
+The task will be created in `blocked` column. When `task_abc123` is marked
+done, the system automatically unblocks it and wakes the billing-engineer.
+
+### Adding dependencies after creation
+
+```bash
+curl -s -X POST "${ORCH_API_URL}/api/tasks/${TASK_ID}/dependencies" \
+  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
+  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Content-Type: application/json" \
+  -d '{ "dependsOnId": "task_abc123" }'
+```
+
+If the task is in `backlog`, it will be automatically moved to `blocked`.
+
+### Removing dependencies
+
+```bash
+curl -s -X DELETE "${ORCH_API_URL}/api/tasks/${TASK_ID}/dependencies/${DEP_TASK_ID}" \
+  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
+  -H "X-Project-Id: ${ORCH_PROJECT_ID}"
+```
+
+### Rules
+
+- A task cannot depend on itself
+- Circular dependencies are rejected (A → B → A)
+- When ALL dependencies are done, the task is automatically unblocked
+- The assigned agent is automatically woken when a task is unblocked
 
 ## Common flows
 
@@ -67,6 +125,57 @@ the exact JSON bodies and headers.
   }
 }
 ```
+
+### "Create three tasks where B and C depend on A"
+
+First create task A (no dependencies):
+
+```orch8-card
+{
+  "kind": "confirm_create_task",
+  "summary": "Create task: Set up database schema → api-engineer",
+  "payload": {
+    "title": "Set up database schema",
+    "taskType": "quick",
+    "priority": "high",
+    "assignee": "api-engineer"
+  }
+}
+```
+
+After approval and API call, the result returns `task_a_id`. Then create B and C with `dependsOn`:
+
+```orch8-card
+{
+  "kind": "confirm_create_task",
+  "summary": "Create task: Build API endpoints (blocked by schema) → api-engineer",
+  "payload": {
+    "title": "Build API endpoints",
+    "taskType": "quick",
+    "priority": "high",
+    "assignee": "api-engineer",
+    "dependsOn": ["task_a_id"]
+  }
+}
+```
+
+```orch8-card
+{
+  "kind": "confirm_create_task",
+  "summary": "Create task: Build frontend (blocked by schema) → frontend-engineer",
+  "payload": {
+    "title": "Build frontend components",
+    "taskType": "quick",
+    "priority": "medium",
+    "assignee": "frontend-engineer",
+    "dependsOn": ["task_a_id"]
+  }
+}
+```
+
+Tasks B and C are created in `blocked` state. When the api-engineer
+completes the schema task, both are automatically unblocked and their
+assigned agents are woken.
 
 ### "Move task_abc to in-progress"
 
