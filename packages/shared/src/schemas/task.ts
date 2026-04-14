@@ -13,6 +13,7 @@ const taskBase = {
   projectId: z.string().min(1),
   priority: TaskPrioritySchema.default("medium"),
   assignee: z.string().optional(),
+  dependsOn: z.array(z.string().min(1)).optional(),
 };
 
 export const CreateQuickTaskSchema = z.object({

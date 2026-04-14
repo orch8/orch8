@@ -54,6 +54,30 @@ describe("Task Zod Schemas", () => {
       });
       expect(result.priority).toBe("medium");
     });
+
+    it("accepts optional dependsOn array", () => {
+      const result = CreateTaskSchema.safeParse({
+        title: "Depends on A",
+        projectId: "proj_1",
+        taskType: "quick",
+        dependsOn: ["task_a", "task_b"],
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.dependsOn).toEqual(["task_a", "task_b"]);
+      }
+    });
+
+    it("defaults dependsOn to undefined when omitted", () => {
+      const result = CreateTaskSchema.parse({
+        title: "No deps",
+        projectId: "proj_1",
+        taskType: "quick",
+      });
+
+      expect(result.dependsOn).toBeUndefined();
+    });
   });
 
   describe("UpdateTaskSchema", () => {
