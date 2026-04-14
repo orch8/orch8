@@ -208,7 +208,10 @@ cards.
   more work later."
 - Each epic includes: title, description, priority, assignee (from the
   approved agents)
-- Include dependencies between epics where they exist (in the description)
+- Use the `dependsOn` field to declare dependencies between epics.
+  Create independent epics first, then reference their IDs in dependent
+  epics. Tasks with `dependsOn` are automatically blocked until their
+  dependencies complete.
 - Use progressive refinement: "Want to add anything else before we kick
   this off?" Iterate until the user is satisfied.
 
@@ -234,6 +237,26 @@ Example card:
   }
 }
 ```
+
+Example dependent epic (references the previously-created auth epic):
+
+```orch8-card
+{
+  "kind": "confirm_create_task",
+  "summary": "Create epic: Billing integration (depends on auth) → billing-engineer",
+  "payload": {
+    "title": "Billing integration",
+    "description": "Add Stripe subscription billing with per-org plans.",
+    "priority": "high",
+    "assignee": "billing-engineer",
+    "dependsOn": ["task_auth_id"]
+  }
+}
+```
+
+**Important:** Emit independent epics first (they need to be created and
+approved before you can reference their IDs in `dependsOn`). Then emit
+dependent epics referencing the created task IDs.
 
 ## Phase 4 — Launch
 
