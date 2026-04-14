@@ -257,6 +257,59 @@ POST /api/tasks/{id}/complete  →  { "output": "..." }
 
 ---
 
+## 4a. Task Dependencies
+
+Tasks can declare dependencies on other tasks. The system enforces execution
+order automatically.
+
+### How it works
+
+1. When a task is created with `dependsOn: ["task_x", "task_y"]`, it starts
+   in `blocked` column
+2. When a dependency is added to a `backlog` task via the API, the task is
+   automatically moved to `blocked`
+3. When ALL dependencies are in `done` column, the system automatically moves
+   the task to `backlog` and wakes the assigned agent
+4. The scheduler checks for unblockable tasks every tick
+
+### When creating tasks with dependencies
+
+Use the `dependsOn` field in the create payload:
+
+```bash
+curl -s -X POST "${ORCH_API_URL}/api/tasks" \
+  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
+  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "X-Run-Id: ${ORCH_RUN_ID}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Build API",
+    "projectId": "'"${ORCH_PROJECT_ID}"'",
+    "taskType": "quick",
+    "assignee": "api-engineer",
+    "dependsOn": ["task_abc123"]
+  }'
+```
+
+### When to use dependencies
+
+- **Decomposing work:** When breaking an epic into subtasks, identify which
+  tasks must complete before others can start. Create independent tasks first
+  (no `dependsOn`), then create dependent tasks referencing them.
+- **Sequential workflows:** Database schema before API endpoints, API before
+  frontend, etc.
+- **Do NOT over-constrain:** Only add dependencies where there is a real
+  data or build dependency. Tasks that touch unrelated files can run in parallel.
+
+### Dependency endpoints
+
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| Add dependency | POST | `/api/tasks/{id}/dependencies` → `{ "dependsOnId": "task_x" }` |
+| Remove dependency | DELETE | `/api/tasks/{id}/dependencies/{depId}` |
+
+---
+
 ## 5. Comments & Communication
 
 ### Endpoints
@@ -396,6 +449,8 @@ Use logging for:
 | **Release task** | **POST** | **`/api/tasks/{id}/release`** |
 | Complete task/phase | POST | `/api/tasks/{id}/complete` |
 | Transition task | POST | `/api/tasks/{id}/transition` |
+| Add dependency | POST | `/api/tasks/{id}/dependencies` |
+| Remove dependency | DELETE | `/api/tasks/{id}/dependencies/{depId}` |
 | List comments | GET | `/api/tasks/{taskId}/comments` |
 | Create comment | POST | `/api/tasks/{taskId}/comments` |
 | List agents | GET | `/api/agents` |
