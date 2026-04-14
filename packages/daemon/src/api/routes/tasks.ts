@@ -22,18 +22,31 @@ export async function taskRoutes(app: FastifyInstance) {
       });
     }
 
-    const task = await taskService.create(parsed.data);
+    const { dependsOn, ...taskData } = parsed.data;
+    const task = await taskService.create(taskData);
 
-    // Dispatch agent if task created with assignee
-    if (task.assignee) {
-      await app.heartbeatService.enqueueWakeup(task.assignee, task.projectId, {
+    // Wire dependencies if provided — addDependency auto-blocks the task
+    if (dependsOn && dependsOn.length > 0) {
+      for (const depId of dependsOn) {
+        await taskService.addDependency(task.id, depId);
+      }
+    }
+
+    // Re-read the task to get the potentially-updated column (blocked vs backlog)
+    const finalTask = (dependsOn && dependsOn.length > 0)
+      ? await taskService.getById(task.id)
+      : task;
+
+    // Dispatch agent only if task is in backlog (not blocked by dependencies)
+    if (finalTask!.assignee && finalTask!.column === "backlog") {
+      await app.heartbeatService.enqueueWakeup(finalTask!.assignee, finalTask!.projectId, {
         source: "assignment",
-        taskId: task.id,
+        taskId: finalTask!.id,
         reason: "task_created_with_assignee",
       });
     }
 
-    return reply.code(201).send(task);
+    return reply.code(201).send(finalTask);
   });
 
   // GET /api/tasks — List tasks

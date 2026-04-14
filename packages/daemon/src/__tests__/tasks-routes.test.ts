@@ -51,6 +51,9 @@ describe("Task API Routes", () => {
     const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
     app.decorate("lifecycleService", lifecycleService);
 
+    const enqueueWakeup = vi.fn().mockResolvedValue(undefined);
+    app.decorate("heartbeatService", { enqueueWakeup });
+
     app.register(authPlugin);
     app.register(taskRoutes);
     await app.ready();
@@ -103,6 +106,60 @@ describe("Task API Routes", () => {
       });
 
       expect(response.statusCode).toBe(400);
+    });
+
+    it("creates task with dependsOn — sets dependencies and blocks", async () => {
+      // Create the prerequisite task first
+      const [prereq] = await testDb.db.insert(tasks).values({
+        projectId, title: "Prereq", taskType: "quick",
+      }).returning();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/tasks",
+        headers: { "x-project-id": projectId },
+        payload: {
+          title: "Blocked task",
+          projectId,
+          taskType: "quick",
+          dependsOn: [prereq.id],
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+      expect(body.column).toBe("blocked");
+
+      // Verify dependency row exists
+      const deps = await testDb.db.select().from(taskDependencies);
+      expect(deps).toHaveLength(1);
+      expect(deps[0].taskId).toBe(body.id);
+      expect(deps[0].dependsOnId).toBe(prereq.id);
+    });
+
+    it("does not enqueue wakeup when task is blocked by dependencies", async () => {
+      const [prereq] = await testDb.db.insert(tasks).values({
+        projectId, title: "Prereq2", taskType: "quick",
+      }).returning();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/tasks",
+        headers: { "x-project-id": projectId },
+        payload: {
+          title: "Blocked with assignee",
+          projectId,
+          taskType: "quick",
+          assignee: "agent-1",
+          dependsOn: [prereq.id],
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+      expect(body.column).toBe("blocked");
+      // heartbeatService is decorated in beforeEach with a vi.fn() mock
+      expect(app.heartbeatService.enqueueWakeup).not.toHaveBeenCalled();
     });
   });
 
