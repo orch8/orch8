@@ -1,9 +1,9 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { stringify as stringifyYaml } from "yaml";
-import { DaemonLogFilterSchema, DaemonConfigPatchSchema } from "@orch/shared";
+import { DaemonConfigPatchSchema } from "@orch/shared";
 import { loadGlobalConfig } from "../../config/loader.js";
 import "../../types.js";
 
@@ -28,13 +28,6 @@ export async function daemonRoutes(app: FastifyInstance) {
     };
   });
 
-  // GET /api/daemon/logs
-  app.get("/api/daemon/logs", async (request: FastifyRequest, reply: FastifyReply) => {
-    const parsed = DaemonLogFilterSchema.safeParse(request.query);
-    const _filter = parsed.success ? parsed.data : { limit: 100, offset: 0 };
-    return reply.code(200).send({ logs: [], message: "Use WebSocket daemon:log events for real-time logs" });
-  });
-
   // GET /api/daemon/config
   app.get("/api/daemon/config", async (_request: FastifyRequest) => {
     const globalConfig = loadGlobalConfig(CONFIG_PATH);
@@ -55,7 +48,12 @@ export async function daemonRoutes(app: FastifyInstance) {
 
     if (restart) {
       setImmediate(() => {
-        process.emit("SIGTERM" as any);
+        // process.emit("SIGTERM") is a no-op under systemd/launchd — those
+        // process managers monitor the kernel signal table, not Node's
+        // in-process EventEmitter. Sending an actual signal via
+        // process.kill(pid, "SIGTERM") fires the real handler and is
+        // observable by supervisors so the restart actually happens.
+        process.kill(process.pid, "SIGTERM");
       });
     }
 
@@ -65,7 +63,8 @@ export async function daemonRoutes(app: FastifyInstance) {
   // POST /api/daemon/restart
   app.post("/api/daemon/restart", async (_request: FastifyRequest) => {
     setImmediate(() => {
-      process.emit("SIGTERM" as any);
+      // See note above on process.kill vs process.emit.
+      process.kill(process.pid, "SIGTERM");
     });
     return { ok: true, message: "Restart initiated" };
   });
