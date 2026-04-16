@@ -108,3 +108,40 @@ describe("PUT /api/agents/:id/instructions", () => {
     expect(written).toBe("hb new");
   });
 });
+
+describe("slug validation & existence", () => {
+  it("GET with invalid slug returns 400", async () => {
+    // Fastify decodes %2F back to `/` at routing time, so the router won't
+    // match at all — exercise the slug regex directly with a literal `..`.
+    const res = await app.inject({ method: "GET", url: "/api/agents/..escape/instructions" });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ error: "validation_error" });
+  });
+
+  it("PUT with invalid slug returns 400", async () => {
+    const res = await app.inject({
+      method: "PUT",
+      url: "/api/agents/..escape/instructions",
+      payload: { agentsMd: "nope" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ error: "validation_error" });
+  });
+
+  it("GET for a non-existent agent returns 404", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/agents/does-not-exist/instructions",
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("PUT for a non-existent agent returns 404", async () => {
+    const res = await app.inject({
+      method: "PUT",
+      url: "/api/agents/does-not-exist/instructions",
+      payload: { agentsMd: "nope" },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+});

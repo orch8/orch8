@@ -627,8 +627,19 @@ export class HeartbeatService {
                 description: taskData?.description ?? undefined,
               },
             };
-          case "on_demand":
-            return { source: "on_demand", userMessage: claimedRun.triggerDetail ?? "" };
+          case "on_demand": {
+            // Real producers of on_demand wakes (e.g. /api/agents/:id/wake)
+            // don't populate triggerDetail — they pass the caller's message
+            // via wakeupRequests.reason, and some producers set payload.
+            // Walk a fallback chain so the agent always receives a non-empty
+            // userMessage, otherwise the adapter prompt ends up blank.
+            const userMessage =
+              claimedRun.triggerDetail
+              ?? (typeof wakeupReq?.payload === "string" ? wakeupReq.payload : undefined)
+              ?? (typeof wakeupReq?.reason === "string" ? wakeupReq.reason : undefined)
+              ?? "(on_demand wake — no message provided)";
+            return { source: "on_demand", userMessage };
+          }
           case "automation":
             return {
               source: "automation",

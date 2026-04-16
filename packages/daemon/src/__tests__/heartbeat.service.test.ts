@@ -1011,4 +1011,52 @@ describe("HeartbeatService", () => {
       expect(flushFailure).toBeTruthy();
     });
   });
+
+  describe("executeRun — wake reason fallback", () => {
+    it("uses wakeup_requests.reason for on_demand userMessage when triggerDetail is null", async () => {
+      await testDb.db.insert(agents).values({
+        id: "eng-1", projectId, name: "Eng", role: "engineer",
+        adapterType: "claude_local",
+        adapterConfig: {},
+      });
+
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1",
+        projectId,
+        invocationSource: "on_demand",
+        status: "queued",
+        // triggerDetail intentionally null — matches real /api/agents/:id/wake
+      }).returning();
+
+      // Producers like the wake route populate wakeup_requests.reason, not
+      // heartbeat_runs.trigger_detail. Insert a matching wakeup row linked
+      // to this run so the service can pick up `reason` via the fallback.
+      await testDb.db.insert(wakeupRequests).values({
+        agentId: "eng-1",
+        projectId,
+        source: "on_demand",
+        reason: "hello from user",
+        status: "queued",
+        runId: run.id,
+      });
+
+      let capturedUserMessage: string | undefined;
+      service.setAdapter({
+        runAgent: async (_cfg: unknown, _ctx: unknown, instructions: { wake: { source: string; userMessage?: string } }) => {
+          if (instructions.wake.source === "on_demand") {
+            capturedUserMessage = instructions.wake.userMessage;
+          }
+          return {
+            sessionId: null, model: null, result: "ok",
+            usage: null, costUsd: null, billingType: "api" as const,
+            exitCode: 0, signal: null, error: null, errorCode: null, events: [],
+          };
+        },
+      } as unknown as Parameters<typeof service.setAdapter>[0]);
+
+      await service.executeRun(run.id);
+
+      expect(capturedUserMessage).toBe("hello from user");
+    });
+  });
 });
