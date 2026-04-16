@@ -82,7 +82,7 @@ export function TaskCard({ task, onClick, onLongPress }: TaskCardProps) {
       </div>
 
       {/* Middle: serif title */}
-      <p className="type-section text-ink" style={{ lineHeight: 1.25 }}>
+      <p className="type-section leading-tight text-ink">
         {task.title}
       </p>
 

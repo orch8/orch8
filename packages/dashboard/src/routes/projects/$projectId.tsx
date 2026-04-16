@@ -9,9 +9,14 @@ function ProjectLayout() {
   const navigate = useNavigate();
   const { data: project, isLoading, isError } = useProject(projectId);
 
-  // Write to localStorage so "/" can redirect to last-used project
+  // Write to localStorage so "/" can redirect to last-used project.
+  // Safari ITP + private browsing can throw QuotaExceededError/SecurityError.
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, projectId);
+    try {
+      localStorage.setItem(STORAGE_KEY, projectId);
+    } catch {
+      // Ignore — persistence is best-effort; "/" falls back to first project.
+    }
   }, [projectId]);
 
   if (isLoading) {

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { Link } from "@tanstack/react-router";
+import { useRouter } from "@tanstack/react-router";
 import {
   useNotifications,
   useMarkNotificationsRead,
@@ -24,6 +24,7 @@ export function NotificationBell({ projectId }: NotificationBellProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { data: notifications } = useNotifications(projectId);
   const markRead = useMarkNotificationsRead();
+  const router = useRouter();
 
   const unreadCount = useMemo(
     () => notifications?.filter((n) => !n.read).length ?? 0,
@@ -94,22 +95,53 @@ export function NotificationBell({ projectId }: NotificationBellProps) {
                 No notifications
               </p>
             )}
-            {notifications?.map((ntf) => (
-              <Link
-                key={ntf.id}
-                to={(ntf.link ?? "/") as any}
-                className={`flex flex-col gap-0.5 border-b border-dashed border-edge-soft px-3 py-2 last:border-0 hover:bg-surface-2 ${
-                  !ntf.read ? "bg-surface-2" : ""
-                }`}
-                onClick={() => setOpen(false)}
-              >
-                <p className="truncate type-body text-ink">{ntf.title}</p>
-                <p className="truncate type-micro text-mute">{ntf.message}</p>
-                <p className="type-mono text-whisper">
-                  {relativeTime(ntf.createdAt)}
-                </p>
-              </Link>
-            ))}
+            {notifications?.map((ntf) => {
+              const href = ntf.link ?? "/";
+              const itemClass = `flex flex-col gap-0.5 border-b border-dashed border-edge-soft px-3 py-2 last:border-0 hover:bg-surface-2 text-left ${
+                !ntf.read ? "bg-surface-2" : ""
+              }`;
+              // `ntf.link` is a free-form string from the daemon, so we can't
+              // type it against the route tree. Use a plain anchor for
+              // semantics/middle-click and fall back to client-side navigation
+              // on primary click. Guard navigate() because TanStack Router
+              // throws if the link resolves to a param-bearing route that
+              // this caller can't supply params for.
+              return (
+                <a
+                  key={ntf.id}
+                  href={href}
+                  className={itemClass}
+                  onClick={(e) => {
+                    // Let the browser handle modifier/middle clicks.
+                    if (
+                      e.defaultPrevented ||
+                      e.button !== 0 ||
+                      e.metaKey ||
+                      e.ctrlKey ||
+                      e.shiftKey ||
+                      e.altKey
+                    ) {
+                      return;
+                    }
+                    e.preventDefault();
+                    setOpen(false);
+                    try {
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      router.navigate({ to: href as any });
+                    } catch {
+                      // Unknown/param-bearing route — fall back to a hard nav.
+                      window.location.href = href;
+                    }
+                  }}
+                >
+                  <p className="truncate type-body text-ink">{ntf.title}</p>
+                  <p className="truncate type-micro text-mute">{ntf.message}</p>
+                  <p className="type-mono text-whisper">
+                    {relativeTime(ntf.createdAt)}
+                  </p>
+                </a>
+              );
+            })}
           </div>
         </div>
       )}

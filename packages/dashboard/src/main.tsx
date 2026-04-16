@@ -9,7 +9,9 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5_000,
-      refetchOnWindowFocus: false,
+      // `refetchOnWindowFocus` defaults to true, which keeps dashboards fresh
+      // after the user tabs away and returns. If a specific query ever needs
+      // it disabled, opt out per-query instead of globally.
     },
   },
 });

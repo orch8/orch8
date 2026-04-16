@@ -93,6 +93,9 @@ function DeepLink({
       return <span className="font-mono text-sky-400">{id}</span>;
     case "run":
       return <span className="font-mono text-zinc-300">{id}</span>;
+    case "lesson":
+      // No lesson detail route — render plain text rather than a broken link.
+      return <span className="font-mono text-zinc-300">{id}</span>;
     default:
       return <span className="font-mono text-zinc-300">{id}</span>;
   }

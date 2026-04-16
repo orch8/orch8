@@ -10,6 +10,8 @@ const LOG_COLORS: Record<string, string> = {
   debug: "text-zinc-500",
 };
 
+const MAX_LOG_LINES = 500;
+
 interface LogLine {
   id: number;
   level: string;
@@ -27,17 +29,23 @@ export function DaemonPageComponent() {
   const logEndRef = useRef<HTMLDivElement>(null);
   const logIdRef = useRef(0);
 
-  // Subscribe to daemon:log events
+  // Subscribe to daemon:log events. Keep a bounded ring of the last
+  // MAX_LOG_LINES entries; allocate exactly one new array per event instead
+  // of the old `[...prev, new].slice(-500)` (which allocated twice).
   useEffect(() => {
     const unsub = subscribe("daemon:log", (event) => {
       setLogs((prev) => {
-        const next = [...prev, {
+        const line: LogLine = {
           id: ++logIdRef.current,
           level: event.level,
           message: event.message,
           timestamp: event.timestamp,
-        }];
-        return next.slice(-500); // Keep last 500 lines
+        };
+        if (prev.length < MAX_LOG_LINES) return [...prev, line];
+        // Drop the oldest so length stays at MAX_LOG_LINES.
+        const next = prev.slice(1);
+        next.push(line);
+        return next;
       });
     });
     return unsub;
