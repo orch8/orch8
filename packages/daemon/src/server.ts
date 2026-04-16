@@ -8,6 +8,7 @@ import { healthRoutes } from "./api/routes/health.js";
 import { taskRoutes } from "./api/routes/tasks.js";
 import { commentRoutes } from "./api/routes/comments.js";
 import { agentRoutes } from "./api/routes/agents.js";
+import { agentInstructionRoutes } from "./api/routes/agent-instructions.js";
 import { websocketRoutes } from "./api/websocket.js";
 import { authPlugin } from "./api/middleware/auth.js";
 import { TaskService } from "./services/task.service.js";
@@ -290,6 +291,7 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(taskRoutes);
     app.register(commentRoutes);
     app.register(agentRoutes);
+    app.register(agentInstructionRoutes);
     app.register(chatsRoutes);
     app.register(runRoutes);
     app.register(identityRoutes);
