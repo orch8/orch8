@@ -39,8 +39,7 @@ export const UpdateTaskSchema = z.object({
   assignee: z.string().nullable().optional(),
   autoCommit: z.boolean().optional(),
   autoPr: z.boolean().optional(),
-  branch: z.string().nullable().optional(),
-  worktreePath: z.string().nullable().optional(),
+  finishStrategy: z.enum(["pr", "merge", "none"]).nullable().optional(),
   mcpTools: z.array(z.string()).optional(),
 });
 
