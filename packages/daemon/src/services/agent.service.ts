@@ -1,4 +1,6 @@
 import path from "node:path";
+import { writeFile, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { eq, and } from "drizzle-orm";
 import { agents, projects, wakeupRequests } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
@@ -8,6 +10,34 @@ import {
   generateAgentToken,
   hashAgentToken,
 } from "../api/middleware/agent-token.js";
+import { agentDir, agentsMdPath, heartbeatMdPath } from "./agent-files.js";
+
+async function seedStubFiles(
+  projectHomeDir: string,
+  slug: string,
+  name: string,
+): Promise<void> {
+  const dir = agentDir(projectHomeDir, slug);
+  await mkdir(dir, { recursive: true });
+
+  const agentsPath = agentsMdPath(projectHomeDir, slug);
+  if (!existsSync(agentsPath)) {
+    await writeFile(
+      agentsPath,
+      `# ${name}\n\nDescribe this agent's role and behavior here.\n`,
+      "utf-8",
+    );
+  }
+
+  const heartbeatPath = heartbeatMdPath(projectHomeDir, slug);
+  if (!existsSync(heartbeatPath)) {
+    await writeFile(
+      heartbeatPath,
+      "Describe what this agent should do on each timer wake.\n",
+      "utf-8",
+    );
+  }
+}
 
 type Agent = typeof agents.$inferSelect;
 type WakeupRequest = typeof wakeupRequests.$inferSelect;
@@ -140,21 +170,19 @@ export class AgentService {
       ...stripUndefined(input),
     } as typeof agents.$inferInsert;
 
-    // Auto-populate workLogDir and lessonsFile from project homeDir
-    if (!values.workLogDir || !values.lessonsFile) {
-      const [project] = await this.db
-        .select({ homeDir: projects.homeDir })
-        .from(projects)
-        .where(eq(projects.id, input.projectId));
+    const [project] = await this.db
+      .select({ homeDir: projects.homeDir })
+      .from(projects)
+      .where(eq(projects.id, input.projectId));
 
-      if (project) {
-        const memoryBase = path.join(project.homeDir, ".orch8", "memory");
-        if (!values.workLogDir) {
-          values.workLogDir = path.join(memoryBase, "logs", input.id);
-        }
-        if (!values.lessonsFile) {
-          values.lessonsFile = path.join(memoryBase, "lessons", `${input.id}.md`);
-        }
+    // Auto-populate workLogDir and lessonsFile from project homeDir
+    if (project && (!values.workLogDir || !values.lessonsFile)) {
+      const memoryBase = path.join(project.homeDir, ".orch8", "memory");
+      if (!values.workLogDir) {
+        values.workLogDir = path.join(memoryBase, "logs", input.id);
+      }
+      if (!values.lessonsFile) {
+        values.lessonsFile = path.join(memoryBase, "lessons", `${input.id}.md`);
       }
     }
 
@@ -162,6 +190,11 @@ export class AgentService {
     values.agentTokenHash = hashAgentToken(rawToken);
 
     const [agent] = await this.db.insert(agents).values(values).returning();
+
+    if (project) {
+      await seedStubFiles(project.homeDir, input.id, input.name);
+    }
+
     return { agent, rawToken };
   }
 
