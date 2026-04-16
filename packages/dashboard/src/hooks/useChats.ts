@@ -27,6 +27,7 @@ export function useChat(chatId: string) {
   return useQuery<Chat>({
     queryKey: ["chat", chatId],
     queryFn: () => api.get(`/chats/${chatId}`),
+    enabled: chatId.length > 0,
   });
 }
 
