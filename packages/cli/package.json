@@ -18,7 +18,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
     "commander": "^13.0.0"
