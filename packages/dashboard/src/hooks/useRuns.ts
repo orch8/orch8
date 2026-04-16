@@ -31,7 +31,7 @@ export function useRunLog(runId: string | null, projectId: string) {
     // projectId MUST be part of the key. Otherwise two different projects
     // that happen to share a runId (e.g. in tests or after a seed) would
     // collide in the React Query cache and serve each other's logs.
-    queryKey: ["runLog", runId, projectId],
+    queryKey: ["run-log", runId, projectId],
     queryFn: () => api.get(`/runs/${runId}/log`, { projectId }),
     enabled: !!runId,
   });

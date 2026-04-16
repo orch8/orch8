@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, isRedirect, redirect } from "@tanstack/react-router";
 import { api } from "../api/client.js";
 
 const STORAGE_KEY = "orch8:lastProjectId";
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/")({
         throw redirect({ to: "/projects/$projectId", params: { projectId: projects[0].id } });
       }
     } catch (e) {
-      if ((e as any)?.isRedirect) throw e;
+      if (isRedirect(e)) throw e;
       // API error — fall through to welcome
     }
 

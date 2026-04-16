@@ -18,7 +18,8 @@
     "preview": "vite preview",
     "typecheck": "tsr generate && tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

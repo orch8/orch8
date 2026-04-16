@@ -8,6 +8,9 @@ import type {
   CreateAgentSchema,
   UpdateAgentSchema,
   AgentFilterSchema,
+  AgentRoleSchema,
+  AgentStatusSchema,
+  TaskColumnSchema,
 } from "../schemas/index.js";
 
 export type HealthStatus = z.infer<typeof HealthStatusSchema>;
@@ -22,6 +25,9 @@ export type { CreateComment, CommentFilter } from "../schemas/comment.js";
 export type CreateAgent = z.infer<typeof CreateAgentSchema>;
 export type UpdateAgent = z.infer<typeof UpdateAgentSchema>;
 export type AgentFilter = z.infer<typeof AgentFilterSchema>;
+export type AgentRole = z.infer<typeof AgentRoleSchema>;
+export type AgentStatus = z.infer<typeof AgentStatusSchema>;
+export type TaskColumn = z.infer<typeof TaskColumnSchema>;
 
 // Project types
 import type {

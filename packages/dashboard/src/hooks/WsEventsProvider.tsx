@@ -102,7 +102,7 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
           qc.invalidateQueries({ queryKey: ["run", event.runId] });
           break;
         case "budget_alert":
-          qc.invalidateQueries({ queryKey: ["costSummary"] });
+          qc.invalidateQueries({ queryKey: ["cost-summary"] });
           qc.invalidateQueries({ queryKey: ["agents"] });
           break;
         case "notification:new": {
@@ -126,7 +126,7 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
           qc.invalidateQueries({ queryKey: ["comments", event.taskId] });
           break;
         case "daemon:stats":
-          qc.invalidateQueries({ queryKey: ["daemonStatus"] });
+          qc.invalidateQueries({ queryKey: ["daemon-status"] });
           break;
         case "activity:new":
           qc.invalidateQueries({ queryKey: ["activity"] });
@@ -144,14 +144,14 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
           // Same — pure live event.
           break;
         case "chat_message_complete":
-          qc.invalidateQueries({ queryKey: ["chatMessages", event.chatId] });
+          qc.invalidateQueries({ queryKey: ["chat-messages", event.chatId] });
           qc.invalidateQueries({ queryKey: ["chats"] });
           break;
         case "chat_message_error":
-          qc.invalidateQueries({ queryKey: ["chatMessages", event.chatId] });
+          qc.invalidateQueries({ queryKey: ["chat-messages", event.chatId] });
           break;
         case "chat_card_decision":
-          qc.invalidateQueries({ queryKey: ["chatMessages", event.chatId] });
+          qc.invalidateQueries({ queryKey: ["chat-messages", event.chatId] });
           break;
         case "daemon:log":
           // Pure live log stream consumed by DaemonPage subscribers.

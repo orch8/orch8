@@ -8,21 +8,21 @@ import type {
 
 export function useCostSummary(projectId: string, agentId?: string) {
   return useQuery<CostSummary>({
-    queryKey: ["costSummary", projectId, agentId],
+    queryKey: ["cost-summary", projectId, agentId],
     queryFn: () => api.get("/cost/summary", { projectId, agentId }),
   });
 }
 
 export function useCostTimeseries(projectId: string, days: number = 7) {
   return useQuery<CostTimeseriesPoint[]>({
-    queryKey: ["costTimeseries", projectId, days],
+    queryKey: ["cost-timeseries", projectId, days],
     queryFn: () => api.get("/cost/timeseries", { projectId, days }),
   });
 }
 
 export function useTaskCost(taskId: string | null, projectId: string) {
   return useQuery<TaskCost>({
-    queryKey: ["taskCost", taskId],
+    queryKey: ["task-cost", taskId],
     queryFn: () => api.get(`/cost/task/${taskId}`, { projectId }),
     enabled: !!taskId,
   });

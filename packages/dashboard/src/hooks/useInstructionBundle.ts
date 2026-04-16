@@ -19,7 +19,7 @@ interface BundleFile {
 
 export function useInstructionBundle(agentId: string, projectId: string) {
   return useQuery({
-    queryKey: ["instructionBundle", agentId, projectId],
+    queryKey: ["instruction-bundle", agentId, projectId],
     queryFn: () =>
       api.get<InstructionBundle>(`/agents/${agentId}/instructions`, { projectId }),
     staleTime: 5_000,
@@ -29,7 +29,7 @@ export function useInstructionBundle(agentId: string, projectId: string) {
 
 export function useBundleFiles(agentId: string, projectId: string) {
   return useQuery({
-    queryKey: ["bundleFiles", agentId, projectId],
+    queryKey: ["bundle-files", agentId, projectId],
     queryFn: () =>
       api.get<BundleFile[]>(`/agents/${agentId}/instructions/files`, { projectId }),
     staleTime: 5_000,
@@ -38,7 +38,7 @@ export function useBundleFiles(agentId: string, projectId: string) {
 
 export function useBundleFileContent(agentId: string, projectId: string, path: string | null) {
   return useQuery({
-    queryKey: ["bundleFile", agentId, projectId, path],
+    queryKey: ["bundle-file", agentId, projectId, path],
     queryFn: () =>
       api.get<{ content: string }>(`/agents/${agentId}/instructions/files/${path}`, { projectId }),
     enabled: !!path,
@@ -50,9 +50,13 @@ export function useWriteBundleFile(agentId: string, projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ path, content }: { path: string; content: string }) =>
-      api.put(`/agents/${agentId}/instructions/files/${path}?projectId=${projectId}`, { content }),
+      api.put(
+        `/agents/${agentId}/instructions/files/${path}`,
+        { content },
+        { projectId },
+      ),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["bundleFiles", agentId, projectId] });
+      qc.invalidateQueries({ queryKey: ["bundle-files", agentId, projectId] });
     },
   });
 }
@@ -61,9 +65,9 @@ export function useUpdateBundleMode(agentId: string, projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { mode: string; rootPath?: string; entryFile?: string }) =>
-      api.patch(`/agents/${agentId}/instructions?projectId=${projectId}`, input),
+      api.patch(`/agents/${agentId}/instructions`, input, { projectId }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["instructionBundle", agentId, projectId] });
+      qc.invalidateQueries({ queryKey: ["instruction-bundle", agentId, projectId] });
     },
   });
 }
