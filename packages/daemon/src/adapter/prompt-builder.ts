@@ -18,7 +18,14 @@ export function buildStdinPrompt(
       try {
         return readFileSync(path, "utf8");
       } catch (err) {
-        throw new Error(`Missing heartbeat.md for agent "${slug}" at ${path}`);
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === "ENOENT") {
+          throw new Error(`Missing heartbeat.md for agent "${slug}" at ${path}`);
+        }
+        throw new Error(
+          `Failed to read heartbeat.md for agent "${slug}" at ${path}: ${(err as Error).message}`,
+          { cause: err },
+        );
       }
     }
     case "assignment":
@@ -36,8 +43,8 @@ function formatTaskPayload(task: { title: string; description?: string }): strin
   return parts.join("\n");
 }
 
-function formatAutomationPayload(a: { trigger: string; payload?: string }): string {
-  const parts = [`Automation trigger: ${a.trigger}`];
-  if (a.payload) parts.push("", a.payload);
+function formatAutomationPayload(automation: { trigger: string; payload?: string }): string {
+  const parts = [`Automation trigger: ${automation.trigger}`];
+  if (automation.payload) parts.push("", automation.payload);
   return parts.join("\n");
 }
