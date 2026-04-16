@@ -62,12 +62,24 @@ export class WorktreeService {
     }
   }
 
+  /**
+   * Git refname max length is ~250 bytes once you add the
+   * `task/<uuid>/` prefix; terminal filesystems (esp. older ecryptfs)
+   * further cap filenames at 255 chars. A 500-char task title
+   * therefore overflows both and produces an invalid branch. Cap the
+   * slug portion at a safe length (trim a trailing `-` if the cut
+   * lands on one).
+   */
+  static readonly MAX_SLUG_LENGTH = 60;
+
   static slugify(title: string): string {
-    return title
+    const raw = title
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, " ")
       .replace(/\s+/g, "-")
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "");
+    if (raw.length <= WorktreeService.MAX_SLUG_LENGTH) return raw;
+    return raw.slice(0, WorktreeService.MAX_SLUG_LENGTH).replace(/-+$/, "");
   }
 }

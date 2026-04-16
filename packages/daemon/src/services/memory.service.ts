@@ -1,4 +1,4 @@
-import { eq, and, ilike, isNull, inArray, sql } from "drizzle-orm";
+import { eq, and, isNull, inArray, sql } from "drizzle-orm";
 import { knowledgeEntities, knowledgeFacts, sharedDecisions } from "@orch/shared/db";
 import { mkdir, readdir, readFile, appendFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -212,9 +212,19 @@ export class MemoryService {
   // ─── Search ──────────────────────────────────────
 
   async searchFacts(search: KnowledgeSearch): Promise<Array<Fact & { entitySlug: string }>> {
-    const escaped = search.query.replace(/[%_\\]/g, "\\$&");
+    // Postgres LIKE/ILIKE do NOT interpret backslash escapes by default
+    // (standard_conforming_strings=on), so the previous `\$&` regex was
+    // inert — a literal `%` or `_` in the query was still treated as a
+    // wildcard. We switch to an explicit ESCAPE clause and replace the
+    // backslash with a character (`!`) we also escape inside the
+    // pattern to avoid double-interpretation.
+    const ESCAPE = "!";
+    const escaped = search.query.replace(
+      /[%_!]/g,
+      (ch) => `${ESCAPE}${ch}`,
+    );
     const conditions = [
-      ilike(knowledgeFacts.content, `%${escaped}%`),
+      sql`${knowledgeFacts.content} ILIKE ${"%" + escaped + "%"} ESCAPE ${ESCAPE}`,
       isNull(knowledgeFacts.supersededBy),
     ];
 
@@ -246,16 +256,29 @@ export class MemoryService {
 
   // ─── Worklog (file-based) ───────────────────────
 
-  async appendWorklog(workLogDir: string, content: string): Promise<string> {
+  async appendWorklog(
+    workLogDir: string,
+    content: string,
+    homeDir?: string,
+  ): Promise<string> {
+    assertPathUnderHome(workLogDir, homeDir, "workLogDir");
     await mkdir(workLogDir, { recursive: true });
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const filename = `${timestamp}.md`;
     const filePath = path.join(workLogDir, filename);
+    // Re-validate the joined path: `filename` is server-generated but
+    // cheap to double-check so future refactors that introduce
+    // user-controlled filenames here remain safe.
+    assertPathUnderHome(filePath, homeDir, "workLogDir");
     await writeFile(filePath, content, "utf-8");
     return filename;
   }
 
-  async readWorklog(workLogDir: string): Promise<Array<{ filename: string; content: string }>> {
+  async readWorklog(
+    workLogDir: string,
+    homeDir?: string,
+  ): Promise<Array<{ filename: string; content: string }>> {
+    assertPathUnderHome(workLogDir, homeDir, "workLogDir");
     try {
       const files = await readdir(workLogDir);
       const mdFiles = files.filter(f => f.endsWith(".md")).sort().reverse();
@@ -273,17 +296,56 @@ export class MemoryService {
 
   // ─── Lessons (file-based) ──────────────────────
 
-  async appendLesson(lessonsFile: string, content: string): Promise<void> {
+  async appendLesson(
+    lessonsFile: string,
+    content: string,
+    homeDir?: string,
+  ): Promise<void> {
+    assertPathUnderHome(lessonsFile, homeDir, "lessonsFile");
     await mkdir(path.dirname(lessonsFile), { recursive: true });
     const entry = `\n---\n_${new Date().toISOString()}_\n\n${content}\n`;
     await appendFile(lessonsFile, entry, "utf-8");
   }
 
-  async readLessons(lessonsFile: string): Promise<string> {
+  async readLessons(
+    lessonsFile: string,
+    homeDir?: string,
+  ): Promise<string> {
+    assertPathUnderHome(lessonsFile, homeDir, "lessonsFile");
     try {
       return await readFile(lessonsFile, "utf-8");
     } catch {
       return "";
     }
+  }
+}
+
+/**
+ * Defense-in-depth check: if `homeDir` is supplied, refuse to read/write
+ * a memory file whose resolved path escapes the project home. Agent
+ * rows are server-managed today, but a restored-from-backup DB or a
+ * future code path that lets an agent influence `workLogDir` /
+ * `lessonsFile` would otherwise produce an arbitrary-file-access
+ * primitive. Throws on violation; callers already surface the error as
+ * a 500 via the global error handler.
+ */
+function assertPathUnderHome(
+  target: string,
+  homeDir: string | undefined,
+  label: "workLogDir" | "lessonsFile",
+): void {
+  if (!homeDir) return;
+  const resolvedTarget = path.resolve(target);
+  const resolvedHome = path.resolve(homeDir);
+  // path.resolve strips trailing separators; the `+ path.sep` guard
+  // prevents `/home/user-evil` from passing a prefix check against
+  // `/home/user`.
+  if (
+    resolvedTarget !== resolvedHome &&
+    !resolvedTarget.startsWith(resolvedHome + path.sep)
+  ) {
+    throw new Error(
+      `Refusing ${label} outside project home: ${resolvedTarget} ∉ ${resolvedHome}`,
+    );
   }
 }

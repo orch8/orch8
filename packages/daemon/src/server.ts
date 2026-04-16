@@ -141,6 +141,7 @@ export function buildServer(options: ServerOptions = {}) {
     heartbeatService.setApiUrl(`http://${apiHost}:${apiPort}`);
     heartbeatService.setLogger(app.log);
     heartbeatService.setWorktreeService(worktreeService);
+    heartbeatService.setPipelineService(pipelineService);
     app.decorate("heartbeatService", heartbeatService);
 
     // Chat service — reuses the adapter, session manager, and broadcast service.

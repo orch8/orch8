@@ -1,6 +1,6 @@
 import path from "node:path";
 import { eq, and } from "drizzle-orm";
-import { agents, projects, wakeupRequests } from "@orch/shared/db";
+import { agents, projects } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { CreateAgent, UpdateAgent, AgentFilter } from "@orch/shared";
 import type { BroadcastService } from "./broadcast.service.js";
@@ -10,7 +10,6 @@ import {
 } from "../api/middleware/agent-token.js";
 
 type Agent = typeof agents.$inferSelect;
-type WakeupRequest = typeof wakeupRequests.$inferSelect;
 
 /**
  * Result of creating a new agent. `rawToken` is the single opportunity
@@ -20,13 +19,6 @@ type WakeupRequest = typeof wakeupRequests.$inferSelect;
 export interface CreateAgentResult {
   agent: Agent;
   rawToken: string;
-}
-
-interface WakeupOpts {
-  source: "timer" | "assignment" | "on_demand" | "automation";
-  taskId?: string;
-  reason?: string;
-  payload?: unknown;
 }
 
 export const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
@@ -316,30 +308,6 @@ export class AgentService {
     return cloned;
   }
 
-  async enqueueWakeup(
-    agentId: string,
-    projectId: string,
-    opts: WakeupOpts,
-  ): Promise<WakeupRequest> {
-    const agent = await this.getById(agentId, projectId);
-    if (!agent) throw new Error("Agent not found");
-    if (agent.status === "paused") throw new Error("Cannot wake a paused agent");
-
-    const [wakeup] = await this.db
-      .insert(wakeupRequests)
-      .values({
-        agentId,
-        projectId,
-        taskId: opts.taskId ?? null,
-        source: opts.source,
-        reason: opts.reason ?? null,
-        payload: opts.payload ?? null,
-        status: "queued",
-      })
-      .returning();
-
-    return wakeup;
-  }
 }
 
 function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {

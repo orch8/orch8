@@ -5,6 +5,13 @@ import type { CreateTaskInput, UpdateTask, TaskFilter } from "@orch/shared";
 
 type Task = typeof tasks.$inferSelect;
 
+// Drizzle's tx callback receives a PgTransaction that shares the same
+// fluent builder surface as SchemaDb. Typing the helpers as
+// `TxOrDb = Parameters<SchemaDb["transaction"]>[0] extends (tx: infer T) => unknown ? T : never`
+// is accurate but awkward; accepting the intersection here keeps the
+// call sites readable and lets us pass either the root db or a tx.
+type TxOrDb = SchemaDb | Parameters<Parameters<SchemaDb["transaction"]>[0]>[0];
+
 export class TaskService {
   constructor(private db: SchemaDb) {}
 
@@ -24,6 +31,53 @@ export class TaskService {
 
     const [task] = await this.db.insert(tasks).values(values).returning();
     return task;
+  }
+
+  /**
+   * Create a task and attach its initial dependencies atomically.
+   *
+   * A partial failure in the middle of the dependency loop (e.g. a cycle
+   * detected on the second `dependsOn` entry) previously left the task
+   * row in the database with only the first dependency wired. Callers
+   * then saw an HTTP 409 but had to clean up the dangling row by hand.
+   *
+   * Wrapping both the insert and the dependency loop in a single
+   * `db.transaction` rolls everything back on any error, matching the
+   * atomicity guarantees of `chat.service.ts#createChat` and
+   * `project-skill.service.ts#delete`.
+   */
+  async createWithDependencies(
+    input: CreateTaskInput,
+    dependsOn: string[],
+  ): Promise<Task> {
+    return this.db.transaction(async (tx) => {
+      const values: typeof tasks.$inferInsert = {
+        projectId: input.projectId,
+        title: input.title,
+        description: input.description,
+        taskType: input.taskType,
+        priority: input.priority,
+        assignee: input.assignee,
+      };
+
+      if (input.taskType === "brainstorm") {
+        values.brainstormStatus = "active";
+      }
+
+      const [task] = await tx.insert(tasks).values(values).returning();
+
+      for (const depId of dependsOn) {
+        await this.addDependencyTx(tx, task.id, depId);
+      }
+
+      if (dependsOn.length > 0) {
+        // Re-read so the caller sees the potentially flipped column.
+        const [refreshed] = await tx.select().from(tasks).where(eq(tasks.id, task.id));
+        return refreshed ?? task;
+      }
+
+      return task;
+    });
   }
 
   async getById(id: string): Promise<Task | null> {
@@ -64,22 +118,30 @@ export class TaskService {
   }
 
   async addDependency(taskId: string, dependsOnId: string): Promise<void> {
+    await this.addDependencyTx(this.db as TxOrDb, taskId, dependsOnId);
+  }
+
+  private async addDependencyTx(
+    db: TxOrDb,
+    taskId: string,
+    dependsOnId: string,
+  ): Promise<void> {
     if (taskId === dependsOnId) {
       throw new Error("A task cannot depend on itself");
     }
 
-    const wouldCycle = await this.wouldCreateCycle(taskId, dependsOnId);
+    const wouldCycle = await this.wouldCreateCycleTx(db, taskId, dependsOnId);
     if (wouldCycle) {
       throw new Error("Adding this dependency would create a cycle");
     }
 
-    await this.db.insert(taskDependencies).values({ taskId, dependsOnId });
+    await db.insert(taskDependencies).values({ taskId, dependsOnId });
 
     // Auto-block: if the dependent task is in backlog, move it to blocked
     // since it now has an unresolved dependency
-    const task = await this.getById(taskId);
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
     if (task && task.column === "backlog") {
-      await this.db
+      await db
         .update(tasks)
         .set({ column: "blocked", updatedAt: new Date() })
         .where(eq(tasks.id, taskId));
@@ -141,8 +203,12 @@ export class TaskService {
     return result as unknown as Array<{ id: string; title: string; assignee: string | null }>;
   }
 
-  private async wouldCreateCycle(newTaskId: string, newDepId: string): Promise<boolean> {
-    const result = await this.db.execute(sql`
+  private async wouldCreateCycleTx(
+    db: TxOrDb,
+    newTaskId: string,
+    newDepId: string,
+  ): Promise<boolean> {
+    const result = await db.execute(sql`
       WITH RECURSIVE dep_chain AS (
         SELECT depends_on_id AS ancestor
         FROM task_dependencies

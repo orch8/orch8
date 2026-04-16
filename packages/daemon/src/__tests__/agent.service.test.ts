@@ -193,35 +193,6 @@ describe("AgentService", () => {
     });
   });
 
-  describe("enqueueWakeup", () => {
-    it("inserts a wakeup request for the agent", async () => {
-      await service.create({ id: "wake-1", projectId, name: "Wake Me", role: "engineer" });
-      const wakeup = await service.enqueueWakeup("wake-1", projectId, {
-        source: "on_demand",
-        reason: "Manual trigger from dashboard",
-      });
-
-      expect(wakeup.agentId).toBe("wake-1");
-      expect(wakeup.projectId).toBe(projectId);
-      expect(wakeup.source).toBe("on_demand");
-      expect(wakeup.status).toBe("queued");
-    });
-
-    it("throws if agent does not exist", async () => {
-      await expect(
-        service.enqueueWakeup("nope", projectId, { source: "on_demand" }),
-      ).rejects.toThrow("Agent not found");
-    });
-
-    it("throws if agent is paused", async () => {
-      await service.create({ id: "wake-paused", projectId, name: "Paused", role: "engineer" });
-      await service.pause("wake-paused", projectId);
-      await expect(
-        service.enqueueWakeup("wake-paused", projectId, { source: "on_demand" }),
-      ).rejects.toThrow("paused");
-    });
-  });
-
   describe("bearer tokens", () => {
     it("create auto-generates an agent token hash", async () => {
       const agent = await service.create({

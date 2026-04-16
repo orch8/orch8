@@ -2052,6 +2052,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "500":
+          description: |
+            Pipeline data lookup failed for a task whose `pipelineId` is set
+            but the pipeline metadata is missing (e.g. orphaned row).
+            Surfaces as `{ "error": "internal", "message": "Pipeline data not found for task" }`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/tasks/{id}/dependencies:
     post:
@@ -3490,42 +3499,6 @@ paths:
                     type: integer
                   queueDepth:
                     type: integer
-
-  /api/daemon/logs:
-    get:
-      tags: [Daemon]
-      summary: Daemon logs (stub)
-      description: Always returns empty array. Use WebSocket `daemon:log` events for real-time logs.
-      parameters:
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 100
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
-        - name: level
-          in: query
-          schema:
-            type: string
-            enum: [trace, debug, info, warn, error, fatal]
-      responses:
-        "200":
-          description: Empty logs with redirect message
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  logs:
-                    type: array
-                    items: {}
-                  message:
-                    type: string
-                    example: "Use WebSocket daemon:log events for real-time logs"
 
   /api/daemon/config:
     get:

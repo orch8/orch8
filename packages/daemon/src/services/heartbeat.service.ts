@@ -8,6 +8,7 @@ import type { ClaudeLocalAdapter, RunAgentPrompts } from "../adapter/claude-loca
 import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "../adapter/types.js";
 import type { MemoryExtractionService } from "./memory-extraction.service.js";
 import type { BroadcastService } from "./broadcast.service.js";
+import type { PipelineService } from "./pipeline.service.js";
 import { WorktreeService } from "./worktree.service.js";
 import type { FastifyBaseLogger } from "fastify";
 import { RunLogger, type LogHandle } from "./run-logger.js";
@@ -84,6 +85,7 @@ export class HeartbeatService {
   private worktreeService?: WorktreeService;
   private sessionManager: SessionManager | null = null;
   private apiUrl: string = "http://localhost:3847";
+  private pipelineService: PipelineService | null = null;
 
   setLogger(logger: FastifyBaseLogger): void {
     this.logger = logger;
@@ -126,6 +128,16 @@ export class HeartbeatService {
 
   setApiUrl(url: string): void {
     this.apiUrl = url;
+  }
+
+  /**
+   * Inject the app-wide `PipelineService` so the per-run hot path
+   * doesn't dynamically `import()` the module and spin up a fresh
+   * `PipelineService` every launch. Optional for tests that don't
+   * exercise pipeline-linked tasks.
+   */
+  setPipelineService(service: PipelineService): void {
+    this.pipelineService = service;
   }
 
   get activeCount(): number {
@@ -599,12 +611,13 @@ export class HeartbeatService {
         pipelineOutputFilePath: undefined as string | undefined,
       };
 
-      // Inject pipeline context if this task belongs to a pipeline step
+      // Inject pipeline context if this task belongs to a pipeline step.
+      // Use the app-wide PipelineService singleton; falling back to a
+      // lazily-constructed one keeps tests that never call
+      // setPipelineService() functional, but production always injects.
       if (taskData?.pipelineId && taskData?.pipelineStepId) {
-        const pipelineService = new (await import("./pipeline.service.js")).PipelineService(
-          this.db,
-          new (await import("./pipeline-template.service.js")).PipelineTemplateService(this.db),
-        );
+        const pipelineService = this.pipelineService
+          ?? await this.getFallbackPipelineService();
         const pipelineData = await pipelineService.findByTaskId(taskData.id);
         if (pipelineData) {
           ctx.pipelineContext = await pipelineService.buildStepContext(
@@ -1080,5 +1093,23 @@ export class HeartbeatService {
       })
       .returning();
     return wakeup;
+  }
+
+  /**
+   * Lazily build a PipelineService if none has been injected. Cached
+   * on `this.pipelineService` so the dynamic `import()` only happens
+   * once per instance (vs the previous per-run pattern). Tests and
+   * standalone `new HeartbeatService(...)` callers that touch a
+   * pipeline-linked task hit this path; production always injects
+   * via `setPipelineService` from `server.ts`.
+   */
+  private async getFallbackPipelineService(): Promise<PipelineService> {
+    if (this.pipelineService) return this.pipelineService;
+    const { PipelineService: Svc } = await import("./pipeline.service.js");
+    const { PipelineTemplateService } = await import(
+      "./pipeline-template.service.js"
+    );
+    this.pipelineService = new Svc(this.db, new PipelineTemplateService(this.db));
+    return this.pipelineService;
   }
 }

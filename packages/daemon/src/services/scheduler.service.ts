@@ -1,5 +1,5 @@
 import { eq, and, sql } from "drizzle-orm";
-import { heartbeatRuns, projects, agents } from "@orch/shared/db";
+import { heartbeatRuns, projects, agents, tasks } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { HeartbeatService } from "./heartbeat.service.js";
 import type { SummaryService } from "./summary.service.js";
@@ -157,23 +157,71 @@ export class SchedulerService {
           })
           .where(eq(heartbeatRuns.id, run.id));
 
-        // Create a retry run
-        await this.db.insert(heartbeatRuns).values({
-          agentId: run.agentId,
-          projectId: run.projectId,
-          taskId: run.taskId,
-          invocationSource: run.invocationSource,
-          status: "queued",
-          retryOfRunId: run.id,
-          parentRunId: run.parentRunId,
-          contextSnapshot: run.contextSnapshot,
-        });
+        // Refresh the task row before retrying. The orphaned run row
+        // may have been created minutes or hours ago; the task could
+        // have been deleted, reassigned, or marked done in the
+        // meantime. Using `run.taskId` verbatim would either
+        // foreign-key-fail on insert (if deleted) or retry a task
+        // that's no longer a valid target.
+        let retryTaskId: string | null = run.taskId;
+        if (run.taskId) {
+          const [freshTask] = await this.db
+            .select()
+            .from(tasks)
+            .where(eq(tasks.id, run.taskId));
+          if (!freshTask) {
+            this.logger?.warn(
+              { runId: run.id, taskId: run.taskId },
+              "reapOrphanedRuns: task no longer exists; failing retry",
+            );
+            retryTaskId = null;
+          } else if (freshTask.column === "done") {
+            this.logger?.info(
+              {
+                runId: run.id,
+                taskId: run.taskId,
+                column: freshTask.column,
+              },
+              "reapOrphanedRuns: task already terminal; skipping retry",
+            );
+            retryTaskId = null;
+          } else if (
+            freshTask.executionAgentId &&
+            freshTask.executionAgentId !== run.agentId
+          ) {
+            this.logger?.info(
+              {
+                runId: run.id,
+                taskId: run.taskId,
+                originalAgent: run.agentId,
+                currentAgent: freshTask.executionAgentId,
+              },
+              "reapOrphanedRuns: task reassigned; skipping retry",
+            );
+            retryTaskId = null;
+          }
+        }
 
-        // Start the retry
-        await this.heartbeatService.startNextQueuedRunForAgent(
-          run.agentId,
-          run.projectId,
-        );
+        if (retryTaskId !== null || !run.taskId) {
+          // Create a retry run only when the refreshed task is still
+          // a valid target (or the original run wasn't task-scoped).
+          await this.db.insert(heartbeatRuns).values({
+            agentId: run.agentId,
+            projectId: run.projectId,
+            taskId: retryTaskId,
+            invocationSource: run.invocationSource,
+            status: "queued",
+            retryOfRunId: run.id,
+            parentRunId: run.parentRunId,
+            contextSnapshot: run.contextSnapshot,
+          });
+
+          // Start the retry
+          await this.heartbeatService.startNextQueuedRunForAgent(
+            run.agentId,
+            run.projectId,
+          );
+        }
       } else {
         // Retries exhausted — fail permanently
         await this.db

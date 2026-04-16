@@ -6,14 +6,11 @@ import { TaskService } from "../services/task.service.js";
 import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
 import { WorktreeService, type ExecFn } from "../services/worktree.service.js";
 import { CommentService } from "../services/comment.service.js";
-import { TaskDispatcher } from "../services/task-dispatcher.service.js";
-
 describe("Task Lifecycle Integration", () => {
   let testDb: TestDb;
   let taskService: TaskService;
   let lifecycleService: TaskLifecycleService;
   let commentService: CommentService;
-  let dispatcher: TaskDispatcher;
   let execFn: ExecFn;
   let projectId: string;
 
@@ -24,7 +21,6 @@ describe("Task Lifecycle Integration", () => {
     const worktreeService = new WorktreeService(execFn);
     lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
     commentService = new CommentService(testDb.db);
-    dispatcher = new TaskDispatcher(testDb.db);
 
     const [project] = await testDb.db.insert(projects).values({
       name: "Integration Test",
@@ -55,11 +51,6 @@ describe("Task Lifecycle Integration", () => {
       assignee: "engineer-1",
     });
     expect(task.column).toBe("backlog");
-
-    // Get dispatch plan
-    const plan = await dispatcher.plan(task);
-    expect(plan.type).toBe("quick");
-    expect(plan.needsWorktree).toBe(true);
 
     // Dispatch: backlog → in_progress
     const dispatched = await lifecycleService.transition(task.id, "in_progress", {

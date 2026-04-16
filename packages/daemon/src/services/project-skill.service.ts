@@ -11,12 +11,21 @@ export type TrustLevel = "markdown_only" | "assets" | "scripts_executables";
 
 const SCRIPT_EXTENSIONS = new Set([".sh", ".js", ".ts", ".py", ".rb"]);
 
+function isExecutableScript(name: string): boolean {
+  const lower = name.toLowerCase();
+  // `.d.ts` is a TypeScript declaration file — type info only, never
+  // executed. It reuses the `.ts` extension but should be classified
+  // as an asset, not as an executable script.
+  if (lower.endsWith(".d.ts")) return false;
+  return SCRIPT_EXTENSIONS.has(extname(lower));
+}
+
 export function deriveTrustLevel(filenames: string[]): TrustLevel {
   let hasNonMarkdown = false;
 
   for (const name of filenames) {
+    if (isExecutableScript(name)) return "scripts_executables";
     const ext = extname(name).toLowerCase();
-    if (SCRIPT_EXTENSIONS.has(ext)) return "scripts_executables";
     if (ext !== ".md") hasNonMarkdown = true;
   }
 
