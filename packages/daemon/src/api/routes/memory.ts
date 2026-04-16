@@ -161,7 +161,8 @@ export async function memoryRoutes(app: FastifyInstance) {
       return { entries: [] };
     }
 
-    const entries = await app.memoryService.readWorklog(agent.workLogDir);
+    const homeDir = await getProjectHomeDir(app, request.projectId);
+    const entries = await app.memoryService.readWorklog(agent.workLogDir, homeDir);
     return { entries };
   });
 
@@ -187,7 +188,8 @@ export async function memoryRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "bad_request", message: "Agent has no workLogDir configured" });
     }
 
-    const filename = await app.memoryService.appendWorklog(targetAgent.workLogDir, parsed.data.content);
+    const homeDir = await getProjectHomeDir(app, targetAgent.projectId);
+    const filename = await app.memoryService.appendWorklog(targetAgent.workLogDir, parsed.data.content, homeDir);
     return reply.code(201).send({ ok: true, filename });
   });
 
@@ -206,7 +208,8 @@ export async function memoryRoutes(app: FastifyInstance) {
       return { content: "" };
     }
 
-    const content = await app.memoryService.readLessons(agent.lessonsFile);
+    const homeDir = await getProjectHomeDir(app, request.projectId);
+    const content = await app.memoryService.readLessons(agent.lessonsFile, homeDir);
     return { content };
   });
 
@@ -232,7 +235,8 @@ export async function memoryRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "bad_request", message: "Agent has no lessonsFile configured" });
     }
 
-    await app.memoryService.appendLesson(targetAgent.lessonsFile, parsed.data.content);
+    const homeDir = await getProjectHomeDir(app, targetAgent.projectId);
+    await app.memoryService.appendLesson(targetAgent.lessonsFile, parsed.data.content, homeDir);
     return reply.code(201).send({ ok: true });
   });
 }
@@ -243,4 +247,12 @@ async function getAgentWithPaths(app: FastifyInstance, agentId: string, projectI
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.projectId, projectId)));
   return agent ?? null;
+}
+
+async function getProjectHomeDir(app: FastifyInstance, projectId: string): Promise<string | undefined> {
+  const [project] = await app.db
+    .select({ homeDir: projects.homeDir })
+    .from(projects)
+    .where(eq(projects.id, projectId));
+  return project?.homeDir;
 }
