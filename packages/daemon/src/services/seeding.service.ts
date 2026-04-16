@@ -19,7 +19,7 @@ import {
   type ParsedAgentsMd,
 } from "@orch/shared/defaults";
 import type { BundledAgent } from "@orch/shared";
-import { agents, chats } from "@orch/shared/db";
+import { agents, chats, projects } from "@orch/shared/db";
 import { eq, and } from "drizzle-orm";
 import type { SchemaDb } from "../db/client.js";
 
@@ -357,24 +357,37 @@ export class SeedingService {
       return false;
     }
 
+    const [project] = await db
+      .select({ homeDir: projects.homeDir })
+      .from(projects)
+      .where(eq(projects.id, projectId));
+    if (!project) throw new Error(`Project not found: ${projectId}`);
+
+    await this.copyDefaults(project.homeDir, ["chat"]);
+    await this.ensureGitignore(project.homeDir);
+
+    const defs = await this.parseAgentDefinitions(project.homeDir);
+    const chatDef = defs.find((d) => d.name === "chat");
+    if (!chatDef) throw new Error("chat bundled template missing");
+
     await db.insert(agents).values({
-      id: CHAT_AGENT_DEFAULTS.id,
+      id: "chat",
       projectId,
-      name: CHAT_AGENT_DEFAULTS.name,
-      role: CHAT_AGENT_DEFAULTS.role,
-      model: CHAT_AGENT_DEFAULTS.model,
-      effort: CHAT_AGENT_DEFAULTS.effort,
-      maxTurns: CHAT_AGENT_DEFAULTS.maxTurns,
-      heartbeatEnabled: CHAT_AGENT_DEFAULTS.heartbeatEnabled,
-      heartbeatIntervalSec: CHAT_AGENT_DEFAULTS.heartbeatIntervalSec,
-      wakeOnAssignment: CHAT_AGENT_DEFAULTS.wakeOnAssignment,
-      wakeOnOnDemand: CHAT_AGENT_DEFAULTS.wakeOnOnDemand,
-      wakeOnAutomation: CHAT_AGENT_DEFAULTS.wakeOnAutomation,
-      canCreateTasks: CHAT_AGENT_DEFAULTS.canCreateTasks,
-      canAssignTo: CHAT_AGENT_DEFAULTS.canAssignTo,
-      canMoveTo: CHAT_AGENT_DEFAULTS.canMoveTo as unknown as typeof agents.$inferInsert.canMoveTo,
-      allowedTools: CHAT_AGENT_DEFAULTS.allowedTools as unknown as string[],
-      desiredSkills: CHAT_AGENT_DEFAULTS.desiredSkills as unknown as string[],
+      name: chatDef.name,
+      role: chatDef.role as typeof agents.$inferInsert.role,
+      model: MODEL_MAP[chatDef.model] ?? chatDef.model,
+      effort: chatDef.effort,
+      maxTurns: chatDef.maxTurns,
+      heartbeatEnabled: chatDef.heartbeat.enabled,
+      heartbeatIntervalSec: chatDef.heartbeat.intervalSec ?? 0,
+      wakeOnAssignment: false,
+      wakeOnOnDemand: true,
+      wakeOnAutomation: false,
+      canCreateTasks: true,
+      canAssignTo: ["*"],
+      canMoveTo: ["backlog", "blocked", "in_progress", "done"] as typeof agents.$inferInsert.canMoveTo,
+      allowedTools: ["Bash", "Read", "Edit", "Write", "Grep", "Glob"],
+      desiredSkills: chatDef.skills,
       adapterType: "claude_local",
     });
 

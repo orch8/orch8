@@ -112,13 +112,13 @@ describe("SeedingService", () => {
   });
 
   describe("listBundledAgents", () => {
-    it("returns all 6 bundled agents", async () => {
+    it("returns all 7 bundled agents", async () => {
       const service = new SeedingService();
       const agents = await service.listBundledAgents();
 
-      expect(agents).toHaveLength(6);
+      expect(agents).toHaveLength(7);
       const ids = agents.map((a) => a.id).sort();
-      expect(ids).toEqual(["cto", "implementer", "planner", "qa", "researcher", "reviewer"]);
+      expect(ids).toEqual(["chat", "cto", "implementer", "planner", "qa", "researcher", "reviewer"]);
     });
 
     it("resolves model shorthands to full IDs", async () => {
@@ -263,6 +263,7 @@ describe("SeedingService", () => {
   describe("provisionChatAgent", () => {
     let testDb: TestDb;
     let projectId: string;
+    let projectHomeDir: string;
 
     beforeAll(async () => {
       testDb = await setupTestDb();
@@ -276,13 +277,19 @@ describe("SeedingService", () => {
       await testDb.db.delete(agents);
       await testDb.db.delete(projects);
 
+      projectHomeDir = await mkdtemp(join(tmpdir(), "chat-perms-home-"));
+
       const [project] = await testDb.db.insert(projects).values({
         name: "Chat Perms Test",
         slug: `chat-perms-${Date.now()}`,
-        homeDir: "/tmp/chat-perms",
-        worktreeDir: "/tmp/chat-perms-wt",
+        homeDir: projectHomeDir,
+        worktreeDir: `${projectHomeDir}-wt`,
       }).returning();
       projectId = project.id;
+    });
+
+    afterEach(async () => {
+      await rm(projectHomeDir, { recursive: true, force: true });
     });
 
     async function getChatRow() {
