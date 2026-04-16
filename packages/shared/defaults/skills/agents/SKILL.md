@@ -2,18 +2,23 @@
 name: agents
 description: >
   Manage orch8 agents: create new agents, edit their config (name, model,
-  system prompt, skills, tools, budget, heartbeat), pause and resume them,
-  delete them. Use when the user wants to add a new agent, change how an
-  existing agent works, or take an agent offline. Do NOT use for runs (use
-  the `runs` skill) or for assigning tasks to agents (use the `tasks` skill).
+  skills, tools, budget, heartbeat), pause and resume them, delete them.
+  Use when the user wants to add a new agent, change how an existing
+  agent works, or take an agent offline. Do NOT use for runs (use the
+  `runs` skill) or for assigning tasks to agents (use the `tasks` skill).
+  Editing an agent's system prompt is handled through the Instructions
+  tab / `PUT /api/agents/{id}/instructions`, not through this skill's
+  confirm cards.
 ---
 
 # Agents Skill
 
-Agents are the workers in orch8. Each agent has a model, a system prompt,
-a set of allowed tools, a list of skills it loads on every turn, and
-optional heartbeat / budget configuration. This skill teaches the chat
-agent how to manage them.
+Agents are the workers in orch8. Each agent has a model, a set of
+allowed tools, a list of skills it loads on every turn, and optional
+heartbeat / budget configuration. Their system prompt lives on disk
+(see "Instructions on disk" below) — not in the database or in this
+skill's confirm-card payloads. This skill teaches the chat agent how
+to manage them.
 
 ## Endpoints
 
@@ -34,7 +39,7 @@ See the `orch8` skill for the full request body shapes.
 
 | Kind | Buttons | Payload essentials |
 |---|---|---|
-| `confirm_create_agent` | Approve / Cancel | full agent config (`id`, `name`, `role`, `model`, `effort?`, `maxTurns?`, `heartbeatEnabled?`, `desiredSkills?`, `allowedTools?`, `systemPrompt?`, `budgetLimitUsd?`) |
+| `confirm_create_agent` | Approve / Cancel | full agent config (`id`, `name`, `role`, `model`, `effort?`, `maxTurns?`, `heartbeatEnabled?`, `desiredSkills?`, `allowedTools?`, `budgetLimitUsd?`) |
 | `confirm_update_agent` | Approve / Cancel | `agentId`, `current`, `proposed` |
 | `confirm_pause_agent` | Approve / Cancel | `agentId`, `name`, `reason?` |
 | `confirm_resume_agent` | Approve / Cancel | `agentId`, `name` |
@@ -121,8 +126,8 @@ Using the `GET /api/agents` result from Step 0:
 - Flag any existing agent that overlaps with the proposed new one —
   matching on `role` enum (e.g., a `qa` agent already exists in the
   project) or on obvious purpose overlap visible in the existing
-  agent's `name` / `systemPrompt` — and ask whether the user wants to
-  extend that agent instead of creating a new one.
+  agent's `name` / `role` — and ask whether the user wants to extend
+  that agent instead of creating a new one.
 - Propose `canAssignTo` values only from IDs that actually exist.
 - Note in one line how the new agent complements the fleet.
 
@@ -169,13 +174,15 @@ config from scratch.
 - `effort` — reasoning effort hint for models that support it
   (`low`, `medium`, `high`, `xhigh`, `max`). Bundled templates use `xhigh`.
 - `maxTurns` — per-run turn budget. Usually 180.
-- `systemPrompt` — the agent's persona and operating instructions.
-  Propose one if the user does not supply one.
-- `promptTemplate` — per-turn prompt scaffold with `{{variable}}`
-  placeholders. Optional.
-- `bootstrapPromptTemplate` — one-time first-run prompt. Optional.
-- `instructionsFilePath` — path to an external instructions file
-  loaded on every turn. Optional.
+
+> Agents no longer store prompts in the database. The system prompt
+> lives in `<projectRoot>/.orch8/agents/<slug>/AGENTS.md` on disk, and
+> the per-wake heartbeat brief lives in `heartbeat.md` next to it. To
+> edit either one, use `PUT /api/agents/{id}/instructions` with an
+> `agentsMd` and/or `heartbeatMd` body, or the Instructions tab in the
+> dashboard. Do NOT try to set `systemPrompt`, `promptTemplate`,
+> `bootstrapPromptTemplate`, or `instructionsFilePath` on a confirm
+> card — those fields no longer exist.
 
 **Tools & skills**
 - `allowedTools` — usually `["Bash","Read","Edit","Write","Grep","Glob"]`.
