@@ -1,7 +1,8 @@
 import type { StreamEvent, StreamAssistantEvent } from "./types.js";
+import type { RunEventType } from "@orch/shared";
 
 export interface MappedEvent {
-  eventType: "init" | "tool_use" | "tool_result" | "assistant_text" | "result" | "error";
+  eventType: RunEventType;
   toolName: string | null;
   summary: string;
 }

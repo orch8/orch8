@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../test-utils.js";
 import { RunEventCard } from "../components/runs/RunEventCard.js";
-import type { RunEvent } from "../types.js";
+import type { RunEvent } from "@orch/shared";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;

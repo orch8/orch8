@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
-import type { DaemonStatus } from "../types.js";
+import type { DaemonStatus } from "@orch/shared";
 
 export interface DaemonConfig {
   orchestrator: { tick_interval_ms: number; log_level: string };

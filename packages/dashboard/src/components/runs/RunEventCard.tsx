@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { RunEvent } from "../../types.js";
+import type { RunEvent } from "@orch/shared";
 
 const EVENT_ICONS: Record<string, { icon: string; color: string }> = {
   init:           { icon: "⚡", color: "text-blue-400" },

@@ -3,7 +3,7 @@ import { useRun, useRunLog } from "../../hooks/useRuns.js";
 import { useRunEvents, useRunEventStream } from "../../hooks/useRunEvents.js";
 import { useModalA11y } from "../../hooks/useModalA11y.js";
 import { RunEventCard } from "./RunEventCard.js";
-import type { RunEvent } from "../../types.js";
+import type { RunEvent } from "@orch/shared";
 
 const STATUS_COLORS: Record<string, string> = {
   queued: "bg-zinc-800 text-zinc-400",

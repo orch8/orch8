@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useTasks, useTransitionTask } from "../../hooks/useTasks.js";
-import { KANBAN_COLUMNS, type Task, type KanbanColumn } from "../../types.js";
+import { KANBAN_COLUMNS, type KanbanColumn } from "@orch/shared";
+import type { Task } from "../../types.js";
 import { TaskCard } from "./TaskCard.js";
 import { TaskMoveMenu } from "./TaskMoveMenu.js";
 

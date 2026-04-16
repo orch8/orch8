@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAgents } from "../../hooks/useAgents.js";
-import { KANBAN_COLUMNS, COLUMN_LABELS, type KanbanColumn } from "../../types.js";
+import { KANBAN_COLUMNS, COLUMN_LABELS, type KanbanColumn } from "@orch/shared";
 import type { Agent } from "../../types.js";
 import type { UseMutationResult } from "@tanstack/react-query";
 
