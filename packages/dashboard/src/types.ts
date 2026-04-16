@@ -27,83 +27,22 @@ export type Pipeline = typeof pipelines.$inferSelect;
 export type PipelineStep = typeof pipelineSteps.$inferSelect;
 export type PipelineTemplate = typeof pipelineTemplates.$inferSelect;
 
-export interface PipelineWithSteps {
-  pipeline: Pipeline;
-  steps: PipelineStep[];
-}
-
-// API-specific response types
-export interface CostSummary {
-  total: number;
-  byAgent: Array<{
-    agentId: string;
-    totalCost: number;
-    runCount: number;
-  }>;
-}
-
-export interface CostTimeseriesPoint {
-  date: string;
-  agentId: string;
-  totalCost: number;
-  runCount: number;
-}
-
-export interface TaskCost {
-  total: number;
-  runs: Array<{
-    id: string;
-    agentId: string;
-    costUsd: number | null;
-    status: string;
-    startedAt: string | null;
-    finishedAt: string | null;
-  }>;
-}
-
-export interface RunLog {
-  content: string;
-  store: string;
-  bytes: number;
-}
-
-export interface RunEvent {
-  id: string;
-  runId: string;
-  projectId: string;
-  seq: number;
-  timestamp: string;
-  eventType: "init" | "tool_use" | "tool_result" | "assistant_text" | "result" | "error";
-  toolName: string | null;
-  summary: string;
-  payload: unknown;
-  createdAt: string;
-}
-
-// Kanban column ordering
-export const KANBAN_COLUMNS = [
-  "backlog",
-  "blocked",
-  "in_progress",
-  "done",
-] as const;
-
-export type KanbanColumn = (typeof KANBAN_COLUMNS)[number];
-
-// Column display labels
-export const COLUMN_LABELS: Record<KanbanColumn, string> = {
-  backlog: "Backlog",
-  blocked: "Blocked",
-  in_progress: "In Progress",
-  done: "Done",
-};
-
-export interface DaemonStatus {
-  status: string;
-  pid: number;
-  uptimeMs: number;
-  uptimeFormatted: string;
-  tickIntervalMs: number;
-  processCount: number;
-  queueDepth: number;
-}
+// API-response shapes + shared UI vocabulary now live in @orch/shared. We
+// re-export here so existing dashboard imports (e.g. `from "../types.js"`)
+// keep working without churn. Prefer importing from "@orch/shared" in new code.
+export {
+  KANBAN_COLUMNS,
+  COLUMN_LABELS,
+  RUN_EVENT_TYPES,
+} from "@orch/shared";
+export type {
+  DaemonStatus,
+  CostSummary,
+  CostTimeseriesPoint,
+  TaskCost,
+  RunLog,
+  RunEvent,
+  RunEventType,
+  KanbanColumn,
+  PipelineWithSteps,
+} from "@orch/shared";

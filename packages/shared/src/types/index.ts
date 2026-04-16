@@ -75,3 +75,12 @@ export type AddBundledAgents = z.infer<typeof AddBundledAgentsSchema>;
 
 // WebSocket event discriminated union (daemon → dashboard).
 export * from "./ws-events.js";
+
+// API-response shapes produced by the daemon. Lived in
+// packages/dashboard/src/types.ts before; moved here so daemon + dashboard
+// can't silently drift.
+export * from "./daemon.js";
+export * from "./cost.js";
+export * from "./runs.js";
+export * from "./pipeline.js";
+export * from "./kanban.js";
