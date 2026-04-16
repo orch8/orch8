@@ -3,7 +3,6 @@ import { useState } from "react";
 import { WizardStepper } from "../shared/WizardStepper.js";
 import { TemplateStep } from "./TemplateStep.js";
 import { IdentityStep, type IdentityData } from "./IdentityStep.js";
-import { PromptsStep, type PromptsData } from "./PromptsStep.js";
 import { PermissionsStep, type PermissionsData } from "./PermissionsStep.js";
 import { BudgetStep, type BudgetData } from "./BudgetStep.js";
 import { useCreateAgent, useAgents } from "../../hooks/useAgents.js";
@@ -30,13 +29,6 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
     effort: "xhigh",
     maxTurns: 180,
   });
-  const [prompts, setPrompts] = useState<PromptsData>({
-    instructionsFilePath: "",
-    systemPrompt: "",
-    promptTemplate: "",
-    bootstrapPromptTemplate: "",
-    desiredSkills: [],
-  });
   const [permissions, setPermissions] = useState<PermissionsData>({
     canCreateTasks: false,
     canMoveTo: [],
@@ -61,15 +53,6 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
       maxTurns: agent.maxTurns,
     }));
 
-    // Pre-fill ALL prompt fields from bundled data
-    setPrompts({
-      instructionsFilePath: "",
-      systemPrompt: agent.systemPrompt ?? "",
-      promptTemplate: agent.promptTemplate ?? "",
-      bootstrapPromptTemplate: agent.bootstrapPromptTemplate ?? "",
-      desiredSkills: agent.skills ?? [],
-    });
-
     // Permissions stay at defaults — role defaults are applied server-side
     setPermissions((prev) => ({
       ...prev,
@@ -92,11 +75,10 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
       model: identity.model,
       effort: identity.effort || undefined,
       maxTurns: identity.maxTurns,
-      instructionsFilePath: prompts.instructionsFilePath || undefined,
-      systemPrompt: prompts.systemPrompt || undefined,
-      promptTemplate: prompts.promptTemplate || undefined,
-      bootstrapPromptTemplate: prompts.bootstrapPromptTemplate || undefined,
-      desiredSkills: prompts.desiredSkills.length > 0 ? prompts.desiredSkills : undefined,
+      desiredSkills:
+        selectedBundled?.skills && selectedBundled.skills.length > 0
+          ? selectedBundled.skills
+          : undefined,
       canCreateTasks: permissions.canCreateTasks,
       canMoveTo: permissions.canMoveTo,
       canAssignTo: permissions.canAssignTo,
@@ -123,10 +105,6 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
     {
       label: "Identity",
       content: <IdentityStep data={identity} onChange={setIdentity} />,
-    },
-    {
-      label: "Prompts",
-      content: <PromptsStep data={prompts} onChange={setPrompts} />,
     },
     {
       label: "Permissions",

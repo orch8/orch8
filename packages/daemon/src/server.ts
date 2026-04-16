@@ -8,6 +8,7 @@ import { healthRoutes } from "./api/routes/health.js";
 import { taskRoutes } from "./api/routes/tasks.js";
 import { commentRoutes } from "./api/routes/comments.js";
 import { agentRoutes } from "./api/routes/agents.js";
+import { agentInstructionRoutes } from "./api/routes/agent-instructions.js";
 import { websocketRoutes } from "./api/websocket.js";
 import { authPlugin } from "./api/middleware/auth.js";
 import { TaskService } from "./services/task.service.js";
@@ -36,8 +37,6 @@ import { BroadcastService } from "./services/broadcast.service.js";
 import { NotificationService } from "./services/notification.service.js";
 import { projectSkillRoutes } from "./api/routes/project-skills.js";
 import { ProjectSkillService } from "./services/project-skill.service.js";
-import { instructionBundleRoutes } from "./api/routes/instruction-bundles.js";
-import { InstructionBundleService } from "./services/instruction-bundle.service.js";
 import { SeedingService } from "./services/seeding.service.js";
 import { bundledAgentRoutes } from "./api/routes/bundled-agents.js";
 import { PipelineTemplateService } from "./services/pipeline-template.service.js";
@@ -124,14 +123,10 @@ export function buildServer(options: ServerOptions = {}) {
     const projectSkillService = new ProjectSkillService(dbClient.db);
     app.decorate("projectSkillService", projectSkillService);
 
-    // Instruction bundle service
-    const instructionBundleService = new InstructionBundleService(dbClient.db);
-    app.decorate("instructionBundleService", instructionBundleService);
-
     // Heartbeat service
     const heartbeatService = new HeartbeatService(dbClient.db, broadcastService);
     const spawnFn = options.spawnFn ?? nodeSpawn;
-    const adapter = new ClaudeLocalAdapter(dbClient.db, spawnFn, projectSkillService, instructionBundleService);
+    const adapter = new ClaudeLocalAdapter(dbClient.db, spawnFn, projectSkillService);
     heartbeatService.setAdapter(adapter);
     const sessionMgr = new SessionManager(dbClient.db);
     heartbeatService.setSessionManager(sessionMgr);
@@ -297,6 +292,7 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(taskRoutes);
     app.register(commentRoutes);
     app.register(agentRoutes);
+    app.register(agentInstructionRoutes);
     app.register(chatsRoutes);
     app.register(runRoutes);
     app.register(identityRoutes);
@@ -307,7 +303,6 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(daemonRoutes);
     app.register(notificationRoutes);
     app.register(projectSkillRoutes);
-    app.register(instructionBundleRoutes);
     app.register(bundledAgentRoutes);
     app.register(pipelineTemplateRoutes);
     app.register(pipelineRoutes);

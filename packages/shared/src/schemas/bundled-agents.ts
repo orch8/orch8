@@ -15,7 +15,4 @@ export interface BundledAgent {
   skills: string[];
   heartbeatEnabled: boolean;
   heartbeatIntervalSec?: number;
-  systemPrompt: string;
-  promptTemplate?: string;
-  bootstrapPromptTemplate?: string;
 }

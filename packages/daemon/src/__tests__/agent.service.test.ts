@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { eq, and } from "drizzle-orm";
 import { projects, agents, wakeupRequests } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
@@ -60,7 +63,6 @@ describe("AgentService", () => {
         canCreateTasks: true,
         canAssignTo: ["fe-eng", "be-eng"],
         canMoveTo: ["in_progress", "done"],
-        systemPrompt: "You are the CTO.",
         budgetLimitUsd: 50.0,
       });
 
@@ -78,6 +80,37 @@ describe("AgentService", () => {
       await expect(
         service.create({ id: "dup", projectId, name: "Second", role: "engineer" }),
       ).rejects.toThrow();
+    });
+
+    it("seeds stub AGENTS.md + heartbeat.md on create", async () => {
+      const tmpHome = await mkdtemp(join(tmpdir(), "agent-create-"));
+      const [project] = await testDb.db
+        .insert(projects)
+        .values({
+          name: "P",
+          slug: `p-${Date.now()}`,
+          homeDir: tmpHome,
+          worktreeDir: tmpHome,
+        })
+        .returning();
+
+      await service.create({
+        id: "custom-bot",
+        projectId: project.id,
+        name: "Custom Bot",
+        role: "custom",
+      });
+
+      const agentsMd = await readFile(
+        join(tmpHome, ".orch8", "agents", "custom-bot", "AGENTS.md"),
+        "utf-8",
+      );
+      expect(agentsMd).toContain("# Custom Bot");
+      const hb = await readFile(
+        join(tmpHome, ".orch8", "agents", "custom-bot", "heartbeat.md"),
+        "utf-8",
+      );
+      expect(hb).toContain("timer wake");
     });
   });
 

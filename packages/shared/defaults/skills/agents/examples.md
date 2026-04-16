@@ -14,13 +14,15 @@
     "maxTurns": 180,
     "heartbeatEnabled": true,
     "heartbeatIntervalSec": 21600,
-    "allowedTools": ["Bash", "Read", "Edit", "Write", "Grep", "Glob"],
-    "systemPrompt": "You are a QA agent for this project. On each wakeup, scan recent commits for new test gaps and create tasks for the gaps you find."
+    "allowedTools": ["Bash", "Read", "Edit", "Write", "Grep", "Glob"]
   }
 }
 ```
 
-After approval, call `POST /api/agents` with the same payload, then:
+After approval, call `POST /api/agents` with the same payload. The
+daemon seeds stub `AGENTS.md` and `heartbeat.md` files on disk; edit
+them via the Instructions tab or
+`PUT /api/agents/qa-bot/instructions`. Then:
 
 ```orch8-card
 {

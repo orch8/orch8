@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseAgentsMd } from "../defaults/agents-md-parser.js";
+import { parseAgentsMd, stripFrontmatter } from "../defaults/agents-md-parser.js";
 
 const MINIMAL_AGENTS_MD = `---
 name: test-agent
@@ -15,21 +15,7 @@ heartbeat:
 
 # Test Agent
 
-You are a test agent. You do test things.
-
-## On Task Assignment
-
-You are working on: **{{task.title}}**
-
-{{task.description}}
-
-## On First Run
-
-Read the codebase first.
-
-## Phase: Implement
-
-Execute the plan.
+You are a test agent. Any markdown here is ignored by the parser.
 `;
 
 const CTO_AGENTS_MD = `---
@@ -48,30 +34,7 @@ heartbeat:
 
 # CTO
 
-You are the CTO agent. You provide oversight.
-
-## On Task Assignment
-
-Assess this task: **{{task.title}}**
-
-## On First Run
-
-Welcome to the project.
-`;
-
-const MINIMAL_NO_SECTIONS = `---
-name: simple
-role: custom
-model: sonnet
-maxTurns: 10
-skills: []
-heartbeat:
-  enabled: false
----
-
-# Simple Agent
-
-Just a simple agent with no extra sections.
+Body is ignored.
 `;
 
 describe("parseAgentsMd", () => {
@@ -86,54 +49,14 @@ describe("parseAgentsMd", () => {
     expect(result.heartbeat).toEqual({ enabled: false });
   });
 
-  it("extracts system prompt from body after # Name heading", () => {
-    const result = parseAgentsMd(MINIMAL_AGENTS_MD);
-
-    expect(result.systemPrompt).toContain("You are a test agent.");
-    expect(result.systemPrompt).toContain("You do test things.");
-    // Should NOT contain section headings or their content
-    expect(result.systemPrompt).not.toContain("On Task Assignment");
-    expect(result.systemPrompt).not.toContain("Phase: Implement");
-  });
-
-  it("extracts promptTemplate from ## On Task Assignment", () => {
-    const result = parseAgentsMd(MINIMAL_AGENTS_MD);
-
-    expect(result.promptTemplate).toContain("You are working on: **{{task.title}}**");
-    expect(result.promptTemplate).toContain("{{task.description}}");
-  });
-
-  it("extracts bootstrapPromptTemplate from ## On First Run", () => {
-    const result = parseAgentsMd(MINIMAL_AGENTS_MD);
-
-    expect(result.bootstrapPromptTemplate).toContain("Read the codebase first.");
-  });
-
-  it("returns undefined for missing sections", () => {
-    const result = parseAgentsMd(MINIMAL_NO_SECTIONS);
-
-    expect(result.promptTemplate).toBeUndefined();
-    expect(result.bootstrapPromptTemplate).toBeUndefined();
-  });
-
-  it("handles agent with effort field", () => {
+  it("parses effort when present", () => {
     const result = parseAgentsMd(CTO_AGENTS_MD);
-
     expect(result.effort).toBe("high");
   });
 
-  it("handles heartbeat with intervalSec", () => {
+  it("parses heartbeat intervalSec", () => {
     const result = parseAgentsMd(CTO_AGENTS_MD);
-
     expect(result.heartbeat).toEqual({ enabled: true, intervalSec: 3600 });
-  });
-
-  it("extracts system prompt that stops before first ## section", () => {
-    const result = parseAgentsMd(CTO_AGENTS_MD);
-
-    expect(result.systemPrompt).toContain("You are the CTO agent.");
-    expect(result.systemPrompt).toContain("You provide oversight.");
-    expect(result.systemPrompt).not.toContain("On Task Assignment");
   });
 
   it("throws on missing required frontmatter fields", () => {
@@ -142,7 +65,6 @@ name: broken
 ---
 
 # Broken
-No role field.
 `;
     expect(() => parseAgentsMd(badMd)).toThrow();
   });
@@ -167,8 +89,6 @@ describe("parseAgentsMd — sessionCompaction", () => {
       "---",
       "",
       "# CTO",
-      "",
-      "System prompt.",
     ].join("\n");
 
     const parsed = parseAgentsMd(content);
@@ -192,37 +112,28 @@ describe("parseAgentsMd — sessionCompaction", () => {
       "---",
       "",
       "# Eng",
-      "",
-      "System prompt.",
     ].join("\n");
 
     const parsed = parseAgentsMd(content);
     expect(parsed.heartbeat.sessionCompaction).toBeUndefined();
   });
+});
 
-  it("parses partial sessionCompaction (only maxRuns)", () => {
-    const content = [
-      "---",
-      "name: qa",
-      "role: qa",
-      "model: opus",
-      "maxTurns: 10",
-      "heartbeat:",
-      "  enabled: true",
-      "  sessionCompaction:",
-      "    enabled: true",
-      "    maxRuns: 100",
-      "---",
-      "",
-      "# QA",
-      "",
-      "System prompt.",
-    ].join("\n");
+describe("stripFrontmatter", () => {
+  it("removes the YAML frontmatter block and leading blank lines", () => {
+    const input = `---
+name: a
+role: b
+---
 
-    const parsed = parseAgentsMd(content);
-    expect(parsed.heartbeat.sessionCompaction).toEqual({
-      enabled: true,
-      maxRuns: 100,
-    });
+# Agent
+
+Body.
+`;
+    expect(stripFrontmatter(input)).toBe("# Agent\n\nBody.\n");
+  });
+
+  it("returns the full body when no frontmatter is present", () => {
+    expect(stripFrontmatter("# Agent\n\nBody.\n")).toBe("# Agent\n\nBody.\n");
   });
 });

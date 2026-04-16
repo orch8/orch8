@@ -1,6 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderWithProviders, screen } from "../test-utils.js";
+import { renderWithProviders, screen, waitFor } from "../test-utils.js";
 import { AgentSettingsPage } from "../components/agent-settings/AgentSettingsPage.js";
+import { InstructionsTab } from "../components/agent-settings/InstructionsTab.js";
+
+vi.mock("../api/client.js", () => ({
+  api: {
+    get: vi.fn().mockResolvedValue({ agentsMd: "body", heartbeatMd: "hb" }),
+    put: vi.fn().mockResolvedValue({ ok: true }),
+    post: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
@@ -29,10 +40,6 @@ const mockAgent = {
   canAssignTo: [],
   canCreateTasks: false,
   canMoveTo: [],
-  systemPrompt: "You are an engineer.",
-  promptTemplate: "",
-  bootstrapPromptTemplate: "",
-  instructionsFilePath: null,
   mcpTools: [],
   desiredSkills: [],
   adapterType: "claude_local",
@@ -50,16 +57,17 @@ const mockAgent = {
 beforeEach(() => mockFetch.mockReset());
 
 describe("AgentSettingsPage", () => {
-  it("renders all six tab labels", () => {
+  it("renders all seven tab labels", () => {
     renderWithProviders(
       <AgentSettingsPage agent={mockAgent} projectId="proj_1" />,
     );
     expect(screen.getByText("General")).toBeInTheDocument();
     expect(screen.getByText("Execution")).toBeInTheDocument();
-    expect(screen.getByText("Prompts")).toBeInTheDocument();
+    expect(screen.getByText("Instructions")).toBeInTheDocument();
     expect(screen.getByText("Skills & Tools")).toBeInTheDocument();
     expect(screen.getByText("Permissions")).toBeInTheDocument();
     expect(screen.getByText("Budget")).toBeInTheDocument();
+    expect(screen.getByText("Runs")).toBeInTheDocument();
   });
 
   it("shows agent name and status in header", () => {
@@ -76,5 +84,17 @@ describe("AgentSettingsPage", () => {
     );
     // General tab should show model field
     expect(screen.getByLabelText(/model/i)).toBeInTheDocument();
+  });
+});
+
+describe("InstructionsTab", () => {
+  it("renders both editors with loaded content", async () => {
+    renderWithProviders(
+      <InstructionsTab agentId="a" projectId="p" />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/Save AGENTS\.md/i)).toBeInTheDocument();
+      expect(screen.getByText(/Save heartbeat\.md/i)).toBeInTheDocument();
+    });
   });
 });

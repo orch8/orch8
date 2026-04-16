@@ -43,7 +43,6 @@ describe("Chat message replay (end-to-end)", () => {
       name: "Project Chat",
       role: "custom",
       model: "claude-sonnet-4-6",
-      promptTemplate: "{{context.userMessage}}",
       wakeOnOnDemand: true,
     });
   });

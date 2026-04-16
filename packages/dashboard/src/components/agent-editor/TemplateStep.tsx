@@ -52,14 +52,6 @@ export function TemplateStep(props: TemplateStepProps) {
     }
   }
 
-  // Extract a short description from the first sentence of systemPrompt
-  function getDescription(agent: BundledAgent): string {
-    const firstSentence = agent.systemPrompt.split(/\.\s/)[0];
-    return firstSentence.length > 120
-      ? firstSentence.slice(0, 117) + "..."
-      : firstSentence + ".";
-  }
-
   return (
     <div className="grid grid-cols-2 gap-[var(--gap-block)]">
       {bundledAgents.map((agent) => (
@@ -79,7 +71,6 @@ export function TemplateStep(props: TemplateStepProps) {
               {agent.role}
             </span>
           </div>
-          <p className="mt-1 text-xs text-zinc-500">{getDescription(agent)}</p>
           <div className="mt-2 flex gap-1.5">
             <span className="rounded bg-zinc-800/60 px-1.5 py-0.5 text-[10px] text-zinc-500">
               {agent.model.split("-").slice(1, 3).join("-")}
@@ -110,7 +101,6 @@ export function TemplateStep(props: TemplateStepProps) {
               maxTurns: 180,
               skills: [],
               heartbeatEnabled: false,
-              systemPrompt: "",
             })
           }
           className={`rounded-lg border p-[var(--gap-block)] text-left transition-colors ${

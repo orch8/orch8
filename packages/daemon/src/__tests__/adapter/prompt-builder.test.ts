@@ -1,195 +1,65 @@
-// packages/daemon/src/__tests__/adapter/prompt-builder.test.ts
-import { describe, it, expect } from "vitest";
-import { interpolateTemplate, buildPrompt } from "../../adapter/prompt-builder.js";
-import type { RunContext } from "../../adapter/types.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { buildStdinPrompt, type WakeReason } from "../../adapter/prompt-builder.js";
 
-describe("interpolateTemplate", () => {
-  it("replaces {{variable}} with values", () => {
-    const result = interpolateTemplate(
-      "Hello {{name}}, welcome to {{project}}.",
-      { name: "Alice", project: "Orch8" },
-    );
-    expect(result).toBe("Hello Alice, welcome to Orch8.");
-  });
+let tempRoot: string;
 
-  it("replaces dotted variables like {{agent.name}}", () => {
-    const result = interpolateTemplate(
-      "Agent: {{agent.name}}",
-      { "agent.name": "Builder Bot" },
-    );
-    expect(result).toBe("Agent: Builder Bot");
-  });
-
-  it("leaves unmatched variables as empty strings", () => {
-    const result = interpolateTemplate(
-      "Value: {{missing}}",
-      {},
-    );
-    expect(result).toBe("Value: ");
-  });
-
-  it("handles multiple occurrences of the same variable", () => {
-    const result = interpolateTemplate(
-      "{{x}} and {{x}}",
-      { x: "A" },
-    );
-    expect(result).toBe("A and A");
-  });
+beforeEach(async () => {
+  tempRoot = await mkdtemp(join(tmpdir(), "stdin-prompt-"));
 });
 
-const baseContext: RunContext = {
-  agentId: "agent-1",
-  agentName: "Builder",
-  projectId: "proj-1",
-  runId: "run-1",
-  wakeReason: "assignment",
-  apiUrl: "http://localhost:3847",
-  cwd: "/tmp/ws",
-  taskTitle: "Fix login bug",
-  taskDescription: "The login page crashes on submit",
-};
-
-describe("buildPrompt", () => {
-  it("includes only heartbeat prompt when no bootstrap or handoff", () => {
-    const result = buildPrompt({
-      heartbeatTemplate: "Work on: {{task.title}}",
-      context: baseContext,
-      isFirstRun: false,
-    });
-    expect(result).toBe("Work on: Fix login bug");
-  });
-
-  it("includes bootstrap prompt on first run", () => {
-    const result = buildPrompt({
-      heartbeatTemplate: "Do the work.",
-      bootstrapTemplate: "You are {{agent.name}}.",
-      context: baseContext,
-      isFirstRun: true,
-    });
-    expect(result).toContain("You are Builder.");
-    expect(result).toContain("Do the work.");
-  });
-
-  it("does not include bootstrap prompt on subsequent runs", () => {
-    const result = buildPrompt({
-      heartbeatTemplate: "Do the work.",
-      bootstrapTemplate: "You are {{agent.name}}.",
-      context: baseContext,
-      isFirstRun: false,
-    });
-    expect(result).not.toContain("You are Builder.");
-    expect(result).toContain("Do the work.");
-  });
-
-  it("includes session handoff when provided", () => {
-    const result = buildPrompt({
-      heartbeatTemplate: "Continue work.",
-      sessionHandoff: "## Previous Context\n\nYou were fixing a login bug.",
-      context: baseContext,
-      isFirstRun: false,
-    });
-    expect(result).toContain("## Previous Context");
-    expect(result).toContain("Continue work.");
-  });
-
-  it("assembles all three sections on first run with handoff", () => {
-    const result = buildPrompt({
-      heartbeatTemplate: "Step 3.",
-      bootstrapTemplate: "Step 1.",
-      sessionHandoff: "Step 2.",
-      context: baseContext,
-      isFirstRun: true,
-    });
-    const parts = result.split("\n\n");
-    expect(parts[0]).toBe("Step 1.");
-    expect(parts[1]).toBe("Step 2.");
-    expect(parts[2]).toBe("Step 3.");
-  });
-
-  it("interpolates context.* variables", () => {
-    const ctx: RunContext = {
-      ...baseContext,
-      context: { repo: "my-repo" },
-    };
-    const result = buildPrompt({
-      heartbeatTemplate: "Repo: {{context.repo}}",
-      context: ctx,
-      isFirstRun: false,
-    });
-    expect(result).toBe("Repo: my-repo");
-  });
-
-  it("interpolates task-level context variables", () => {
-    const ctx: RunContext = {
-      ...baseContext,
-      context: { deployTarget: "staging" },
-    };
-    const result = buildPrompt({
-      heartbeatTemplate: "Deploy to: {{context.deployTarget}}",
-      context: ctx,
-      isFirstRun: false,
-    });
-    expect(result).toContain("Deploy to: staging");
-  });
+afterEach(async () => {
+  await rm(tempRoot, { recursive: true, force: true });
 });
 
-describe("prompt-builder — Phase 3 template vars", () => {
-  it("interpolates {{workspace.branch}}", () => {
-    const ctx: RunContext = { ...baseContext, workspaceBranch: "feature/foo" };
-    const result = buildPrompt({
-      heartbeatTemplate: "Branch: {{workspace.branch}}",
-      context: ctx,
-      isFirstRun: false,
-    });
-    expect(result).toBe("Branch: feature/foo");
+async function seedAgent(slug: string, files: { heartbeat?: string } = {}): Promise<string> {
+  const dir = join(tempRoot, ".orch8", "agents", slug);
+  await mkdir(dir, { recursive: true });
+  if (files.heartbeat !== undefined) {
+    await writeFile(join(dir, "heartbeat.md"), files.heartbeat, "utf-8");
+  }
+  return dir;
+}
+
+describe("buildStdinPrompt", () => {
+  it("reads heartbeat.md contents for timer wakes", async () => {
+    await seedAgent("cto", { heartbeat: "Do your heartbeat review." });
+    const wake: WakeReason = { source: "timer" };
+    const out = buildStdinPrompt(wake, tempRoot, "cto");
+    expect(out).toBe("Do your heartbeat review.");
   });
 
-  it("interpolates {{workspace.repoUrl}}", () => {
-    const ctx: RunContext = { ...baseContext, workspaceRepoUrl: "https://github.com/org/repo.git" };
-    const result = buildPrompt({
-      heartbeatTemplate: "Repo: {{workspace.repoUrl}}",
-      context: ctx,
-      isFirstRun: false,
-    });
-    expect(result).toBe("Repo: https://github.com/org/repo.git");
+  it("throws when heartbeat.md is missing on a timer wake", async () => {
+    await seedAgent("cto");
+    const wake: WakeReason = { source: "timer" };
+    expect(() => buildStdinPrompt(wake, tempRoot, "cto")).toThrow(/heartbeat\.md/);
   });
 
-  it("interpolates {{workspace.worktreePath}}", () => {
-    const ctx: RunContext = { ...baseContext, worktreePath: "/worktrees/task-1" };
-    const result = buildPrompt({
-      heartbeatTemplate: "WT: {{workspace.worktreePath}}",
-      context: ctx,
-      isFirstRun: false,
-    });
-    expect(result).toBe("WT: /worktrees/task-1");
+  it("formats task payload for assignment wakes", () => {
+    const wake: WakeReason = {
+      source: "assignment",
+      task: { title: "Fix login bug", description: "Crashes on submit" },
+    };
+    const out = buildStdinPrompt(wake, tempRoot, "cto");
+    expect(out).toContain("Fix login bug");
+    expect(out).toContain("Crashes on submit");
   });
 
-  it("interpolates {{wake.commentId}}", () => {
-    const ctx: RunContext = { ...baseContext, wakeCommentId: "comment-42" };
-    const result = buildPrompt({
-      heartbeatTemplate: "Comment: {{wake.commentId}}",
-      context: ctx,
-      isFirstRun: false,
-    });
-    expect(result).toBe("Comment: comment-42");
+  it("returns the user message verbatim for on_demand wakes", () => {
+    const wake: WakeReason = { source: "on_demand", userMessage: "hi there" };
+    const out = buildStdinPrompt(wake, tempRoot, "cto");
+    expect(out).toBe("hi there");
   });
 
-  it("interpolates {{task.linkedIssueIds}}", () => {
-    const ctx: RunContext = { ...baseContext, linkedIssueIds: "ISS-1,ISS-2" };
-    const result = buildPrompt({
-      heartbeatTemplate: "Issues: {{task.linkedIssueIds}}",
-      context: ctx,
-      isFirstRun: false,
-    });
-    expect(result).toBe("Issues: ISS-1,ISS-2");
-  });
-
-  it("replaces missing Phase 3 vars with empty string", () => {
-    const result = buildPrompt({
-      heartbeatTemplate: "Branch: {{workspace.branch}}, Comment: {{wake.commentId}}",
-      context: baseContext,
-      isFirstRun: false,
-    });
-    expect(result).toBe("Branch: , Comment: ");
+  it("formats automation payload for automation wakes", () => {
+    const wake: WakeReason = {
+      source: "automation",
+      automation: { trigger: "pr_opened", payload: "#42" },
+    };
+    const out = buildStdinPrompt(wake, tempRoot, "cto");
+    expect(out).toContain("pr_opened");
+    expect(out).toContain("#42");
   });
 });

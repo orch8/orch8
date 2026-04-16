@@ -140,9 +140,6 @@ config in the payload:
 - `model`: pick per the model-matches-role rule above
 - `effort`: `"xhigh"` for lead and complex roles, `"medium"` for volume work
 - `maxTurns`: 180 (default)
-- `systemPrompt`: a tailored persona and operating instructions specific
-  to this agent's specialty. Be concrete — reference the technologies,
-  patterns, and scope from the discovery conversation.
 - `heartbeatEnabled`: `true` only for the lead agent
 - `heartbeatIntervalSec`: 21600 (6 hours) for the lead, omit for others
 - `wakeOnAssignment`: `true` for all non-lead agents
@@ -168,7 +165,6 @@ Example card:
     "model": "claude-opus-4-7",
     "effort": "xhigh",
     "maxTurns": 180,
-    "systemPrompt": "You are the project lead for [project]. Your job is to...",
     "heartbeatEnabled": true,
     "heartbeatIntervalSec": 21600,
     "wakeOnAssignment": false,
@@ -182,6 +178,18 @@ Example card:
   }
 }
 ```
+
+### Step 3 — Agent prompts live in `AGENTS.md` on disk
+
+Agent personas and operating instructions are **not** part of the card
+payload. The create flow seeds an empty `AGENTS.md` for each agent. After
+the user approves the agents, either the user or the chat agent can fill
+in each agent's persona via the dashboard Instructions tab (backed by
+`PUT /api/agents/<id>/instructions`) or by editing
+`.orch8/agents/<agent-id>/AGENTS.md` directly.
+
+See the `agents` skill for the full agent lifecycle and how prompts are
+loaded at runtime.
 
 Present all agent cards at once with a brief introduction: "Here's the team
 I'd put together for this."

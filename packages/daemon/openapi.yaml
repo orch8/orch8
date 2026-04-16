@@ -52,8 +52,6 @@ tags:
     description: Reusable pipeline step definitions
   - name: Project Skills
     description: Per-project skill registry and sync
-  - name: Instruction Bundles
-    description: Per-agent instruction file bundles
   - name: Bundled Agents
     description: Built-in agent templates that can be added to a project
 
@@ -425,15 +423,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TaskColumn"
-        systemPrompt:
-          type: string
-        promptTemplate:
-          type: string
-        bootstrapPromptTemplate:
-          type: string
-        instructionsFilePath:
-          type: string
-          nullable: true
         budgetLimitUsd:
           type: number
           nullable: true
@@ -504,14 +493,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TaskColumn"
-        systemPrompt:
-          type: string
-        promptTemplate:
-          type: string
-        bootstrapPromptTemplate:
-          type: string
-        instructionsFilePath:
-          type: string
         mcpTools:
           type: array
           items:
@@ -548,7 +529,7 @@ components:
 
     UpdateAgent:
       type: object
-      description: Same fields as CreateAgent, all optional. id and projectId are not updatable. effort, instructionsFilePath, and budgetLimitUsd are nullable.
+      description: Same fields as CreateAgent, all optional. id and projectId are not updatable. effort and budgetLimitUsd are nullable.
       properties:
         name:
           type: string
@@ -596,15 +577,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TaskColumn"
-        systemPrompt:
-          type: string
-        promptTemplate:
-          type: string
-        bootstrapPromptTemplate:
-          type: string
-        instructionsFilePath:
-          type: string
-          nullable: true
         mcpTools:
           type: array
           items:
@@ -1302,61 +1274,6 @@ components:
           type: string
           minLength: 1
 
-    # --- Instruction Bundle ---
-    InstructionBundle:
-      type: object
-      properties:
-        id:
-          type: string
-          example: ibun_abc123
-        agentId:
-          type: string
-        projectId:
-          type: string
-        mode:
-          type: string
-          enum: [managed, external]
-        rootPath:
-          type: string
-        entryFile:
-          type: string
-          example: AGENTS.md
-        fileInventory:
-          type: array
-          items:
-            type: object
-        metadata:
-          type: object
-          nullable: true
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    UpdateInstructionBundle:
-      type: object
-      required: [mode]
-      properties:
-        mode:
-          type: string
-          enum: [managed, external]
-        rootPath:
-          type: string
-          description: Must resolve under ~/.orch8/projects/
-        entryFile:
-          type: string
-          description: Relative path; must not contain '..' or start with '/'
-
-    InstructionBundleFile:
-      type: object
-      properties:
-        path:
-          type: string
-        content:
-          type: string
-
     # --- Bundled Agent ---
     BundledAgent:
       type: object
@@ -1381,12 +1298,6 @@ components:
           type: boolean
         heartbeatIntervalSec:
           type: integer
-        systemPrompt:
-          type: string
-        promptTemplate:
-          type: string
-        bootstrapPromptTemplate:
-          type: string
 
     AddBundledAgents:
       type: object
@@ -4489,26 +4400,38 @@ paths:
                 $ref: "#/components/schemas/Error"
 
   # ============================================================
-  # Instruction Bundles
+  # Agent Instructions (AGENTS.md + heartbeat.md)
   # ============================================================
   /api/agents/{id}/instructions:
     get:
-      tags: [Instruction Bundles]
-      summary: Get instruction bundle for agent
-      description: Requires X-Project-Id header.
+      tags: [Agents]
+      summary: Read the agent's AGENTS.md and heartbeat.md
+      description: |
+        Returns the on-disk contents of `<projectRoot>/.orch8/agents/<slug>/AGENTS.md`
+        and `heartbeat.md`. Missing files are returned as empty strings.
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: string
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
       responses:
         "200":
-          description: Bundle
+          description: Both files' contents (empty strings if missing)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/InstructionBundle"
+                type: object
+                properties:
+                  agentsMd:
+                    type: string
+                  heartbeatMd:
+                    type: string
         "400":
           description: Missing projectId
           content:
@@ -4516,18 +4439,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: No bundle found
+          description: Agent not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-    patch:
-      tags: [Instruction Bundles]
-      summary: Update instruction bundle mode
-      description: Requires X-Project-Id header. `rootPath` must resolve under `~/.orch8/projects/`.
+    put:
+      tags: [Agents]
+      summary: Write the agent's AGENTS.md and/or heartbeat.md
+      description: |
+        Writes one or both instruction files to disk under
+        `<projectRoot>/.orch8/agents/<slug>/`. Omitted fields are left unchanged.
       parameters:
         - name: id
           in: path
+          required: true
+          schema:
+            type: string
+        - name: projectId
+          in: query
           required: true
           schema:
             type: string
@@ -4536,10 +4466,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateInstructionBundle"
+              type: object
+              properties:
+                agentsMd:
+                  type: string
+                heartbeatMd:
+                  type: string
       responses:
         "200":
-          description: Updated
+          description: Success
           content:
             application/json:
               schema:
@@ -4551,146 +4486,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ValidationError"
         "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /api/agents/{id}/instructions/files:
-    get:
-      tags: [Instruction Bundles]
-      summary: List files in instruction bundle
-      description: Requires X-Project-Id header.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: File inventory
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-        "400":
-          description: Missing projectId
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /api/agents/{id}/instructions/files/{path}:
-    get:
-      tags: [Instruction Bundles]
-      summary: Read a file from instruction bundle
-      description: Requires X-Project-Id header.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: path
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: File content
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/InstructionBundleFile"
-        "400":
-          description: Missing projectId
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-    put:
-      tags: [Instruction Bundles]
-      summary: Write a file in instruction bundle
-      description: Requires X-Project-Id header. Blocked for external-mode bundles and on path traversal.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: path
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [content]
-              properties:
-                content:
-                  type: string
-      responses:
-        "200":
-          description: Written
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/OkResponse"
-        "400":
-          description: External bundle, path traversal, or missing projectId
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-    delete:
-      tags: [Instruction Bundles]
-      summary: Delete a file from instruction bundle
-      description: |
-        Requires X-Project-Id header. Cannot delete the entry file, files in
-        external-mode bundles, or traverse outside the bundle root.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: path
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "204":
-          description: Deleted
-        "400":
-          description: External bundle, entry file, path traversal, or missing projectId
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "404":
-          description: Not found
+          description: Agent not found
           content:
             application/json:
               schema:

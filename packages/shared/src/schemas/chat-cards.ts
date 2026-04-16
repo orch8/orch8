@@ -56,7 +56,6 @@ export const AgentDetailSchema = AgentSummarySchema.extend({
   heartbeatIntervalSec: z.number().int().optional(),
   desiredSkills: z.array(z.string()).optional(),
   allowedTools: z.array(z.string()).optional(),
-  systemPrompt: z.string().optional(),
   budgetLimitUsd: z.number().nullable().optional(),
   budgetSpentUsd: z.number().optional(),
 });
@@ -246,7 +245,6 @@ const AgentCreateInputSchema = z.object({
   heartbeatIntervalSec: z.number().int().min(0).optional(),
   desiredSkills: z.array(z.string()).optional(),
   allowedTools: z.array(z.string()).optional(),
-  systemPrompt: z.string().optional(),
   budgetLimitUsd: z.number().nonnegative().nullable().optional(),
 });
 
@@ -259,7 +257,6 @@ const AgentPatchSchema = z.object({
   heartbeatIntervalSec: z.number().int().min(0).optional(),
   desiredSkills: z.array(z.string()).optional(),
   allowedTools: z.array(z.string()).optional(),
-  systemPrompt: z.string().optional(),
   budgetLimitUsd: z.number().nullable().optional(),
 });
 

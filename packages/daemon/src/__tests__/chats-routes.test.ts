@@ -72,7 +72,6 @@ describe("Chat API Routes", () => {
       name: "Project Chat",
       role: "custom",
       model: "claude-sonnet-4-6",
-      promptTemplate: "{{context.userMessage}}",
       wakeOnOnDemand: true,
     });
 

@@ -63,6 +63,17 @@ describe("SeedingService", () => {
       const entries = await readdir(agentsDir);
       expect(entries).toEqual(["implementer"]);
     });
+
+    it("strips YAML frontmatter from copied AGENTS.md", async () => {
+      const service = new SeedingService();
+      await service.copyDefaults(tempDir, ["cto"]);
+      const copied = await readFile(
+        join(tempDir, ".orch8", "agents", "cto", "AGENTS.md"),
+        "utf-8",
+      );
+      expect(copied.startsWith("---")).toBe(false);
+      expect(copied).toContain("# CTO");
+    });
   });
 
   describe("parseAgentDefinitions", () => {
@@ -101,13 +112,13 @@ describe("SeedingService", () => {
   });
 
   describe("listBundledAgents", () => {
-    it("returns all 6 bundled agents", async () => {
+    it("returns all 7 bundled agents", async () => {
       const service = new SeedingService();
       const agents = await service.listBundledAgents();
 
-      expect(agents).toHaveLength(6);
+      expect(agents).toHaveLength(7);
       const ids = agents.map((a) => a.id).sort();
-      expect(ids).toEqual(["cto", "implementer", "planner", "qa", "researcher", "reviewer"]);
+      expect(ids).toEqual(["chat", "cto", "implementer", "planner", "qa", "researcher", "reviewer"]);
     });
 
     it("resolves model shorthands to full IDs", async () => {
@@ -121,14 +132,12 @@ describe("SeedingService", () => {
       expect(implementer.model).toBe("claude-opus-4-7");
     });
 
-    it("includes parsed prompt sections", async () => {
+    it("omits prompt template fields from bundled list", async () => {
       const service = new SeedingService();
-      const agents = await service.listBundledAgents();
-
-      const implementer = agents.find((a) => a.id === "implementer")!;
-      expect(implementer.systemPrompt).toContain("implementer agent");
-      expect(implementer.promptTemplate).toBeDefined();
-      expect(implementer.bootstrapPromptTemplate).toBeDefined();
+      const list = await service.listBundledAgents();
+      const implementer = list.find((a) => a.id === "implementer")!;
+      expect((implementer as any).systemPrompt).toBeUndefined();
+      expect((implementer as any).promptTemplate).toBeUndefined();
     });
 
     it("includes heartbeat config", async () => {
@@ -254,6 +263,7 @@ describe("SeedingService", () => {
   describe("provisionChatAgent", () => {
     let testDb: TestDb;
     let projectId: string;
+    let projectHomeDir: string;
 
     beforeAll(async () => {
       testDb = await setupTestDb();
@@ -267,13 +277,19 @@ describe("SeedingService", () => {
       await testDb.db.delete(agents);
       await testDb.db.delete(projects);
 
+      projectHomeDir = await mkdtemp(join(tmpdir(), "chat-perms-home-"));
+
       const [project] = await testDb.db.insert(projects).values({
         name: "Chat Perms Test",
         slug: `chat-perms-${Date.now()}`,
-        homeDir: "/tmp/chat-perms",
-        worktreeDir: "/tmp/chat-perms-wt",
+        homeDir: projectHomeDir,
+        worktreeDir: `${projectHomeDir}-wt`,
       }).returning();
       projectId = project.id;
+    });
+
+    afterEach(async () => {
+      await rm(projectHomeDir, { recursive: true, force: true });
     });
 
     async function getChatRow() {

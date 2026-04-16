@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1775124783572,
-      "tag": "0000_workable_zaran",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1775570574758,
-      "tag": "0001_daffy_hannibal_king",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1775579667204,
-      "tag": "0002_fat_beyonder",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1776371033021,
-      "tag": "0003_tearful_phalanx",
+      "when": 1776374228504,
+      "tag": "0000_legal_virginia_dare",
       "breakpoints": true
     }
   ]

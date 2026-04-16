@@ -19,7 +19,6 @@ const mockAgents = [
     budgetSpentUsd: 3.5,
     heartbeatEnabled: true,
     heartbeatIntervalSec: 300,
-    systemPrompt: "You are an engineer.",
   },
   {
     id: "qa",
@@ -31,7 +30,6 @@ const mockAgents = [
     budgetLimitUsd: 5,
     budgetSpentUsd: 1.2,
     heartbeatEnabled: false,
-    systemPrompt: null,
   },
 ];
 
