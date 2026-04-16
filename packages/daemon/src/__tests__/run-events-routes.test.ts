@@ -14,15 +14,18 @@ describe("Run Events Routes", () => {
   const projectId = `proj_${randomUUID()}`;
   const agentId = "test-agent";
   const runId = `run_${randomUUID()}`;
+  const projectHomeDir = join(tmpdir(), `orch8-run-events-home-${randomUUID()}`);
+  const projectLogDir = join(projectHomeDir, ".orch8", "logs");
 
   beforeAll(async () => {
     testDb = await setupTestDb();
+    await mkdir(projectLogDir, { recursive: true });
     await testDb.db.insert(projects).values({
       id: projectId,
       name: "Test",
       slug: "test",
-      homeDir: "/tmp/test",
-      worktreeDir: "/tmp/test-wt",
+      homeDir: projectHomeDir,
+      worktreeDir: join(projectHomeDir, "worktrees"),
     });
     await testDb.db.insert(agents).values({
       id: agentId,
@@ -112,9 +115,7 @@ describe("Run Events Routes", () => {
 
   describe("GET /api/runs/:id/log (updated)", () => {
     it("returns log file content", async () => {
-      const logDir = join(tmpdir(), `orch8-test-${randomUUID()}`);
-      await mkdir(logDir, { recursive: true });
-      const logPath = join(logDir, "test.log");
+      const logPath = join(projectLogDir, `test-${randomUUID()}.log`);
       await writeFile(logPath, "line1\nline2\nline3\n");
 
       await testDb.db
@@ -137,9 +138,7 @@ describe("Run Events Routes", () => {
     });
 
     it("supports tail param", async () => {
-      const logDir = join(tmpdir(), `orch8-test-${randomUUID()}`);
-      await mkdir(logDir, { recursive: true });
-      const logPath = join(logDir, "test-tail.log");
+      const logPath = join(projectLogDir, `test-tail-${randomUUID()}.log`);
       await writeFile(logPath, "line1\nline2\nline3\n");
 
       await testDb.db

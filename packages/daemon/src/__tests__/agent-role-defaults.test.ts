@@ -34,7 +34,7 @@ describe("Agent Role Defaults (Integration)", () => {
     app = Fastify();
     app.decorate("db", testDb.db);
     app.decorate("agentService", new AgentService(testDb.db));
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(agentRoutes);
     await app.ready();
   });

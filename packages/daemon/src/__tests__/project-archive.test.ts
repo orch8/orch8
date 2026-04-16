@@ -119,7 +119,7 @@ describe("Project Archive", () => {
       app.decorate("db", testDb.db);
       const ps = new ProjectService(testDb.db);
       app.decorate("projectService", ps);
-      app.register(authPlugin);
+      app.register(authPlugin, { allowLocalhostAdmin: true });
       app.register(projectRoutes);
       await app.ready();
     });

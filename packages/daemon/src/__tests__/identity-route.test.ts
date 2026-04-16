@@ -35,7 +35,7 @@ describe("Identity Route", () => {
 
     app = Fastify();
     app.decorate("db", testDb.db);
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(identityRoutes);
     await app.ready();
   });

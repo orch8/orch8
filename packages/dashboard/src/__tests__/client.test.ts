@@ -54,4 +54,38 @@ describe("api client", () => {
       expect.any(Object),
     );
   });
+
+  it("delete returns undefined on 204 without calling .json()", async () => {
+    const jsonSpy = vi.fn();
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+      headers: new Headers(),
+      json: jsonSpy,
+    });
+
+    const result = await api.delete<void>("/chats/chat_1");
+
+    expect(result).toBeUndefined();
+    expect(jsonSpy).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/chats/chat_1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("delete returns undefined when content-length is 0", async () => {
+    const jsonSpy = vi.fn();
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-length": "0" }),
+      json: jsonSpy,
+    });
+
+    const result = await api.delete<void>("/anything");
+
+    expect(result).toBeUndefined();
+    expect(jsonSpy).not.toHaveBeenCalled();
+  });
 });

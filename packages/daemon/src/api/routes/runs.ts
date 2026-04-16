@@ -1,7 +1,9 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { eq, and, desc, inArray, asc } from "drizzle-orm";
-import { heartbeatRuns, runEvents } from "@orch/shared/db";
+import { heartbeatRuns, runEvents, projects } from "@orch/shared/db";
 import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { getRunLogDir } from "../../services/run-logger.js";
 import "../../types.js";
 
 export async function runRoutes(app: FastifyInstance) {
@@ -182,7 +184,15 @@ export async function runRoutes(app: FastifyInstance) {
     }
   });
 
-  // GET /api/runs/:id/log — Get run log content
+  // GET /api/runs/:id/log — Get run log content.
+  //
+  // Defense-in-depth: `run.logRef` is server-derived today, but any
+  // future code path that writes a user-influenced value to `logRef`
+  // (or a restored-from-backup DB) would give an arbitrary local-file
+  // read primitive. We resolve logRef and the project's log directory,
+  // then require one to be a prefix of the other before opening the
+  // file. IO errors are separated: ENOENT → 404, everything else → 500
+  // with the error logged.
   app.get("/api/runs/:id/log", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const projectId = request.projectId;
     if (!projectId) {
@@ -203,21 +213,52 @@ export async function runRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: "not_found", message: "No log found for this run" });
     }
 
+    const [project] = await app.db
+      .select({ homeDir: projects.homeDir })
+      .from(projects)
+      .where(eq(projects.id, projectId));
+
+    if (!project) {
+      return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    }
+
+    const expectedLogDir = getRunLogDir(project.homeDir);
+    const resolvedRef = path.resolve(run.logRef);
+    const boundaryDir = expectedLogDir.endsWith(path.sep)
+      ? expectedLogDir
+      : expectedLogDir + path.sep;
+    if (!resolvedRef.startsWith(boundaryDir)) {
+      request.log.warn(
+        { runId: run, logRef: run.logRef, resolvedRef, expectedLogDir },
+        "Refused to serve run log outside project logDir",
+      );
+      return reply.code(403).send({
+        error: "forbidden",
+        message: "Log path is outside the project log directory",
+      });
+    }
+
     const params = request.query as { tail?: string };
 
+    let raw: string;
     try {
-      const raw = await readFile(run.logRef, "utf-8");
-      let content = raw;
-
-      if (params.tail) {
-        const n = parseInt(params.tail, 10);
-        const lines = raw.split("\n").filter(Boolean);
-        content = lines.slice(-n).join("\n");
+      raw = await readFile(resolvedRef, "utf-8");
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") {
+        return reply.code(404).send({ error: "not_found", message: "Log file not found" });
       }
-
-      return { content, store: run.logStore, bytes: Buffer.byteLength(raw) };
-    } catch {
-      return reply.code(404).send({ error: "not_found", message: "Log file not accessible" });
+      request.log.error({ err, logRef: resolvedRef }, "Failed to read run log");
+      return reply.code(500).send({ error: "internal_error", message: "Failed to read log file" });
     }
+
+    let content = raw;
+    if (params.tail) {
+      const n = parseInt(params.tail, 10);
+      const lines = raw.split("\n").filter(Boolean);
+      content = lines.slice(-n).join("\n");
+    }
+
+    return { content, store: run.logStore, bytes: Buffer.byteLength(raw) };
   });
 }

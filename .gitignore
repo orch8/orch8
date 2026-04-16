@@ -9,5 +9,6 @@ dist/
 routeTree.gen.ts
 .worktrees/
 .superpowers/
+
 docs/
 specs/

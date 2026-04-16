@@ -435,6 +435,53 @@ describe("ChatService", () => {
 
   // ─── Session Invalidation ──────────────────────
 
+  // ─── Pagination isolation ──────────────────────
+
+  it("listMessages refuses a `before` cursor that belongs to a different chat", async () => {
+    service = new ChatService(
+      testDb.db,
+      makeMockAdapter("ok") as any,
+      sessionMgr,
+      broadcast,
+      TEST_API_URL,
+    );
+
+    const chatA = await service.createChat({ projectId, agentId, title: "A" });
+    const chatB = await service.createChat({ projectId, agentId, title: "B" });
+
+    // Two messages in chat A (oldest first).
+    const [msgA1] = await testDb.db
+      .insert(chatMessages)
+      .values({ chatId: chatA.id, role: "user", content: "A1" })
+      .returning();
+    // Force distinct createdAt ordering even on fast hardware.
+    await new Promise((r) => setTimeout(r, 10));
+    await testDb.db
+      .insert(chatMessages)
+      .values({ chatId: chatA.id, role: "assistant", content: "A2" })
+      .returning();
+
+    // One message in chat B.
+    await testDb.db
+      .insert(chatMessages)
+      .values({ chatId: chatB.id, role: "user", content: "B1" })
+      .returning();
+
+    // Baseline: chatB has exactly one message.
+    const baselineB = await service.listMessages(chatB.id);
+    expect(baselineB.map((m) => m.content)).toEqual(["B1"]);
+
+    // Using msgA1 (from chat A) as a `before` cursor on chat B must
+    // NOT filter chat B's results. Pre-fix, the anchor lookup returned
+    // msgA1 (no chatId check), yielding 0 messages older than msgA1 in
+    // chat B; post-fix, the anchor isn't recognised and the query falls
+    // back to the full chat B list.
+    const withForeignCursor = await service.listMessages(chatB.id, {
+      before: msgA1.id,
+    });
+    expect(withForeignCursor.map((m) => m.content)).toEqual(["B1"]);
+  });
+
   it("invalidateSession clears the taskSessions row for this chat", async () => {
     const adapter = makeMockAdapter("ok");
     service = new ChatService(

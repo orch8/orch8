@@ -82,8 +82,13 @@ describe("ChatMessageRenderer", () => {
       { id: "c2", kind: "b", summary: "", payload: {}, status: "pending", decidedAt: null, decidedBy: null, resultRunId: null },
     ];
     renderMsg(fenced, cards);
-    // Unknown kinds fall back to ResultErrorCard via CardRegistry's validation guard.
-    const errors = screen.getAllByText(/payload failed validation/i);
-    expect(errors).toHaveLength(2);
+    // Unknown kinds fall back to a generic info card (the catch-all
+    // branch in CardRegistry). Each card humanizes its kind as the title:
+    // "a" → "A", "b" → "B".
+    expect(screen.getByText("A")).toBeInTheDocument();
+    expect(screen.getByText("B")).toBeInTheDocument();
+    // Both interleaved prose blocks are rendered in order.
+    expect(screen.getByText("First:")).toBeInTheDocument();
+    expect(screen.getByText("Second:")).toBeInTheDocument();
   });
 });

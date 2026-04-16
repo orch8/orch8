@@ -15,15 +15,19 @@ describe("Run Cancel + Log Routes", () => {
   let testDb: TestDb;
   let app: ReturnType<typeof Fastify>;
   let projectId: string;
+  let projectHomeDir: string;
 
   beforeAll(async () => {
     testDb = await setupTestDb();
 
+    projectHomeDir = join(tmpdir(), `orch8-run-cancel-home-${randomUUID()}`);
+    await mkdir(join(projectHomeDir, ".orch8", "logs"), { recursive: true });
+
     const [project] = await testDb.db.insert(projects).values({
       name: "Run Cancel Test",
       slug: "run-cancel-test",
-      homeDir: "/tmp/run-cancel",
-      worktreeDir: "/tmp/run-cancel-wt",
+      homeDir: projectHomeDir,
+      worktreeDir: join(projectHomeDir, "worktrees"),
     }).returning();
     projectId = project.id;
   }, 60_000);
@@ -44,7 +48,7 @@ describe("Run Cancel + Log Routes", () => {
     const heartbeatService = new HeartbeatService(testDb.db, broadcastService);
     app.decorate("heartbeatService", heartbeatService);
 
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(runRoutes);
     await app.ready();
   });
@@ -148,9 +152,11 @@ describe("Run Cancel + Log Routes", () => {
 
   describe("GET /api/runs/:id/log", () => {
     it("returns log content for a run", async () => {
-      const logDir = join(tmpdir(), `orch8-test-${randomUUID()}`);
+      // Write the log inside the project's expected logDir so the
+      // realpath check (routes/runs.ts GET /log) passes.
+      const logDir = join(projectHomeDir, ".orch8", "logs");
       await mkdir(logDir, { recursive: true });
-      const logPath = join(logDir, "test.log");
+      const logPath = join(logDir, `test-${randomUUID()}.log`);
       await writeFile(logPath, "Line 1\nLine 2\nDone");
 
       await testDb.db.insert(agents).values({

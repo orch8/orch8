@@ -36,7 +36,7 @@ CREATE TABLE "agents" (
 	"color" text DEFAULT '#888780',
 	"model" text DEFAULT 'claude-opus-4-6' NOT NULL,
 	"effort" text,
-	"max_turns" integer DEFAULT 25 NOT NULL,
+	"max_turns" integer DEFAULT 180 NOT NULL,
 	"allowed_tools" text[] DEFAULT '{}',
 	"heartbeat_enabled" boolean DEFAULT false NOT NULL,
 	"heartbeat_interval_sec" integer DEFAULT 0 NOT NULL,

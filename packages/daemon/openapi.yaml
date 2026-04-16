@@ -298,6 +298,11 @@ components:
         taskType:
           type: string
           enum: [quick]
+        dependsOn:
+          type: array
+          items:
+            type: string
+          description: Task IDs this task depends on; created in a blocked state until all deps complete
 
     CreateBrainstormTask:
       type: object
@@ -321,6 +326,11 @@ components:
         taskType:
           type: string
           enum: [brainstorm]
+        dependsOn:
+          type: array
+          items:
+            type: string
+          description: Task IDs this task depends on; created in a blocked state until all deps complete
 
     CreateTask:
       oneOf:
@@ -943,6 +953,10 @@ components:
           type: string
           minLength: 1
           maxLength: 200
+        seedMessage:
+          type: string
+          maxLength: 10000
+          description: Initial user message seeded into the chat at creation time
 
     UpdateChat:
       type: object
@@ -1894,6 +1908,45 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      tags: [Tasks]
+      summary: Delete task
+      description: |
+        Deletes a task. Dependencies and comments are cascaded; run
+        references become null. Requires `create_task` permission.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: No create_task permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Task is actively executing or part of a pipeline
           content:
             application/json:
               schema:

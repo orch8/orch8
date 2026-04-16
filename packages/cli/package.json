@@ -2,6 +2,15 @@
   "name": "@orch/cli",
   "version": "0.0.1",
   "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/orch8/orch8.git"
+  },
+  "homepage": "https://github.com/orch8/orch8#readme",
+  "bugs": {
+    "url": "https://github.com/orch8/orch8/issues"
+  },
   "bin": {
     "orch": "./dist/index.js"
   },

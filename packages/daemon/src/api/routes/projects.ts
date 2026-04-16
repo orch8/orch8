@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { CreateProjectSchema, UpdateProjectSchema, ProjectFilterSchema } from "@orch/shared";
+import { isUniqueViolation } from "../utils/db-errors.js";
 import "../../types.js";
 
 export async function projectRoutes(app: FastifyInstance) {
@@ -18,8 +19,7 @@ export async function projectRoutes(app: FastifyInstance) {
       const project = await app.projectService.create(parsed.data);
       return reply.code(201).send(project);
     } catch (err) {
-      const message = (err as Error).message;
-      if (message.includes("duplicate") || message.includes("unique")) {
+      if (isUniqueViolation(err)) {
         return reply.code(409).send({ error: "conflict", message: "Project with this slug already exists" });
       }
       throw err;

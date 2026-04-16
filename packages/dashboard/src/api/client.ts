@@ -44,6 +44,14 @@ async function request<T>(
     throw new ApiError(response.status, body);
   }
 
+  // No-content responses (204, or explicit content-length: 0) — skip JSON
+  // parsing. Callers that type the result as `void` will correctly receive
+  // `undefined`.
+  const contentLength = response.headers?.get("content-length");
+  if (response.status === 204 || contentLength === "0") {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
 

@@ -65,6 +65,45 @@ export async function taskRoutes(app: FastifyInstance) {
     return task;
   });
 
+  // DELETE /api/tasks/:id — Delete task
+  // Requires `create_task` permission (no dedicated delete permission exists yet;
+  // create_task is the closest analogue — agents that can create can also delete).
+  // Returns 409 if the task is currently held by an active execution lock.
+  app.delete<{ Params: { id: string } }>(
+    "/api/tasks/:id",
+    {
+      preHandler: requirePermission("create_task"),
+    },
+    async (request, reply: FastifyReply) => {
+      const task = await taskService.getById(request.params.id);
+      if (!task) {
+        return reply.code(404).send({ error: "not_found", message: "Task not found" });
+      }
+
+      // Refuse to delete a task that's actively executing. The executing
+      // agent still owns the worktree and run; yanking the task out from
+      // under it leaves orphan state. The client should release or wait.
+      if (task.executionAgentId || task.executionRunId) {
+        return reply.code(409).send({
+          error: "conflict",
+          message: "Cannot delete a task that is actively executing; release the lock first",
+        });
+      }
+
+      // Pipeline-linked tasks drive a larger pipeline; deleting one in
+      // isolation would leave the pipeline pointing at a ghost step.
+      if (task.pipelineId) {
+        return reply.code(409).send({
+          error: "conflict",
+          message: "Cannot delete a task that is part of a pipeline",
+        });
+      }
+
+      await taskService.delete(request.params.id);
+      return reply.code(204).send();
+    },
+  );
+
   // PATCH /api/tasks/:id — Update task (non-state fields only)
   app.patch<{ Params: { id: string } }>("/api/tasks/:id", {
     preHandler: requirePermission("assign_task"),

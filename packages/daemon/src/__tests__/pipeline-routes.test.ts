@@ -4,6 +4,7 @@ import { Writable, Readable } from "node:stream";
 import { projects, agents, pipelineTemplates, pipelines, pipelineSteps, tasks } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { buildServer } from "../server.js";
+import { globalConfigSchema } from "../config/schema.js";
 
 function createMockProcess() {
   const stdin = new Writable({
@@ -28,6 +29,9 @@ describe("Pipeline API routes", () => {
     app = buildServer({
       databaseUrl: testDb.connectionUri,
       spawnFn: vi.fn(() => createMockProcess()) as unknown as typeof import("node:child_process").spawn,
+      // Enable the loopback-admin bypass so test requests (source IP
+      // 127.0.0.1 under app.inject) pass auth without Bearer tokens.
+      config: globalConfigSchema.parse({ auth: { allow_localhost_admin: true } }),
     });
     await app.ready();
 

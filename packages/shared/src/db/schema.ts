@@ -172,6 +172,12 @@ export const agents = pgTable("agents", {
 
   envVars: jsonb("env_vars").default({}),
 
+  // SHA-256 hex hash of the agent's bearer token. 64 chars when set.
+  // Nullable only so that legacy rows inserted before the migration can
+  // be upgraded in-place; the migration and AgentService.create backfill
+  // ensure every agent has a token once the migration has run.
+  agentTokenHash: text("agent_token_hash").unique(),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [

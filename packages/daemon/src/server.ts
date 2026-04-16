@@ -1,6 +1,7 @@
 // packages/daemon/src/server.ts
 import Fastify from "fastify";
 import websocket from "@fastify/websocket";
+import cors from "@fastify/cors";
 import { spawn as nodeSpawn } from "node:child_process";
 import { registerSwagger } from "./api/swagger.js";
 import { healthRoutes } from "./api/routes/health.js";
@@ -52,6 +53,14 @@ export interface ServerOptions {
   databaseUrl?: string;
   spawnFn?: typeof nodeSpawn;
   config?: GlobalConfig;
+  /**
+   * Canonical admin bearer token. Clients must present this value as
+   * `Authorization: Bearer <token>` to reach admin-scoped endpoints.
+   * Pass `null` to disable admin authentication via the Bearer header;
+   * in that case the only admin path is the optional loopback shortcut
+   * (config.auth.allow_localhost_admin).
+   */
+  adminToken?: string | null;
 }
 
 export function buildServer(options: ServerOptions = {}) {
@@ -66,6 +75,19 @@ export function buildServer(options: ServerOptions = {}) {
   });
 
   app.register(websocket);
+
+  // Register CORS with an explicit allowlist. Fastify 5's default is to
+  // accept any Origin, which is unsafe once the daemon binds to a
+  // non-loopback interface. In non-production we whitelist the local
+  // dashboard dev-server; in production no origin is allowed by default.
+  // credentials:false means cookies are never sent cross-origin either way.
+  const isDev = (process.env.NODE_ENV ?? "development") !== "production";
+  const corsOrigins = isDev ? ["http://localhost:5173"] : [];
+  app.register(cors, {
+    origin: corsOrigins,
+    credentials: false,
+  });
+
   registerSwagger(app);
 
   // Health check is always available (no auth required)
@@ -190,8 +212,16 @@ export function buildServer(options: ServerOptions = {}) {
       );
     });
 
-    // Populate global skills directory and sync all projects
-    (async () => {
+    // Populate global skills directory and sync all projects.
+    //
+    // The returned promise is attached to the app as `initPromise`
+    // so index.ts can `await` it before `server.listen(...)`. Running
+    // this synchronously on the request-serving path was a real
+    // race: before the fix, skills copy, per-project sync, and
+    // chat-agent provisioning could all be in flight when the first
+    // request arrived, producing "agent not found" / "skill missing"
+    // on cold-start installs.
+    const initPromise = (async () => {
       try {
         await seedingService.populateGlobalSkills();
         app.log.info("Global skills directory populated");
@@ -227,6 +257,7 @@ export function buildServer(options: ServerOptions = {}) {
         app.log.error({ err }, "Failed to sync global skills on startup");
       }
     })();
+    app.decorate("initPromise", initPromise);
 
     // Comment service
     const commentService = new CommentService(dbClient.db);
@@ -240,7 +271,10 @@ export function buildServer(options: ServerOptions = {}) {
     app.decorate("lifecycleService", lifecycleService);
 
     // Auth middleware + routes that require DB
-    app.register(authPlugin);
+    app.register(authPlugin, {
+      adminToken: options.adminToken ?? null,
+      allowLocalhostAdmin: options.config?.auth.allow_localhost_admin ?? false,
+    });
 
     // Enrich request-scoped logger with correlation IDs (spec §14 §2.2)
     app.addHook("onRequest", async (request) => {

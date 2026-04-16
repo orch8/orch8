@@ -54,7 +54,7 @@ describe("Task API Routes", () => {
     const enqueueWakeup = vi.fn().mockResolvedValue(undefined);
     app.decorate("heartbeatService", { enqueueWakeup });
 
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(taskRoutes);
     await app.ready();
   });
@@ -249,6 +249,88 @@ describe("Task API Routes", () => {
       const body = JSON.parse(response.body);
       expect(body.title).toBe("New");
       expect(body.priority).toBe("high");
+    });
+  });
+
+  describe("DELETE /api/tasks/:id", () => {
+    it("deletes an existing task (204)", async () => {
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Delete me",
+        taskType: "quick",
+      }).returning();
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/tasks/${task.id}`,
+        headers: { "x-project-id": projectId },
+      });
+
+      expect(response.statusCode).toBe(204);
+      expect(response.body).toBe("");
+
+      const remaining = await testDb.db.select().from(tasks);
+      expect(remaining.find((t) => t.id === task.id)).toBeUndefined();
+    });
+
+    it("returns 404 for nonexistent task", async () => {
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/api/tasks/task_does_not_exist",
+        headers: { "x-project-id": projectId },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("returns 409 when task is actively executing", async () => {
+      const [task] = await testDb.db.insert(tasks).values({
+        projectId,
+        title: "Locked task",
+        taskType: "quick",
+        column: "in_progress",
+        executionAgentId: "agent-1",
+        executionRunId: "run-xyz",
+        executionLockedAt: new Date(),
+      }).returning();
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/tasks/${task.id}`,
+        headers: { "x-project-id": projectId },
+      });
+
+      expect(response.statusCode).toBe(409);
+      const body = JSON.parse(response.body);
+      expect(body.error).toBe("conflict");
+
+      // Row still exists
+      const remaining = await testDb.db.select().from(tasks);
+      expect(remaining.find((t) => t.id === task.id)).toBeDefined();
+    });
+
+    it("cascades task dependency rows on delete", async () => {
+      const [a] = await testDb.db.insert(tasks).values({
+        projectId, title: "A", taskType: "quick",
+      }).returning();
+      const [b] = await testDb.db.insert(tasks).values({
+        projectId, title: "B", taskType: "quick",
+      }).returning();
+      await testDb.db.insert(taskDependencies).values({
+        taskId: b.id,
+        dependsOnId: a.id,
+      });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/tasks/${a.id}`,
+        headers: { "x-project-id": projectId },
+      });
+
+      expect(response.statusCode).toBe(204);
+
+      const deps = await testDb.db.select().from(taskDependencies);
+      expect(deps).toHaveLength(0);
     });
   });
 

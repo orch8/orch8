@@ -127,10 +127,19 @@ export class ChatService {
     const limit = Math.min(opts.limit ?? 100, 500);
     let where = eq(chatMessages.chatId, chatId);
     if (opts.before) {
+      // The anchor message MUST belong to the same chat. Looking it up
+      // by id alone lets a caller who can guess (or has harvested from
+      // logs) a message id from any other chat page across chat
+      // boundaries, which leaks both existence and ordering metadata.
       const [anchor] = await this.db
         .select()
         .from(chatMessages)
-        .where(eq(chatMessages.id, opts.before));
+        .where(
+          and(
+            eq(chatMessages.id, opts.before),
+            eq(chatMessages.chatId, chatId),
+          ),
+        );
       if (anchor) {
         where = and(
           eq(chatMessages.chatId, chatId),

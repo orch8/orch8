@@ -5,6 +5,7 @@ import { Writable, Readable } from "node:stream";
 import { projects, tasks, agents, taskDependencies, heartbeatRuns } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { buildServer } from "../server.js";
+import { globalConfigSchema } from "../config/schema.js";
 
 function createMockProcess() {
   const stdin = new Writable({
@@ -32,6 +33,10 @@ describe("Integration: Task Type Lifecycle", () => {
     app = buildServer({
       databaseUrl: testDb.connectionUri,
       spawnFn: vi.fn(() => createMockProcess()) as unknown as typeof import("node:child_process").spawn,
+      // Enable the loopback-admin bypass so app.inject() requests — which
+      // use 127.0.0.1 as remoteAddress — pass auth without needing to
+      // thread a bearer token through every test case.
+      config: globalConfigSchema.parse({ auth: { allow_localhost_admin: true } }),
     });
     await app.ready();
 

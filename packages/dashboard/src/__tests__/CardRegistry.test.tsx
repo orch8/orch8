@@ -80,24 +80,34 @@ describe("CardRegistry", () => {
     expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
   });
 
-  it("falls back to ResultErrorCard for an unknown kind", () => {
+  it("falls back to a generic confirm card for an unknown confirm_* kind", () => {
     renderCard(
       makeExtracted({
         kind: "confirm_destroy_universe" as ExtractedCard["kind"],
         payload: {},
       }),
     );
-    expect(screen.getByText(/payload failed validation/i)).toBeInTheDocument();
+    // Fallback is GenericConfirmFallback — renders the humanized kind as
+    // the card title and keeps the Approve/Cancel chrome so the user can
+    // still respond to unknown confirmations.
+    expect(screen.getByText(/destroy universe/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /approve/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
   });
 
-  it("falls back to ResultErrorCard for a malformed payload", () => {
+  it("falls back to a generic confirm card for a malformed payload", () => {
     renderCard(
       makeExtracted({
         kind: "confirm_move_task",
         payload: { taskId: "task_a" }, // missing from/to
       }),
     );
-    expect(screen.getByText(/payload failed validation/i)).toBeInTheDocument();
+    // Fallback is GenericConfirmFallback — the card body renders the raw
+    // payload as key/value pairs rather than rejecting the card outright.
+    expect(screen.getByText(/move task/i)).toBeInTheDocument();
+    expect(screen.getByText("taskId")).toBeInTheDocument();
+    expect(screen.getByText("task_a")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /approve/i })).toBeInTheDocument();
   });
 
   it("renders a result_error card directly", () => {

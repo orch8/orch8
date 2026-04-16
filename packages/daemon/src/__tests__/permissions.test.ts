@@ -34,7 +34,7 @@ describe("Permission Middleware", () => {
   function buildApp(permission: "create_task" | "move_task" | "assign_task") {
     const app = Fastify();
     app.decorate("db", testDb.db);
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.post("/test", {
       preHandler: requirePermission(permission),
     }, async (request) => {

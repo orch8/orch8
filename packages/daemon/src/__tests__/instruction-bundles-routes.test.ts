@@ -60,7 +60,7 @@ describe("instruction-bundles routes", () => {
     bundleService = new InstructionBundleService(testDb.db, tempDir);
     app.decorate("db", testDb.db);
     app.decorate("instructionBundleService", bundleService);
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(instructionBundleRoutes);
     await app.ready();
 

@@ -28,7 +28,7 @@ describe("Project Routes", () => {
     const projectService = new ProjectService(testDb.db);
     app.decorate("projectService", projectService);
 
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(projectRoutes);
     await app.ready();
   });

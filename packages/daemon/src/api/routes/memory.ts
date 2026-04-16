@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { EntityFilterSchema, KnowledgeSearchSchema, CreateFactSchema, CreateEntitySchema, SupersedeFactSchema, WorklogEntrySchema, LessonEntrySchema } from "@orch/shared";
 import { eq, and } from "drizzle-orm";
 import { agents, projects } from "@orch/shared/db";
+import { isUniqueViolation } from "../utils/db-errors.js";
 import "../../types.js";
 
 export async function memoryRoutes(app: FastifyInstance) {
@@ -23,7 +24,7 @@ export async function memoryRoutes(app: FastifyInstance) {
       });
       return reply.code(201).send(entity);
     } catch (err: unknown) {
-      if ((err as Error).message?.includes("uniq_entity_project_slug")) {
+      if (isUniqueViolation(err, "uniq_entity_project_slug")) {
         return reply.code(409).send({ error: "conflict", message: "Entity with this slug already exists in project" });
       }
       throw err;

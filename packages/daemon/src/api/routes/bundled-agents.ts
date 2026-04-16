@@ -1,6 +1,7 @@
 // packages/daemon/src/api/routes/bundled-agents.ts
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { AddBundledAgentsSchema } from "@orch/shared";
+import { isUniqueViolation } from "../utils/db-errors.js";
 import "../../types.js";
 
 export async function bundledAgentRoutes(app: FastifyInstance) {
@@ -71,9 +72,8 @@ export async function bundledAgentRoutes(app: FastifyInstance) {
           });
           created.push(agent);
         } catch (err) {
-          const message = (err as Error).message;
           // Skip agents that already exist in the project
-          if (message.includes("duplicate") || message.includes("unique")) {
+          if (isUniqueViolation(err)) {
             continue;
           }
           throw err;

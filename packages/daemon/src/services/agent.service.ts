@@ -4,9 +4,23 @@ import { agents, projects, wakeupRequests } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { CreateAgent, UpdateAgent, AgentFilter } from "@orch/shared";
 import type { BroadcastService } from "./broadcast.service.js";
+import {
+  generateAgentToken,
+  hashAgentToken,
+} from "../api/middleware/agent-token.js";
 
 type Agent = typeof agents.$inferSelect;
 type WakeupRequest = typeof wakeupRequests.$inferSelect;
+
+/**
+ * Result of creating a new agent. `rawToken` is the single opportunity
+ * the caller has to capture the bearer credential — the hash-at-rest
+ * means it cannot be recovered later; rotation produces a new token.
+ */
+export interface CreateAgentResult {
+  agent: Agent;
+  rawToken: string;
+}
 
 interface WakeupOpts {
   source: "timer" | "assignment" | "on_demand" | "automation";
@@ -109,6 +123,17 @@ export class AgentService {
   }
 
   async create(input: CreateAgent): Promise<Agent> {
+    const { agent } = await this.createWithToken(input);
+    return agent;
+  }
+
+  /**
+   * Creates an agent and returns the bearer token alongside. Prefer
+   * this overload over `create` in any code path that needs to hand
+   * the token back to a caller — the hash-at-rest design means there
+   * is no other way to recover it.
+   */
+  async createWithToken(input: CreateAgent): Promise<CreateAgentResult> {
     const defaults = AgentService.getRoleDefaults(input.role);
     const values = {
       ...defaults,
@@ -133,8 +158,35 @@ export class AgentService {
       }
     }
 
+    const rawToken = generateAgentToken();
+    values.agentTokenHash = hashAgentToken(rawToken);
+
     const [agent] = await this.db.insert(agents).values(values).returning();
-    return agent;
+    return { agent, rawToken };
+  }
+
+  /**
+   * Rotates the bearer token for an existing agent. Invalidates the
+   * previous token immediately. Returns the new raw token — callers
+   * must persist it before the next call because it is not recoverable.
+   */
+  async rotateAgentToken(
+    agentId: string,
+    projectId: string,
+  ): Promise<{ agent: Agent; rawToken: string }> {
+    const existing = await this.getById(agentId, projectId);
+    if (!existing) throw new Error("Agent not found");
+
+    const rawToken = generateAgentToken();
+    const agentTokenHash = hashAgentToken(rawToken);
+
+    const [updated] = await this.db
+      .update(agents)
+      .set({ agentTokenHash, updatedAt: new Date() })
+      .where(and(eq(agents.id, agentId), eq(agents.projectId, projectId)))
+      .returning();
+
+    return { agent: updated, rawToken };
   }
 
   async getById(id: string, projectId: string): Promise<Agent | null> {
@@ -229,6 +281,9 @@ export class AgentService {
 
     // IMPORTANT: When adding new columns to agents table,
     // decide if they belong in definition (copied) or runtime (reset below).
+    // `agentTokenHash` is explicitly reset — each cloned agent gets a
+    // brand-new bearer credential so leaking the source agent's token
+    // does not implicitly unlock its clones.
     const {
       id: _id,
       projectId: _pid,
@@ -237,6 +292,7 @@ export class AgentService {
       budgetSpentUsd: _spent,
       budgetPaused: _bp,
       lastHeartbeat: _lh,
+      agentTokenHash: _ath,
       createdAt: _ca,
       updatedAt: _ua,
       ...definition
@@ -253,6 +309,7 @@ export class AgentService {
         budgetSpentUsd: 0,
         budgetPaused: false,
         lastHeartbeat: null,
+        agentTokenHash: hashAgentToken(generateAgentToken()),
       })
       .returning();
 

@@ -114,6 +114,12 @@ Detailed specs live in the `specs/` directory:
 
 API reference is in [docs/api-reference.md](docs/api-reference.md).
 
+## Security
+
+- **Default bind host.** The daemon binds to `localhost` by default, so only the host machine can reach the API and dashboard. The admin gate currently trusts loopback requests; if you override this by setting `ORCH_HOST=0.0.0.0` (or any non-loopback address) to reach the dashboard from another machine, **every peer on that network becomes an admin** until a proper authentication mechanism is added. Keep the bind host on loopback unless you have put the daemon behind a trusted proxy and reverse-auth layer.
+- **Agent execution.** The daemon spawns the `claude` CLI with `--dangerously-skip-permissions` inside each task's git worktree (see `packages/daemon/src/adapter/args-builder.ts`). This means agents can read and write any file under the worktree without per-tool prompts. Treat every worktree as a privileged execution context; do not point Orch8 at repositories whose contents you would not want an LLM to run arbitrary commands against.
+- **Reporting issues.** Please report security vulnerabilities privately to sergio.jisko@gmail.com before filing a public issue.
+
 ## License
 
-Proprietary.
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text.

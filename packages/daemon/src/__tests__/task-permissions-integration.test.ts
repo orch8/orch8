@@ -66,7 +66,7 @@ describe("Task Routes Permission Enforcement", () => {
     app.decorate("lifecycleService", lifecycleService);
     app.decorate("heartbeatService", { enqueueWakeup: vi.fn().mockResolvedValue(undefined) });
 
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(taskRoutes);
     await app.ready();
   });

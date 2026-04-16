@@ -35,6 +35,15 @@ declare module "fastify" {
     pipelineService: import("./services/pipeline.service.js").PipelineService;
     pipelineTemplateService: import("./services/pipeline-template.service.js").PipelineTemplateService;
     chatService: import("./services/chat.service.js").ChatService;
+    /**
+     * Resolves once cold-start initialization (global skills populate,
+     * per-project skill sync, chat-agent backfill) has finished. The
+     * entrypoint awaits this before calling `listen` so the first
+     * incoming request always sees a fully provisioned daemon. Tests
+     * and lightweight `buildServer({})` callers that skip the DB path
+     * will not have this property, hence the optional marker.
+     */
+    initPromise?: Promise<void>;
   }
   interface FastifyRequest {
     agent?: typeof schema.agents.$inferSelect;

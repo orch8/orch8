@@ -148,7 +148,7 @@ describe("Agent Clone", () => {
       const hs = new HeartbeatService(testDb.db, broadcastService);
       app.decorate("heartbeatService", hs);
 
-      app.register(authPlugin);
+      app.register(authPlugin, { allowLocalhostAdmin: true });
       app.register(agentRoutes);
       await app.ready();
     });

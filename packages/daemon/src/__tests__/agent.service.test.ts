@@ -222,6 +222,53 @@ describe("AgentService", () => {
     });
   });
 
+  describe("bearer tokens", () => {
+    it("create auto-generates an agent token hash", async () => {
+      const agent = await service.create({
+        id: "tok-eng",
+        projectId,
+        name: "Tok Eng",
+        role: "engineer",
+      });
+      expect(agent.agentTokenHash).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it("createWithToken returns the raw token and stores only the hash", async () => {
+      const { agent, rawToken } = await service.createWithToken({
+        id: "cwt-eng",
+        projectId,
+        name: "CWT Eng",
+        role: "engineer",
+      });
+      expect(rawToken).toMatch(/^[0-9a-f]{32}$/);
+      expect(agent.agentTokenHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(agent.agentTokenHash).not.toBe(rawToken);
+    });
+
+    it("rotateAgentToken changes the hash and returns a new raw token", async () => {
+      const created = await service.createWithToken({
+        id: "rot-eng",
+        projectId,
+        name: "Rot Eng",
+        role: "engineer",
+      });
+      const originalHash = created.agent.agentTokenHash;
+      const { agent, rawToken } = await service.rotateAgentToken(
+        "rot-eng",
+        projectId,
+      );
+      expect(rawToken).not.toBe(created.rawToken);
+      expect(agent.agentTokenHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(agent.agentTokenHash).not.toBe(originalHash);
+    });
+
+    it("rotateAgentToken throws when the agent does not exist", async () => {
+      await expect(
+        service.rotateAgentToken("nope", projectId),
+      ).rejects.toThrow("Agent not found");
+    });
+  });
+
   describe("getRoleDefaults", () => {
     it("returns CTO defaults with heartbeat and task creation", () => {
       const defaults = AgentService.getRoleDefaults("cto");

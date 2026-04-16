@@ -10,6 +10,13 @@ export const apiSectionSchema = z.object({
   host: z.string().default("localhost"),
 }).default({});
 
+export const authSectionSchema = z.object({
+  // Admin-auth bypass for requests from the loopback interface. Off by
+  // default so that non-loopback binds (ORCH_HOST=0.0.0.0) require an
+  // explicit Authorization header.
+  allow_localhost_admin: z.boolean().default(false),
+}).default({});
+
 export const databaseSectionSchema = z.object({
   host: z.string().default("localhost"),
   port: z.number().int().positive().default(5433),
@@ -52,6 +59,7 @@ export const orphanDetectionSectionSchema = z.object({
 export const globalConfigSchema = z.object({
   orchestrator: orchestratorSectionSchema,
   api: apiSectionSchema,
+  auth: authSectionSchema,
   database: databaseSectionSchema,
   defaults: defaultsSectionSchema,
   limits: limitsSectionSchema,

@@ -3,6 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/orch8/orch8.git"
+  },
+  "homepage": "https://github.com/orch8/orch8#readme",
+  "bugs": {
+    "url": "https://github.com/orch8/orch8/issues"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
@@ -13,5 +22,11 @@
     "turbo": "^2.4.0",
     "typescript": "^5.7.0"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "pnpm": {
+    "overrides": {
+      "vite": "^6.4.2",
+      "esbuild": "^0.25.0"
+    }
+  }
 }

@@ -89,7 +89,7 @@ describe("Chat API Routes", () => {
     app = Fastify();
     app.decorate("db", testDb.db);
     app.decorate("chatService", chatService);
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(chatsRoutes);
     await app.ready();
   });
@@ -268,7 +268,7 @@ describe("Chat API Routes", () => {
     const localApp = Fastify();
     localApp.decorate("db", testDb.db);
     localApp.decorate("chatService", chatService);
-    localApp.register(authPlugin);
+    localApp.register(authPlugin, { allowLocalhostAdmin: true });
     localApp.register(chatsRoutes);
     await localApp.ready();
 

@@ -32,7 +32,7 @@ describe("Run Routes", () => {
 
     app = Fastify();
     app.decorate("db", testDb.db);
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(runRoutes);
   });
 

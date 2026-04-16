@@ -254,7 +254,7 @@ describe("Wiring: Dispatch", () => {
       const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
       app.decorate("lifecycleService", lifecycleService);
 
-      app.register(authPlugin);
+      app.register(authPlugin, { allowLocalhostAdmin: true });
       app.register(taskRoutes);
       await app.ready();
 
@@ -317,7 +317,7 @@ describe("Wiring: Dispatch", () => {
       const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
       app.decorate("lifecycleService", lifecycleService);
 
-      app.register(authPlugin);
+      app.register(authPlugin, { allowLocalhostAdmin: true });
       app.register(taskRoutes);
       await app.ready();
 
@@ -373,7 +373,7 @@ describe("Wiring: Dispatch", () => {
       const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
       app.decorate("lifecycleService", lifecycleService);
 
-      app.register(authPlugin);
+      app.register(authPlugin, { allowLocalhostAdmin: true });
       app.register(taskRoutes);
       await app.ready();
 
@@ -520,7 +520,7 @@ describe("Wiring: Dispatch", () => {
       app.decorate("taskService", taskService);
       app.decorate("broadcastService", broadcastService);
 
-      app.register(authPlugin);
+      app.register(authPlugin, { allowLocalhostAdmin: true });
       app.register(agentRoutes);
       await app.ready();
 

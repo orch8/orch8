@@ -47,7 +47,7 @@ describe("Agent API Routes", () => {
     app.decorate("heartbeatService", heartbeatService);
     app.decorate("taskService", { list: vi.fn().mockResolvedValue([]) });
 
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(agentRoutes);
     await app.ready();
   });

@@ -2,6 +2,16 @@ import { createWriteStream, type WriteStream } from "node:fs";
 import { stat, readFile } from "node:fs/promises";
 import path from "node:path";
 
+/**
+ * Resolves the absolute directory under which all run log files live
+ * for a given project. Mirrors HeartbeatService#getLogDir so the HTTP
+ * route can enforce a traversal check without reaching into the
+ * scheduler. Change one, change the other.
+ */
+export function getRunLogDir(projectHomeDir: string): string {
+  return path.resolve(path.join(projectHomeDir, ".orch8", "logs"));
+}
+
 export interface LogHandle {
   runId: string;
   logRef: string;

@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { CreateAgentSchema, UpdateAgentSchema, AgentFilterSchema, CloneAgentSchema } from "@orch/shared";
+import { isUniqueViolation } from "../utils/db-errors.js";
 import "../../types.js";
 
 export async function agentRoutes(app: FastifyInstance) {
@@ -17,8 +18,7 @@ export async function agentRoutes(app: FastifyInstance) {
       const agent = await app.agentService.create(parsed.data);
       return reply.code(201).send(agent);
     } catch (err) {
-      const message = (err as Error).message;
-      if (message.includes("duplicate") || message.includes("unique")) {
+      if (isUniqueViolation(err)) {
         return reply.code(409).send({ error: "conflict", message: "Agent with this ID already exists in project" });
       }
       throw err;
@@ -186,7 +186,7 @@ export async function agentRoutes(app: FastifyInstance) {
       if (message === "Agent not found") {
         return reply.code(404).send({ error: "not_found", message });
       }
-      if (message.includes("duplicate") || message.includes("unique")) {
+      if (isUniqueViolation(err)) {
         return reply.code(409).send({ error: "conflict", message: "Agent with this ID already exists in target project" });
       }
       throw err;

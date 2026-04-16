@@ -46,7 +46,7 @@ describe("Memory Routes — Knowledge", () => {
     app.decorate("db", testDb.db);
     const memoryService = new MemoryService(testDb.db);
     app.decorate("memoryService", memoryService);
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(memoryRoutes);
     await app.ready();
   });
@@ -313,7 +313,7 @@ describe("Memory Routes — Worklog + Lessons", () => {
     app.decorate("db", testDb.db);
     const memoryService = new MemoryService(testDb.db);
     app.decorate("memoryService", memoryService);
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(memoryRoutes);
     await app.ready();
   });
@@ -445,7 +445,7 @@ describe("Memory Routes — Full Integration", () => {
     const summaryService = new SummaryService(testDb.db, memoryService);
     app.decorate("summaryService", summaryService);
 
-    app.register(authPlugin);
+    app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(memoryRoutes);
     await app.ready();
   });
