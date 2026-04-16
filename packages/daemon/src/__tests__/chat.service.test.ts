@@ -17,7 +17,7 @@ const TEST_API_URL = "http://localhost:3847";
 
 function makeMockAdapter(mockOutput: string) {
   return {
-    runAgent: vi.fn(async (_cfg: unknown, ctx: any, _prompts: unknown) => {
+    runAgent: vi.fn(async (_cfg: unknown, ctx: any, _instructions: unknown) => {
       // Simulate streaming chunks
       if (typeof ctx.onEvent === "function") {
         ctx.onEvent({
@@ -85,7 +85,6 @@ describe("ChatService", () => {
         name: "Project Chat",
         role: "custom",
         model: "claude-sonnet-4-6",
-        promptTemplate: "{{context.userMessage}}",
         wakeOnOnDemand: true,
       })
       .returning();
@@ -167,6 +166,18 @@ describe("ChatService", () => {
     // Wait for the async turn to finish
     await new Promise((r) => setTimeout(r, 100));
     expect(adapter.runAgent).toHaveBeenCalledTimes(1);
+
+    // The adapter's third arg is RunAgentInstructions; on_demand wakes must
+    // carry the raw user message through wake.userMessage (not template
+    // interpolation via ctx.context).
+    const instructions = adapter.runAgent.mock.calls[0][2] as {
+      projectRoot: string;
+      slug: string;
+      wake: { source: string; userMessage?: string };
+    };
+    expect(instructions.wake).toEqual({ source: "on_demand", userMessage: "hello" });
+    expect(instructions.slug).toBe("chat");
+    expect(instructions.projectRoot).toBe("/tmp/orch8-chat-test");
 
     const msgs = await service.listMessages(chat.id);
     expect(msgs.map((m) => m.role)).toEqual(["user", "assistant"]);
@@ -314,7 +325,6 @@ describe("ChatService", () => {
       name: "Project Chat",
       role: "custom",
       model: "claude-sonnet-4-6",
-      promptTemplate: "{{context.userMessage}}",
       wakeOnOnDemand: true,
     });
 

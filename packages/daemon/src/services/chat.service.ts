@@ -9,7 +9,10 @@ import {
 } from "@orch/shared/db";
 import type { ExtractedCard } from "@orch/shared";
 import type { SchemaDb } from "../db/client.js";
-import type { ClaudeLocalAdapter } from "../adapter/claude-local-adapter.js";
+import type {
+  ClaudeLocalAdapter,
+  RunAgentInstructions,
+} from "../adapter/claude-local-adapter.js";
 import type { SessionManager } from "../adapter/session-manager.js";
 import type { BroadcastService } from "./broadcast.service.js";
 import { extractCards } from "./chat-card-parser.js";
@@ -260,9 +263,6 @@ export class ChatService {
         apiUrl: this.apiUrl,
         cwd: project.homeDir,
         sessionKey: chat.id,
-        context: {
-          userMessage: userMessageForPrompt,
-        },
         onEvent: (event: unknown) => {
           // Accumulate assistant text chunks and broadcast them live.
           const maybeText = extractStreamText(event);
@@ -276,16 +276,13 @@ export class ChatService {
         },
       };
 
-      // 4. Build prompts. The chat agent's promptTemplate is
-      //    expected to reference {{context.userMessage}}; if it
-      //    does not, we fall back to raw content.
-      const heartbeatTemplate = agent.promptTemplate && agent.promptTemplate.length > 0
-        ? agent.promptTemplate
-        : "{{context.userMessage}}";
-
-      const prompts = {
-        heartbeatTemplate,
-        bootstrapTemplate: agent.bootstrapPromptTemplate ?? undefined,
+      // 4. Build RunAgentInstructions. The adapter loads AGENTS.md
+      //    from <projectRoot>/.orch8/agents/<slug>/AGENTS.md and the
+      //    user's raw message is the stdin prompt for on_demand wakes.
+      const instructions: RunAgentInstructions = {
+        projectRoot: project.homeDir,
+        slug: agent.id,
+        wake: { source: "on_demand", userMessage: userMessageForPrompt },
         desiredSkills: agent.desiredSkills ?? undefined,
       };
 
@@ -303,7 +300,7 @@ export class ChatService {
       const result = await this.adapter.runAgent(
         adapterConfig,
         ctx as unknown as Parameters<ClaudeLocalAdapter["runAgent"]>[1],
-        prompts as unknown as Parameters<ClaudeLocalAdapter["runAgent"]>[2],
+        instructions,
       );
 
       // 6. Parse cards out of the accumulated output (fall back to
