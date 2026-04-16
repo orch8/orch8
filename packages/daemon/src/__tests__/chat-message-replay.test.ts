@@ -103,10 +103,12 @@ describe("Chat message replay (end-to-end)", () => {
 
     // Turn 1: user message → assistant emits confirm card
     await service.sendUserMessage(chat.id, "create task T");
-    await new Promise((r) => setTimeout(r, 100));
 
-    let msgs = await service.listMessages(chat.id);
-    expect(msgs.map((m) => m.role)).toEqual(["user", "assistant"]);
+    let msgs = await vi.waitFor(async () => {
+      const list = await service.listMessages(chat.id);
+      expect(list.map((m) => m.role)).toEqual(["user", "assistant"]);
+      return list;
+    });
     const assistant1 = msgs[1];
     const cards1 = assistant1.cards as ExtractedCard[];
     expect(cards1).toHaveLength(1);
@@ -115,11 +117,14 @@ describe("Chat message replay (end-to-end)", () => {
 
     // Turn 2: user approves the card
     await service.decideCard(chat.id, cards1[0].id, "approved", "tester", projectId);
-    await new Promise((r) => setTimeout(r, 150));
 
-    msgs = await service.listMessages(chat.id);
+    msgs = await vi.waitFor(async () => {
+      const list = await service.listMessages(chat.id);
+      // Ordering: user, assistant(confirm), system(approval), assistant(result)
+      expect(list.map((m) => m.role)).toEqual(["user", "assistant", "system", "assistant"]);
+      return list;
+    });
     const roles = msgs.map((m) => m.role);
-    // Ordering: user, assistant(confirm), system(approval), assistant(result)
     expect(roles).toEqual(["user", "assistant", "system", "assistant"]);
 
     const systemMsg = msgs[2];

@@ -422,21 +422,23 @@ describe("HeartbeatService", () => {
         maxConcurrentRuns: 2,
       });
 
+      // Set createdAt explicitly so FIFO ordering is deterministic even on
+      // fast hardware where two back-to-back inserts could share a timestamp.
+      const now = Date.now();
       const [first] = await testDb.db.insert(heartbeatRuns).values({
         agentId: "eng-1",
         projectId,
         invocationSource: "on_demand",
         status: "queued",
+        createdAt: new Date(now),
       }).returning();
-
-      // Small delay to ensure distinct timestamps
-      await new Promise((r) => setTimeout(r, 10));
 
       const [second] = await testDb.db.insert(heartbeatRuns).values({
         agentId: "eng-1",
         projectId,
         invocationSource: "on_demand",
         status: "queued",
+        createdAt: new Date(now + 1000),
       }).returning();
 
       const claimed = await service.startNextQueuedRunForAgent("eng-1", projectId);
@@ -885,18 +887,23 @@ describe("HeartbeatService", () => {
         withAgentLock<T>(id: string, fn: () => Promise<T>): Promise<T>;
       }).withAgentLock.bind(service);
 
-      const body = async (delay: number): Promise<void> => {
+      // Yield to the microtask queue several times inside the critical
+      // section. If the lock weren't serializing, the other callers would
+      // slip in during these yields and `maxInside` would exceed 1.
+      const body = async (yields: number): Promise<void> => {
         inside++;
         overlaps.push(inside);
         if (inside > maxInside) maxInside = inside;
-        await new Promise((r) => setTimeout(r, delay));
+        for (let i = 0; i < yields; i++) {
+          await Promise.resolve();
+        }
         inside--;
       };
 
       await Promise.all([
-        withLock("lock-agent", () => body(30)),
-        withLock("lock-agent", () => body(10)),
-        withLock("lock-agent", () => body(5)),
+        withLock("lock-agent", () => body(6)),
+        withLock("lock-agent", () => body(4)),
+        withLock("lock-agent", () => body(2)),
       ]);
 
       expect(maxInside).toBe(1);
@@ -913,16 +920,26 @@ describe("HeartbeatService", () => {
         withAgentLock<T>(id: string, fn: () => Promise<T>): Promise<T>;
       }).withAgentLock.bind(service);
 
+      // Barrier: both bodies must enter their critical section before
+      // either is allowed to leave. If the lock serialized across agents,
+      // the second body would never start and the barrier would time out.
+      let resolveA!: () => void;
+      let resolveB!: () => void;
+      const aEntered = new Promise<void>((r) => { resolveA = r; });
+      const bEntered = new Promise<void>((r) => { resolveB = r; });
+
       await Promise.all([
         withLock("agent-a", async () => {
           aInside = true;
-          await new Promise((r) => setTimeout(r, 20));
+          resolveA();
+          await bEntered;
           if (bInside) overlapped = true;
           aInside = false;
         }),
         withLock("agent-b", async () => {
           bInside = true;
-          await new Promise((r) => setTimeout(r, 20));
+          resolveB();
+          await aEntered;
           if (aInside) overlapped = true;
           bInside = false;
         }),

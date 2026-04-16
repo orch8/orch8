@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { projects, agents, knowledgeEntities, knowledgeFacts } from "@orch/shared/db";
 import { eq } from "drizzle-orm";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
@@ -44,13 +44,15 @@ describe("Memory Access Tracking", () => {
 
     await memoryService.listFacts(entity.id);
 
-    // Wait briefly for fire-and-forget to complete
-    await new Promise(r => setTimeout(r, 50));
-
-    const [updated] = await testDb.db
-      .select()
-      .from(knowledgeFacts)
-      .where(eq(knowledgeFacts.id, fact.id));
+    // Poll until the fire-and-forget trackAccess finishes writing.
+    const updated = await vi.waitFor(async () => {
+      const [row] = await testDb.db
+        .select()
+        .from(knowledgeFacts)
+        .where(eq(knowledgeFacts.id, fact.id));
+      expect(row.accessCount).toBe(1);
+      return row;
+    });
 
     expect(updated.accessCount).toBe(1);
     expect(updated.lastAccessed).not.toBeNull();
@@ -69,7 +71,14 @@ describe("Memory Access Tracking", () => {
     await memoryService.listFacts(entity.id);
     await memoryService.listFacts(entity.id);
 
-    await new Promise(r => setTimeout(r, 50));
+    // Poll until all three fire-and-forget trackAccess calls have settled.
+    await vi.waitFor(async () => {
+      const rows = await testDb.db
+        .select()
+        .from(knowledgeFacts)
+        .where(eq(knowledgeFacts.entityId, entity.id));
+      expect(rows[0].accessCount).toBe(3);
+    });
 
     const facts = await testDb.db
       .select()

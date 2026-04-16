@@ -164,12 +164,13 @@ describe("ChatService", () => {
     expect(userRow.role).toBe("user");
     expect(userRow.content).toBe("hello");
 
-    // Wait for the async turn to finish
-    await new Promise((r) => setTimeout(r, 100));
+    // Wait for the fire-and-forget assistant turn to finish.
+    const msgs = await vi.waitFor(async () => {
+      const list = await service.listMessages(chat.id);
+      expect(list.map((m) => m.role)).toEqual(["user", "assistant"]);
+      return list;
+    });
     expect(adapter.runAgent).toHaveBeenCalledTimes(1);
-
-    const msgs = await service.listMessages(chat.id);
-    expect(msgs.map((m) => m.role)).toEqual(["user", "assistant"]);
     expect(msgs[1].content).toContain("Thanks for the message.");
     expect(msgs[1].runId).toBeTruthy();
   });
@@ -191,9 +192,12 @@ describe("ChatService", () => {
     );
     const chat = await service.createChat({ projectId, agentId });
     await service.sendUserMessage(chat.id, "create a qa agent");
-    await new Promise((r) => setTimeout(r, 100));
 
-    const msgs = await service.listMessages(chat.id);
+    const msgs = await vi.waitFor(async () => {
+      const list = await service.listMessages(chat.id);
+      expect(list.some((m) => m.role === "assistant")).toBe(true);
+      return list;
+    });
     const assistant = msgs.find((m) => m.role === "assistant")!;
     const cards = assistant.cards as ExtractedCard[];
     expect(cards).toHaveLength(1);
@@ -212,9 +216,12 @@ describe("ChatService", () => {
     );
     const chat = await service.createChat({ projectId, agentId });
     await service.sendUserMessage(chat.id, "plan the migration please");
-    await new Promise((r) => setTimeout(r, 100));
 
-    const refreshed = await service.getChat(chat.id);
+    const refreshed = await vi.waitFor(async () => {
+      const c = await service.getChat(chat.id);
+      expect(c?.title).toBe("Plan the migration please");
+      return c;
+    });
     expect(refreshed?.title).toBe("Plan the migration please");
   });
 
@@ -236,16 +243,25 @@ describe("ChatService", () => {
     );
     const chat = await service.createChat({ projectId, agentId });
     await service.sendUserMessage(chat.id, "hi");
-    await new Promise((r) => setTimeout(r, 100));
 
-    const msgs = await service.listMessages(chat.id);
+    const msgs = await vi.waitFor(async () => {
+      const list = await service.listMessages(chat.id);
+      expect(list.some((m) => m.role === "assistant")).toBe(true);
+      return list;
+    });
     const assistant = msgs.find((m) => m.role === "assistant")!;
     const card = (assistant.cards as ExtractedCard[])[0];
 
     await service.decideCard(chat.id, card.id, "approved", "test-user", projectId);
-    await new Promise((r) => setTimeout(r, 100));
 
-    const refreshedMsgs = await service.listMessages(chat.id);
+    // decideCard writes a system message synchronously and kicks off a
+    // follow-up assistant turn asynchronously. Wait for the system row to
+    // appear before asserting on the final shape.
+    const refreshedMsgs = await vi.waitFor(async () => {
+      const list = await service.listMessages(chat.id);
+      expect(list.some((m) => m.role === "system")).toBe(true);
+      return list;
+    });
     const systemMsgs = refreshedMsgs.filter((m) => m.role === "system");
     expect(systemMsgs).toHaveLength(1);
     expect(systemMsgs[0].content).toContain("approved");
@@ -275,19 +291,26 @@ describe("ChatService", () => {
     );
     const chat = await service.createChat({ projectId, agentId });
     await service.sendUserMessage(chat.id, "hi");
-    await new Promise((r) => setTimeout(r, 100));
 
-    const msgs = await service.listMessages(chat.id);
+    const msgs = await vi.waitFor(async () => {
+      const list = await service.listMessages(chat.id);
+      expect(list.some((m) => m.role === "assistant")).toBe(true);
+      return list;
+    });
     const assistant = msgs.find((m) => m.role === "assistant")!;
     const card = (assistant.cards as ExtractedCard[])[0];
 
     await service.decideCard(chat.id, card.id, "approved", "user-1", projectId);
+    // Wait for the follow-up assistant turn from the first decision to
+    // complete so the runAgent call count assertion below is stable.
+    await vi.waitFor(() => {
+      expect(adapter.runAgent).toHaveBeenCalledTimes(2);
+    });
     const firstDecision = (await testDb.db.select().from(chatMessages).where(eq(chatMessages.id, assistant.id)))[0];
     const firstDecidedAt = (firstDecision.cards as ExtractedCard[])[0].decidedAt;
 
     // Second call should be a no-op (same decidedAt preserved)
     await service.decideCard(chat.id, card.id, "approved", "user-2", projectId);
-    await new Promise((r) => setTimeout(r, 100));
     const secondDecision = (await testDb.db.select().from(chatMessages).where(eq(chatMessages.id, assistant.id)))[0];
     expect((secondDecision.cards as ExtractedCard[])[0].decidedAt).toBe(firstDecidedAt);
     expect((secondDecision.cards as ExtractedCard[])[0].decidedBy).toBe("user-1");
@@ -335,15 +358,21 @@ describe("ChatService", () => {
     // Project A chat with a pending card.
     const chatA = await service.createChat({ projectId, agentId });
     await service.sendUserMessage(chatA.id, "make a task");
-    await new Promise((r) => setTimeout(r, 100));
-    const msgsA = await service.listMessages(chatA.id);
+    const msgsA = await vi.waitFor(async () => {
+      const list = await service.listMessages(chatA.id);
+      expect(list.some((m) => m.role === "assistant")).toBe(true);
+      return list;
+    });
     const cardA = ((msgsA.find((m) => m.role === "assistant")!).cards as ExtractedCard[])[0];
 
     // Project B chat with its own pending card.
     const chatB = await service.createChat({ projectId: projectB.id, agentId: "chat" });
     await service.sendUserMessage(chatB.id, "make another task");
-    await new Promise((r) => setTimeout(r, 100));
-    const msgsB = await service.listMessages(chatB.id);
+    const msgsB = await vi.waitFor(async () => {
+      const list = await service.listMessages(chatB.id);
+      expect(list.some((m) => m.role === "assistant")).toBe(true);
+      return list;
+    });
     const cardB = ((msgsB.find((m) => m.role === "assistant")!).cards as ExtractedCard[])[0];
 
     // Caller is authenticated for project A. Trying to decide a card
@@ -449,16 +478,26 @@ describe("ChatService", () => {
     const chatA = await service.createChat({ projectId, agentId, title: "A" });
     const chatB = await service.createChat({ projectId, agentId, title: "B" });
 
-    // Two messages in chat A (oldest first).
+    // Two messages in chat A (oldest first). Force distinct createdAt
+    // ordering by setting the timestamps explicitly — no sleep needed.
+    const now = Date.now();
     const [msgA1] = await testDb.db
       .insert(chatMessages)
-      .values({ chatId: chatA.id, role: "user", content: "A1" })
+      .values({
+        chatId: chatA.id,
+        role: "user",
+        content: "A1",
+        createdAt: new Date(now),
+      })
       .returning();
-    // Force distinct createdAt ordering even on fast hardware.
-    await new Promise((r) => setTimeout(r, 10));
     await testDb.db
       .insert(chatMessages)
-      .values({ chatId: chatA.id, role: "assistant", content: "A2" })
+      .values({
+        chatId: chatA.id,
+        role: "assistant",
+        content: "A2",
+        createdAt: new Date(now + 1000),
+      })
       .returning();
 
     // One message in chat B.
