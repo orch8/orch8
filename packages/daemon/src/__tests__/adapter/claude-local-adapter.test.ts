@@ -2,9 +2,13 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import { Writable, Readable } from "node:stream";
+import { mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { projects, agents, taskSessions } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "../helpers/test-db.js";
-import { ClaudeLocalAdapter } from "../../adapter/claude-local-adapter.js";
+import { ClaudeLocalAdapter, type RunAgentInstructions } from "../../adapter/claude-local-adapter.js";
 import type { RunContext, ClaudeLocalAdapterConfig, SpawnFn } from "../../adapter/types.js";
 
 function createMockProcess(lines: string[], exitCode = 0) {
@@ -42,6 +46,7 @@ function createMockProcess(lines: string[], exitCode = 0) {
 describe("ClaudeLocalAdapter", () => {
   let testDb: TestDb;
   let projectId: string;
+  let tempRoot: string;
 
   beforeAll(async () => {
     testDb = await setupTestDb();
@@ -59,17 +64,24 @@ describe("ClaudeLocalAdapter", () => {
       projectId,
       name: "Test Agent",
       role: "engineer",
-      promptTemplate: "Work on: {{task.title}}",
-      bootstrapPromptTemplate: "You are {{agent.name}}.",
     });
   }, 60_000);
 
   afterAll(async () => {
     await teardownTestDb(testDb);
+    if (tempRoot) {
+      await rm(tempRoot, { recursive: true, force: true }).catch(() => {});
+    }
   });
 
   beforeEach(async () => {
     await testDb.db.delete(taskSessions);
+
+    // Seed AGENTS.md on disk for the test agent
+    tempRoot = mkdtempSync(join(tmpdir(), "adapter-test-"));
+    const agentDir = join(tempRoot, ".orch8", "agents", "test-agent");
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, "AGENTS.md"), "# Test Agent\n\nYou are a test agent.\n", "utf-8");
   });
 
   it("runs an agent and returns session + result", async () => {
@@ -103,10 +115,14 @@ describe("ClaudeLocalAdapter", () => {
       taskTitle: "Fix login",
     };
 
+    const instructions: RunAgentInstructions = {
+      projectRoot: tempRoot,
+      slug: "test-agent",
+      wake: { source: "on_demand", userMessage: "hello" },
+    };
+
     const adapter = new ClaudeLocalAdapter(testDb.db, spawnFn as unknown as SpawnFn);
-    const result = await adapter.runAgent(config, context, {
-      heartbeatTemplate: "Work on: {{task.title}}",
-    });
+    const result = await adapter.runAgent(config, context, instructions);
 
     expect(result.sessionId).toBe("new-sess");
     expect(result.result).toBe("Bug fixed");
@@ -139,10 +155,14 @@ describe("ClaudeLocalAdapter", () => {
       cwd: "/tmp/adapt",
     };
 
+    const instructions: RunAgentInstructions = {
+      projectRoot: tempRoot,
+      slug: "test-agent",
+      wake: { source: "on_demand", userMessage: "do work" },
+    };
+
     const adapter = new ClaudeLocalAdapter(testDb.db, spawnFn as unknown as SpawnFn);
-    await adapter.runAgent(config, context, {
-      heartbeatTemplate: "Do work.",
-    });
+    await adapter.runAgent(config, context, instructions);
 
     // Verify session was persisted
     const rows = await testDb.db.select().from(taskSessions);
@@ -175,82 +195,27 @@ describe("ClaudeLocalAdapter", () => {
       cwd: "/tmp/adapt",
     };
 
-    const adapter = new ClaudeLocalAdapter(testDb.db, spawnFn as unknown as SpawnFn);
-
-    // First run — no session to resume
-    await adapter.runAgent(config, context, { heartbeatTemplate: "First run." });
-    const firstArgs = (spawnFn as ReturnType<typeof vi.fn>).mock.calls[0][1] as string[];
-    expect(firstArgs).not.toContain("--resume");
-
-    // Second run — should resume
-    await adapter.runAgent(config, { ...context, runId: "run-4" }, { heartbeatTemplate: "Second run." });
-    const secondArgs = (spawnFn as ReturnType<typeof vi.fn>).mock.calls[1][1] as string[];
-    expect(secondArgs).toContain("--resume");
-    expect(secondArgs[secondArgs.indexOf("--resume") + 1]).toBe("sess-1");
-  });
-
-  it("passes bootstrap template only on first run", async () => {
-    const makeLines = (sessId: string) => [
-      JSON.stringify({ type: "system", subtype: "init", session_id: sessId, model: "claude-sonnet-4-6" }),
-      JSON.stringify({ type: "result", session_id: sessId, result: "OK", model: "claude-sonnet-4-6", usage: { input_tokens: 10, output_tokens: 5 }, total_cost_usd: 0.001 }),
-    ];
-
-    let writtenPrompts: string[] = [];
-    let callCount = 0;
-
-    const spawnFn = vi.fn(() => {
-      callCount++;
-      const stdin = new Writable({
-        write(chunk, _enc, cb) { writtenPrompts.push(chunk.toString()); cb(); },
-      });
-      const stdout = new Readable({ read() {} });
-      const stderr = new Readable({ read() {} });
-      const proc = Object.assign(new EventEmitter(), {
-        stdin, stdout, stderr,
-        pid: 12345,
-        kill: vi.fn(() => { proc.emit("close", 0, null); return true; }),
-      });
-
-      queueMicrotask(() => {
-        for (const line of makeLines(`sess-${callCount}`)) {
-          stdout.push(line + "\n");
-        }
-        stdout.push(null);
-        stderr.push(null);
-        proc.emit("close", 0, null);
-      });
-
-      return proc as unknown as ReturnType<SpawnFn>;
-    });
-
-    const config: ClaudeLocalAdapterConfig = {};
-    const context: RunContext = {
-      agentId: "test-agent",
-      agentName: "Test Agent",
-      projectId,
-      runId: "run-5",
-      taskId: "task-5",
-      wakeReason: "assignment",
-      apiUrl: "http://localhost:3847",
-      cwd: "/tmp/adapt",
+    const instructions: RunAgentInstructions = {
+      projectRoot: tempRoot,
+      slug: "test-agent",
+      wake: { source: "on_demand", userMessage: "first run" },
     };
 
     const adapter = new ClaudeLocalAdapter(testDb.db, spawnFn as unknown as SpawnFn);
 
-    // First run — should include bootstrap
-    await adapter.runAgent(config, context, {
-      heartbeatTemplate: "Do work.",
-      bootstrapTemplate: "BOOTSTRAP",
-    });
-    expect(writtenPrompts[0]).toContain("BOOTSTRAP");
+    // First run — no session to resume
+    await adapter.runAgent(config, context, instructions);
+    const firstArgs = (spawnFn as ReturnType<typeof vi.fn>).mock.calls[0][1] as string[];
+    expect(firstArgs).not.toContain("--resume");
 
-    // Second run — should NOT include bootstrap
-    writtenPrompts = [];
-    await adapter.runAgent(config, { ...context, runId: "run-6" }, {
-      heartbeatTemplate: "Continue work.",
-      bootstrapTemplate: "BOOTSTRAP",
+    // Second run — should resume
+    await adapter.runAgent(config, { ...context, runId: "run-4" }, {
+      ...instructions,
+      wake: { source: "on_demand", userMessage: "second run" },
     });
-    expect(writtenPrompts[0]).not.toContain("BOOTSTRAP");
+    const secondArgs = (spawnFn as ReturnType<typeof vi.fn>).mock.calls[1][1] as string[];
+    expect(secondArgs).toContain("--resume");
+    expect(secondArgs[secondArgs.indexOf("--resume") + 1]).toBe("sess-1");
   });
 });
 

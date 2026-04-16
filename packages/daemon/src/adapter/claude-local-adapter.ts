@@ -6,7 +6,9 @@ import type { SchemaDb } from "../db/client.js";
 import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "./types.js";
 import { buildArgs } from "./args-builder.js";
 import { buildEnv } from "./env-builder.js";
-import { buildPrompt } from "./prompt-builder.js";
+import type { WakeReason } from "./prompt-builder.js";
+import { buildStdinPrompt } from "./prompt-builder.js";
+import { agentsMdPath } from "../services/agent-files.js";
 import { dirname, join } from "node:path";
 import { createSkillsDir, createInstructionsFile, cleanupTempPath } from "./file-injector.js";
 import { DEFAULT_SKILLS_DIR, GLOBAL_SKILLS_DIR } from "@orch/shared/defaults";
@@ -14,7 +16,6 @@ import { SessionManager } from "./session-manager.js";
 import { runProcess } from "./process-runner.js";
 import { resolveClaudePath } from "./resolve-claude-path.js";
 import type { ProjectSkillService } from "../services/project-skill.service.js";
-import type { InstructionBundleService } from "../services/instruction-bundle.service.js";
 
 export async function resolveSkillPaths(
   skillService: ProjectSkillService,
@@ -33,9 +34,10 @@ export async function resolveSkillPaths(
   return paths;
 }
 
-export interface RunAgentPrompts {
-  heartbeatTemplate: string;
-  bootstrapTemplate?: string;
+export interface RunAgentInstructions {
+  projectRoot: string;
+  slug: string;
+  wake: WakeReason;
   sessionHandoff?: string;
   desiredSkills?: string[];
 }
@@ -47,7 +49,6 @@ export class ClaudeLocalAdapter {
     private db: SchemaDb,
     private spawnFn: SpawnFn = nodeSpawn,
     private projectSkillService?: ProjectSkillService,
-    private bundleService?: InstructionBundleService,
   ) {
     this.sessionManager = new SessionManager(db);
   }
@@ -55,7 +56,7 @@ export class ClaudeLocalAdapter {
   async runAgent(
     config: ClaudeLocalAdapterConfig,
     ctx: RunContext,
-    prompts: RunAgentPrompts,
+    instructions: RunAgentInstructions,
   ): Promise<RunResult> {
     const taskKey = ctx.sessionKey ?? ctx.taskId ?? ctx.runId;
     const adapterType = "claude_local";
@@ -69,7 +70,6 @@ export class ClaudeLocalAdapter {
       cwd,
     });
 
-    const isFirstRun = !existingSession;
     const sessionId = existingSession?.sessionId;
 
     // 2. Inject files (spec §7, §8)
@@ -80,9 +80,9 @@ export class ClaudeLocalAdapter {
     try {
       // Resolve skill paths from desiredSkills
       let effectiveSkillPaths: string[] = [];
-      if (prompts.desiredSkills && prompts.desiredSkills.length > 0 && this.projectSkillService) {
+      if (instructions.desiredSkills && instructions.desiredSkills.length > 0 && this.projectSkillService) {
         effectiveSkillPaths = await resolveSkillPaths(
-          this.projectSkillService, ctx.projectId, prompts.desiredSkills,
+          this.projectSkillService, ctx.projectId, instructions.desiredSkills,
         );
       }
 
@@ -94,15 +94,19 @@ export class ClaudeLocalAdapter {
       skillsDir = await createSkillsDir(effectiveSkillPaths);
       if (skillsDir) tempPaths.push(skillsDir);
 
-      // Stale recovery: if instructionsFilePath is set but the file is missing, attempt recovery
-      if (config.instructionsFilePath && !existsSync(config.instructionsFilePath) && this.bundleService) {
-        const agentRole = ctx.agentRole ?? "engineer";
-        await this.bundleService.recover(ctx.agentId, ctx.projectId, agentRole);
+      // Load AGENTS.md from disk as the system prompt source
+      const systemPromptPath = agentsMdPath(instructions.projectRoot, instructions.slug);
+      if (!existsSync(systemPromptPath)) {
+        throw new Error(`Missing AGENTS.md for agent "${instructions.slug}" at ${systemPromptPath}`);
       }
 
-      if (config.instructionsFilePath) {
-        instructionsFilePath = await createInstructionsFile(config.instructionsFilePath);
-        tempPaths.push(dirname(instructionsFilePath));
+      instructionsFilePath = await createInstructionsFile(systemPromptPath);
+      tempPaths.push(dirname(instructionsFilePath));
+
+      // Build stdin prompt from the WakeReason
+      let stdinPrompt = buildStdinPrompt(instructions.wake, instructions.projectRoot, instructions.slug);
+      if (instructions.sessionHandoff) {
+        stdinPrompt = `${instructions.sessionHandoff}\n\n${stdinPrompt}`;
       }
 
       // 3. Build CLI args (spec §1)
@@ -114,16 +118,7 @@ export class ClaudeLocalAdapter {
       // 4. Build environment (spec §2.3, §3)
       const env = buildEnv(config, { ...ctx, cwd }, process.env as Record<string, string | undefined>);
 
-      // 5. Build prompt (spec §6)
-      const prompt = buildPrompt({
-        heartbeatTemplate: prompts.heartbeatTemplate,
-        bootstrapTemplate: prompts.bootstrapTemplate,
-        sessionHandoff: prompts.sessionHandoff,
-        context: ctx,
-        isFirstRun,
-      });
-
-      // 6. Run the process (spec §2)
+      // 5. Run the process (spec §2)
       const command = config.command ?? resolveClaudePath();
       const result = await runProcess(
         {
@@ -131,7 +126,7 @@ export class ClaudeLocalAdapter {
           args,
           cwd,
           env,
-          prompt,
+          prompt: stdinPrompt,
           timeoutSec: config.timeoutSec ?? 0,
           graceSec: config.graceSec ?? 20,
           logStream: ctx.logStream,
@@ -140,7 +135,7 @@ export class ClaudeLocalAdapter {
         this.spawnFn,
       );
 
-      // 7. Handle session persistence (spec §5.1)
+      // 6. Handle session persistence (spec §5.1)
       if (result.sessionId) {
         if (result.errorCode === "unknown_session" && sessionId) {
           // Unknown session recovery (spec §5.4):
@@ -158,7 +153,7 @@ export class ClaudeLocalAdapter {
               args: retryArgs,
               cwd,
               env,
-              prompt,
+              prompt: stdinPrompt,
               timeoutSec: config.timeoutSec ?? 0,
               graceSec: config.graceSec ?? 20,
               logStream: ctx.logStream,

@@ -18,8 +18,8 @@ export { buildEnv, resolveBillingType } from "./env-builder.js";
 export { parseOutputStream, detectError } from "./output-parser.js";
 export type { ParsedOutput } from "./output-parser.js";
 
-export { interpolateTemplate, buildPrompt } from "./prompt-builder.js";
-export type { BuildPromptInput } from "./prompt-builder.js";
+export { buildStdinPrompt } from "./prompt-builder.js";
+export type { WakeReason } from "./prompt-builder.js";
 
 export { createSkillsDir, createInstructionsFile, cleanupTempPath } from "./file-injector.js";
 
@@ -30,4 +30,4 @@ export { runProcess } from "./process-runner.js";
 export type { ProcessRunInput } from "./process-runner.js";
 
 export { ClaudeLocalAdapter } from "./claude-local-adapter.js";
-export type { RunAgentPrompts } from "./claude-local-adapter.js";
+export type { RunAgentInstructions } from "./claude-local-adapter.js";

@@ -23,10 +23,6 @@ export interface ClaudeLocalAdapterConfig {
   chrome?: boolean;
   dangerouslySkipPermissions?: boolean;
 
-  instructionsFilePath?: string;
-  promptTemplate?: string;
-  bootstrapPromptTemplate?: string;
-
   cwd?: string;
   workspaceStrategy?: {
     type: "git_worktree";
