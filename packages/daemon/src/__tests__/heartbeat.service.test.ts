@@ -449,7 +449,6 @@ describe("HeartbeatService", () => {
     it("executes a queued run to completion (happy path)", async () => {
       await testDb.db.insert(agents).values({
         id: "eng-1", projectId, name: "Eng", role: "engineer",
-        promptTemplate: "Do your work, {{agent.name}}.",
         adapterType: "claude_local",
         adapterConfig: {},
       });

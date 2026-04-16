@@ -4,7 +4,8 @@ import {
 } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import { checkBudget, autoPauseIfExhausted } from "./budget.service.js";
-import type { ClaudeLocalAdapter, RunAgentPrompts } from "../adapter/claude-local-adapter.js";
+import type { ClaudeLocalAdapter, RunAgentInstructions } from "../adapter/claude-local-adapter.js";
+import type { WakeReason } from "../adapter/prompt-builder.js";
 import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "../adapter/types.js";
 import type { MemoryExtractionService } from "./memory-extraction.service.js";
 import type { BroadcastService } from "./broadcast.service.js";
@@ -504,7 +505,6 @@ export class HeartbeatService {
         model: agent.model,
         effort: agent.effort as ClaudeLocalAdapterConfig["effort"],
         maxTurnsPerRun: agent.maxTurns,
-        instructionsFilePath: agent.instructionsFilePath ?? undefined,
         cwd,
         env: {
           ...(agent.adapterConfig as ClaudeLocalAdapterConfig ?? {}).env,
@@ -615,9 +615,35 @@ export class HeartbeatService {
         }
       }
 
-      const prompts: RunAgentPrompts = {
-        heartbeatTemplate: agent.promptTemplate ?? "",
-        bootstrapTemplate: agent.bootstrapPromptTemplate ?? undefined,
+      const wake: WakeReason = (() => {
+        switch (claimedRun.invocationSource) {
+          case "timer":
+            return { source: "timer" };
+          case "assignment":
+            return {
+              source: "assignment",
+              task: {
+                title: taskData?.title ?? "(no title)",
+                description: taskData?.description ?? undefined,
+              },
+            };
+          case "on_demand":
+            return { source: "on_demand", userMessage: claimedRun.triggerDetail ?? "" };
+          case "automation":
+            return {
+              source: "automation",
+              automation: {
+                trigger: claimedRun.triggerDetail ?? "automation",
+                payload: typeof wakeupReq?.payload === "string" ? wakeupReq.payload : undefined,
+              },
+            };
+        }
+      })();
+
+      const instructions: RunAgentInstructions = {
+        projectRoot: project.homeDir,
+        slug: agent.id,
+        wake,
         desiredSkills: agent.desiredSkills ?? undefined,
       };
 
@@ -660,8 +686,8 @@ export class HeartbeatService {
                 adapterType: "claude_local",
               });
 
-              // Set sessionHandoff on prompts so the adapter includes it
-              prompts.sessionHandoff = handoff;
+              // Set sessionHandoff on instructions so the adapter includes it
+              instructions.sessionHandoff = handoff;
             }
           }
         } catch (compactionErr) {
@@ -672,7 +698,7 @@ export class HeartbeatService {
         }
       }
 
-      const result = await this.adapter.runAgent(adapterConfig, ctx, prompts);
+      const result = await this.adapter.runAgent(adapterConfig, ctx, instructions);
 
       // 8. Record results AND update budget atomically.
       //
