@@ -60,7 +60,6 @@ describe("Agent Clone", () => {
         role: "engineer",
         model: "claude-sonnet-4-6",
         maxTurns: 30,
-        systemPrompt: "You are Alpha's engineer",
       });
 
       const cloned = await agentService.clone(
@@ -74,7 +73,6 @@ describe("Agent Clone", () => {
       expect(cloned.name).toBe("Alpha Engineer");
       expect(cloned.role).toBe("engineer");
       expect(cloned.model).toBe("claude-sonnet-4-6");
-      expect(cloned.systemPrompt).toBe("You are Alpha's engineer");
       // Fresh agent state
       expect(cloned.status).toBe("active");
       expect(cloned.budgetSpentUsd).toBe(0);

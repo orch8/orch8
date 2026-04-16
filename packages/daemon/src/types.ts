@@ -30,7 +30,6 @@ declare module "fastify" {
     broadcastService: BroadcastService;
     notificationService: NotificationService;
     projectSkillService: import("./services/project-skill.service.js").ProjectSkillService;
-    instructionBundleService: import("./services/instruction-bundle.service.js").InstructionBundleService;
     seedingService: SeedingService;
     pipelineService: import("./services/pipeline.service.js").PipelineService;
     pipelineTemplateService: import("./services/pipeline-template.service.js").PipelineTemplateService;

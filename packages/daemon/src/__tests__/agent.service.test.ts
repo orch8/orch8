@@ -63,7 +63,6 @@ describe("AgentService", () => {
         canCreateTasks: true,
         canAssignTo: ["fe-eng", "be-eng"],
         canMoveTo: ["in_progress", "done"],
-        systemPrompt: "You are the CTO.",
         budgetLimitUsd: 50.0,
       });
 

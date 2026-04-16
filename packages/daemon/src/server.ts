@@ -36,8 +36,6 @@ import { BroadcastService } from "./services/broadcast.service.js";
 import { NotificationService } from "./services/notification.service.js";
 import { projectSkillRoutes } from "./api/routes/project-skills.js";
 import { ProjectSkillService } from "./services/project-skill.service.js";
-import { instructionBundleRoutes } from "./api/routes/instruction-bundles.js";
-import { InstructionBundleService } from "./services/instruction-bundle.service.js";
 import { SeedingService } from "./services/seeding.service.js";
 import { bundledAgentRoutes } from "./api/routes/bundled-agents.js";
 import { PipelineTemplateService } from "./services/pipeline-template.service.js";
@@ -123,10 +121,6 @@ export function buildServer(options: ServerOptions = {}) {
     // Project skill service
     const projectSkillService = new ProjectSkillService(dbClient.db);
     app.decorate("projectSkillService", projectSkillService);
-
-    // Instruction bundle service
-    const instructionBundleService = new InstructionBundleService(dbClient.db);
-    app.decorate("instructionBundleService", instructionBundleService);
 
     // Heartbeat service
     const heartbeatService = new HeartbeatService(dbClient.db, broadcastService);
@@ -306,7 +300,6 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(daemonRoutes);
     app.register(notificationRoutes);
     app.register(projectSkillRoutes);
-    app.register(instructionBundleRoutes);
     app.register(bundledAgentRoutes);
     app.register(pipelineTemplateRoutes);
     app.register(pipelineRoutes);
