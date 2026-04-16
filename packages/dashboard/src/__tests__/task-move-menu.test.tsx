@@ -5,7 +5,7 @@ import { TaskMoveMenu } from "../components/kanban/TaskMoveMenu.js";
 import { KANBAN_COLUMNS, COLUMN_LABELS, type Task } from "../types.js";
 
 function makeTask(overrides: Partial<Task> = {}): Task {
-  return {
+  const base: Partial<Task> = {
     id: "task_1",
     title: "Implement login",
     taskType: "quick",
@@ -13,8 +13,8 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     priority: "high",
     column: "backlog",
     projectId: "proj_1",
-    ...(overrides as Task),
-  } as Task;
+  };
+  return { ...base, ...overrides } as Task;
 }
 
 describe("TaskMoveMenu", () => {
