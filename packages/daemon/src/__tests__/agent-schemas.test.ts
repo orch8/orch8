@@ -40,8 +40,6 @@ describe("Agent Schemas", () => {
         canAssignTo: ["fe-eng", "be-eng"],
         canCreateTasks: true,
         canMoveTo: ["in_progress", "done"],
-        systemPrompt: "You are the CTO.",
-        promptTemplate: "Review task: {{task.title}}",
         mcpTools: ["orchestrator-api"],
         desiredSkills: ["tdd", "verification"],
         adapterType: "claude_local",
