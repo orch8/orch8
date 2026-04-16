@@ -63,15 +63,9 @@ describe("Project seeding integration", () => {
       expect(typeof agent.role).toBe("string");
       expect(typeof agent.model).toBe("string");
       expect(typeof agent.maxTurns).toBe("number");
-      expect(typeof agent.systemPrompt).toBe("string");
-      expect(agent.systemPrompt.length).toBeGreaterThan(0);
 
       // Heartbeat config present
       expect(typeof agent.heartbeat.enabled).toBe("boolean");
-
-      // Instructions file path points to the copied AGENTS.md
-      expect(agent.instructionsFilePath).toContain(".orch8/agents/");
-      expect(agent.instructionsFilePath).toMatch(/AGENTS\.md$/);
     }
 
     // Verify specific agent configurations

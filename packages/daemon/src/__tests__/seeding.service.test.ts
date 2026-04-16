@@ -63,6 +63,17 @@ describe("SeedingService", () => {
       const entries = await readdir(agentsDir);
       expect(entries).toEqual(["implementer"]);
     });
+
+    it("strips YAML frontmatter from copied AGENTS.md", async () => {
+      const service = new SeedingService();
+      await service.copyDefaults(tempDir, ["cto"]);
+      const copied = await readFile(
+        join(tempDir, ".orch8", "agents", "cto", "AGENTS.md"),
+        "utf-8",
+      );
+      expect(copied.startsWith("---")).toBe(false);
+      expect(copied).toContain("# CTO");
+    });
   });
 
   describe("parseAgentDefinitions", () => {
@@ -121,14 +132,12 @@ describe("SeedingService", () => {
       expect(implementer.model).toBe("claude-opus-4-7");
     });
 
-    it("includes parsed prompt sections", async () => {
+    it("omits prompt template fields from bundled list", async () => {
       const service = new SeedingService();
-      const agents = await service.listBundledAgents();
-
-      const implementer = agents.find((a) => a.id === "implementer")!;
-      expect(implementer.systemPrompt).toContain("implementer agent");
-      expect(implementer.promptTemplate).toBeDefined();
-      expect(implementer.bootstrapPromptTemplate).toBeDefined();
+      const list = await service.listBundledAgents();
+      const implementer = list.find((a) => a.id === "implementer")!;
+      expect((implementer as any).systemPrompt).toBeUndefined();
+      expect((implementer as any).promptTemplate).toBeUndefined();
     });
 
     it("includes heartbeat config", async () => {

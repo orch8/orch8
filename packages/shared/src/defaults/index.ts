@@ -1,4 +1,4 @@
-export { parseAgentsMd, type ParsedAgentsMd } from "./agents-md-parser.js";
+export { parseAgentsMd, stripFrontmatter, type ParsedAgentsMd } from "./agents-md-parser.js";
 
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";

@@ -12,6 +12,7 @@ import { existsSync } from "node:fs";
 import type { FastifyBaseLogger } from "fastify";
 import {
   parseAgentsMd,
+  stripFrontmatter,
   DEFAULT_SKILLS_DIR,
   DEFAULT_AGENTS_DIR,
   GLOBAL_SKILLS_DIR,
@@ -31,46 +32,6 @@ import type { SchemaDb } from "../db/client.js";
  * we should refuse to overwrite.
  */
 const VERSION_MARKER_FILE = ".orch8-version";
-
-/**
- * System prompt for the project chat agent. The agent is the user's
- * conversational entry point to orch8 — it uses skills to delegate
- * work and emits confirmation cards for any state-changing actions.
- */
-export const CHAT_AGENT_SYSTEM_PROMPT = `You are the project chat assistant.
-
-Your job is to help the user manage this orch8 project conversationally.
-You have skills that teach you how to do specific things — brainstorm,
-manage agents, manage tasks, build pipelines, query project state.
-When the user's intent matches a skill, follow that skill's instructions.
-When unclear, ask one focused clarifying question.
-
-CARD PROTOCOL — REQUIRED:
-For any action that creates, modifies, or deletes orch8 state
-(agents, tasks, pipelines, etc.), you MUST emit a confirmation card
-BEFORE calling the API. Format:
-
-  \`\`\`orch8-card
-  {
-    "kind": "confirm_create_agent",
-    "summary": "Create QA agent 'qa-bot' (sonnet, heartbeat 6h)",
-    "payload": { "...the proposed config...": true }
-  }
-  \`\`\`
-
-After emitting the card, STOP. The user will click Approve or Cancel.
-You will receive a system message: "User approved card_<id>" or
-"User cancelled card_<id>". Only AFTER an approval should you call
-the API. After the API call, emit a result card (kind: "result_*").
-
-IDS AND HYPERLINKS:
-When you reference a task, run, agent, pipeline, or chat thread,
-always use its canonical ID (e.g., task_abc123, run_xyz, agent_qa-bot,
-pipe_pipe456). The chat UI renders these as clickable links automatically.
-
-API access:
-The orch8 REST API is reachable via Bash + curl. The orch8-api skill
-explains all available endpoints. Never bypass the card protocol.`;
 
 /**
  * Default config for a project chat agent. Id is the slug "chat", so
@@ -112,8 +73,6 @@ export const CHAT_AGENT_DEFAULTS = {
     "memory",
     "project-setup",
   ],
-  systemPrompt: CHAT_AGENT_SYSTEM_PROMPT,
-  promptTemplate: "{{context.userMessage}}",
 } as const;
 
 const MODEL_MAP: Record<string, string> = {
@@ -121,10 +80,6 @@ const MODEL_MAP: Record<string, string> = {
   sonnet: "claude-sonnet-4-6",
   haiku: "claude-haiku-4-5-20251001",
 };
-
-export interface ParsedAgentWithPaths extends ParsedAgentsMd {
-  instructionsFilePath: string;
-}
 
 export class SeedingService {
   private logger?: FastifyBaseLogger;
@@ -234,13 +189,27 @@ export class SeedingService {
 
     await mkdir(destAgents, { recursive: true });
 
-    if (agentIds && agentIds.length > 0) {
-      for (const id of agentIds) {
-        const srcAgent = join(DEFAULT_AGENTS_DIR, id);
-        if (!existsSync(srcAgent)) continue;
-        const destAgent = join(destAgents, id);
-        await mkdir(destAgent, { recursive: true });
-        await copyDirRecursive(srcAgent, destAgent);
+    if (!agentIds || agentIds.length === 0) return;
+
+    for (const id of agentIds) {
+      const srcAgent = join(DEFAULT_AGENTS_DIR, id);
+      if (!existsSync(srcAgent)) continue;
+      const destAgent = join(destAgents, id);
+      await mkdir(destAgent, { recursive: true });
+
+      const srcAgentsMd = join(srcAgent, "AGENTS.md");
+      if (existsSync(srcAgentsMd)) {
+        const raw = await readFile(srcAgentsMd, "utf-8");
+        await writeFile(
+          join(destAgent, "AGENTS.md"),
+          stripFrontmatter(raw),
+          "utf-8",
+        );
+      }
+
+      const srcHeartbeat = join(srcAgent, "heartbeat.md");
+      if (existsSync(srcHeartbeat)) {
+        await copyFile(srcHeartbeat, join(destAgent, "heartbeat.md"));
       }
     }
   }
@@ -251,22 +220,21 @@ export class SeedingService {
    */
   async parseAgentDefinitions(
     projectHomeDir: string,
-  ): Promise<ParsedAgentWithPaths[]> {
+  ): Promise<ParsedAgentsMd[]> {
     const agentsDir = join(projectHomeDir, ".orch8", "agents");
     const entries = await readdir(agentsDir);
-    const results: ParsedAgentWithPaths[] = [];
+    const results: ParsedAgentsMd[] = [];
 
     for (const entry of entries) {
       const agentsMdPath = join(agentsDir, entry, "AGENTS.md");
       if (!existsSync(agentsMdPath)) continue;
 
-      const content = await readFile(agentsMdPath, "utf-8");
-      const parsed = parseAgentsMd(content);
-
-      results.push({
-        ...parsed,
-        instructionsFilePath: agentsMdPath,
-      });
+      // Read frontmatter from the bundled source when available; the
+      // in-project copy has been stripped to prose-only during install.
+      const srcBundled = join(DEFAULT_AGENTS_DIR, entry, "AGENTS.md");
+      const source = existsSync(srcBundled) ? srcBundled : agentsMdPath;
+      const content = await readFile(source, "utf-8");
+      results.push(parseAgentsMd(content));
     }
 
     return results;
@@ -327,11 +295,6 @@ export class SeedingService {
         heartbeatEnabled: parsed.heartbeat.enabled,
         ...(parsed.heartbeat.intervalSec != null
           ? { heartbeatIntervalSec: parsed.heartbeat.intervalSec }
-          : {}),
-        systemPrompt: parsed.systemPrompt,
-        ...(parsed.promptTemplate != null ? { promptTemplate: parsed.promptTemplate } : {}),
-        ...(parsed.bootstrapPromptTemplate != null
-          ? { bootstrapPromptTemplate: parsed.bootstrapPromptTemplate }
           : {}),
       });
     }
@@ -412,8 +375,6 @@ export class SeedingService {
       canMoveTo: CHAT_AGENT_DEFAULTS.canMoveTo as unknown as typeof agents.$inferInsert.canMoveTo,
       allowedTools: CHAT_AGENT_DEFAULTS.allowedTools as unknown as string[],
       desiredSkills: CHAT_AGENT_DEFAULTS.desiredSkills as unknown as string[],
-      systemPrompt: CHAT_AGENT_DEFAULTS.systemPrompt,
-      promptTemplate: CHAT_AGENT_DEFAULTS.promptTemplate,
       adapterType: "claude_local",
     });
 
