@@ -50,7 +50,11 @@ export function useWriteBundleFile(agentId: string, projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ path, content }: { path: string; content: string }) =>
-      api.put(`/agents/${agentId}/instructions/files/${path}?projectId=${projectId}`, { content }),
+      api.put(
+        `/agents/${agentId}/instructions/files/${path}`,
+        { content },
+        { projectId },
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["bundle-files", agentId, projectId] });
     },
@@ -61,7 +65,7 @@ export function useUpdateBundleMode(agentId: string, projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { mode: string; rootPath?: string; entryFile?: string }) =>
-      api.patch(`/agents/${agentId}/instructions?projectId=${projectId}`, input),
+      api.patch(`/agents/${agentId}/instructions`, input, { projectId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["instruction-bundle", agentId, projectId] });
     },
