@@ -23,25 +23,29 @@ export async function taskRoutes(app: FastifyInstance) {
     }
 
     const { dependsOn, ...taskData } = parsed.data;
-    const task = await taskService.create(taskData);
 
-    // Wire dependencies if provided — addDependency auto-blocks the task
-    if (dependsOn && dependsOn.length > 0) {
-      for (const depId of dependsOn) {
-        await taskService.addDependency(task.id, depId);
+    // Insert the task row and attach its initial dependencies in a single
+    // transaction. A cycle detected on dep #2 previously left the task
+    // persisted with only dep #1 wired; the atomic version rolls back
+    // the whole create on any failure.
+    let finalTask;
+    try {
+      finalTask = dependsOn && dependsOn.length > 0
+        ? await taskService.createWithDependencies(taskData, dependsOn)
+        : await taskService.create(taskData);
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message.includes("cycle") || message.includes("cannot depend on itself")) {
+        return reply.code(409).send({ error: "conflict", message });
       }
+      throw err;
     }
 
-    // Re-read the task to get the potentially-updated column (blocked vs backlog)
-    const finalTask = (dependsOn && dependsOn.length > 0)
-      ? await taskService.getById(task.id)
-      : task;
-
     // Dispatch agent only if task is in backlog (not blocked by dependencies)
-    if (finalTask!.assignee && finalTask!.column === "backlog") {
-      await app.heartbeatService.enqueueWakeup(finalTask!.assignee, finalTask!.projectId, {
+    if (finalTask.assignee && finalTask.column === "backlog") {
+      await app.heartbeatService.enqueueWakeup(finalTask.assignee, finalTask.projectId, {
         source: "assignment",
-        taskId: finalTask!.id,
+        taskId: finalTask.id,
         reason: "task_created_with_assignee",
       });
     }
