@@ -194,15 +194,17 @@ describe("Chat API Routes", () => {
     expect(body.role).toBe("user");
     expect(body.content).toBe("hello");
 
-    // Wait for background turn to settle
-    await new Promise((r) => setTimeout(r, 100));
-
-    const msgsRes = await app.inject({
-      method: "GET",
-      url: `/api/chats/${chat.id}/messages`,
-      headers: { "x-project-id": projectId },
+    // Poll until the fire-and-forget assistant turn has written its row.
+    const msgs = await vi.waitFor(async () => {
+      const msgsRes = await app.inject({
+        method: "GET",
+        url: `/api/chats/${chat.id}/messages`,
+        headers: { "x-project-id": projectId },
+      });
+      const parsed = JSON.parse(msgsRes.body);
+      expect(parsed.map((m: { role: string }) => m.role)).toEqual(["user", "assistant"]);
+      return parsed;
     });
-    const msgs = JSON.parse(msgsRes.body);
     expect(msgs.map((m: { role: string }) => m.role)).toEqual(["user", "assistant"]);
   });
 
@@ -286,14 +288,18 @@ describe("Chat API Routes", () => {
       headers: { "x-project-id": projectId },
       payload: { content: "create task" },
     });
-    await new Promise((r) => setTimeout(r, 100));
 
-    const msgsRes = await localApp.inject({
-      method: "GET",
-      url: `/api/chats/${chat.id}/messages`,
-      headers: { "x-project-id": projectId },
+    // Poll until the assistant row has landed.
+    const msgs = await vi.waitFor(async () => {
+      const msgsRes = await localApp.inject({
+        method: "GET",
+        url: `/api/chats/${chat.id}/messages`,
+        headers: { "x-project-id": projectId },
+      });
+      const parsed = JSON.parse(msgsRes.body);
+      expect(parsed.some((m: { role: string }) => m.role === "assistant")).toBe(true);
+      return parsed;
     });
-    const msgs = JSON.parse(msgsRes.body);
     const assistant = msgs.find((m: { role: string }) => m.role === "assistant");
     const card: ExtractedCard = assistant.cards[0];
 
