@@ -2,7 +2,7 @@ import { KANBAN_COLUMNS, COLUMN_LABELS, type KanbanColumn } from "../../types.js
 
 export interface PermissionsData {
   canCreateTasks: boolean;
-  canMoveTo: string[];
+  canMoveTo: KanbanColumn[];
   canAssignTo: string[];
 }
 
@@ -17,7 +17,7 @@ export function PermissionsStep({ data, agentIds, onChange }: PermissionsStepPro
     onChange({ ...data, ...partial });
   }
 
-  function toggleMoveTo(col: string) {
+  function toggleMoveTo(col: KanbanColumn) {
     const next = data.canMoveTo.includes(col)
       ? data.canMoveTo.filter((c) => c !== col)
       : [...data.canMoveTo, col];
@@ -61,7 +61,7 @@ export function PermissionsStep({ data, agentIds, onChange }: PermissionsStepPro
                   : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
               }`}
             >
-              {COLUMN_LABELS[col as KanbanColumn]}
+              {COLUMN_LABELS[col]}
             </button>
           ))}
         </div>

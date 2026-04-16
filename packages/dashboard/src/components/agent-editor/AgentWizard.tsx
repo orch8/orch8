@@ -7,7 +7,7 @@ import { PromptsStep, type PromptsData } from "./PromptsStep.js";
 import { PermissionsStep, type PermissionsData } from "./PermissionsStep.js";
 import { BudgetStep, type BudgetData } from "./BudgetStep.js";
 import { useCreateAgent, useAgents } from "../../hooks/useAgents.js";
-import type { BundledAgent } from "@orch/shared";
+import type { AgentRole, BundledAgent } from "@orch/shared";
 
 interface AgentWizardProps {
   projectId: string;
@@ -83,7 +83,12 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
       id: identity.slug,
       projectId,
       name: identity.name,
-      role: (selectedBundled?.role ?? "custom") as any,
+      // BundledAgent.role is a free-form string in the bundle JSON; the server
+      // re-validates against AgentRoleSchema before persisting. Narrow the cast
+      // to AgentRole so the field still participates in CreateAgent inference.
+      // TODO: Tighten BundledAgent.role in @orch/shared to AgentRole once every
+      // bundled-agent JSON file has been audited to use the enum values.
+      role: (selectedBundled?.role ?? "custom") as AgentRole,
       model: identity.model,
       effort: identity.effort || undefined,
       maxTurns: identity.maxTurns,
@@ -93,7 +98,7 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
       bootstrapPromptTemplate: prompts.bootstrapPromptTemplate || undefined,
       desiredSkills: prompts.desiredSkills.length > 0 ? prompts.desiredSkills : undefined,
       canCreateTasks: permissions.canCreateTasks,
-      canMoveTo: permissions.canMoveTo as any,
+      canMoveTo: permissions.canMoveTo,
       canAssignTo: permissions.canAssignTo,
       // Include heartbeat config from bundled data
       heartbeatEnabled: selectedBundled?.heartbeatEnabled,

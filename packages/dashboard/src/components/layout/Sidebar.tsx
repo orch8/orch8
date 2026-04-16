@@ -1,7 +1,16 @@
 import { Link, useRouterState, useParams } from "@tanstack/react-router";
+import type { ComponentProps } from "react";
 import { useDaemonStatus } from "../../hooks/useDaemon.js";
 import { ProjectSwitcher } from "./ProjectSwitcher.js";
 import { NotificationBell } from "./NotificationBell.js";
+
+// Sidebar builds target routes at runtime by concatenating the active projectId
+// (e.g. `/projects/${id}/board`). TanStack Router's Link component checks the
+// `to` prop against the generated route-tree literal type, which cannot match a
+// template string at compile time. We widen to the prop type rather than `any`
+// so the rest of the Link API still benefits from inference.
+// TODO: Revisit once TanStack Router supports typed builders for runtime paths.
+type LinkTo = ComponentProps<typeof Link>["to"];
 
 interface NavItem {
   to: string;
@@ -87,7 +96,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
         {params.projectId && (
           <>
             <Link
-              to={`/projects/${params.projectId}/chat` as any}
+              to={`/projects/${params.projectId}/chat` as LinkTo}
               className={navItemClass(
                 pathname.startsWith(`/projects/${params.projectId}/chat`),
               )}
@@ -95,7 +104,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
               <span>Chat</span>
             </Link>
             <Link
-              to={`/projects/${params.projectId}/briefing` as any}
+              to={`/projects/${params.projectId}/briefing` as LinkTo}
               className={navItemClass(
                 pathname.startsWith(`/projects/${params.projectId}/briefing`),
               )}
@@ -113,7 +122,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
               {section.items.map((item) => (
                 <Link
                   key={item.to}
-                  to={item.to as any}
+                  to={item.to as LinkTo}
                   className={navItemClass(isActive(item.to))}
                 >
                   <span>{item.label}</span>
@@ -131,7 +140,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
       <div className="border-t border-edge-soft px-3 py-3">
         <div className="flex items-center justify-between">
           <Link
-            to={"/daemon" as any}
+            to="/daemon"
             className="focus-ring flex items-center gap-2 text-mute hover:text-ink"
           >
             <span

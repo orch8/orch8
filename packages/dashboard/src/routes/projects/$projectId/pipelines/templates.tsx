@@ -1,11 +1,14 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import {
   usePipelineTemplates,
   useDeletePipelineTemplate,
 } from "../../../../hooks/usePipelineTemplates.js";
 import { PipelineTemplateEditor } from "../../../../components/pipeline/PipelineTemplateEditor.js";
 import type { PipelineTemplate } from "../../../../types.js";
+
+// See pipelines/index.tsx for rationale.
+type LinkTo = ComponentProps<typeof Link>["to"];
 
 type Tab = "active" | "history" | "templates";
 
@@ -31,7 +34,7 @@ function PipelinesTemplatesPage() {
         {tabs.map((tab) => (
           <Link
             key={tab.key}
-            to={tab.to as any}
+            to={tab.to as LinkTo}
             className={`px-3 py-2 text-sm font-medium transition-colors ${
               pathname === tab.to || (tab.key === "templates" && pathname.endsWith("/templates"))
                 ? "border-b-2 border-blue-500 text-zinc-100"

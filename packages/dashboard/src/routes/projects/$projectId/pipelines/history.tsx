@@ -1,6 +1,10 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
+import type { ComponentProps } from "react";
 import { usePipelines } from "../../../../hooks/usePipelines.js";
 import { PipelineList } from "../../../../components/pipeline/PipelineList.js";
+
+// See pipelines/index.tsx for rationale.
+type LinkTo = ComponentProps<typeof Link>["to"];
 
 type Tab = "active" | "history" | "templates";
 
@@ -27,7 +31,7 @@ function PipelinesHistoryPage() {
         {tabs.map((tab) => (
           <Link
             key={tab.key}
-            to={tab.to as any}
+            to={tab.to as LinkTo}
             className={`px-3 py-2 text-sm font-medium transition-colors ${
               pathname === tab.to || (tab.key === "history" && pathname.endsWith("/history"))
                 ? "border-b-2 border-blue-500 text-zinc-100"

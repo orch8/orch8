@@ -1,23 +1,23 @@
 import { useState, useEffect } from "react";
 import { FormField } from "../shared/FormField.js";
+import { useUpdateAgent } from "../../hooks/useAgents.js";
 import type { Agent } from "../../types.js";
-import type { UseMutationResult } from "@tanstack/react-query";
 
 interface BudgetTabProps {
   agent: Agent;
   projectId: string;
-  updateAgent: UseMutationResult<any, any, any, any>;
+  updateAgent: ReturnType<typeof useUpdateAgent>;
 }
 
 export function BudgetTab({ agent, projectId, updateAgent }: BudgetTabProps) {
   const [budgetLimit, setBudgetLimit] = useState(agent.budgetLimitUsd?.toString() ?? "");
   const [autoPauseThreshold, setAutoPauseThreshold] = useState(
-    (agent as any).autoPauseThreshold?.toString() ?? "",
+    agent.autoPauseThreshold?.toString() ?? "",
   );
 
   useEffect(() => {
     setBudgetLimit(agent.budgetLimitUsd?.toString() ?? "");
-    setAutoPauseThreshold((agent as any).autoPauseThreshold?.toString() ?? "");
+    setAutoPauseThreshold(agent.autoPauseThreshold?.toString() ?? "");
   }, [agent]);
 
   function handleSave() {

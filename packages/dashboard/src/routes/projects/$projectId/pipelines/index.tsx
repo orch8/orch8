@@ -1,6 +1,13 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
+import type { ComponentProps } from "react";
 import { usePipelines } from "../../../../hooks/usePipelines.js";
 import { PipelineList } from "../../../../components/pipeline/PipelineList.js";
+
+// Pipelines tabs are built from runtime paths like
+// `/projects/${projectId}/pipelines/history`, which TanStack Router's Link
+// cannot verify against the generated route-tree literal at compile time.
+// Widen to the prop type rather than `any` so inference still applies elsewhere.
+type LinkTo = ComponentProps<typeof Link>["to"];
 
 type Tab = "active" | "history" | "templates";
 
@@ -31,7 +38,7 @@ function PipelinesActivePage() {
         {tabs.map((tab) => (
           <Link
             key={tab.key}
-            to={tab.to as any}
+            to={tab.to as LinkTo}
             className={`px-3 py-2 text-sm font-medium transition-colors ${
               isTabActive(tab.to)
                 ? "border-b-2 border-blue-500 text-zinc-100"
