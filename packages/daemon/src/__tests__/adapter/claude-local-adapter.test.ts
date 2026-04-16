@@ -170,6 +170,34 @@ describe("ClaudeLocalAdapter", () => {
     expect(rows[0].sessionDisplayId).toBe("persist-sess");
   });
 
+  it("rejects when AGENTS.md is missing", async () => {
+    const agentDir = join(tempRoot, ".orch8", "agents", "test-agent");
+    await rm(join(agentDir, "AGENTS.md"));
+
+    const spawnFn = vi.fn(() => createMockProcess([]) as unknown as ReturnType<SpawnFn>);
+
+    const config: ClaudeLocalAdapterConfig = {};
+    const context: RunContext = {
+      agentId: "test-agent",
+      agentName: "Test Agent",
+      projectId,
+      runId: "run-missing",
+      taskId: "task-missing",
+      wakeReason: "assignment",
+      apiUrl: "http://localhost:3847",
+      cwd: "/tmp/adapt",
+    };
+
+    const instructions: RunAgentInstructions = {
+      projectRoot: tempRoot,
+      slug: "test-agent",
+      wake: { source: "on_demand", userMessage: "hello" },
+    };
+
+    const adapter = new ClaudeLocalAdapter(testDb.db, spawnFn as unknown as SpawnFn);
+    await expect(adapter.runAgent(config, context, instructions)).rejects.toThrow(/Missing AGENTS.md/);
+  });
+
   it("resumes session on second run to same task", async () => {
     const makeLines = (sessId: string) => [
       JSON.stringify({ type: "system", subtype: "init", session_id: sessId, model: "claude-sonnet-4-6" }),

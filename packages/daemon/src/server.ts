@@ -131,7 +131,7 @@ export function buildServer(options: ServerOptions = {}) {
     // Heartbeat service
     const heartbeatService = new HeartbeatService(dbClient.db, broadcastService);
     const spawnFn = options.spawnFn ?? nodeSpawn;
-    const adapter = new ClaudeLocalAdapter(dbClient.db, spawnFn, projectSkillService, instructionBundleService);
+    const adapter = new ClaudeLocalAdapter(dbClient.db, spawnFn, projectSkillService);
     heartbeatService.setAdapter(adapter);
     const sessionMgr = new SessionManager(dbClient.db);
     heartbeatService.setSessionManager(sessionMgr);
