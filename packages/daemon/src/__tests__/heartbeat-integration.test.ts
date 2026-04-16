@@ -8,13 +8,15 @@ import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
 
 async function waitForRunComplete(db: TestDb["db"], runId: string, timeoutMs = 2000) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const [r] = await db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, runId));
-    if (r && !["queued", "running"].includes(r.status)) return r;
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  throw new Error(`Run ${runId} did not complete within ${timeoutMs}ms`);
+  return vi.waitFor(
+    async () => {
+      const [r] = await db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, runId));
+      expect(r).toBeDefined();
+      expect(["queued", "running"]).not.toContain(r.status);
+      return r;
+    },
+    { timeout: timeoutMs },
+  );
 }
 
 describe("Heartbeat Pipeline Integration", () => {
