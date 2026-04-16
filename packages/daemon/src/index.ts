@@ -6,15 +6,27 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { buildServer } from "./server.js";
 import { startEmbeddedPostgres, stopEmbeddedPostgres } from "./db/embedded.js";
-import { loadGlobalConfig } from "./config/loader.js";
+import { loadGlobalConfig, ConfigError } from "./config/loader.js";
 import { loadOrGenerateAdminToken, defaultAdminTokenPath } from "./api/middleware/admin-token.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = join(__dirname, "db", "migrations");
 
-// 1. Load global config
+// 1. Load global config. Parsing errors are reported with a clear message
+//    and exit with code 1 so process managers see a deterministic failure
+//    instead of an uncaught YAML stack trace.
 const configPath = join(homedir(), ".orch8", "config.yaml");
-const config = loadGlobalConfig(configPath);
+let config;
+try {
+  config = loadGlobalConfig(configPath);
+} catch (err) {
+  if (err instanceof ConfigError) {
+    // eslint-disable-next-line no-console
+    console.error(`[orch8] ${err.message}`);
+    process.exit(1);
+  }
+  throw err;
+}
 
 // 2. Connect to Postgres
 const databaseUrl = await startEmbeddedPostgres({
