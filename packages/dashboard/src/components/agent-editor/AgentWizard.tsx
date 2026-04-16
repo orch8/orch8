@@ -26,8 +26,8 @@ export function AgentWizard({ projectId, onCreated }: AgentWizardProps) {
   const [identity, setIdentity] = useState<IdentityData>({
     name: "",
     slug: "",
-    model: "claude-opus-4-6",
-    effort: "medium",
+    model: "claude-opus-4-7",
+    effort: "xhigh",
     maxTurns: 180,
   });
   const [prompts, setPrompts] = useState<PromptsData>({

@@ -63,7 +63,7 @@ describe("ProjectForm — edit mode new fields", () => {
     worktreeDir: "/wt/test",
     repoUrl: "https://github.com/org/repo",
     defaultBranch: "main",
-    defaultModel: "claude-opus-4-6",
+    defaultModel: "claude-opus-4-7",
     defaultMaxTurns: 25,
 
     budgetLimitUsd: 500,

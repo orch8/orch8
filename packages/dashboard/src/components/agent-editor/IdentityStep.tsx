@@ -1,12 +1,13 @@
 import { FormField } from "../shared/FormField.js";
 
 const MODELS = [
+  "claude-opus-4-7",
   "claude-opus-4-6",
   "claude-sonnet-4-6",
   "claude-haiku-4-5-20251001",
 ];
 
-const EFFORT_LEVELS = ["low", "medium", "high"];
+const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
 
 export interface IdentityData {
   name: string;

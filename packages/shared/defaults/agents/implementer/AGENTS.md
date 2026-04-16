@@ -1,8 +1,8 @@
 ---
 name: implementer
 role: implementer
-model: sonnet
-effort: high
+model: opus
+effort: xhigh
 maxTurns: 200
 skills:
   - orch8

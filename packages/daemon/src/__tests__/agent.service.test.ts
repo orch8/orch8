@@ -45,7 +45,7 @@ describe("AgentService", () => {
       expect(agent.name).toBe("Frontend Engineer");
       expect(agent.role).toBe("engineer");
       expect(agent.status).toBe("active");
-      expect(agent.model).toBe("claude-opus-4-6");
+      expect(agent.model).toBe("claude-opus-4-7");
     });
 
     it("creates an agent with all optional fields", async () => {
@@ -54,7 +54,7 @@ describe("AgentService", () => {
         projectId,
         name: "CTO",
         role: "cto",
-        model: "claude-opus-4-6",
+        model: "claude-opus-4-7",
         heartbeatEnabled: true,
         heartbeatIntervalSec: 3600,
         canCreateTasks: true,
@@ -64,7 +64,7 @@ describe("AgentService", () => {
         budgetLimitUsd: 50.0,
       });
 
-      expect(agent.model).toBe("claude-opus-4-6");
+      expect(agent.model).toBe("claude-opus-4-7");
       expect(agent.heartbeatEnabled).toBe(true);
       expect(agent.heartbeatIntervalSec).toBe(3600);
       expect(agent.canCreateTasks).toBe(true);
@@ -131,12 +131,12 @@ describe("AgentService", () => {
       await service.create({ id: "upd-1", projectId, name: "Original", role: "engineer" });
       const updated = await service.update("upd-1", projectId, {
         name: "Updated",
-        model: "claude-opus-4-6",
+        model: "claude-opus-4-7",
         maxTurns: 50,
       });
 
       expect(updated.name).toBe("Updated");
-      expect(updated.model).toBe("claude-opus-4-6");
+      expect(updated.model).toBe("claude-opus-4-7");
       expect(updated.maxTurns).toBe(50);
     });
 
@@ -225,7 +225,7 @@ describe("AgentService", () => {
   describe("getRoleDefaults", () => {
     it("returns CTO defaults with heartbeat and task creation", () => {
       const defaults = AgentService.getRoleDefaults("cto");
-      expect(defaults.model).toBe("claude-opus-4-6");
+      expect(defaults.model).toBe("claude-opus-4-7");
       expect(defaults.heartbeatEnabled).toBe(true);
       expect(defaults.canCreateTasks).toBe(true);
       expect(defaults.maxTurns).toBeGreaterThan(25);

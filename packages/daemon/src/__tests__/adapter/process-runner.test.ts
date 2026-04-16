@@ -95,8 +95,8 @@ describe("runProcess", () => {
   });
 
   it("returns parsed output with session and cost data", async () => {
-    const initEvent = JSON.stringify({ type: "system", subtype: "init", session_id: "sess-42", model: "claude-opus-4-6" });
-    const resultEvent = JSON.stringify({ type: "result", session_id: "sess-42", result: "All done", model: "claude-opus-4-6", usage: { input_tokens: 500, output_tokens: 200 }, total_cost_usd: 0.03 });
+    const initEvent = JSON.stringify({ type: "system", subtype: "init", session_id: "sess-42", model: "claude-opus-4-7" });
+    const resultEvent = JSON.stringify({ type: "result", session_id: "sess-42", result: "All done", model: "claude-opus-4-7", usage: { input_tokens: 500, output_tokens: 200 }, total_cost_usd: 0.03 });
 
     const mockProc = createMockProcess([initEvent, resultEvent]);
     const spawnFn = vi.fn(() => mockProc as unknown as ReturnType<SpawnFn>);
@@ -104,7 +104,7 @@ describe("runProcess", () => {
     const result = await runProcess(makeInput(), spawnFn as unknown as SpawnFn);
 
     expect(result.sessionId).toBe("sess-42");
-    expect(result.model).toBe("claude-opus-4-6");
+    expect(result.model).toBe("claude-opus-4-7");
     expect(result.result).toBe("All done");
     expect(result.costUsd).toBe(0.03);
     expect(result.exitCode).toBe(0);

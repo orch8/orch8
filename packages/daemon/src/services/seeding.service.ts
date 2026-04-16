@@ -82,8 +82,8 @@ export const CHAT_AGENT_DEFAULTS = {
   id: "chat",
   name: "Project Chat",
   role: "custom" as const,
-  model: "claude-opus-4-6",
-  effort: "high" as const,
+  model: "claude-opus-4-7",
+  effort: "xhigh" as const,
   maxTurns: 180,
   heartbeatEnabled: false,
   heartbeatIntervalSec: 0,
@@ -117,7 +117,7 @@ export const CHAT_AGENT_DEFAULTS = {
 } as const;
 
 const MODEL_MAP: Record<string, string> = {
-  opus: "claude-opus-4-6",
+  opus: "claude-opus-4-7",
   sonnet: "claude-sonnet-4-6",
   haiku: "claude-haiku-4-5-20251001",
 };

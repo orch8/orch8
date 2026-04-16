@@ -115,10 +115,10 @@ describe("SeedingService", () => {
       const agents = await service.listBundledAgents();
 
       const cto = agents.find((a) => a.id === "cto")!;
-      expect(cto.model).toBe("claude-opus-4-6");
+      expect(cto.model).toBe("claude-opus-4-7");
 
       const implementer = agents.find((a) => a.id === "implementer")!;
-      expect(implementer.model).toBe("claude-sonnet-4-6");
+      expect(implementer.model).toBe("claude-opus-4-7");
     });
 
     it("includes parsed prompt sections", async () => {

@@ -118,7 +118,7 @@ Do NOT emit info cards for these fetches — they are internal reconnaissance.
 - Domain-agnostic — `linkedin-content-creator`, `copywriter`,
   `market-researcher` are first-class agents, not afterthoughts
 - Model matches role:
-  - **Opus** (`claude-opus-4-6`): lead agents, complex reasoning,
+  - **Opus** (`claude-opus-4-7`): lead agents, complex reasoning,
     planning, architecture decisions
   - **Sonnet** (`claude-sonnet-4-6`): high-volume work, content
     generation, repetitive tasks, simple testing
@@ -138,7 +138,7 @@ config in the payload:
 - `role`: use `cto` for the lead, `engineer`/`qa`/`researcher`/`custom`
   for specialists
 - `model`: pick per the model-matches-role rule above
-- `effort`: `"high"` for lead and complex roles, `"medium"` for volume work
+- `effort`: `"xhigh"` for lead and complex roles, `"medium"` for volume work
 - `maxTurns`: 180 (default)
 - `systemPrompt`: a tailored persona and operating instructions specific
   to this agent's specialty. Be concrete — reference the technologies,
@@ -165,8 +165,8 @@ Example card:
     "id": "project-lead",
     "name": "Project Lead",
     "role": "cto",
-    "model": "claude-opus-4-6",
-    "effort": "high",
+    "model": "claude-opus-4-7",
+    "effort": "xhigh",
     "maxTurns": 180,
     "systemPrompt": "You are the project lead for [project]. Your job is to...",
     "heartbeatEnabled": true,

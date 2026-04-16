@@ -66,7 +66,7 @@ Call `GET /api/agents?projectId=$PROJECT_ID`:
   "summary": "4 agents",
   "payload": {
     "agents": [
-      { "id": "engineer", "name": "Engineer", "model": "claude-opus-4-6", "status": "active" },
+      { "id": "engineer", "name": "Engineer", "model": "claude-opus-4-7", "status": "active" },
       { "id": "qa-bot", "name": "QA Bot", "model": "claude-sonnet-4-6", "status": "active" },
       { "id": "cost-watcher", "name": "Cost Watcher", "model": "claude-haiku-4-5-20251001", "status": "paused" },
       { "id": "chat", "name": "Project Chat", "model": "claude-sonnet-4-6", "status": "active" }

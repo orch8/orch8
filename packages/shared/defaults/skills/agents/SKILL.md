@@ -164,10 +164,10 @@ config from scratch.
 - `color` — optional hex color string for the dashboard chip.
 
 **LLM config**
-- `model` — `claude-opus-4-6`, `claude-sonnet-4-6` (right pick for
-  most agents), or `claude-haiku-4-5-20251001`.
+- `model` — `claude-opus-4-7` (recommended), `claude-sonnet-4-6`,
+  or `claude-haiku-4-5-20251001`.
 - `effort` — reasoning effort hint for models that support it
-  (`low`, `medium`, `high`). Bundled templates use `high`.
+  (`low`, `medium`, `high`, `xhigh`, `max`). Bundled templates use `xhigh`.
 - `maxTurns` — per-run turn budget. Usually 180.
 - `systemPrompt` — the agent's persona and operating instructions.
   Propose one if the user does not supply one.

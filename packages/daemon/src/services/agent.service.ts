@@ -17,7 +17,7 @@ interface WakeupOpts {
 
 export const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> = {
   cto: {
-    model: "claude-opus-4-6",
+    model: "claude-opus-4-7",
     maxTurns: 200,
     heartbeatEnabled: true,
     heartbeatIntervalSec: 3600,
@@ -28,7 +28,7 @@ export const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> 
     maxConcurrentRuns: 1,
   },
   engineer: {
-    model: "claude-opus-4-6",
+    model: "claude-opus-4-7",
     maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
@@ -36,7 +36,7 @@ export const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> 
     maxConcurrentRuns: 1,
   },
   qa: {
-    model: "claude-opus-4-6",
+    model: "claude-opus-4-7",
     maxTurns: 200,
     heartbeatEnabled: true,
     heartbeatIntervalSec: 3600,
@@ -46,21 +46,21 @@ export const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> 
     maxConcurrentRuns: 1,
   },
   researcher: {
-    model: "claude-opus-4-6",
+    model: "claude-opus-4-7",
     maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
     maxConcurrentRuns: 1,
   },
   planner: {
-    model: "claude-opus-4-6",
+    model: "claude-opus-4-7",
     maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
     maxConcurrentRuns: 1,
   },
   implementer: {
-    model: "claude-opus-4-6",
+    model: "claude-opus-4-7",
     maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
@@ -68,28 +68,28 @@ export const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> 
     maxConcurrentSubagents: 3,
   },
   reviewer: {
-    model: "claude-opus-4-6",
+    model: "claude-opus-4-7",
     maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAssignment: true,
     maxConcurrentRuns: 1,
   },
   verifier: {
-    model: "claude-opus-4-6",
+    model: "claude-opus-4-7",
     maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAutomation: true,
     maxConcurrentRuns: 1,
   },
   referee: {
-    model: "claude-opus-4-6",
+    model: "claude-opus-4-7",
     maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAutomation: true,
     maxConcurrentRuns: 1,
   },
   custom: {
-    model: "claude-opus-4-6",
+    model: "claude-opus-4-7",
     maxTurns: 200,
     heartbeatEnabled: false,
     wakeOnAssignment: true,

@@ -26,10 +26,10 @@ describe("buildArgs", () => {
   });
 
   it("adds --model when configured", () => {
-    const args = buildArgs({ model: "claude-opus-4-6" });
+    const args = buildArgs({ model: "claude-opus-4-7" });
     const idx = args.indexOf("--model");
     expect(idx).toBeGreaterThan(-1);
-    expect(args[idx + 1]).toBe("claude-opus-4-6");
+    expect(args[idx + 1]).toBe("claude-opus-4-7");
   });
 
   it("adds --resume when sessionId provided", () => {

@@ -17,7 +17,7 @@ export interface ClaudeLocalAdapterConfig {
   extraArgs?: string[];
 
   model?: string;
-  effort?: "low" | "medium" | "high";
+  effort?: "low" | "medium" | "high" | "xhigh" | "max";
 
   maxTurnsPerRun?: number;
   chrome?: boolean;

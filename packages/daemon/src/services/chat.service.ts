@@ -283,7 +283,7 @@ export class ChatService {
       // 5. Execute the run.
       const adapterConfig = {
         model: agent.model,
-        effort: (agent.effort as "low" | "medium" | "high" | undefined) ?? undefined,
+        effort: (agent.effort as "low" | "medium" | "high" | "xhigh" | "max" | undefined) ?? undefined,
         maxTurnsPerRun: agent.maxTurns,
         cwd: project.homeDir,
       };

@@ -4,12 +4,13 @@ import type { Agent } from "../../types.js";
 import type { UseMutationResult } from "@tanstack/react-query";
 
 const MODEL_OPTIONS = [
+  "claude-opus-4-7",
   "claude-opus-4-6",
   "claude-sonnet-4-6",
   "claude-haiku-4-5-20251001",
 ];
 
-const EFFORT_OPTIONS = ["low", "medium", "high"];
+const EFFORT_OPTIONS = ["low", "medium", "high", "xhigh", "max"];
 
 interface GeneralTabProps {
   agent: Agent;

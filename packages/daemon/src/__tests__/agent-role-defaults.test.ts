@@ -48,7 +48,7 @@ describe("Agent Role Defaults (Integration)", () => {
     });
 
     const body = JSON.parse(response.body);
-    expect(body.model).toBe("claude-opus-4-6");
+    expect(body.model).toBe("claude-opus-4-7");
     expect(body.heartbeatEnabled).toBe(true);
     expect(body.heartbeatIntervalSec).toBe(3600);
     expect(body.canCreateTasks).toBe(true);
@@ -66,7 +66,7 @@ describe("Agent Role Defaults (Integration)", () => {
     });
 
     const body = JSON.parse(response.body);
-    expect(body.model).toBe("claude-opus-4-6");
+    expect(body.model).toBe("claude-opus-4-7");
     expect(body.heartbeatEnabled).toBe(false);
     expect(body.wakeOnAssignment).toBe(true);
 
@@ -97,7 +97,7 @@ describe("Agent Role Defaults (Integration)", () => {
     });
 
     const body = JSON.parse(response.body);
-    expect(body.model).toBe("claude-opus-4-6");
+    expect(body.model).toBe("claude-opus-4-7");
     expect(body.wakeOnAutomation).toBe(true);
 
     await app.close();
@@ -113,7 +113,7 @@ describe("Agent Role Defaults (Integration)", () => {
         projectId,
         name: "Custom Engineer",
         role: "engineer",
-        model: "claude-opus-4-6",
+        model: "claude-opus-4-7",
         maxTurns: 100,
         heartbeatEnabled: true,
         heartbeatIntervalSec: 300,
@@ -121,7 +121,7 @@ describe("Agent Role Defaults (Integration)", () => {
     });
 
     const body = JSON.parse(response.body);
-    expect(body.model).toBe("claude-opus-4-6");
+    expect(body.model).toBe("claude-opus-4-7");
     expect(body.maxTurns).toBe(100);
     expect(body.heartbeatEnabled).toBe(true);
     expect(body.heartbeatIntervalSec).toBe(300);

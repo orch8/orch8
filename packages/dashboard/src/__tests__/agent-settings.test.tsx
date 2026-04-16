@@ -13,7 +13,7 @@ const mockAgent = {
   status: "active",
   icon: "🤖",
   color: "#888780",
-  model: "claude-opus-4-6",
+  model: "claude-opus-4-7",
   effort: "medium",
   maxTurns: 180,
   allowedTools: [],

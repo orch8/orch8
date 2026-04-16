@@ -1,8 +1,8 @@
 ---
 name: researcher
 role: researcher
-model: sonnet
-effort: high
+model: opus
+effort: xhigh
 maxTurns: 180
 skills:
   - orch8

@@ -120,7 +120,7 @@ export const agents = pgTable("agents", {
   icon: text("icon").default("🤖"),
   color: text("color").default("#888780"),
 
-  model: text("model").notNull().default("claude-opus-4-6"),
+  model: text("model").notNull().default("claude-opus-4-7"),
   effort: text("effort"),
   maxTurns: integer("max_turns").notNull().default(180),
   allowedTools: text("allowed_tools").array().default(sql`'{}'`),

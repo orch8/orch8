@@ -31,7 +31,7 @@ describe("Agent Schemas", () => {
         role: "cto",
         icon: "🧠",
         color: "#FF0000",
-        model: "claude-opus-4-6",
+        model: "claude-opus-4-7",
         effort: "high",
         maxTurns: 50,
         heartbeatEnabled: true,
@@ -95,7 +95,7 @@ describe("Agent Schemas", () => {
     it("validates partial update", () => {
       const result = UpdateAgentSchema.safeParse({
         name: "Updated Name",
-        model: "claude-opus-4-6",
+        model: "claude-opus-4-7",
       });
       expect(result.success).toBe(true);
     });

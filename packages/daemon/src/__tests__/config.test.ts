@@ -22,7 +22,7 @@ describe("globalConfigSchema", () => {
         auto_migrate: true,
       },
       defaults: {
-        model: "claude-opus-4-6",
+        model: "claude-opus-4-7",
         max_turns: 25,
         auto_commit: false,
         auto_pr: true,
@@ -57,7 +57,7 @@ describe("globalConfigSchema", () => {
     if (result.success) {
       expect(result.data.orchestrator.tick_interval_ms).toBe(5000);
       expect(result.data.api.port).toBe(3847);
-      expect(result.data.defaults.model).toBe("claude-opus-4-6");
+      expect(result.data.defaults.model).toBe("claude-opus-4-7");
       expect(result.data.limits.max_concurrent_agents).toBe(5);
     }
   });
@@ -67,7 +67,7 @@ describe("projectConfigSchema", () => {
   it("accepts a valid project config", () => {
     const input = {
       project: { name: "Project Alpha", default_branch: "main" },
-      defaults: { model: "claude-opus-4-6", verification_required: true },
+      defaults: { model: "claude-opus-4-7", verification_required: true },
       limits: { max_concurrent_per_project: 4 },
       budget: { limit_usd: 500.0 },
     };
@@ -123,7 +123,7 @@ api:
     expect(config.api.port).toBe(4000);
     // Defaults still applied
     expect(config.api.host).toBe("localhost");
-    expect(config.defaults.model).toBe("claude-opus-4-6");
+    expect(config.defaults.model).toBe("claude-opus-4-7");
 
     rmSync(dir, { recursive: true });
   });
