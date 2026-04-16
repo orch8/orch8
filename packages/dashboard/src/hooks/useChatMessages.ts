@@ -17,7 +17,7 @@ export interface ChatMessage {
 
 export function useChatMessages(chatId: string) {
   return useQuery<ChatMessage[]>({
-    queryKey: ["chatMessages", chatId],
+    queryKey: ["chat-messages", chatId],
     queryFn: () => api.get(`/chats/${chatId}/messages`),
     enabled: chatId.length > 0,
   });
@@ -36,7 +36,7 @@ export function useSendChatMessage() {
       // Refetch messages so the user row appears immediately. The
       // assistant row arrives via WebSocket and the chat_message_complete
       // handler in WsEventsProvider invalidates this same query.
-      qc.invalidateQueries({ queryKey: ["chatMessages", chatId] });
+      qc.invalidateQueries({ queryKey: ["chat-messages", chatId] });
     },
   });
 }

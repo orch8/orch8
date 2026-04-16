@@ -16,7 +16,7 @@ interface ProjectSkill {
 
 export function useProjectSkills(projectId: string) {
   return useQuery({
-    queryKey: ["projectSkills", projectId],
+    queryKey: ["project-skills", projectId],
     queryFn: () => api.get<ProjectSkill[]>(`/projects/${projectId}/skills`),
     staleTime: 5_000,
   });
@@ -26,6 +26,6 @@ export function useSyncProjectSkills(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.post<{ synced: number }>(`/projects/${projectId}/skills/sync`, {}),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["projectSkills", projectId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["project-skills", projectId] }),
   });
 }

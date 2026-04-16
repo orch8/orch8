@@ -31,7 +31,7 @@ export function useSupersedeFact() {
       category: string;
     }) => api.post(`/memory/knowledge/${entityId}/facts/${factId}/supersede`, { content: newContent, category }),
     onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: ["entityFacts", vars.entityId] });
+      qc.invalidateQueries({ queryKey: ["entity-facts", vars.entityId] });
     },
   });
 }

@@ -13,7 +13,7 @@ export interface DaemonConfig {
 
 export function useDaemonStatus() {
   return useQuery<DaemonStatus>({
-    queryKey: ["daemonStatus"],
+    queryKey: ["daemon-status"],
     queryFn: () => api.get("/daemon/status"),
     refetchInterval: 10_000,
   });
@@ -21,7 +21,7 @@ export function useDaemonStatus() {
 
 export function useDaemonConfig() {
   return useQuery<DaemonConfig>({
-    queryKey: ["daemonConfig"],
+    queryKey: ["daemon-config"],
     queryFn: () => api.get("/daemon/config"),
   });
 }
@@ -32,7 +32,7 @@ export function useUpdateDaemonConfig() {
     mutationFn: (patch: Record<string, unknown>) =>
       api.patch("/daemon/config", patch),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["daemonConfig"] });
+      qc.invalidateQueries({ queryKey: ["daemon-config"] });
     },
   });
 }

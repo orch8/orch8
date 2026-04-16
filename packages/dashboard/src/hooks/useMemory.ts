@@ -20,7 +20,7 @@ export function useEntity(entityId: string | null) {
 
 export function useEntityFacts(entityId: string | null) {
   return useQuery<Fact[]>({
-    queryKey: ["entityFacts", entityId],
+    queryKey: ["entity-facts", entityId],
     queryFn: () => api.get(`/memory/knowledge/${entityId}/facts`),
     enabled: !!entityId,
   });
@@ -28,7 +28,7 @@ export function useEntityFacts(entityId: string | null) {
 
 export function useSearchFacts(query: string) {
   return useQuery<Fact[]>({
-    queryKey: ["factSearch", query],
+    queryKey: ["fact-search", query],
     queryFn: () => api.get("/memory/knowledge/search", { query }),
     enabled: query.length > 0,
   });
@@ -63,7 +63,7 @@ export function useCreateFact() {
       sourceTask?: string;
     }) => api.post(`/memory/knowledge/${entityId}/facts`, input),
     onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: ["entityFacts", vars.entityId] });
+      qc.invalidateQueries({ queryKey: ["entity-facts", vars.entityId] });
     },
   });
 }

@@ -44,7 +44,7 @@ describe("useRunLog", () => {
     });
 
     // Each hook should have its own cache entry — if projectId were missing
-    // from the key, both hooks would share `["runLog", "run_1"]` and the
+    // from the key, both hooks would share `["run-log", "run_1"]` and the
     // second hook would replay the first hook's data without a new fetch.
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(a.current.data).toEqual({
@@ -57,8 +57,8 @@ describe("useRunLog", () => {
     });
 
     // Direct cache-level assertion: both keys must exist independently.
-    const entryA = qc.getQueryData(["runLog", "run_1", "proj_a"]);
-    const entryB = qc.getQueryData(["runLog", "run_1", "proj_b"]);
+    const entryA = qc.getQueryData(["run-log", "run_1", "proj_a"]);
+    const entryB = qc.getQueryData(["run-log", "run_1", "proj_b"]);
     expect(entryA).not.toBeUndefined();
     expect(entryB).not.toBeUndefined();
     expect(entryA).not.toEqual(entryB);

@@ -28,7 +28,7 @@ export function useCardDecision() {
         { projectId },
       ),
     onSuccess: (_message, { chatId }) => {
-      qc.invalidateQueries({ queryKey: ["chatMessages", chatId] });
+      qc.invalidateQueries({ queryKey: ["chat-messages", chatId] });
     },
   });
 }
