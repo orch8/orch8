@@ -96,6 +96,9 @@ export const projects = pgTable("projects", {
 
   repoUrl: text("repo_url"),
   defaultBranch: text("default_branch").notNull().default("main"),
+  finishStrategy: text("finish_strategy")
+    .notNull()
+    .default("merge"),
 
   defaultModel: text("default_model"),
   defaultMaxTurns: integer("default_max_turns"),
@@ -199,6 +202,7 @@ export const tasks = pgTable("tasks", {
   // Git
   autoCommit: boolean("auto_commit").notNull().default(false),
   autoPr: boolean("auto_pr").notNull().default(true),
+  finishStrategy: text("finish_strategy"),
   branch: text("branch"),
   worktreePath: text("worktree_path"),
 
