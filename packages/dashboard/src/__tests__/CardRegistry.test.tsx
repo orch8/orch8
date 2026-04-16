@@ -110,6 +110,86 @@ describe("CardRegistry", () => {
     expect(screen.getByRole("button", { name: /approve/i })).toBeInTheDocument();
   });
 
+  it("falls back to a generic info card for an unknown info_* kind", () => {
+    renderCard(
+      makeExtracted({
+        kind: "info_unknown_widget" as ExtractedCard["kind"],
+        summary: "some summary",
+        payload: { count: 42 },
+      }),
+    );
+    // Humanized kind appears as the card title
+    expect(screen.getByText(/unknown widget/i)).toBeInTheDocument();
+    // Payload keys/values are rendered
+    expect(screen.getByText("count")).toBeInTheDocument();
+    expect(screen.getByText("42")).toBeInTheDocument();
+    // No approve/cancel chrome on info fallback
+    expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
+  });
+
+  it("falls back to a generic result card for an unknown result_* kind", () => {
+    renderCard(
+      makeExtracted({
+        kind: "result_mystery_action" as ExtractedCard["kind"],
+        summary: "Something happened",
+        payload: { value: "ok" },
+        status: "approved",
+      }),
+    );
+    // Summary is used as the title when available on result fallback
+    expect(screen.getByText(/something happened/i)).toBeInTheDocument();
+    // Payload rendered
+    expect(screen.getByText("value")).toBeInTheDocument();
+    expect(screen.getByText("ok")).toBeInTheDocument();
+  });
+
+  it("falls back to a generic info card for a truly unrecognizable kind", () => {
+    renderCard(
+      makeExtracted({
+        kind: "weird_thing" as ExtractedCard["kind"],
+        summary: "nonsense",
+        payload: { x: 1 },
+      }),
+    );
+    // The unknown-prefix path lands on GenericInfoFallback
+    expect(screen.getByText(/weird thing/i)).toBeInTheDocument();
+    expect(screen.getByText("x")).toBeInTheDocument();
+    // No "payload failed validation" or error-ish copy is shown
+    expect(screen.queryByText(/payload failed validation/i)).not.toBeInTheDocument();
+  });
+
+  it("does not show a 'payload failed validation' message for unknown kinds", () => {
+    renderCard(
+      makeExtracted({
+        kind: "confirm_destroy_universe" as ExtractedCard["kind"],
+        payload: {},
+      }),
+    );
+    expect(screen.queryByText(/payload failed validation/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/failed to parse/i)).not.toBeInTheDocument();
+  });
+
+  it("routes known kinds to their dedicated component, not the fallback", () => {
+    // A known info_task_list with a valid payload should render the real
+    // InfoTaskListCard (which surfaces the task count), not the generic
+    // fallback (which would render a `tasks` key/value pair).
+    renderCard(
+      makeExtracted({
+        kind: "info_task_list",
+        summary: "2 tasks",
+        payload: {
+          tasks: [
+            { id: "task_a", title: "T1", column: "backlog" },
+            { id: "task_b", title: "T2", column: "done" },
+          ],
+        },
+      }),
+    );
+    // The real component renders the task titles as link text.
+    expect(screen.getByText("T1")).toBeInTheDocument();
+    expect(screen.getByText("T2")).toBeInTheDocument();
+  });
+
   it("renders a result_error card directly", () => {
     renderCard(
       makeExtracted({

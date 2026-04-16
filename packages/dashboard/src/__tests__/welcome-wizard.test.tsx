@@ -113,6 +113,69 @@ describe("WelcomeWizard", () => {
     expect(screen.getByText("Create Your First Task")).toBeInTheDocument();
   });
 
+  it("cannot advance past Setup step without choosing a path", async () => {
+    renderWithProviders(<WelcomeWizard onComplete={() => {}} onChatNavigate={() => {}} />);
+    // Welcome → Next (now on Setup step)
+    await userEvent.click(screen.getByText("Next"));
+    expect(screen.getByText("How would you like to get started?")).toBeInTheDocument();
+
+    // Clicking "Next" without choosing a path should be a no-op (guarded in handleStepChange)
+    await userEvent.click(screen.getByText("Next"));
+    // Still on Setup step — the Project step heading should NOT be visible
+    expect(screen.getByText("How would you like to get started?")).toBeInTheDocument();
+    expect(screen.queryByText("Create Project")).not.toBeInTheDocument();
+  });
+
+  it("manual path creates project and calls onComplete with the project id", async () => {
+    const projectId = "proj_manual_1";
+
+    mockFetch.mockImplementation((input: any, init?: RequestInit) => {
+      const url = String(input ?? "");
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (url.includes("/api/projects") && method === "POST") {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          text: () => Promise.resolve(JSON.stringify({ id: projectId })),
+          json: () => Promise.resolve({ id: projectId }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve("[]"),
+        json: () => Promise.resolve([]),
+      });
+    });
+
+    const onComplete = vi.fn();
+    const onChatNavigate = vi.fn();
+    renderWithProviders(
+      <WelcomeWizard onComplete={onComplete} onChatNavigate={onChatNavigate} />,
+    );
+
+    // Welcome → Next
+    await userEvent.click(screen.getByText("Next"));
+    // Setup → choose manual path
+    await userEvent.click(screen.getByText("I know what I need"));
+    // Project step: fill required fields
+    await userEvent.type(screen.getByPlaceholderText("My App"), "Manual Project");
+    await userEvent.type(screen.getByPlaceholderText("/path/to/your/repo"), "/tmp/manual");
+    await userEvent.click(screen.getByText("Next"));
+    // Settings → Next
+    await userEvent.click(screen.getByText("Next"));
+    // Agents → Next (no selection)
+    await userEvent.click(screen.getByText("Next"));
+    // First Task step → Finish Setup (no task title — that's allowed)
+    await userEvent.click(screen.getByText("Finish Setup"));
+
+    await waitFor(() => {
+      expect(onComplete).toHaveBeenCalledWith(projectId);
+    });
+    // onChatNavigate should NOT be called for the manual path
+    expect(onChatNavigate).not.toHaveBeenCalled();
+  });
+
   it("conversational path creates project and chat, then calls onChatNavigate", async () => {
     const projectId = "proj_test123";
     const chatId = "chat_test456";
