@@ -6,11 +6,11 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jisko/orch8.git"
+    "url": "git+https://github.com/orch8/orch8.git"
   },
-  "homepage": "https://github.com/jisko/orch8#readme",
+  "homepage": "https://github.com/orch8/orch8#readme",
   "bugs": {
-    "url": "https://github.com/jisko/orch8/issues"
+    "url": "https://github.com/orch8/orch8/issues"
   },
   "scripts": {
     "dev": "vite",
