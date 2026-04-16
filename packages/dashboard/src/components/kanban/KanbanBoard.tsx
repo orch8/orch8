@@ -9,7 +9,8 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { useTasks, useTransitionTask } from "../../hooks/useTasks.js";
-import { KANBAN_COLUMNS, COLUMN_LABELS, type Task } from "../../types.js";
+import { KANBAN_COLUMNS, COLUMN_LABELS } from "@orch/shared";
+import type { Task } from "../../types.js";
 import { KanbanColumn } from "./KanbanColumn.js";
 import { TaskCard } from "./TaskCard.js";
 import { BoardToolbar, type BoardFilters } from "./BoardToolbar.js";

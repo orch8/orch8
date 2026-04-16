@@ -4,7 +4,7 @@ import type {
   CostSummary,
   CostTimeseriesPoint,
   TaskCost,
-} from "../types.js";
+} from "@orch/shared";
 
 export function useCostSummary(projectId: string, agentId?: string) {
   return useQuery<CostSummary>({

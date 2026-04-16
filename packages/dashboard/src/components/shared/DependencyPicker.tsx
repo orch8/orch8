@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useTasks } from "../../hooks/useTasks.js";
-import { COLUMN_LABELS, type KanbanColumn } from "../../types.js";
+import { COLUMN_LABELS, type KanbanColumn } from "@orch/shared";
 
 interface DependencyPickerProps {
   projectId: string;

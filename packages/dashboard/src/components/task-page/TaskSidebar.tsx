@@ -3,7 +3,7 @@ import { useAgents } from "../../hooks/useAgents.js";
 import { useTaskCost } from "../../hooks/useCost.js";
 import { DependenciesSection } from "../task-detail/DependenciesSection.js";
 import { InlineEdit } from "./InlineEdit.js";
-import { KANBAN_COLUMNS, COLUMN_LABELS, type KanbanColumn } from "../../types.js";
+import { KANBAN_COLUMNS, COLUMN_LABELS, type KanbanColumn } from "@orch/shared";
 import type { Task } from "../../types.js";
 
 const COLUMN_COLORS: Record<string, string> = {

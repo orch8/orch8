@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
-import type { Run, RunLog } from "../types.js";
+import type { Run } from "../types.js";
+import type { RunLog } from "@orch/shared";
 
 export function useRuns(
   projectId: string,

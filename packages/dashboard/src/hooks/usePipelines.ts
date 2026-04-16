@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client.js";
-import type { Pipeline, PipelineWithSteps } from "../types.js";
+import type { Pipeline } from "../types.js";
+import type { PipelineWithSteps } from "@orch/shared";
 
 export function usePipelines(projectId: string) {
   return useQuery<Pipeline[]>({

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { KANBAN_COLUMNS, COLUMN_LABELS, type Task } from "../../types.js";
+import { KANBAN_COLUMNS, COLUMN_LABELS } from "@orch/shared";
+import type { Task } from "../../types.js";
 
 interface TaskMoveMenuProps {
   task: Task;

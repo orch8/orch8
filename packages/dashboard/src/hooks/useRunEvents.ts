@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { api } from "../api/client.js";
-import type { RunEvent } from "../types.js";
+import type { RunEvent } from "@orch/shared";
 import { useWsEvents } from "./WsEventsProvider.js";
 
 export function useRunEvents(runId: string | null, projectId: string) {

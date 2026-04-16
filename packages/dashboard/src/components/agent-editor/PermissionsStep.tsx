@@ -1,4 +1,4 @@
-import { KANBAN_COLUMNS, COLUMN_LABELS, type KanbanColumn } from "../../types.js";
+import { KANBAN_COLUMNS, COLUMN_LABELS, type KanbanColumn } from "@orch/shared";
 
 export interface PermissionsData {
   canCreateTasks: boolean;
