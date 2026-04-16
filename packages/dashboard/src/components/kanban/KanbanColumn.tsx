@@ -60,7 +60,7 @@ export function KanbanColumn({
           className={`inline-block h-3 w-[3px] ${COLUMN_STRIPE[column] ?? "bg-whisper"}`}
         />
         <span className="type-label text-mute">{label}</span>
-        <span className="ml-auto type-numeral text-ink" style={{ fontSize: "16px" }}>
+        <span className="ml-auto type-numeral text-base text-ink">
           {tasks.length}
         </span>
       </div>
