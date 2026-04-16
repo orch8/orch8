@@ -12,7 +12,6 @@ const mockBundledAgents = [
     maxTurns: 200,
     skills: ["tdd"],
     heartbeatEnabled: false,
-    systemPrompt: "You are an implementer agent.",
   },
   {
     id: "reviewer",
@@ -22,7 +21,6 @@ const mockBundledAgents = [
     maxTurns: 180,
     skills: [],
     heartbeatEnabled: false,
-    systemPrompt: "You are a reviewer agent.",
   },
 ];
 
@@ -66,7 +64,7 @@ describe("AgentWizard", () => {
     expect(screen.getByText("Model")).toBeInTheDocument();
   });
 
-  it("shows all 5 step labels in progress indicator", async () => {
+  it("shows all step labels in progress indicator", async () => {
     renderWithProviders(
       <AgentWizard projectId="proj_1" onCreated={() => {}} />,
     );
@@ -74,7 +72,6 @@ describe("AgentWizard", () => {
       expect(screen.getByText("Template")).toBeInTheDocument();
     });
     expect(screen.getByText("Identity")).toBeInTheDocument();
-    expect(screen.getByText("Prompts")).toBeInTheDocument();
     expect(screen.getByText("Permissions")).toBeInTheDocument();
     expect(screen.getByText("Budget")).toBeInTheDocument();
   });

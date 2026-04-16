@@ -11,7 +11,6 @@ export function AgentForm({ agent }: AgentFormProps) {
   const pauseAgent = usePauseAgent();
   const resumeAgent = useResumeAgent();
 
-  const [systemPrompt, setSystemPrompt] = useState(agent.systemPrompt ?? "");
   const [model, setModel] = useState(agent.model ?? "");
   const [effort, setEffort] = useState(agent.effort ?? "");
   const [budgetLimit, setBudgetLimit] = useState(
@@ -19,7 +18,6 @@ export function AgentForm({ agent }: AgentFormProps) {
   );
 
   useEffect(() => {
-    setSystemPrompt(agent.systemPrompt ?? "");
     setModel(agent.model ?? "");
     setEffort(agent.effort ?? "");
     setBudgetLimit(agent.budgetLimitUsd?.toString() ?? "");
@@ -29,7 +27,6 @@ export function AgentForm({ agent }: AgentFormProps) {
     updateAgent.mutate({
       agentId: agent.id,
       projectId: agent.projectId,
-      systemPrompt: systemPrompt || undefined,
       model: model || undefined,
       effort: effort || null,
       budgetLimitUsd: budgetLimit ? parseFloat(budgetLimit) : null,
@@ -143,18 +140,6 @@ export function AgentForm({ agent }: AgentFormProps) {
             : "Disabled"}
         </p>
       </div>
-
-      {/* System prompt editor */}
-      <div>
-        <label className="mb-1 block text-xs text-zinc-500">System Prompt</label>
-        <textarea
-          value={systemPrompt}
-          onChange={(e) => setSystemPrompt(e.target.value)}
-          rows={8}
-          className="w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-200 focus:border-zinc-600 focus:outline-none"
-        />
-      </div>
-
 
       {/* MCP Tools */}
       {agent.mcpTools && agent.mcpTools.length > 0 && (

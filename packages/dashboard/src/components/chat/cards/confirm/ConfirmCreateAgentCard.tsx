@@ -49,12 +49,6 @@ export function ConfirmCreateAgentCard({
             <dd className="text-zinc-300">{p.desiredSkills.join(", ")}</dd>
           </>
         )}
-        {p.systemPrompt && (
-          <>
-            <dt className="text-zinc-500">prompt</dt>
-            <dd className="text-zinc-300 line-clamp-3">{p.systemPrompt}</dd>
-          </>
-        )}
       </dl>
     </BaseConfirmCard>
   );
