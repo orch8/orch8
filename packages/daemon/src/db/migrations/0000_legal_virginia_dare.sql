@@ -1,6 +1,8 @@
 CREATE TYPE "public"."agent_role" AS ENUM('cto', 'engineer', 'qa', 'researcher', 'planner', 'implementer', 'reviewer', 'verifier', 'referee', 'custom');--> statement-breakpoint
 CREATE TYPE "public"."agent_status" AS ENUM('active', 'paused', 'terminated');--> statement-breakpoint
 CREATE TYPE "public"."brainstorm_status" AS ENUM('active', 'idle', 'ready', 'expired');--> statement-breakpoint
+CREATE TYPE "public"."chat_message_role" AS ENUM('user', 'assistant', 'system');--> statement-breakpoint
+CREATE TYPE "public"."chat_message_status" AS ENUM('streaming', 'complete', 'error');--> statement-breakpoint
 CREATE TYPE "public"."comment_type" AS ENUM('inline', 'system', 'verification', 'brainstorm');--> statement-breakpoint
 CREATE TYPE "public"."entity_type" AS ENUM('project', 'area', 'archive');--> statement-breakpoint
 CREATE TYPE "public"."fact_category" AS ENUM('decision', 'status', 'milestone', 'issue', 'relationship', 'convention', 'observation');--> statement-breakpoint
@@ -14,7 +16,7 @@ CREATE TYPE "public"."task_type" AS ENUM('quick', 'brainstorm');--> statement-br
 CREATE TYPE "public"."wakeup_source" AS ENUM('timer', 'assignment', 'on_demand', 'automation');--> statement-breakpoint
 CREATE TYPE "public"."wakeup_status" AS ENUM('queued', 'claimed', 'coalesced', 'deferred_issue_execution', 'skipped', 'budget_blocked');--> statement-breakpoint
 CREATE TYPE "public"."pipeline_status" AS ENUM('pending', 'running', 'completed', 'failed', 'cancelled');--> statement-breakpoint
-CREATE TYPE "public"."pipeline_step_status" AS ENUM('pending', 'running', 'completed', 'skipped', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."pipeline_step_status" AS ENUM('pending', 'running', 'completed', 'skipped', 'failed', 'awaiting_verification');--> statement-breakpoint
 CREATE TABLE "activity_log" (
 	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "activity_log_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"project_id" text NOT NULL,
@@ -34,7 +36,7 @@ CREATE TABLE "agents" (
 	"status" "agent_status" DEFAULT 'active' NOT NULL,
 	"icon" text DEFAULT '🤖',
 	"color" text DEFAULT '#888780',
-	"model" text DEFAULT 'claude-opus-4-6' NOT NULL,
+	"model" text DEFAULT 'claude-opus-4-7' NOT NULL,
 	"effort" text,
 	"max_turns" integer DEFAULT 180 NOT NULL,
 	"allowed_tools" text[] DEFAULT '{}',
@@ -52,10 +54,6 @@ CREATE TABLE "agents" (
 	"can_assign_to" text[] DEFAULT '{}',
 	"can_create_tasks" boolean DEFAULT false,
 	"can_move_to" "task_column"[] DEFAULT '{}',
-	"system_prompt" text DEFAULT '',
-	"prompt_template" text DEFAULT '',
-	"bootstrap_prompt_template" text DEFAULT '',
-	"instructions_file_path" text,
 	"mcp_tools" text[] DEFAULT '{}',
 	"skill_paths" text[] DEFAULT '{}',
 	"desired_skills" text[],
@@ -72,9 +70,35 @@ CREATE TABLE "agents" (
 	"budget_paused" boolean DEFAULT false NOT NULL,
 	"pause_reason" text,
 	"env_vars" jsonb DEFAULT '{}'::jsonb,
+	"agent_token_hash" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "agents_id_project_id_pk" PRIMARY KEY("id","project_id")
+	CONSTRAINT "agents_id_project_id_pk" PRIMARY KEY("id","project_id"),
+	CONSTRAINT "agents_agent_token_hash_unique" UNIQUE("agent_token_hash")
+);
+--> statement-breakpoint
+CREATE TABLE "chat_messages" (
+	"id" text PRIMARY KEY NOT NULL,
+	"chat_id" text NOT NULL,
+	"role" "chat_message_role" NOT NULL,
+	"content" text DEFAULT '' NOT NULL,
+	"cards" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"skill_invoked" text,
+	"run_id" text,
+	"status" "chat_message_status" DEFAULT 'complete' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "chats" (
+	"id" text PRIMARY KEY NOT NULL,
+	"project_id" text NOT NULL,
+	"agent_id" text NOT NULL,
+	"title" text DEFAULT 'New chat' NOT NULL,
+	"pinned" boolean DEFAULT false NOT NULL,
+	"archived" boolean DEFAULT false NOT NULL,
+	"last_message_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "comments" (
@@ -118,19 +142,6 @@ CREATE TABLE "heartbeat_runs" (
 	"retry_of_run_id" text,
 	"process_loss_retry_count" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "instruction_bundles" (
-	"id" text PRIMARY KEY NOT NULL,
-	"agent_id" text NOT NULL,
-	"project_id" text NOT NULL,
-	"mode" text DEFAULT 'managed' NOT NULL,
-	"root_path" text NOT NULL,
-	"entry_file" text DEFAULT 'AGENTS.md' NOT NULL,
-	"file_inventory" jsonb DEFAULT '[]'::jsonb NOT NULL,
-	"metadata" jsonb,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "knowledge_entities" (
@@ -314,6 +325,7 @@ CREATE TABLE "pipeline_steps" (
 	"task_id" text,
 	"agent_id" text,
 	"prompt_override" text,
+	"requires_verification" boolean DEFAULT false NOT NULL,
 	"output_file_path" text,
 	"output_summary" text,
 	"status" "pipeline_step_status" DEFAULT 'pending' NOT NULL,
@@ -349,11 +361,13 @@ ALTER TABLE "activity_log" ADD CONSTRAINT "activity_log_project_id_projects_id_f
 ALTER TABLE "activity_log" ADD CONSTRAINT "activity_log_task_id_tasks_id_fk" FOREIGN KEY ("task_id") REFERENCES "public"."tasks"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "activity_log" ADD CONSTRAINT "activity_log_run_id_heartbeat_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."heartbeat_runs"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "agents" ADD CONSTRAINT "agents_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_chat_id_chats_id_fk" FOREIGN KEY ("chat_id") REFERENCES "public"."chats"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_run_id_heartbeat_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."heartbeat_runs"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "chats" ADD CONSTRAINT "chats_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "comments" ADD CONSTRAINT "comments_task_id_tasks_id_fk" FOREIGN KEY ("task_id") REFERENCES "public"."tasks"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "heartbeat_runs" ADD CONSTRAINT "heartbeat_runs_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "heartbeat_runs" ADD CONSTRAINT "heartbeat_runs_task_id_tasks_id_fk" FOREIGN KEY ("task_id") REFERENCES "public"."tasks"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "heartbeat_runs" ADD CONSTRAINT "heartbeat_runs_parent_run_id_heartbeat_runs_id_fk" FOREIGN KEY ("parent_run_id") REFERENCES "public"."heartbeat_runs"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "instruction_bundles" ADD CONSTRAINT "instruction_bundles_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_entities" ADD CONSTRAINT "knowledge_entities_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_facts" ADD CONSTRAINT "knowledge_facts_entity_id_knowledge_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."knowledge_entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_facts" ADD CONSTRAINT "knowledge_facts_source_task_tasks_id_fk" FOREIGN KEY ("source_task") REFERENCES "public"."tasks"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -374,7 +388,9 @@ ALTER TABLE "pipeline_steps" ADD CONSTRAINT "pipeline_steps_pipeline_id_pipeline
 ALTER TABLE "pipeline_templates" ADD CONSTRAINT "pipeline_templates_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "pipelines" ADD CONSTRAINT "pipelines_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "pipelines" ADD CONSTRAINT "pipelines_template_id_pipeline_templates_id_fk" FOREIGN KEY ("template_id") REFERENCES "public"."pipeline_templates"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "instruction_bundles_agent_project_idx" ON "instruction_bundles" USING btree ("agent_id","project_id");--> statement-breakpoint
+CREATE INDEX "chat_messages_chat_created_idx" ON "chat_messages" USING btree ("chat_id","created_at");--> statement-breakpoint
+CREATE INDEX "chats_project_last_msg_idx" ON "chats" USING btree ("project_id","last_message_at");--> statement-breakpoint
+CREATE INDEX "chats_project_archived_idx" ON "chats" USING btree ("project_id","archived");--> statement-breakpoint
 CREATE UNIQUE INDEX "uniq_entity_project_slug" ON "knowledge_entities" USING btree ("project_id","slug");--> statement-breakpoint
 CREATE UNIQUE INDEX "project_skills_project_slug_idx" ON "project_skills" USING btree ("project_id","slug");--> statement-breakpoint
 CREATE INDEX "run_events_run_id_seq_idx" ON "run_events" USING btree ("run_id","seq");--> statement-breakpoint
