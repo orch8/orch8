@@ -3,7 +3,7 @@ import { usePauseAgent, useResumeAgent, useUpdateAgent } from "../../hooks/useAg
 import type { Agent } from "../../types.js";
 import { GeneralTab } from "./GeneralTab.js";
 import { ExecutionTab } from "./ExecutionTab.js";
-import { PromptsTab } from "./PromptsTab.js";
+import { InstructionsTab } from "./InstructionsTab.js";
 import { SkillsToolsTab } from "./SkillsToolsTab.js";
 import { PermissionsTab } from "./PermissionsTab.js";
 import { BudgetTab } from "./BudgetTab.js";
@@ -12,7 +12,7 @@ import { RunInspector } from "../runs/RunInspector.js";
 const TABS = [
   "General",
   "Execution",
-  "Prompts",
+  "Instructions",
   "Skills & Tools",
   "Permissions",
   "Budget",
@@ -103,8 +103,8 @@ export function AgentSettingsPage({ agent, projectId }: AgentSettingsPageProps) 
       {activeTab === "Execution" && (
         <ExecutionTab agent={agent} projectId={projectId} updateAgent={updateAgent} />
       )}
-      {activeTab === "Prompts" && (
-        <PromptsTab agent={agent} projectId={projectId} updateAgent={updateAgent} />
+      {activeTab === "Instructions" && (
+        <InstructionsTab agentId={agent.id} projectId={projectId} />
       )}
       {activeTab === "Skills & Tools" && (
         <SkillsToolsTab agent={agent} projectId={projectId} updateAgent={updateAgent} />
