@@ -41,12 +41,11 @@ These variables provide workspace context so you don't need to run git commands:
 
 | Variable | Description |
 |---|---|
-| `ORCH_WORKSPACE_BRANCH` | Current git branch for the task workspace |
 | `ORCH_WORKSPACE_REPO_URL` | Remote origin URL of the repository |
-| `ORCH_WORKTREE_PATH` | Absolute path to the task's git worktree (if using worktrees) |
 | `ORCH_WORKSPACE_ID` | The project ID (same as `ORCH_PROJECT_ID`) |
 | `ORCH_WAKE_COMMENT_ID` | The comment ID that triggered this wakeup (when triggered by a comment) |
 | `ORCH_LINKED_ISSUE_IDS` | Comma-separated list of linked issue IDs for the current task |
+| `ORCH_FINISH_STRATEGY` | `pr` / `merge` / `none` — how to integrate the task branch when finishing. Set for non-brainstorm tasks. |
 
 ### Standard Request Pattern
 
@@ -107,7 +106,9 @@ Check `$ORCH_WAKE_REASON`:
 
 ### Step 3: Checkout before working
 
-**ALWAYS** checkout a task before doing any work on it:
+If the task is not a brainstorm, invoke the `using-git-worktrees` skill before doing any domain work — it ensures you're in the right per-task worktree, creating one on first wake.
+
+Then, **ALWAYS** checkout a task before doing any work on it:
 
 ```bash
 curl -s -X POST "${ORCH_API_URL}/api/tasks/${TASK_ID}/checkout" \
@@ -116,7 +117,7 @@ curl -s -X POST "${ORCH_API_URL}/api/tasks/${TASK_ID}/checkout" \
   -H "X-Run-Id: ${ORCH_RUN_ID}"
 ```
 
-**Success (200):** Task is now yours. Response includes the task with `column: "in_progress"`, execution lock set, and `worktreePath` for your working directory.
+**Success (200):** Task is now yours. Response includes the task with `column: "in_progress"` and the execution lock set. Your working directory is the per-task worktree set up by `using-git-worktrees`.
 
 **Conflict (409):** Another agent owns this task. **Do NOT retry.** Pick a different task.
 
@@ -127,6 +128,8 @@ Use your domain tools (write code, run tests, research, etc.). This is your norm
 ### Step 5: Update status and communicate
 
 After working, update the task and leave a comment:
+
+**Before marking done.** For non-brainstorm tasks, invoke the `finishing-a-development-branch` skill before PATCHing `column: "done"`. The skill integrates your branch per `ORCH_FINISH_STRATEGY` and removes the worktree.
 
 ```bash
 # Update task status (e.g., mark as done)
