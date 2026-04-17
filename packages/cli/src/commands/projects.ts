@@ -58,8 +58,12 @@ export function registerProjectCommands(
     .requiredOption("--name <name>", "Project name")
     .requiredOption("--home <path>", "Git repo home directory")
     .option("--slug <slug>", "URL-safe slug (auto-generated from name)")
-    .option("--worktree <path>", "Worktree directory (default: <home>/.worktrees)")
     .option("--branch <branch>", "Default branch", "main")
+    .option(
+      "--finish-strategy <mode>",
+      "How to integrate task work when done: pr | merge | none",
+      "merge",
+    )
     .option("--budget <usd>", "Budget limit in USD")
     .option("--json", "Output as JSON")
     .action(async (opts) => {
@@ -70,14 +74,13 @@ export function registerProjectCommands(
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "");
-      const worktreeDir = opts.worktree ?? `${opts.home}/.worktrees`;
 
       const project = await client.post<Project>("/projects", {
         name: opts.name,
         slug,
         homeDir: opts.home,
-        worktreeDir,
         defaultBranch: opts.branch,
+        finishStrategy: opts.finishStrategy,
         budgetLimitUsd: opts.budget ? Number(opts.budget) : undefined,
       });
 
