@@ -234,10 +234,11 @@ export function buildServer(options: ServerOptions = {}) {
             );
             if (created) provisionedCount++;
             await seedingService.ensureInitialChat(dbClient.db, project.id);
+            await seedingService.reconcileAgentSkills(dbClient.db, project.id);
           } catch (err) {
             app.log.error(
               { err, projectId: project.id },
-              "Failed to provision chat agent for project",
+              "Failed to provision chat agent or reconcile skills for project",
             );
           }
         }
