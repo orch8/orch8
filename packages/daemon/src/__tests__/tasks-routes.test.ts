@@ -246,6 +246,28 @@ describe("Task API Routes", () => {
       expect(body.title).toBe("New");
       expect(body.priority).toBe("high");
     });
+
+    it("round-trips finishStrategy on a task", async () => {
+      const created = await app.inject({
+        method: "POST",
+        url: "/api/tasks",
+        payload: {
+          title: "Strategy task",
+          projectId,
+          taskType: "quick",
+        },
+      });
+      const task = created.json();
+
+      const patched = await app.inject({
+        method: "PATCH",
+        url: `/api/tasks/${task.id}`,
+        payload: { finishStrategy: "none" },
+      });
+
+      expect(patched.statusCode).toBe(200);
+      expect(patched.json().finishStrategy).toBe("none");
+    });
   });
 
   describe("DELETE /api/tasks/:id", () => {

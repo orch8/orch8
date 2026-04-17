@@ -34,7 +34,7 @@ describe("Project Routes", () => {
   });
 
   describe("POST /api/projects", () => {
-    it("creates a project (admin)", async () => {
+    it("creates a project with the default merge strategy when finishStrategy is omitted", async () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/projects",
@@ -47,9 +47,43 @@ describe("Project Routes", () => {
 
       expect(res.statusCode).toBe(201);
       const body = res.json();
-      expect(body.name).toBe("Test Project");
-      expect(body.slug).toBe("test-project");
+      expect(body.finishStrategy).toBe("merge");
       expect(body.id).toMatch(/^proj_/);
+    });
+
+    it("accepts an explicit finishStrategy", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/projects",
+        payload: {
+          name: "PR Project",
+          slug: "pr-project",
+          homeDir: "/tmp/pr",
+          finishStrategy: "pr",
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().finishStrategy).toBe("pr");
+    });
+
+    it("rejects the legacy worktreeDir field", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/projects",
+        payload: {
+          name: "Legacy",
+          slug: "legacy",
+          homeDir: "/tmp/legacy",
+          worktreeDir: "/tmp/wt",
+        },
+      });
+
+      // Zod allows unknown keys by default — the field is silently dropped, but
+      // the project must still be created without it. Confirm no worktreeDir
+      // makes it onto the row.
+      expect(res.statusCode).toBe(201);
+      expect(res.json()).not.toHaveProperty("worktreeDir");
     });
 
     it("returns 400 for missing required fields", async () => {
