@@ -10,6 +10,8 @@ skills:
   - systematic-debugging
   - verification
   - subagent-coordination
+  - using-git-worktrees
+  - finishing-a-development-branch
 heartbeat:
   enabled: false
 ---
