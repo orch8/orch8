@@ -66,6 +66,8 @@ const fixtures: Record<ChatCardKind, unknown> = {
       // unset numeric fields. AgentPatchSchema already accepts null,
       // so keep AgentCreateInputSchema consistent.
       budgetLimitUsd: null,
+      agentsMd: "# QA Bot\n\nRuns regression sweeps...\n",
+      heartbeatMd: "Check the last 24h of runs for regressions.\n",
     },
   },
   confirm_update_agent: {

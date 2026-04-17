@@ -246,6 +246,14 @@ const AgentCreateInputSchema = z.object({
   desiredSkills: z.array(z.string()).optional(),
   allowedTools: z.array(z.string()).optional(),
   budgetLimitUsd: z.number().nonnegative().nullable().optional(),
+  // Proposed AGENTS.md / heartbeat.md contents drafted during the
+  // brainstorm. Carried on the confirm card so the user approves the
+  // agent's substance alongside its config; on approval the chat agent
+  // writes them via PUT /api/agents/{id}/instructions. Capped well
+  // below the chat-cards transport limits so a runaway prompt can't
+  // balloon a single card past the message size budget.
+  agentsMd: z.string().max(50_000).optional(),
+  heartbeatMd: z.string().max(20_000).optional(),
 });
 
 const AgentPatchSchema = z.object({

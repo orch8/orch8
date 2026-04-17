@@ -50,6 +50,25 @@ export function ConfirmCreateAgentCard({
           </>
         )}
       </dl>
+      {(p.agentsMd || p.heartbeatMd) && (
+        <div className="mt-3 space-y-2">
+          {p.agentsMd && <InstructionsPreview label="AGENTS.md" body={p.agentsMd} />}
+          {p.heartbeatMd && <InstructionsPreview label="heartbeat.md" body={p.heartbeatMd} />}
+        </div>
+      )}
     </BaseConfirmCard>
+  );
+}
+
+function InstructionsPreview({ label, body }: { label: string; body: string }) {
+  return (
+    <details className="rounded border border-zinc-800 bg-zinc-950/60">
+      <summary className="cursor-pointer select-none px-2 py-1 text-[10px] uppercase tracking-widest text-zinc-500 hover:text-zinc-300">
+        {label} · {body.length.toLocaleString()} chars
+      </summary>
+      <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words px-2 pb-2 pt-1 text-[11px] leading-snug text-zinc-300">
+        {body}
+      </pre>
+    </details>
   );
 }

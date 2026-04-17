@@ -1,14 +1,16 @@
 ---
 name: agents
 description: >
-  Manage orch8 agents: create new agents, edit their config (name, model,
-  skills, tools, budget, heartbeat), pause and resume them, delete them.
-  Use when the user wants to add a new agent, change how an existing
-  agent works, or take an agent offline. Do NOT use for runs (use the
-  `runs` skill) or for assigning tasks to agents (use the `tasks` skill).
-  Editing an agent's system prompt is handled through the Instructions
-  tab / `PUT /api/agents/{id}/instructions`, not through this skill's
-  confirm cards.
+  Manage orch8 agents: create new agents (config + instructions), edit
+  their config (name, model, skills, tools, budget, heartbeat), pause
+  and resume them, delete them. Use when the user wants to add a new
+  agent, change how an existing agent works, or take an agent offline.
+  Do NOT use for runs (use the `runs` skill) or for assigning tasks to
+  agents (use the `tasks` skill). Editing an EXISTING agent's system
+  prompt is handled through the Instructions tab /
+  `PUT /api/agents/{id}/instructions` separately — this skill's
+  `confirm_create_agent` card does carry the initial AGENTS.md /
+  heartbeat.md contents for new agents.
 ---
 
 # Agents Skill
@@ -39,7 +41,7 @@ See the `orch8` skill for the full request body shapes.
 
 | Kind | Buttons | Payload essentials |
 |---|---|---|
-| `confirm_create_agent` | Approve / Cancel | full agent config (`id`, `name`, `role`, `model`, `effort?`, `maxTurns?`, `heartbeatEnabled?`, `desiredSkills?`, `allowedTools?`, `budgetLimitUsd?`) |
+| `confirm_create_agent` | Approve / Cancel | full agent config (`id`, `name`, `role`, `model`, `effort?`, `maxTurns?`, `heartbeatEnabled?`, `desiredSkills?`, `allowedTools?`, `budgetLimitUsd?`) plus drafted `agentsMd` and `heartbeatMd` (the latter only when heartbeat is enabled) |
 | `confirm_update_agent` | Approve / Cancel | `agentId`, `current`, `proposed` |
 | `confirm_pause_agent` | Approve / Cancel | `agentId`, `name`, `reason?` |
 | `confirm_resume_agent` | Approve / Cancel | `agentId`, `name` |
@@ -139,16 +141,83 @@ a bundled template where possible (e.g., "Option A: start from the
 `qa` template, bump heartbeat to 2h, switch to sonnet"). List
 trade-offs. Lead with the recommended option and explain why.
 
+For each option, spell out the proposed `desiredSkills` list (not
+just the model/heartbeat/budget). Skills are what actually make the
+agent competent — `orch8` alone is the bare minimum coordination
+baseline. Use the matrix in "Required and optional fields" below when
+the user went pure-custom; otherwise copy the bundled template's
+skills and mention any additions. Never leave this field blank.
+
 Still no card at this point. Brainstorming is for thought.
 
-### Step 4 — Converge and emit the confirm card
+### Step 4 — Draft the instructions
 
-When the user picks an option (or defers to the recommendation), stop
-brainstorming and emit a single `confirm_create_agent` card with the
-full config. If the chosen option started from a bundled template,
-inherit every field from the template and override only what the
-conversation specifically changed — never re-propose fields the
-template already pins.
+Once the user picks an option, draft the two markdown files that will
+live on disk alongside the agent row:
+
+- `AGENTS.md` — the agent's persistent system prompt. Covers its role,
+  responsibilities, how it collaborates with other agents, any
+  non-obvious constraints, and whatever workflow hints it needs to do
+  its job. If the chosen option started from a bundled template
+  (`cto`, `qa`, `implementer`, `planner`, `researcher`, `reviewer`),
+  open the template's `AGENTS.md` on disk at
+  `<projectRoot>/.orch8/agents/<template-id>/AGENTS.md` (or the shared
+  `packages/shared/defaults/agents/<template-id>/AGENTS.md` if the
+  template hasn't been copied yet) and adapt it; don't invent from
+  scratch when a template captures the archetype.
+- `heartbeat.md` — ONLY when `heartbeatEnabled` is true. Describes
+  what the agent should do on each timer wake, e.g., "check the last
+  24h of runs for regressions, file a new task if any." Skip the file
+  for on-demand / assignment-only agents.
+
+Show both drafts to the user inline (plain markdown fences, not a
+card) and ask if they want to tweak anything before you commit to the
+card. Keep each file tight — `AGENTS.md` is loaded on every turn, so
+verbosity burns tokens. A few hundred words is usually enough; over
+~2000 words suggests the content belongs in a skill instead.
+
+### Step 5 — Converge and emit the confirm card
+
+When the user signs off on the drafts (or defers to them verbatim),
+stop brainstorming and emit a single `confirm_create_agent` card
+that carries BOTH the config AND the drafted markdown in its payload
+— `agentsMd` and, if applicable, `heartbeatMd`. If the chosen option
+started from a bundled template, inherit every config field from the
+template and override only what the conversation specifically changed
+— never re-propose fields the template already pins.
+
+### Step 6 — On approval, create the agent AND write instructions
+
+After the user approves, make TWO API calls in order before emitting
+the `result_create_agent` card:
+
+1. `POST /api/agents` with the config fields (everything in the
+   confirm card payload EXCEPT `agentsMd` / `heartbeatMd`). This
+   inserts the agent row and seeds placeholder markdown files.
+2. `PUT /api/agents/{id}/instructions` with an `{ agentsMd,
+   heartbeatMd? }` body, using the drafts from the confirm card
+   payload. This overwrites the placeholders with the real content.
+
+```bash
+# Step 6a — create the agent row
+curl -s -X POST "${ORCH_API_URL}/api/agents" \
+  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
+  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Content-Type: application/json" \
+  -d @agent-config.json
+
+# Step 6b — write the drafted instructions
+curl -s -X PUT "${ORCH_API_URL}/api/agents/${AGENT_ID}/instructions" \
+  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
+  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Content-Type: application/json" \
+  -d @instructions.json
+```
+
+Only after BOTH calls succeed do you emit `result_create_agent`. If
+the POST succeeds but the PUT fails, say so explicitly in a
+`result_error` card — the agent exists with placeholder instructions
+and the user needs to know.
 
 ## Required and optional fields
 
@@ -177,12 +246,16 @@ config from scratch.
 
 > Agents no longer store prompts in the database. The system prompt
 > lives in `<projectRoot>/.orch8/agents/<slug>/AGENTS.md` on disk, and
-> the per-wake heartbeat brief lives in `heartbeat.md` next to it. To
-> edit either one, use `PUT /api/agents/{id}/instructions` with an
-> `agentsMd` and/or `heartbeatMd` body, or the Instructions tab in the
-> dashboard. Do NOT try to set `systemPrompt`, `promptTemplate`,
-> `bootstrapPromptTemplate`, or `instructionsFilePath` on a confirm
-> card — those fields no longer exist.
+> the per-wake heartbeat brief lives in `heartbeat.md` next to it.
+> For CREATE, draft the initial contents during the brainstorm and
+> ship them on the `confirm_create_agent` card as `agentsMd` and
+> `heartbeatMd`; on approval, call `POST /api/agents` then
+> `PUT /api/agents/{id}/instructions` as described in Step 6. For
+> editing an EXISTING agent, use `PUT /api/agents/{id}/instructions`
+> directly or the Instructions tab. Do NOT try to set `systemPrompt`,
+> `promptTemplate`, `bootstrapPromptTemplate`, or
+> `instructionsFilePath` on any confirm card — those fields do not
+> exist.
 
 **Tools & skills**
 - `allowedTools` — usually `["Bash","Read","Edit","Write","Grep","Glob"]`.
@@ -191,9 +264,33 @@ config from scratch.
   names specific MCP servers.
 - `skillPaths` — raw filesystem skill paths. Rare and DB-only; prefer
   `desiredSkills`.
-- `desiredSkills` — list of skill slugs to load on every turn. Default
-  to none unless the user names specific skills, or inherit from the
-  chosen bundled template.
+- `desiredSkills` — list of skill slugs to load on every turn. ALWAYS
+  propose a non-empty list — an agent with no skills can't coordinate
+  beyond the auto-injected `orch8` baseline, which is almost never
+  what the user wants. If the chosen option started from a bundled
+  template, copy that template's skill list verbatim and add any
+  extras the conversation uncovered. If the user declined every
+  template (pure `custom` role), use the matrix below:
+
+  | Role shape                        | Baseline `desiredSkills`                                                                       |
+  |-----------------------------------|------------------------------------------------------------------------------------------------|
+  | `cto` / oversight                 | `verification`, `parallel-decomposition`, `using-git-worktrees`, `finishing-a-development-branch` |
+  | `implementer` / `engineer`        | `tdd`, `systematic-debugging`, `verification`, `subagent-coordination`, `using-git-worktrees`, `finishing-a-development-branch` |
+  | `planner`                         | `plan-quality`, `verification`, `using-git-worktrees`, `finishing-a-development-branch`        |
+  | `qa` / `verifier`                 | `verification`, `using-git-worktrees`, `finishing-a-development-branch`                        |
+  | `researcher`                      | `research-methodology`, `verification`, `using-git-worktrees`, `finishing-a-development-branch` |
+  | `reviewer` / `referee`            | `spec-compliance-review`, `code-quality-review`, `using-git-worktrees`, `finishing-a-development-branch` |
+  | `custom` (no clear archetype)     | `verification`, `using-git-worktrees`, `finishing-a-development-branch`                        |
+
+  The `orch8` skill is auto-injected by the adapter on every run, so
+  listing it is optional; the bundled templates list it explicitly for
+  visibility and the adapter de-dupes. When in doubt, keep it on the
+  list so the user sees it in the confirm card.
+
+  If the user says "just the basics" or "don't add anything fancy,"
+  still propose the baseline — explain that without these the agent
+  can't verify its own work, use worktrees, or finish a branch
+  cleanly. Only drop them if the user explicitly waves each one off.
 
 **Wake triggers**
 - `wakeOnAssignment` — wake when a task is assigned. Usually `true`.
@@ -232,6 +329,14 @@ config from scratch.
 - `adapterConfig` — adapter-specific configuration object.
 - `envVars` — extra environment variables to inject into the agent's
   spawn environment.
+
+**Instructions (confirm card only, not part of `POST /api/agents`)**
+- `agentsMd` — the drafted `AGENTS.md` content. Required on
+  `confirm_create_agent` so the user approves config and substance
+  together. Written to disk by `PUT /api/agents/{id}/instructions`
+  after approval — do NOT send this field to `POST /api/agents`.
+- `heartbeatMd` — the drafted `heartbeat.md` content. Include ONLY
+  when `heartbeatEnabled` is `true`. Same delivery path as `agentsMd`.
 
 For CREATE requests, always walk the user through the interactive
 brainstorm mode above — even when the request looks concrete.
