@@ -10,7 +10,6 @@ import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "../adapter
 import type { MemoryExtractionService } from "./memory-extraction.service.js";
 import type { BroadcastService } from "./broadcast.service.js";
 import type { PipelineService } from "./pipeline.service.js";
-import { WorktreeService } from "./worktree.service.js";
 import type { FastifyBaseLogger } from "fastify";
 import { RunLogger, type LogHandle } from "./run-logger.js";
 import { mkdir } from "node:fs/promises";
@@ -62,15 +61,6 @@ async function getRepoUrl(cwd: string): Promise<string | undefined> {
   }
 }
 
-async function getBranch(cwd: string): Promise<string | undefined> {
-  try {
-    const { stdout } = await execFileAsync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd });
-    return stdout.trim() || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 export class HeartbeatService {
   // In-memory tracking for orphan detection
   private activeRunExecutions = new Set<string>();
@@ -83,7 +73,6 @@ export class HeartbeatService {
   private extractionService: MemoryExtractionService | null = null;
   private logger: FastifyBaseLogger | null = null;
   private onRunCompleted?: (taskId: string, status: string) => Promise<void>;
-  private worktreeService?: WorktreeService;
   private sessionManager: SessionManager | null = null;
   private apiUrl: string = "http://localhost:3847";
   private pipelineService: PipelineService | null = null;
@@ -117,10 +106,6 @@ export class HeartbeatService {
 
   setOnRunCompleted(fn: (taskId: string, status: string) => Promise<void>): void {
     this.onRunCompleted = fn;
-  }
-
-  setWorktreeService(worktreeService: WorktreeService): void {
-    this.worktreeService = worktreeService;
   }
 
   setSessionManager(sessionManager: SessionManager): void {
@@ -485,7 +470,7 @@ export class HeartbeatService {
       }
 
       // 6. Resolve working directory and load task context
-      let cwd = project.homeDir;
+      const cwd = project.homeDir;
       let taskData: typeof tasks.$inferSelect | undefined;
       if (claimedRun.taskId) {
         const [task] = await this.db
@@ -493,11 +478,6 @@ export class HeartbeatService {
           .from(tasks)
           .where(eq(tasks.id, claimedRun.taskId));
         taskData = task;
-        if (task?.worktreePath) {
-          cwd = task.worktreePath;
-        }
-        // Note: worktree creation is now handled by POST /api/tasks/:id/checkout.
-        // If the task has no worktree yet, the agent will create one via checkout.
       }
 
       // 7. Invoke adapter
@@ -579,6 +559,10 @@ export class HeartbeatService {
 
       const workspaceRepoUrl = await getRepoUrl(cwd);
 
+      const finishStrategy = taskData?.taskType !== "brainstorm"
+        ? (taskData?.finishStrategy ?? project.finishStrategy ?? "merge") as "pr" | "merge" | "none"
+        : undefined;
+
       const ctx: RunContext = {
         agentId: agent.id,
         agentName: agent.name,
@@ -595,9 +579,8 @@ export class HeartbeatService {
         onEvent,
 
         // Phase 3: Workspace metadata
-        workspaceBranch: taskData?.branch ?? await getBranch(cwd),
-        worktreePath: taskData?.worktreePath ?? undefined,
         workspaceId: claimedRun.projectId,
+        finishStrategy,
         workspaceRepoUrl,
 
         // Phase 3: Wake trigger details

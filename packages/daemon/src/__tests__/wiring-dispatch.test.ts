@@ -5,7 +5,6 @@ import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/sh
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
-import { WorktreeService } from "../services/worktree.service.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { taskRoutes } from "../api/routes/tasks.js";
 import { agentRoutes } from "../api/routes/agents.js";
@@ -24,7 +23,6 @@ describe("Wiring: Dispatch", () => {
       name: "Wiring Test",
       slug: "wiring-test",
       homeDir: "/tmp/wiring-test",
-      worktreeDir: "/tmp/wiring-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);
@@ -76,116 +74,6 @@ describe("Wiring: Dispatch", () => {
         .from(tasks)
         .where(eq(tasks.id, task.id));
       expect(updated.column).toBe("backlog");
-    });
-  });
-
-  describe("P0 #2: worktree resolution in executeRun", () => {
-    it("does not create worktree lazily (agents handle via checkout)", async () => {
-      await testDb.db.insert(agents).values({
-        id: "agent-1",
-        projectId,
-        name: "Worker",
-        role: "engineer",
-        status: "active",
-        wakeOnAssignment: true,
-        maxConcurrentRuns: 1,
-      });
-
-      const [task] = await testDb.db.insert(tasks).values({
-        projectId,
-        title: "Build login form",
-        taskType: "quick",
-        column: "in_progress",
-      }).returning();
-
-      const [run] = await testDb.db.insert(heartbeatRuns).values({
-        agentId: "agent-1",
-        projectId,
-        taskId: task.id,
-        invocationSource: "assignment",
-        status: "running",
-        startedAt: new Date(),
-      }).returning();
-
-      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
-      const broadcastService = new BroadcastService(sockets);
-      const service = new HeartbeatService(testDb.db, broadcastService);
-
-      const mockWorktreeService = {
-        create: vi.fn().mockResolvedValue("/tmp/wiring-wt/task-" + task.id),
-        remove: vi.fn().mockResolvedValue(undefined),
-      } as unknown as WorktreeService;
-      service.setWorktreeService(mockWorktreeService);
-
-      // Mock adapter to avoid real execution
-      service.setAdapter({
-        runAgent: vi.fn().mockResolvedValue({
-          exitCode: 0,
-          result: "done",
-          costUsd: 0,
-        }),
-      } as any);
-
-      await service.executeRun(run.id);
-
-      // Worktree should NOT be created lazily — agents handle this via checkout
-      expect(mockWorktreeService.create).not.toHaveBeenCalled();
-
-      // Task should not have worktreePath set (no lazy creation)
-      const [updated] = await testDb.db
-        .select()
-        .from(tasks)
-        .where(eq(tasks.id, task.id));
-      expect(updated.worktreePath).toBeNull();
-    });
-
-    it("skips worktree creation for brainstorm tasks", async () => {
-      await testDb.db.insert(agents).values({
-        id: "agent-1",
-        projectId,
-        name: "Worker",
-        role: "researcher",
-        status: "active",
-        maxConcurrentRuns: 1,
-      });
-
-      const [task] = await testDb.db.insert(tasks).values({
-        projectId,
-        title: "Explore options",
-        taskType: "brainstorm",
-        column: "in_progress",
-      }).returning();
-
-      const [run] = await testDb.db.insert(heartbeatRuns).values({
-        agentId: "agent-1",
-        projectId,
-        taskId: task.id,
-        invocationSource: "assignment",
-        status: "running",
-        startedAt: new Date(),
-      }).returning();
-
-      const sockets = new Set() as unknown as Set<import("ws").WebSocket>;
-      const broadcastService = new BroadcastService(sockets);
-      const service = new HeartbeatService(testDb.db, broadcastService);
-
-      const mockWorktreeService = {
-        create: vi.fn(),
-        remove: vi.fn(),
-      } as unknown as WorktreeService;
-      service.setWorktreeService(mockWorktreeService);
-
-      service.setAdapter({
-        runAgent: vi.fn().mockResolvedValue({
-          exitCode: 0,
-          result: "done",
-          costUsd: 0,
-        }),
-      } as any);
-
-      await service.executeRun(run.id);
-
-      expect(mockWorktreeService.create).not.toHaveBeenCalled();
     });
   });
 
@@ -250,8 +138,7 @@ describe("Wiring: Dispatch", () => {
       const taskService = new TaskService(testDb.db);
       app.decorate("taskService", taskService);
 
-      const worktreeService = new WorktreeService();
-      const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
+      const lifecycleService = new TaskLifecycleService(testDb.db, taskService);
       app.decorate("lifecycleService", lifecycleService);
 
       app.register(authPlugin, { allowLocalhostAdmin: true });
@@ -313,8 +200,7 @@ describe("Wiring: Dispatch", () => {
       const taskService = new TaskService(testDb.db);
       app.decorate("taskService", taskService);
 
-      const worktreeService = new WorktreeService();
-      const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
+      const lifecycleService = new TaskLifecycleService(testDb.db, taskService);
       app.decorate("lifecycleService", lifecycleService);
 
       app.register(authPlugin, { allowLocalhostAdmin: true });
@@ -369,8 +255,7 @@ describe("Wiring: Dispatch", () => {
       const taskService = new TaskService(testDb.db);
       app.decorate("taskService", taskService);
 
-      const worktreeService = new WorktreeService();
-      const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
+      const lifecycleService = new TaskLifecycleService(testDb.db, taskService);
       app.decorate("lifecycleService", lifecycleService);
 
       app.register(authPlugin, { allowLocalhostAdmin: true });

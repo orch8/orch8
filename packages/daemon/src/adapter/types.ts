@@ -110,10 +110,10 @@ export interface RunContext {
   subtaskScope?: string;
 
   // Workspace metadata (Phase 3)
-  workspaceBranch?: string;
   workspaceRepoUrl?: string;
-  worktreePath?: string;
   workspaceId?: string;
+  // Resolved per-run from task.finishStrategy ?? project.finishStrategy
+  finishStrategy?: "pr" | "merge" | "none";
 
   // Wake trigger details (Phase 3)
   wakeCommentId?: string;

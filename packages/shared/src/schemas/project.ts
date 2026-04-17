@@ -1,16 +1,18 @@
 import { z } from "zod";
 
+export const FinishStrategySchema = z.enum(["pr", "merge", "none"]);
+
 export const CreateProjectSchema = z.object({
   name: z.string().min(1).max(200),
   slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/),
   description: z.string().max(5000).default(""),
   homeDir: z.string().min(1),
-  worktreeDir: z.string().min(1),
   repoUrl: z.string().optional(),
   defaultBranch: z.string().default("main"),
   defaultModel: z.string().optional(),
   defaultMaxTurns: z.number().int().min(1).optional(),
   budgetLimitUsd: z.number().min(0).optional(),
+  finishStrategy: FinishStrategySchema.default("merge"),
 });
 
 export const UpdateProjectSchema = z.object({
@@ -21,6 +23,7 @@ export const UpdateProjectSchema = z.object({
   defaultModel: z.string().nullable().optional(),
   defaultMaxTurns: z.number().int().min(1).nullable().optional(),
   budgetLimitUsd: z.number().min(0).nullable().optional(),
+  finishStrategy: FinishStrategySchema.optional(),
   active: z.boolean().optional(),
 });
 

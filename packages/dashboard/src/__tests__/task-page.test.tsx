@@ -31,8 +31,6 @@ const mockTask = {
   brainstormStatus: null,
   autoCommit: false,
   autoPr: true,
-  branch: "feat/fix-auth",
-  worktreePath: "/tmp/wt/fix-auth",
 
   mcpTools: [],
   createdAt: new Date().toISOString(),

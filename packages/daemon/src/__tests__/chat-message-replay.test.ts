@@ -32,7 +32,6 @@ describe("Chat message replay (end-to-end)", () => {
         name: "replay",
         slug: `replay-${Date.now()}`,
         homeDir: "/tmp/orch8-chat-replay",
-        worktreeDir: "/tmp/orch8-chat-replay/worktrees",
       })
       .returning();
     projectId = project.id;

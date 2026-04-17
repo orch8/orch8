@@ -7,6 +7,8 @@ maxTurns: 180
 skills:
   - orch8
   - verification
+  - using-git-worktrees
+  - finishing-a-development-branch
 heartbeat:
   enabled: true
   intervalSec: 3600

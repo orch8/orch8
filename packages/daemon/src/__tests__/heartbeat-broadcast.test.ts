@@ -35,7 +35,6 @@ describe("HeartbeatService broadcast", () => {
       name: "Test",
       slug: "test",
       homeDir: "/tmp/test",
-      worktreeDir: "/tmp/wt",
     }).returning();
     projectId = project.id;
 

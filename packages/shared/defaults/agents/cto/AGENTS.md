@@ -8,6 +8,8 @@ skills:
   - orch8
   - verification
   - parallel-decomposition
+  - using-git-worktrees
+  - finishing-a-development-branch
 heartbeat:
   enabled: true
   intervalSec: 3600

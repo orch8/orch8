@@ -18,7 +18,6 @@ describe("Activity Log Routes", () => {
       name: "Activity Test",
       slug: "activity-test",
       homeDir: "/tmp/activity",
-      worktreeDir: "/tmp/activity-wt",
     }).returning();
     projectId = project.id;
 

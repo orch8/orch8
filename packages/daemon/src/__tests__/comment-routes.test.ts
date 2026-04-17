@@ -19,7 +19,6 @@ describe("Comment API Routes", () => {
       name: "Comment Route Test",
       slug: "comment-route-test",
       homeDir: "/tmp/cr",
-      worktreeDir: "/tmp/cr-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

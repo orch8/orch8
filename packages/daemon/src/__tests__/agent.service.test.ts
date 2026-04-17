@@ -20,7 +20,6 @@ describe("AgentService", () => {
       name: "Agent Test",
       slug: "agent-test",
       homeDir: "/tmp/agent-test",
-      worktreeDir: "/tmp/agent-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);
@@ -90,7 +89,6 @@ describe("AgentService", () => {
           name: "P",
           slug: `p-${Date.now()}`,
           homeDir: tmpHome,
-          worktreeDir: tmpHome,
         })
         .returning();
 

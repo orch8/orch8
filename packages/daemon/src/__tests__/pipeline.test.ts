@@ -21,7 +21,6 @@ describe("PipelineService", () => {
       name: "Pipeline Test",
       slug: "pipeline-test",
       homeDir: "/tmp/pipe",
-      worktreeDir: "/tmp/pipe-wt",
     }).returning();
     projectId = project.id;
 

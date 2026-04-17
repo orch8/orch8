@@ -34,7 +34,6 @@ describe("Agent Clone", () => {
         name: "Source",
         slug: "source",
         homeDir: "/tmp/src",
-        worktreeDir: "/tmp/src-wt",
       })
       .returning();
     sourceProjectId = srcProj.id;
@@ -45,7 +44,6 @@ describe("Agent Clone", () => {
         name: "Target",
         slug: "target",
         homeDir: "/tmp/tgt",
-        worktreeDir: "/tmp/tgt-wt",
       })
       .returning();
     targetProjectId = tgtProj.id;
@@ -119,7 +117,6 @@ describe("Agent Clone", () => {
           name: "Source",
           slug: "source-r",
           homeDir: "/tmp/src-r",
-          worktreeDir: "/tmp/src-r-wt",
         })
         .returning();
       sourceProjectId = srcProj.id;
@@ -130,7 +127,6 @@ describe("Agent Clone", () => {
           name: "Target",
           slug: "target-r",
           homeDir: "/tmp/tgt-r",
-          worktreeDir: "/tmp/tgt-r-wt",
         })
         .returning();
       targetProjectId = tgtProj.id;

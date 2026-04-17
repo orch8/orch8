@@ -8,6 +8,13 @@
       "when": 1776374228504,
       "tag": "0000_legal_virginia_dare",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779062400000,
+      "tag": "0001_agent_managed_worktrees",
+      "breakpoints": true
     }
   ]
 }

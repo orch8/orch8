@@ -18,7 +18,6 @@ describe("HeartbeatService", () => {
       name: "Heartbeat Test",
       slug: "heartbeat-test",
       homeDir: "/tmp/heartbeat-test",
-      worktreeDir: "/tmp/heartbeat-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

@@ -27,7 +27,6 @@ describe("Run Cancel + Log Routes", () => {
       name: "Run Cancel Test",
       slug: "run-cancel-test",
       homeDir: projectHomeDir,
-      worktreeDir: join(projectHomeDir, "worktrees"),
     }).returning();
     projectId = project.id;
   }, 60_000);

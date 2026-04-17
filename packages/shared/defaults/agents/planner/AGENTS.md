@@ -8,6 +8,8 @@ skills:
   - orch8
   - plan-quality
   - verification
+  - using-git-worktrees
+  - finishing-a-development-branch
 heartbeat:
   enabled: false
 ---

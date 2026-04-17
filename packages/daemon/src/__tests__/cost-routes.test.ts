@@ -19,7 +19,6 @@ describe("Cost Routes", () => {
       name: "Cost Test",
       slug: "cost-test",
       homeDir: "/tmp/cost",
-      worktreeDir: "/tmp/cost-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

@@ -8,6 +8,8 @@ skills:
   - orch8
   - spec-compliance-review
   - code-quality-review
+  - using-git-worktrees
+  - finishing-a-development-branch
 heartbeat:
   enabled: false
 ---

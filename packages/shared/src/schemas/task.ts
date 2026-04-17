@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FinishStrategySchema } from "./project.js";
 
 export const TaskTypeSchema = z.enum(["quick", "brainstorm"]);
 export const TaskColumnSchema = z.enum([
@@ -39,8 +40,7 @@ export const UpdateTaskSchema = z.object({
   assignee: z.string().nullable().optional(),
   autoCommit: z.boolean().optional(),
   autoPr: z.boolean().optional(),
-  branch: z.string().nullable().optional(),
-  worktreePath: z.string().nullable().optional(),
+  finishStrategy: FinishStrategySchema.nullable().optional(),
   mcpTools: z.array(z.string()).optional(),
 });
 

@@ -44,7 +44,6 @@ describe("Integration: Task Type Lifecycle", () => {
       name: "Integration",
       slug: "integration",
       homeDir: "/tmp/integ",
-      worktreeDir: "/tmp/integ-wt",
     }).returning();
     projectId = project.id;
 

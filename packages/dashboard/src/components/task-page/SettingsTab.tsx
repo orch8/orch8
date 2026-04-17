@@ -12,16 +12,16 @@ export function SettingsTab({ task }: SettingsTabProps) {
 
   const [autoCommit, setAutoCommit] = useState(task.autoCommit);
   const [autoPr, setAutoPr] = useState(task.autoPr);
-  const [branch, setBranch] = useState(task.branch ?? "");
-  const [worktreePath, setWorktreePath] = useState(task.worktreePath ?? "");
+  const [finishStrategy, setFinishStrategy] = useState<string>(
+    task.finishStrategy ?? "",
+  );
   const [mcpTools, setMcpTools] = useState<string[]>(task.mcpTools ?? []);
   const [newTool, setNewTool] = useState("");
 
   useEffect(() => {
     setAutoCommit(task.autoCommit);
     setAutoPr(task.autoPr);
-    setBranch(task.branch ?? "");
-    setWorktreePath(task.worktreePath ?? "");
+    setFinishStrategy(task.finishStrategy ?? "");
     setMcpTools(task.mcpTools ?? []);
   }, [task]);
 
@@ -30,8 +30,9 @@ export function SettingsTab({ task }: SettingsTabProps) {
       taskId: task.id,
       autoCommit,
       autoPr,
-      branch: branch || null,
-      worktreePath: worktreePath || null,
+      finishStrategy: finishStrategy
+        ? (finishStrategy as "pr" | "merge" | "none")
+        : null,
       mcpTools,
     });
   }
@@ -49,15 +50,18 @@ export function SettingsTab({ task }: SettingsTabProps) {
     <div className="flex flex-col gap-[var(--gap-section)]">
       <h3 className="text-sm font-semibold text-zinc-300">Git Configuration</h3>
 
-      <div className="grid grid-cols-2 gap-4">
-        <FormField label="Branch">
-          <input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="auto-generated" className={inputClass} />
-        </FormField>
-
-        <FormField label="Worktree Path">
-          <input value={worktreePath} onChange={(e) => setWorktreePath(e.target.value)} placeholder="auto-generated" className={inputClass} />
-        </FormField>
-      </div>
+      <FormField label="Finish Strategy">
+        <select
+          value={finishStrategy}
+          onChange={(e) => setFinishStrategy(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">Use project default</option>
+          <option value="merge">Merge to default branch</option>
+          <option value="pr">Open a pull request</option>
+          <option value="none">Leave branch alone</option>
+        </select>
+      </FormField>
 
       <div className="flex gap-[var(--gap-section)]">
         <label className="flex items-center gap-2 text-sm text-zinc-300">

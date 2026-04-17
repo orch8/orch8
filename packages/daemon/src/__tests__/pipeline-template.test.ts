@@ -16,7 +16,6 @@ describe("PipelineTemplateService", () => {
       name: "Pipeline Template Test",
       slug: "pipeline-tpl-test",
       homeDir: "/tmp/ptpl",
-      worktreeDir: "/tmp/ptpl-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

@@ -55,7 +55,6 @@ describe("ClaudeLocalAdapter", () => {
       name: "Adapter Test",
       slug: "adapter-test",
       homeDir: "/tmp/adapt",
-      worktreeDir: "/tmp/adapt-wt",
     }).returning();
     projectId = project.id;
 

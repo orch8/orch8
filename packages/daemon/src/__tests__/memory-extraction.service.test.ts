@@ -23,7 +23,7 @@ describe("MemoryExtractionService", () => {
 
     const [project] = await testDb.db.insert(projects).values({
       name: "Extract Test", slug: "extract-test",
-      homeDir: tmpDir, worktreeDir: path.join(tmpDir, "wt"),
+      homeDir: tmpDir,
     }).returning();
     projectId = project.id;
 

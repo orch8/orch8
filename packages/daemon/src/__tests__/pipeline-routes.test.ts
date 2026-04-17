@@ -39,7 +39,6 @@ describe("Pipeline API routes", () => {
       name: "Route Test",
       slug: "route-test",
       homeDir: "/tmp/route",
-      worktreeDir: "/tmp/route-wt",
     }).returning();
     projectId = project.id;
 

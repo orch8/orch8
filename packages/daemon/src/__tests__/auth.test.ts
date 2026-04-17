@@ -23,7 +23,6 @@ describe("Auth Middleware", () => {
       name: "Auth Test",
       slug: "auth-test",
       homeDir: "/tmp/auth",
-      worktreeDir: "/tmp/auth-wt",
     }).returning();
     projectId = project.id;
 

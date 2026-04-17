@@ -25,6 +25,7 @@ export {
   CloneAgentSchema,
 } from "./agent.js";
 export {
+  FinishStrategySchema,
   CreateProjectSchema,
   UpdateProjectSchema,
   ProjectFilterSchema,

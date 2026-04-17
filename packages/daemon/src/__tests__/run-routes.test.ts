@@ -17,7 +17,6 @@ describe("Run Routes", () => {
       name: "Run Routes Test",
       slug: "run-routes-test",
       homeDir: "/tmp/run-routes",
-      worktreeDir: "/tmp/run-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

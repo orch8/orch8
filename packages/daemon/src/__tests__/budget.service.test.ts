@@ -15,7 +15,6 @@ describe("checkBudget", () => {
       name: "Budget Test",
       slug: "budget-test",
       homeDir: "/tmp/budget-test",
-      worktreeDir: "/tmp/budget-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);
@@ -124,7 +123,6 @@ describe("autoPauseIfExhausted — threshold", () => {
       name: "Threshold Test",
       slug: "threshold-test",
       homeDir: "/tmp/threshold-test",
-      worktreeDir: "/tmp/threshold-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

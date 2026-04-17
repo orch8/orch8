@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vites
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
 import { TaskService } from "../services/task.service.js";
-import { WorktreeService } from "../services/worktree.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
 import { projects, tasks, agents } from "@orch/shared/db";
 
@@ -16,12 +15,11 @@ describe("TaskLifecycleService broadcast", () => {
   beforeAll(async () => {
     testDb = await setupTestDb();
     const taskService = new TaskService(testDb.db);
-    const worktreeService = new WorktreeService();
     mockSocket = { readyState: 1, send: vi.fn() };
     const sockets = new Set([mockSocket]) as unknown as Set<import("ws").WebSocket>;
     broadcastService = new BroadcastService(sockets);
 
-    service = new TaskLifecycleService(testDb.db, taskService, worktreeService, broadcastService);
+    service = new TaskLifecycleService(testDb.db, taskService, broadcastService);
   }, 60_000);
 
   afterAll(async () => {
@@ -38,7 +36,6 @@ describe("TaskLifecycleService broadcast", () => {
       name: "Test",
       slug: "test",
       homeDir: "/tmp/test",
-      worktreeDir: "/tmp/wt",
     }).returning();
     projectId = project.id;
   });

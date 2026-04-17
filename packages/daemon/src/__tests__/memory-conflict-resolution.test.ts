@@ -16,7 +16,7 @@ describe("Memory Conflict Resolution", () => {
 
     const [project] = await testDb.db.insert(projects).values({
       name: "Conflict Test", slug: "conflict-test",
-      homeDir: "/tmp/conflict", worktreeDir: "/tmp/conflict-wt",
+      homeDir: "/tmp/conflict",
     }).returning();
     projectId = project.id;
 

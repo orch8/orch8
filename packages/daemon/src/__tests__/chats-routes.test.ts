@@ -61,7 +61,6 @@ describe("Chat API Routes", () => {
         name: "t",
         slug: `t-${Date.now()}`,
         homeDir: "/tmp/orch8-chat-routes-test",
-        worktreeDir: "/tmp/orch8-chat-routes-test/worktrees",
       })
       .returning();
     projectId = project.id;

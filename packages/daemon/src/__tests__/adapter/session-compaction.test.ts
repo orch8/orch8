@@ -28,7 +28,6 @@ describe("SessionManager.getSessionStats", () => {
       name: "Test",
       slug: "test",
       homeDir: "/tmp/test",
-      worktreeDir: "/tmp/test/worktrees",
     }).returning();
     projectId = proj.id;
   });

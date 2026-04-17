@@ -30,7 +30,6 @@ beforeEach(async () => {
     name: "P",
     slug: `p-${Date.now()}`,
     homeDir: projectHome,
-    worktreeDir: projectHome,
   }).returning();
   projectId = p.id;
 

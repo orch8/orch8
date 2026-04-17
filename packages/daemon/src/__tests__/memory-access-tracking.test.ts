@@ -15,7 +15,7 @@ describe("Memory Access Tracking", () => {
 
     const [project] = await testDb.db.insert(projects).values({
       name: "Access Test", slug: "access-test",
-      homeDir: "/tmp/access", worktreeDir: "/tmp/access-wt",
+      homeDir: "/tmp/access",
     }).returning();
     projectId = project.id;
 

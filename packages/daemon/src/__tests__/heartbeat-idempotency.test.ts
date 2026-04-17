@@ -16,7 +16,6 @@ describe("HeartbeatService idempotency", () => {
       name: "Idem Test",
       slug: "idem-test",
       homeDir: "/tmp/idem",
-      worktreeDir: "/tmp/idem-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

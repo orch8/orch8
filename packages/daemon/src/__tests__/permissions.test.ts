@@ -17,7 +17,6 @@ describe("Permission Middleware", () => {
       name: "Perms Test",
       slug: "perms-test",
       homeDir: "/tmp/perms",
-      worktreeDir: "/tmp/perms-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

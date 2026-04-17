@@ -35,7 +35,6 @@ describe("project-skills routes", () => {
       name: "Test",
       slug: "test",
       homeDir: projectHomeDir,
-      worktreeDir: join(projectHomeDir, "worktrees"),
     }).returning();
     projectId = proj.id;
 

@@ -19,7 +19,6 @@ describe("SchedulerService", () => {
       name: "Scheduler Test",
       slug: "scheduler-test",
       homeDir: "/tmp/scheduler-test",
-      worktreeDir: "/tmp/scheduler-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

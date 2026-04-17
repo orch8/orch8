@@ -18,7 +18,6 @@ describe("Database Schema", () => {
       name: "Test Project",
       slug: "test-project",
       homeDir: "/tmp/test",
-      worktreeDir: "/tmp/worktrees",
     }).returning();
 
     expect(project.id).toMatch(/^proj_/);
@@ -31,7 +30,6 @@ describe("Database Schema", () => {
       name: "Agent Project",
       slug: "agent-project",
       homeDir: "/tmp/ap",
-      worktreeDir: "/tmp/ap-wt",
     }).returning();
 
     const [agent] = await testDb.db.insert(agents).values({

@@ -5,7 +5,6 @@ import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { taskRoutes } from "../api/routes/tasks.js";
 import { TaskService } from "../services/task.service.js";
-import { WorktreeService } from "../services/worktree.service.js";
 import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
 import "../types.js";
 
@@ -21,7 +20,6 @@ describe("Task Routes Permission Enforcement", () => {
       name: "Perm Integration",
       slug: "perm-integration",
       homeDir: "/tmp/perm-int",
-      worktreeDir: "/tmp/perm-int-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);
@@ -61,8 +59,7 @@ describe("Task Routes Permission Enforcement", () => {
     app.decorate("db", testDb.db);
 
     const taskService = new TaskService(testDb.db);
-    const worktreeService = new WorktreeService();
-    const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
+    const lifecycleService = new TaskLifecycleService(testDb.db, taskService);
     app.decorate("lifecycleService", lifecycleService);
     app.decorate("heartbeatService", { enqueueWakeup: vi.fn().mockResolvedValue(undefined) });
 

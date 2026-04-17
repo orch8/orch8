@@ -128,8 +128,9 @@ components:
           type: string
         homeDir:
           type: string
-        worktreeDir:
+        finishStrategy:
           type: string
+          enum: [pr, merge, none]
         repoUrl:
           type: string
           nullable: true
@@ -157,7 +158,7 @@ components:
 
     CreateProject:
       type: object
-      required: [name, slug, homeDir, worktreeDir]
+      required: [name, slug, homeDir]
       properties:
         name:
           type: string
@@ -175,9 +176,6 @@ components:
         homeDir:
           type: string
           minLength: 1
-        worktreeDir:
-          type: string
-          minLength: 1
         repoUrl:
           type: string
         defaultBranch:
@@ -191,6 +189,10 @@ components:
         budgetLimitUsd:
           type: number
           minimum: 0
+        finishStrategy:
+          type: string
+          enum: [pr, merge, none]
+          default: merge
 
     UpdateProject:
       type: object
@@ -220,6 +222,9 @@ components:
           nullable: true
         active:
           type: boolean
+        finishStrategy:
+          type: string
+          enum: [pr, merge, none]
 
     # --- Task ---
     Task:
@@ -243,14 +248,12 @@ components:
         assignee:
           type: string
           nullable: true
+        finishStrategy:
+          type: string
+          enum: [pr, merge, none]
+          nullable: true
         brainstormStatus:
           $ref: "#/components/schemas/BrainstormStatus"
-        branch:
-          type: string
-          nullable: true
-        worktreePath:
-          type: string
-          nullable: true
         verificationResult:
           $ref: "#/components/schemas/VerificationResult"
         verifierReport:
@@ -361,11 +364,9 @@ components:
           type: boolean
         autoPr:
           type: boolean
-        branch:
+        finishStrategy:
           type: string
-          nullable: true
-        worktreePath:
-          type: string
+          enum: [pr, merge, none]
           nullable: true
         mcpTools:
           type: array

@@ -72,7 +72,6 @@ describe("ChatService", () => {
         name: "t",
         slug: `t-${Date.now()}`,
         homeDir: "/tmp/orch8-chat-test",
-        worktreeDir: "/tmp/orch8-chat-test/worktrees",
       })
       .returning();
     projectId = project.id;
@@ -340,7 +339,6 @@ describe("ChatService", () => {
         name: "tB",
         slug: `tB-${Date.now()}`,
         homeDir: "/tmp/orch8-chat-test-b",
-        worktreeDir: "/tmp/orch8-chat-test-b/worktrees",
       })
       .returning();
     await testDb.db.insert(agents).values({
