@@ -110,9 +110,7 @@ export interface RunContext {
   subtaskScope?: string;
 
   // Workspace metadata (Phase 3)
-  workspaceBranch?: string;
   workspaceRepoUrl?: string;
-  worktreePath?: string;
   workspaceId?: string;
 
   // Wake trigger details (Phase 3)
