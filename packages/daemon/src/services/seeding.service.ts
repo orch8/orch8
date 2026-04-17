@@ -395,6 +395,38 @@ export class SeedingService {
   }
 
   /**
+   * For every non-chat, non-custom agent in this project, merge any bundled
+   * skills that aren't already in the row's desiredSkills list. Never removes
+   * skills — only fills gaps. Idempotent.
+   */
+  async reconcileAgentSkills(db: SchemaDb, projectId: string): Promise<void> {
+    const rows = await db
+      .select()
+      .from(agents)
+      .where(eq(agents.projectId, projectId));
+
+    for (const row of rows) {
+      if (row.role === "custom") continue;
+
+      const bundledPath = join(DEFAULT_AGENTS_DIR, row.role, "AGENTS.md");
+      if (!existsSync(bundledPath)) continue;
+
+      const content = await readFile(bundledPath, "utf-8");
+      const parsed = parseAgentsMd(content);
+      const bundled = parsed.skills ?? [];
+
+      const current = new Set(row.desiredSkills ?? []);
+      const missing = bundled.filter((s) => !current.has(s));
+      if (missing.length === 0) continue;
+
+      await db
+        .update(agents)
+        .set({ desiredSkills: [...current, ...missing] })
+        .where(and(eq(agents.id, row.id), eq(agents.projectId, projectId)));
+    }
+  }
+
+  /**
    * Creates an initial "Welcome" chat for a newly provisioned chat agent,
    * if the project has no chats yet. Idempotent — safe for backfill.
    */

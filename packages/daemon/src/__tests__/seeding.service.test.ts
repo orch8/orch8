@@ -429,4 +429,67 @@ describe("SeedingService", () => {
   it("includes project-setup in CHAT_AGENT_DEFAULTS.desiredSkills", () => {
     expect(CHAT_AGENT_DEFAULTS.desiredSkills).toContain("project-setup");
   });
+
+  describe("reconcileAgentSkills", () => {
+    let testDb: TestDb;
+    let projectId: string;
+
+    beforeAll(async () => {
+      testDb = await setupTestDb();
+      const [project] = await testDb.db.insert(projects).values({
+        name: "reconcile-test",
+        slug: "reconcile-test",
+        homeDir: "/tmp/reconcile",
+      }).returning();
+      projectId = project.id;
+    }, 60_000);
+
+    afterAll(async () => {
+      await teardownTestDb(testDb);
+    });
+
+    it("merges missing bundled skills into desiredSkills without removing existing entries", async () => {
+      await testDb.db.insert(agents).values({
+        id: "researcher",
+        projectId,
+        name: "researcher",
+        role: "researcher",
+        desiredSkills: ["custom-skill", "orch8"],
+      });
+
+      const service = new SeedingService();
+      await service.reconcileAgentSkills(testDb.db, projectId);
+
+      const [row] = await testDb.db
+        .select()
+        .from(agents)
+        .where(and(eq(agents.id, "researcher"), eq(agents.projectId, projectId)));
+
+      expect(row.desiredSkills).toContain("custom-skill");
+      expect(row.desiredSkills).toContain("orch8");
+      expect(row.desiredSkills).toContain("using-git-worktrees");
+      expect(row.desiredSkills).toContain("finishing-a-development-branch");
+    });
+
+    it("skips chat and custom roles", async () => {
+      await testDb.db.insert(agents).values([
+        {
+          id: "chat-2",
+          projectId,
+          name: "chat",
+          role: "custom",
+          desiredSkills: ["_card-protocol"],
+        },
+      ]);
+
+      const service = new SeedingService();
+      await service.reconcileAgentSkills(testDb.db, projectId);
+
+      const [chat] = await testDb.db
+        .select()
+        .from(agents)
+        .where(and(eq(agents.id, "chat-2"), eq(agents.projectId, projectId)));
+      expect(chat.desiredSkills).toEqual(["_card-protocol"]);
+    });
+  });
 });
