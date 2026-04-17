@@ -29,7 +29,9 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
   const [slugTouched, setSlugTouched] = useState(false);
   const [description, setDescription] = useState(project?.description ?? "");
   const [homeDir, setHomeDir] = useState(project?.homeDir ?? "");
-  const [worktreeDir, setWorktreeDir] = useState(project?.worktreeDir ?? "");
+  const [finishStrategy, setFinishStrategy] = useState<"pr" | "merge" | "none">(
+    (project?.finishStrategy as "pr" | "merge" | "none") ?? "merge",
+  );
   const [defaultBranch, setDefaultBranch] = useState(
     project?.defaultBranch ?? "main",
   );
@@ -71,6 +73,7 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
         defaultModel: defaultModel || null,
         defaultMaxTurns: defaultMaxTurns ? parseInt(defaultMaxTurns, 10) : null,
         budgetLimitUsd: budget ?? null,
+        finishStrategy,
       });
       onSuccess?.(result);
     } else {
@@ -79,12 +82,12 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
         slug,
         description,
         homeDir,
-        worktreeDir,
         defaultBranch,
         repoUrl: repoUrl || undefined,
         defaultModel: defaultModel || undefined,
         defaultMaxTurns: defaultMaxTurns ? parseInt(defaultMaxTurns, 10) : undefined,
         budgetLimitUsd: budget,
+        finishStrategy,
       });
       onSuccess?.(result);
     }
@@ -160,18 +163,22 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="project-worktree" className="text-sm font-medium text-zinc-300">
-              Worktree Directory
+            <label htmlFor="project-finish-strategy" className="text-sm font-medium text-zinc-300">
+              Finish Strategy
             </label>
-            <input
-              id="project-worktree"
-              type="text"
-              value={worktreeDir}
-              onChange={(e) => setWorktreeDir(e.target.value)}
-              required
-              placeholder="/path/to/worktrees"
+            <select
+              id="project-finish-strategy"
+              value={finishStrategy}
+              onChange={(e) => setFinishStrategy(e.target.value as "pr" | "merge" | "none")}
               className={inputClass}
-            />
+            >
+              <option value="merge">Merge to default branch</option>
+              <option value="pr">Open a pull request</option>
+              <option value="none">Leave branch alone</option>
+            </select>
+            <span className="text-xs text-zinc-500">
+              How agents integrate work when a task is marked done.
+            </span>
           </div>
         </>
       )}
@@ -263,10 +270,6 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
           <div>
             <span className="text-xs text-zinc-600">Home Directory</span>
             <p className="font-mono text-xs">{project.homeDir}</p>
-          </div>
-          <div>
-            <span className="text-xs text-zinc-600">Worktree Directory</span>
-            <p className="font-mono text-xs">{project.worktreeDir}</p>
           </div>
         </div>
       )}
