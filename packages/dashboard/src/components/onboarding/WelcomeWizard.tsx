@@ -247,7 +247,6 @@ export function WelcomeWizard({ onComplete, onChatNavigate, showIntro = true }: 
         slug,
         description: "",
         homeDir: repoPath,
-        worktreeDir: `${repoPath}/.worktrees`,
         defaultBranch,
         budgetLimitUsd: dailyBudget ? parseFloat(dailyBudget) : undefined,
       });
