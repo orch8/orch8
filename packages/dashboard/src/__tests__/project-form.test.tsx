@@ -14,7 +14,7 @@ describe("ProjectForm", () => {
     expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/slug/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/home directory/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/worktree directory/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/finish strategy/i)).toBeInTheDocument();
   });
 
   it("renders optional fields", () => {
@@ -60,7 +60,6 @@ describe("ProjectForm — edit mode new fields", () => {
     slug: "test",
     description: "A project",
     homeDir: "/home/test",
-    worktreeDir: "/wt/test",
     repoUrl: "https://github.com/org/repo",
     defaultBranch: "main",
     defaultModel: "claude-opus-4-7",

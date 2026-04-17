@@ -12,21 +12,6 @@ describe("UpdateTaskSchema — new fields", () => {
     expect(result.success).toBe(true);
   });
 
-  it("accepts branch", () => {
-    const result = UpdateTaskSchema.safeParse({ branch: "feat/my-branch" });
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts branch as nullable", () => {
-    const result = UpdateTaskSchema.safeParse({ branch: null });
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts worktreePath", () => {
-    const result = UpdateTaskSchema.safeParse({ worktreePath: "/tmp/wt/task-1" });
-    expect(result.success).toBe(true);
-  });
-
   it("accepts mcpTools", () => {
     const result = UpdateTaskSchema.safeParse({ mcpTools: ["tool-a", "tool-b"] });
     expect(result.success).toBe(true);
