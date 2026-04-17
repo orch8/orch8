@@ -12,7 +12,6 @@ import { agentInstructionRoutes } from "./api/routes/agent-instructions.js";
 import { websocketRoutes } from "./api/websocket.js";
 import { authPlugin } from "./api/middleware/auth.js";
 import { TaskService } from "./services/task.service.js";
-import { WorktreeService } from "./services/worktree.service.js";
 import { TaskLifecycleService } from "./services/task-lifecycle.service.js";
 import { AgentService } from "./services/agent.service.js";
 import { HeartbeatService } from "./services/heartbeat.service.js";
@@ -113,8 +112,6 @@ export function buildServer(options: ServerOptions = {}) {
     const pipelineService = new PipelineService(dbClient.db, pipelineTemplateService);
     app.decorate("pipelineService", pipelineService);
 
-    const worktreeService = new WorktreeService();
-
     // Agent service
     const agentService = new AgentService(dbClient.db, broadcastService);
     app.decorate("agentService", agentService);
@@ -135,7 +132,6 @@ export function buildServer(options: ServerOptions = {}) {
     const apiPort = Number(process.env.ORCH_PORT ?? options.config?.api.port ?? 3847);
     heartbeatService.setApiUrl(`http://${apiHost}:${apiPort}`);
     heartbeatService.setLogger(app.log);
-    heartbeatService.setWorktreeService(worktreeService);
     heartbeatService.setPipelineService(pipelineService);
     app.decorate("heartbeatService", heartbeatService);
 
@@ -263,7 +259,7 @@ export function buildServer(options: ServerOptions = {}) {
     app.decorate("notificationService", notificationService);
 
     // Lifecycle service
-    const lifecycleService = new TaskLifecycleService(dbClient.db, taskService, worktreeService, broadcastService);
+    const lifecycleService = new TaskLifecycleService(dbClient.db, taskService, broadcastService);
     app.decorate("lifecycleService", lifecycleService);
 
     // Auth middleware + routes that require DB
