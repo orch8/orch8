@@ -1,9 +1,8 @@
 import { eq } from "drizzle-orm";
-import { tasks, projects } from "@orch/shared/db";
+import { tasks } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import { isValidTransition, type TaskColumn } from "./task-transitions.js";
 import { TaskService } from "./task.service.js";
-import { WorktreeService } from "./worktree.service.js";
 import type { BroadcastService } from "./broadcast.service.js";
 
 type Task = typeof tasks.$inferSelect;
@@ -17,7 +16,6 @@ export class TaskLifecycleService {
   constructor(
     private db: SchemaDb,
     private taskService: TaskService,
-    private worktreeService: WorktreeService,
     private broadcastService?: BroadcastService,
   ) {}
 
@@ -39,18 +37,6 @@ export class TaskLifecycleService {
       updatedAt: new Date(),
     };
 
-    // Track a newly-created worktree so we can clean it up if the DB write fails.
-    // Ordering: we create the worktree *before* the DB update. The filesystem is
-    // the side effect that cannot participate in the DB transaction, so it must
-    // be set up first; if the DB write then fails, we best-effort remove the
-    // worktree to keep DB state and filesystem state in sync. A DB transaction
-    // cannot roll back a worktree, so explicit compensation is the only option.
-    let createdWorktree:
-      | { homeDir: string; worktreeDir: string; taskId: string; slug: string }
-      | null = null;
-
-    // ── Side effects by target state ──
-
     if (to === "in_progress") {
       if (!opts?.agentId || !opts?.runId) {
         throw new Error("agentId and runId are required when moving to in_progress");
@@ -58,31 +44,9 @@ export class TaskLifecycleService {
       updateValues.executionAgentId = opts.agentId;
       updateValues.executionRunId = opts.runId;
       updateValues.executionLockedAt = new Date();
-
-      // Create worktree for non-brainstorm tasks on first dispatch
-      if (task.taskType !== "brainstorm" && !task.worktreePath) {
-        const project = await this.loadProject(task.projectId);
-        const slug = WorktreeService.slugify(task.title);
-        const worktreePath = await this.worktreeService.create({
-          homeDir: project.homeDir,
-          worktreeDir: project.worktreeDir,
-          taskId: task.id,
-          slug,
-          defaultBranch: project.defaultBranch,
-        });
-        updateValues.worktreePath = worktreePath;
-        updateValues.branch = `task/${task.id}/${slug}`;
-        createdWorktree = {
-          homeDir: project.homeDir,
-          worktreeDir: project.worktreeDir,
-          taskId: task.id,
-          slug,
-        };
-      }
     }
 
     if (to === "blocked") {
-      // Release execution lock — task is not being actively worked
       updateValues.executionAgentId = null;
       updateValues.executionRunId = null;
       updateValues.executionLockedAt = null;
@@ -92,46 +56,14 @@ export class TaskLifecycleService {
       updateValues.executionAgentId = null;
       updateValues.executionRunId = null;
       updateValues.executionLockedAt = null;
-
-      // Remove worktree (best-effort — don't block the state transition)
-      if (task.worktreePath && task.branch) {
-        try {
-          const project = await this.loadProject(task.projectId);
-          const slug = task.branch.split("/").pop() ?? "";
-          await this.worktreeService.remove({
-            homeDir: project.homeDir,
-            worktreeDir: project.worktreeDir,
-            taskId: task.id,
-            slug,
-          });
-        } catch {
-          // Worktree cleanup is non-critical; task must still transition to done
-        }
-      }
     }
 
-    // Apply the transition. If the DB write fails after we created a worktree,
-    // best-effort remove the worktree so we don't leave a dangling filesystem
-    // artifact linked to a task row that still points at "no worktree".
-    let updated: Task;
-    try {
-      [updated] = await this.db
-        .update(tasks)
-        .set(updateValues)
-        .where(eq(tasks.id, taskId))
-        .returning();
-    } catch (err) {
-      if (createdWorktree) {
-        try {
-          await this.worktreeService.remove(createdWorktree);
-        } catch {
-          // Compensation is best-effort — surface the original DB error.
-        }
-      }
-      throw err;
-    }
+    const [updated] = await this.db
+      .update(tasks)
+      .set(updateValues)
+      .where(eq(tasks.id, taskId))
+      .returning();
 
-    // Broadcast task_transitioned event (spec §14 §2.1)
     this.broadcastService?.taskTransitioned(task.projectId, {
       taskId,
       from,
@@ -139,7 +71,6 @@ export class TaskLifecycleService {
       agentId: opts?.agentId,
     });
 
-    // Post-transition: unblock dependents when task completes
     if (to === "done") {
       await this.taskService.unblockResolved(task.projectId);
     }
@@ -147,10 +78,6 @@ export class TaskLifecycleService {
     return updated;
   }
 
-  /**
-   * Atomic task checkout: claim lock + transition to in_progress + create worktree.
-   * Returns 409-style error if locked by another agent. Idempotent for same agent.
-   */
   async checkout(
     taskId: string,
     agentId: string,
@@ -159,27 +86,22 @@ export class TaskLifecycleService {
     const task = await this.taskService.getById(taskId);
     if (!task) throw new Error("Task not found");
 
-    // Idempotent: same agent already holds lock
     if (task.executionAgentId === agentId) {
       return task;
     }
 
-    // Conflict: another agent holds lock
     if (task.executionAgentId) {
       throw new Error(`Checkout conflict: locked by ${task.executionAgentId}`);
     }
 
-    // Cannot checkout completed tasks
     if (task.column === "done") {
       throw new Error("Cannot checkout completed task");
     }
 
-    // Backlog or blocked → delegate to transition (handles lock + worktree)
     if (task.column !== "in_progress") {
       return this.transition(taskId, "in_progress", { agentId, runId });
     }
 
-    // Already in_progress but unlocked → just set the lock
     const [updated] = await this.db
       .update(tasks)
       .set({
@@ -194,10 +116,6 @@ export class TaskLifecycleService {
     return updated;
   }
 
-  /**
-   * Release execution lock without completing the task.
-   * Task stays in current column. Only the lock holder can release.
-   */
   async release(taskId: string, agentId: string): Promise<Task> {
     const task = await this.taskService.getById(taskId);
     if (!task) throw new Error("Task not found");
@@ -218,14 +136,5 @@ export class TaskLifecycleService {
       .returning();
 
     return updated;
-  }
-
-  private async loadProject(projectId: string) {
-    const [project] = await this.db
-      .select()
-      .from(projects)
-      .where(eq(projects.id, projectId));
-    if (!project) throw new Error("Project not found");
-    return project;
   }
 }
