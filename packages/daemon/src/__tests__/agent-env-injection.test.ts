@@ -51,4 +51,32 @@ describe("Agent envVars injection", () => {
     // ORCH_* vars must be set AFTER config.env, so identity is authoritative
     expect(env.ORCH_AGENT_ID).toBe("eng");
   });
+
+  describe("ORCH_FINISH_STRATEGY", () => {
+    const baseCtx = {
+      agentId: "eng",
+      agentName: "Engineer",
+      projectId: "proj_1",
+      runId: "run_1",
+      wakeReason: "assignment" as const,
+      apiUrl: "http://localhost:3000",
+      cwd: "/tmp",
+    };
+
+    it("injects ORCH_FINISH_STRATEGY when finishStrategy is set", () => {
+      const env = buildEnv({}, { ...baseCtx, finishStrategy: "pr" }, {});
+      expect(env.ORCH_FINISH_STRATEGY).toBe("pr");
+    });
+
+    it("does not inject ORCH_FINISH_STRATEGY when undefined (brainstorm)", () => {
+      const env = buildEnv({}, baseCtx, {});
+      expect(env.ORCH_FINISH_STRATEGY).toBeUndefined();
+    });
+
+    it("does not inject the removed ORCH_WORKTREE_PATH var", () => {
+      const env = buildEnv({}, { ...baseCtx, finishStrategy: "merge" }, {});
+      expect(env.ORCH_WORKTREE_PATH).toBeUndefined();
+      expect(env.ORCH_WORKSPACE_BRANCH).toBeUndefined();
+    });
+  });
 });

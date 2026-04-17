@@ -45,18 +45,15 @@ export function buildEnv(
     env.ORCH_SUBTASK_SCOPE = ctx.subtaskScope;
   }
 
-  // Workspace metadata (spec Phase 3)
-  if (ctx.workspaceBranch) {
-    env.ORCH_WORKSPACE_BRANCH = ctx.workspaceBranch;
-  }
+  // Workspace metadata
   if (ctx.workspaceRepoUrl) {
     env.ORCH_WORKSPACE_REPO_URL = ctx.workspaceRepoUrl;
   }
-  if (ctx.worktreePath) {
-    env.ORCH_WORKTREE_PATH = ctx.worktreePath;
-  }
   if (ctx.workspaceId) {
     env.ORCH_WORKSPACE_ID = ctx.workspaceId;
+  }
+  if (ctx.finishStrategy) {
+    env.ORCH_FINISH_STRATEGY = ctx.finishStrategy;
   }
 
   // Wake trigger details (spec Phase 3)

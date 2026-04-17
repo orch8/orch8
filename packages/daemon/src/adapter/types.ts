@@ -112,6 +112,8 @@ export interface RunContext {
   // Workspace metadata (Phase 3)
   workspaceRepoUrl?: string;
   workspaceId?: string;
+  // Resolved per-run from task.finishStrategy ?? project.finishStrategy
+  finishStrategy?: "pr" | "merge" | "none";
 
   // Wake trigger details (Phase 3)
   wakeCommentId?: string;

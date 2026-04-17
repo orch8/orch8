@@ -559,6 +559,10 @@ export class HeartbeatService {
 
       const workspaceRepoUrl = await getRepoUrl(cwd);
 
+      const finishStrategy = taskData?.taskType !== "brainstorm"
+        ? (taskData?.finishStrategy ?? project.finishStrategy ?? "merge") as "pr" | "merge" | "none"
+        : undefined;
+
       const ctx: RunContext = {
         agentId: agent.id,
         agentName: agent.name,
@@ -576,6 +580,7 @@ export class HeartbeatService {
 
         // Phase 3: Workspace metadata
         workspaceId: claimedRun.projectId,
+        finishStrategy,
         workspaceRepoUrl,
 
         // Phase 3: Wake trigger details
