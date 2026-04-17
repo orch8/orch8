@@ -116,15 +116,28 @@ export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelP
         </div>
       )}
 
-      {/* Git info */}
-      {task.branch && (
-        <div>
-          <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Git
-          </h4>
-          <p className="font-mono text-xs text-zinc-400">{task.branch}</p>
-        </div>
-      )}
+      {/* Finish strategy */}
+      <div>
+        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+          Finish Strategy
+        </h4>
+        <select
+          value={task.finishStrategy ?? ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            updateTask.mutate({
+              taskId: task.id,
+              finishStrategy: v ? (v as "pr" | "merge" | "none") : null,
+            });
+          }}
+          className="w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-300"
+        >
+          <option value="">Use project default</option>
+          <option value="merge">Merge to default branch</option>
+          <option value="pr">Open a pull request</option>
+          <option value="none">Leave branch alone</option>
+        </select>
+      </div>
 
       {/* Dependencies */}
       <DependenciesSection task={task} allTasks={allTasks ?? []} />

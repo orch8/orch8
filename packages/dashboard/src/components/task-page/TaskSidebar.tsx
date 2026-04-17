@@ -102,14 +102,6 @@ export function TaskSidebar({ task, projectId, allTasks }: TaskSidebarProps) {
       </div>
 
 
-      {/* Branch */}
-      {task.branch && (
-        <div>
-          <span className="text-xs text-zinc-500">Branch</span>
-          <p className="mt-1 font-mono text-xs text-zinc-400">{task.branch}</p>
-        </div>
-      )}
-
       {/* Cost */}
       {taskCost && (
         <div>
