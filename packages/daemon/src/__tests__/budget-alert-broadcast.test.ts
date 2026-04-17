@@ -30,7 +30,6 @@ describe("autoPauseIfExhausted broadcast", () => {
       name: "Test",
       slug: "test",
       homeDir: "/tmp/test",
-      worktreeDir: "/tmp/wt",
       budgetLimitUsd: 1.0,
       budgetSpentUsd: 1.5,
     }).returning();

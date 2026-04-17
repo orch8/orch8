@@ -18,7 +18,6 @@ describe("SessionManager", () => {
       name: "Session Test",
       slug: "session-test",
       homeDir: "/tmp/sess",
-      worktreeDir: "/tmp/sess-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

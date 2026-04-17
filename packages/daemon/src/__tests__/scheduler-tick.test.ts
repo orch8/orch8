@@ -18,7 +18,6 @@ describe("SchedulerService tickTimers", () => {
       name: "Tick Test",
       slug: "tick-test",
       homeDir: "/tmp/tick-test",
-      worktreeDir: "/tmp/tick-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

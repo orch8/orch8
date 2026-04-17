@@ -76,7 +76,6 @@ describe("ProjectSkillService", () => {
       name: "Test Project",
       slug: "test-project",
       homeDir: projectHomeDir,
-      worktreeDir: join(projectHomeDir, "worktrees"),
     }).returning();
     projectId = proj.id;
 
@@ -515,7 +514,6 @@ describe("SeedingService + ProjectSkillService integration", () => {
       name: "Seed Test",
       slug: "seed-test",
       homeDir: projectHomeDir,
-      worktreeDir: join(projectHomeDir, "worktrees"),
     }).returning();
     projectId = proj.id;
 

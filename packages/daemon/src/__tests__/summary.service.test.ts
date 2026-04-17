@@ -22,7 +22,7 @@ describe("SummaryService", () => {
 
     const [project] = await testDb.db.insert(projects).values({
       name: "Summary Test", slug: "summary-test",
-      homeDir: tmpDir, worktreeDir: path.join(tmpDir, "wt"),
+      homeDir: tmpDir,
     }).returning();
     projectId = project.id;
   }, 60_000);

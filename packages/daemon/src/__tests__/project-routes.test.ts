@@ -42,7 +42,6 @@ describe("Project Routes", () => {
           name: "Test Project",
           slug: "test-project",
           homeDir: "/tmp/test",
-          worktreeDir: "/tmp/test-wt",
         },
       });
 
@@ -66,7 +65,7 @@ describe("Project Routes", () => {
     it("returns 409 for duplicate slug", async () => {
       const payload = {
         name: "P1", slug: "dup-slug",
-        homeDir: "/tmp/p1", worktreeDir: "/tmp/p1-wt",
+        homeDir: "/tmp/p1",
       };
       await app.inject({ method: "POST", url: "/api/projects", payload });
 
@@ -82,8 +81,8 @@ describe("Project Routes", () => {
   describe("GET /api/projects", () => {
     it("lists all projects (admin)", async () => {
       await testDb.db.insert(projects).values([
-        { name: "A", slug: "a", homeDir: "/a", worktreeDir: "/a-wt" },
-        { name: "B", slug: "b", homeDir: "/b", worktreeDir: "/b-wt" },
+        { name: "A", slug: "a", homeDir: "/a" },
+        { name: "B", slug: "b", homeDir: "/b" },
       ]);
 
       const res = await app.inject({
@@ -100,7 +99,7 @@ describe("Project Routes", () => {
     it("returns a project by ID", async () => {
       const [proj] = await testDb.db.insert(projects).values({
         name: "Detail", slug: "detail",
-        homeDir: "/d", worktreeDir: "/d-wt",
+        homeDir: "/d",
       }).returning();
 
       const res = await app.inject({
@@ -126,7 +125,7 @@ describe("Project Routes", () => {
     it("updates a project", async () => {
       const [proj] = await testDb.db.insert(projects).values({
         name: "Old", slug: "upd",
-        homeDir: "/u", worktreeDir: "/u-wt",
+        homeDir: "/u",
       }).returning();
 
       const res = await app.inject({

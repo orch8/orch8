@@ -22,7 +22,6 @@ describe("Agent API Routes", () => {
       name: "Agent Route Test",
       slug: "agent-route-test",
       homeDir: "/tmp/agent-routes",
-      worktreeDir: "/tmp/agent-routes-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

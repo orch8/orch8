@@ -17,7 +17,6 @@ describe("TaskService", () => {
       name: "Test",
       slug: "test",
       homeDir: "/tmp/test",
-      worktreeDir: "/tmp/wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

@@ -5,7 +5,6 @@ import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { taskRoutes } from "../api/routes/tasks.js";
 import { TaskService } from "../services/task.service.js";
-import { WorktreeService, type ExecFn } from "../services/worktree.service.js";
 import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
 import "../types.js";
 
@@ -21,7 +20,6 @@ describe("Task API Routes", () => {
       name: "Route Test",
       slug: "route-test",
       homeDir: "/tmp/routes",
-      worktreeDir: "/tmp/routes-wt",
     }).returning();
     projectId = project.id;
 
@@ -46,9 +44,7 @@ describe("Task API Routes", () => {
     app.decorate("db", testDb.db);
 
     const taskService = new TaskService(testDb.db);
-    const execFn = vi.fn<ExecFn>().mockResolvedValue({ stdout: "", stderr: "" });
-    const worktreeService = new WorktreeService(execFn);
-    const lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
+    const lifecycleService = new TaskLifecycleService(testDb.db, taskService);
     app.decorate("lifecycleService", lifecycleService);
 
     const enqueueWakeup = vi.fn().mockResolvedValue(undefined);

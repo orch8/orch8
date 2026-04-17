@@ -19,7 +19,6 @@ describe("Remaining Schema Tables", () => {
       name: "Schema Test",
       slug: "schema-remaining-test",
       homeDir: "/tmp/schema-test",
-      worktreeDir: "/tmp/schema-test-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

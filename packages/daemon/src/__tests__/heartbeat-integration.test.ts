@@ -32,7 +32,6 @@ describe("Heartbeat Pipeline Integration", () => {
       name: "Integration Test",
       slug: "integration-test",
       homeDir: "/tmp/integration-test",
-      worktreeDir: "/tmp/integration-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

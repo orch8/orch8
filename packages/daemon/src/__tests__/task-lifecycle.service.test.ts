@@ -24,7 +24,6 @@ describe("TaskLifecycleService", () => {
       name: "Lifecycle Test",
       slug: "lifecycle-test",
       homeDir: "/tmp/lifecycle",
-      worktreeDir: "/tmp/lifecycle-wt",
     }).returning();
     projectId = project.id;
 

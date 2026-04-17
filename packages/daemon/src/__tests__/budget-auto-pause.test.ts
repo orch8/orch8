@@ -15,7 +15,6 @@ describe("autoPauseIfExhausted", () => {
       name: "Auto-Pause Test",
       slug: "auto-pause-test",
       homeDir: "/tmp/auto-pause-test",
-      worktreeDir: "/tmp/auto-pause-wt",
       budgetLimitUsd: 100,
       budgetSpentUsd: 0,
     }).returning();

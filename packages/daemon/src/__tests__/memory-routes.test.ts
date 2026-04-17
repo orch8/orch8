@@ -22,7 +22,6 @@ describe("Memory Routes — Knowledge", () => {
       name: "Memory Test",
       slug: "memory-test",
       homeDir: "/tmp/memory",
-      worktreeDir: "/tmp/memory-wt",
     }).returning();
     projectId = project.id;
 
@@ -284,7 +283,6 @@ describe("Memory Routes — Worklog + Lessons", () => {
       name: "Worklog Test",
       slug: "worklog-test",
       homeDir: tmpDir,
-      worktreeDir: path.join(tmpDir, "wt"),
     }).returning();
     projectId = project.id;
 
@@ -421,7 +419,6 @@ describe("Memory Routes — Full Integration", () => {
       name: "Integration Test",
       slug: "integration-test",
       homeDir: "/tmp/integration",
-      worktreeDir: "/tmp/integration-wt",
     }).returning();
     projectId = project.id;
 

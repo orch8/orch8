@@ -18,7 +18,6 @@ describe("Identity Route", () => {
       name: "Identity Test",
       slug: "identity-test",
       homeDir: "/tmp/identity",
-      worktreeDir: "/tmp/identity-wt",
       budgetLimitUsd: 100,
       budgetSpentUsd: 25.50,
     }).returning();

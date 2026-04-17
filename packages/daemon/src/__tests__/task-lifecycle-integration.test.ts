@@ -4,29 +4,24 @@ import { projects, tasks, taskDependencies, comments } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { TaskService } from "../services/task.service.js";
 import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
-import { WorktreeService, type ExecFn } from "../services/worktree.service.js";
 import { CommentService } from "../services/comment.service.js";
 describe("Task Lifecycle Integration", () => {
   let testDb: TestDb;
   let taskService: TaskService;
   let lifecycleService: TaskLifecycleService;
   let commentService: CommentService;
-  let execFn: ExecFn;
   let projectId: string;
 
   beforeAll(async () => {
     testDb = await setupTestDb();
     taskService = new TaskService(testDb.db);
-    execFn = vi.fn<ExecFn>().mockResolvedValue({ stdout: "", stderr: "" });
-    const worktreeService = new WorktreeService(execFn);
-    lifecycleService = new TaskLifecycleService(testDb.db, taskService, worktreeService);
+    lifecycleService = new TaskLifecycleService(testDb.db, taskService);
     commentService = new CommentService(testDb.db);
 
     const [project] = await testDb.db.insert(projects).values({
       name: "Integration Test",
       slug: "integration-test",
       homeDir: "/tmp/int-test",
-      worktreeDir: "/tmp/int-test-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);
@@ -59,7 +54,6 @@ describe("Task Lifecycle Integration", () => {
     });
     expect(dispatched.column).toBe("in_progress");
     expect(dispatched.executionAgentId).toBe("engineer-1");
-    expect(dispatched.worktreePath).toBeTruthy();
 
     // Agent adds a comment
     const comment = await commentService.create({

@@ -16,7 +16,6 @@ describe("Wiring: Scheduler Unblock Dispatch", () => {
       name: "Scheduler Test",
       slug: "scheduler-test",
       homeDir: "/tmp/sched-test",
-      worktreeDir: "/tmp/sched-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

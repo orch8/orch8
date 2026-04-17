@@ -17,7 +17,6 @@ describe("CommentService", () => {
       name: "Comment Test",
       slug: "comment-test",
       homeDir: "/tmp/comment",
-      worktreeDir: "/tmp/comment-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

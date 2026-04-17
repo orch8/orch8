@@ -28,13 +28,13 @@ describe("Aggregated Cross-Project Views", () => {
 
     const [projA] = await testDb.db
       .insert(projects)
-      .values({ name: "A", slug: "a", homeDir: "/a", worktreeDir: "/a-wt" })
+      .values({ name: "A", slug: "a", homeDir: "/a" })
       .returning();
     projAId = projA.id;
 
     const [projB] = await testDb.db
       .insert(projects)
-      .values({ name: "B", slug: "b", homeDir: "/b", worktreeDir: "/b-wt" })
+      .values({ name: "B", slug: "b", homeDir: "/b" })
       .returning();
     projBId = projB.id;
 

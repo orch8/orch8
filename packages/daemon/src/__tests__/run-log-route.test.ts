@@ -39,7 +39,6 @@ describe("GET /api/runs/:id/log — path safety and IO error handling", () => {
         name: "Run Log Test",
         slug: `runlog-${Date.now()}`,
         homeDir: projectHome,
-        worktreeDir: path.join(projectHome, "worktrees"),
       })
       .returning();
     projectId = project.id;

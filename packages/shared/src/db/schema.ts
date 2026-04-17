@@ -92,7 +92,6 @@ export const projects = pgTable("projects", {
   description: text("description").default(""),
 
   homeDir: text("home_dir").notNull(),
-  worktreeDir: text("worktree_dir").notNull(),
 
   repoUrl: text("repo_url"),
   defaultBranch: text("default_branch").notNull().default("main"),
@@ -203,8 +202,6 @@ export const tasks = pgTable("tasks", {
   autoCommit: boolean("auto_commit").notNull().default(false),
   autoPr: boolean("auto_pr").notNull().default(true),
   finishStrategy: text("finish_strategy"),
-  branch: text("branch"),
-  worktreePath: text("worktree_path"),
 
   // Execution locking
   executionRunId: text("execution_run_id"),

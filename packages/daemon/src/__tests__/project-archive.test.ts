@@ -35,7 +35,6 @@ describe("Project Archive", () => {
         name: "Archivable",
         slug: "archivable",
         homeDir: "/tmp/arch",
-        worktreeDir: "/tmp/arch-wt",
       });
 
       const archived = await projectService.archive(project.id);
@@ -47,7 +46,6 @@ describe("Project Archive", () => {
         name: "WithAgents",
         slug: "with-agents",
         homeDir: "/tmp/wa",
-        worktreeDir: "/tmp/wa-wt",
       });
 
       await agentService.create({
@@ -69,7 +67,6 @@ describe("Project Archive", () => {
         name: "Mixed",
         slug: "mixed",
         homeDir: "/tmp/mix",
-        worktreeDir: "/tmp/mix-wt",
       });
 
       await agentService.create({
@@ -135,7 +132,6 @@ describe("Project Archive", () => {
           name: "ToArchive",
           slug: "to-archive",
           homeDir: "/tmp/ta",
-          worktreeDir: "/tmp/ta-wt",
         })
         .returning();
 
@@ -163,7 +159,6 @@ describe("Project Archive", () => {
           name: "NoAdmin",
           slug: "no-admin",
           homeDir: "/tmp/na",
-          worktreeDir: "/tmp/na-wt",
         })
         .returning();
 

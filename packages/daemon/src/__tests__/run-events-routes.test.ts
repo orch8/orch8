@@ -25,7 +25,6 @@ describe("Run Events Routes", () => {
       name: "Test",
       slug: "test",
       homeDir: projectHomeDir,
-      worktreeDir: join(projectHomeDir, "worktrees"),
     });
     await testDb.db.insert(agents).values({
       id: agentId,

@@ -19,7 +19,6 @@ describe("Agent Role Defaults (Integration)", () => {
       name: "Role Defaults",
       slug: "role-defaults",
       homeDir: "/tmp/role-defaults",
-      worktreeDir: "/tmp/role-defaults-wt",
     }).returning();
     projectId = project.id;
   }, 60_000);

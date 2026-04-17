@@ -283,7 +283,6 @@ describe("SeedingService", () => {
         name: "Chat Perms Test",
         slug: `chat-perms-${Date.now()}`,
         homeDir: projectHomeDir,
-        worktreeDir: `${projectHomeDir}-wt`,
       }).returning();
       projectId = project.id;
     });
