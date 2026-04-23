@@ -5,8 +5,13 @@ export type {
   StreamAssistantEvent,
   StreamResultEvent,
   RunContext,
+  RunAgentInstructions,
   RunResult,
   RunErrorCode,
+  AgentAdapter,
+  AdapterCapabilities,
+  RuntimeStreamEvent,
+  TestEnvironmentResult,
   SessionParams,
 } from "./types.js";
 
@@ -30,4 +35,7 @@ export { runProcess } from "./process-runner.js";
 export type { ProcessRunInput } from "./process-runner.js";
 
 export { ClaudeLocalAdapter } from "./claude-local-adapter.js";
-export type { RunAgentInstructions } from "./claude-local-adapter.js";
+export { CodexLocalAdapter } from "./codex-local/codex-local-adapter.js";
+export type { CodexLocalAdapterConfig } from "./codex-local/types.js";
+export { resolveAdapter } from "./registry.js";
+export type { AdapterMap } from "./registry.js";

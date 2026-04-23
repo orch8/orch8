@@ -1,6 +1,7 @@
 // packages/daemon/src/adapter/types.ts
 
 import type { spawn as nodeSpawn } from "node:child_process";
+import type { WakeReason } from "./prompt-builder.js";
 
 /**
  * The Node child_process spawn function. Defined here as a neutral
@@ -38,6 +39,56 @@ export interface ClaudeLocalAdapterConfig {
 
   maxConcurrentSubagents?: number;
 }
+
+// ─── Provider-neutral Adapter Contract ───────────────────
+
+export interface AdapterCapabilities {
+  requiresMaterializedRuntimeSkills: boolean;
+  supportsInstructionsBundle: boolean;
+}
+
+export interface RunAgentInstructions {
+  projectRoot: string;
+  slug: string;
+  wake: WakeReason;
+  sessionHandoff?: string;
+  desiredSkills?: string[];
+}
+
+export interface TestEnvironmentResult {
+  ok: boolean;
+  errorCode?: RunErrorCode | "not_found";
+  message?: string;
+  sessionId?: string;
+  raw?: unknown;
+}
+
+export interface AgentAdapter {
+  readonly type: string;
+  readonly capabilities: AdapterCapabilities;
+  runAgent(config: unknown, ctx: RunContext, instructions: RunAgentInstructions): Promise<RunResult>;
+  testEnvironment(config: unknown): Promise<TestEnvironmentResult>;
+}
+
+export interface Usage {
+  input_tokens: number;
+  cache_read_input_tokens?: number;
+  cached_input_tokens?: number;
+  output_tokens: number;
+}
+
+interface RuntimeEventBase {
+  type?: string;
+  rawPayload: unknown;
+}
+
+export type RuntimeStreamEvent =
+  | (RuntimeEventBase & { kind: "init"; sessionId: string; model?: string })
+  | (RuntimeEventBase & { kind: "assistant_text"; text: string })
+  | (RuntimeEventBase & { kind: "tool_use"; toolName: string; input: unknown; toolUseId: string })
+  | (RuntimeEventBase & { kind: "tool_result"; toolUseId: string; output: unknown; isError: boolean })
+  | (RuntimeEventBase & { kind: "result"; usage?: Usage; costUsd?: number | null; result?: string | null })
+  | (RuntimeEventBase & { kind: "error"; errorCode: RunErrorCode; message: string });
 
 // ─── Stream-JSON Events (spec §4) ────────────────────────
 
@@ -103,7 +154,7 @@ export interface RunContext {
   logStream?: import("node:fs").WriteStream;
 
   // Real-time event callback
-  onEvent?: (event: StreamEvent) => void;
+  onEvent?: (event: RuntimeStreamEvent) => void;
 
   // Subagent context
   parentRunId?: string;
@@ -140,19 +191,20 @@ export interface RunResult {
   sessionId: string | null;
   model: string | null;
   result: string | null;
-  usage: StreamResultEvent["usage"] | null;
+  usage: Usage | null;
   costUsd: number | null;
   billingType: "api" | "subscription";
   exitCode: number | null;
   signal: string | null;
   error: string | null;
   errorCode: RunErrorCode | null;
-  events: StreamEvent[];
+  events: RuntimeStreamEvent[];
 }
 
 export type RunErrorCode =
   | "auth_required"
   | "unknown_session"
+  | "transient_upstream"
   | "max_turns_reached"
   | "timeout"
   | "process_error";

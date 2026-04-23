@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
+import { ADAPTER_TYPES, type AdapterType } from "@orch/shared";
 import { FormField } from "../shared/FormField.js";
 import type { Agent } from "../../types.js";
 import type { UseMutationResult } from "@tanstack/react-query";
+import { api } from "../../api/client.js";
 
 const MODEL_OPTIONS = [
+  "gpt-5.5",
   "claude-opus-4-7",
   "claude-opus-4-6",
   "claude-sonnet-4-6",
@@ -28,6 +31,10 @@ export function GeneralTab({ agent, projectId, updateAgent }: GeneralTabProps) {
   const [adapterConfig, setAdapterConfig] = useState(
     JSON.stringify(agent.adapterConfig ?? {}, null, 2),
   );
+  const [testStatus, setTestStatus] = useState<{
+    state: "idle" | "running" | "ok" | "error";
+    message?: string;
+  }>({ state: "idle" });
   const [envVars, setEnvVars] = useState<Record<string, string>>(
     (agent.envVars as Record<string, string>) ?? {},
   );
@@ -43,6 +50,7 @@ export function GeneralTab({ agent, projectId, updateAgent }: GeneralTabProps) {
     setAdapterType(agent.adapterType);
     setAdapterConfig(JSON.stringify(agent.adapterConfig ?? {}, null, 2));
     setEnvVars((agent.envVars as Record<string, string>) ?? {});
+    setTestStatus({ state: "idle" });
   }, [agent]);
 
   function handleSave() {
@@ -80,6 +88,34 @@ export function GeneralTab({ agent, projectId, updateAgent }: GeneralTabProps) {
       delete next[key];
       return next;
     });
+  }
+
+  async function testAdapter() {
+    let parsedAdapterConfig: Record<string, unknown> = {};
+    try {
+      parsedAdapterConfig = JSON.parse(adapterConfig);
+    } catch {
+      setTestStatus({ state: "error", message: "Adapter config is not valid JSON" });
+      return;
+    }
+
+    setTestStatus({ state: "running" });
+    try {
+      const result = await api.post<{
+        ok: boolean;
+        errorCode?: string;
+        message?: string;
+        sessionId?: string;
+      }>(`/adapter/${adapterType}/test-environment`, { config: parsedAdapterConfig });
+      setTestStatus({
+        state: result.ok ? "ok" : "error",
+        message: result.ok
+          ? `Ready${result.sessionId ? ` (${result.sessionId})` : ""}`
+          : `${result.errorCode ?? "error"}${result.message ? `: ${result.message}` : ""}`,
+      });
+    } catch (err) {
+      setTestStatus({ state: "error", message: (err as Error).message });
+    }
   }
 
   return (
@@ -193,11 +229,20 @@ export function GeneralTab({ agent, projectId, updateAgent }: GeneralTabProps) {
       {/* Adapter */}
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Adapter Type">
-          <input
+          <select
             value={adapterType}
-            onChange={(e) => setAdapterType(e.target.value)}
+            onChange={(e) => setAdapterType(e.target.value as AdapterType)}
             className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-600 focus:outline-none"
-          />
+          >
+            {ADAPTER_TYPES.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-zinc-500">
+            {adapterType === "codex_local"
+              ? "Requires codex on PATH and codex login or OPENAI_API_KEY."
+              : "Uses Claude Code CLI from the local environment."}
+          </p>
         </FormField>
 
         <FormField label="Adapter Config (JSON)">
@@ -208,6 +253,30 @@ export function GeneralTab({ agent, projectId, updateAgent }: GeneralTabProps) {
             className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 font-mono text-xs text-zinc-100 focus:border-zinc-600 focus:outline-none"
           />
         </FormField>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={testAdapter}
+          disabled={testStatus.state === "running"}
+          className="rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+        >
+          {testStatus.state === "running" ? "Testing..." : "Test Adapter"}
+        </button>
+        {testStatus.state !== "idle" && (
+          <span
+            className={
+              testStatus.state === "ok"
+                ? "text-sm text-green-400"
+                : testStatus.state === "error"
+                  ? "text-sm text-red-400"
+                  : "text-sm text-zinc-400"
+            }
+          >
+            {testStatus.message ?? "Running"}
+          </span>
+        )}
       </div>
 
       <button

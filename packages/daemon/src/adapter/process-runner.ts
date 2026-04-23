@@ -15,7 +15,7 @@ export interface ProcessRunInput {
   timeoutSec: number;
   graceSec: number;
   logStream?: import("node:fs").WriteStream;
-  onEvent?: (event: import("./types.js").StreamEvent) => void;
+  onEvent?: (event: import("./types.js").RuntimeStreamEvent) => void;
 }
 
 /**

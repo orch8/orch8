@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ADAPTER_TYPES } from "../constants/index.js";
 import { TaskColumnSchema } from "./task.js";
 
 export const AgentRoleSchema = z.enum([
@@ -30,7 +31,7 @@ export const CreateAgentSchema = z.object({
   canMoveTo: z.array(TaskColumnSchema).optional(),
   mcpTools: z.array(z.string()).optional(),
   desiredSkills: z.array(z.string()).optional(),
-  adapterType: z.string().optional(),
+  adapterType: z.enum(ADAPTER_TYPES).optional(),
   adapterConfig: z.record(z.unknown()).optional(),
   envVars: z.record(z.string()).optional(),
   budgetLimitUsd: z.number().min(0).optional(),
@@ -60,7 +61,7 @@ export const UpdateAgentSchema = z.object({
   canMoveTo: z.array(TaskColumnSchema).optional(),
   mcpTools: z.array(z.string()).optional(),
   desiredSkills: z.array(z.string()).optional(),
-  adapterType: z.string().optional(),
+  adapterType: z.enum(ADAPTER_TYPES).optional(),
   adapterConfig: z.record(z.unknown()).optional(),
   envVars: z.record(z.string()).optional(),
   budgetLimitUsd: z.number().min(0).nullable().optional(),

@@ -17,6 +17,7 @@ import { AgentService } from "./services/agent.service.js";
 import { HeartbeatService } from "./services/heartbeat.service.js";
 import { SchedulerService } from "./services/scheduler.service.js";
 import { ClaudeLocalAdapter } from "./adapter/claude-local-adapter.js";
+import { CodexLocalAdapter } from "./adapter/codex-local/codex-local-adapter.js";
 import { SessionManager } from "./adapter/session-manager.js";
 import { runRoutes } from "./api/routes/runs.js";
 import { identityRoutes } from "./api/routes/identity.js";
@@ -25,6 +26,7 @@ import { memoryRoutes } from "./api/routes/memory.js";
 import { costRoutes } from "./api/routes/cost.js";
 import { activityRoutes } from "./api/routes/activity.js";
 import { daemonRoutes } from "./api/routes/daemon.js";
+import { adapterTestRoutes } from "./api/routes/adapter-test.js";
 import { notificationRoutes } from "./api/routes/notifications.js";
 import { createDbClient } from "./db/client.js";
 import { ProjectService } from "./services/project.service.js";
@@ -123,8 +125,11 @@ export function buildServer(options: ServerOptions = {}) {
     // Heartbeat service
     const heartbeatService = new HeartbeatService(dbClient.db, broadcastService);
     const spawnFn = options.spawnFn ?? nodeSpawn;
-    const adapter = new ClaudeLocalAdapter(dbClient.db, spawnFn, projectSkillService);
-    heartbeatService.setAdapter(adapter);
+    const claudeAdapter = new ClaudeLocalAdapter(dbClient.db, spawnFn, projectSkillService);
+    const codexAdapter = new CodexLocalAdapter(dbClient.db, spawnFn, projectSkillService);
+    const adapters = { claude_local: claudeAdapter, codex_local: codexAdapter };
+    app.decorate("adapters", adapters);
+    heartbeatService.setAdapters(adapters);
     const sessionMgr = new SessionManager(dbClient.db);
     heartbeatService.setSessionManager(sessionMgr);
 
@@ -138,7 +143,7 @@ export function buildServer(options: ServerOptions = {}) {
     // Chat service — reuses the adapter, session manager, and broadcast service.
     const chatService = new ChatService(
       dbClient.db,
-      adapter,
+      adapters,
       sessionMgr,
       broadcastService,
       `http://${apiHost}:${apiPort}`,
@@ -298,6 +303,7 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(costRoutes);
     app.register(activityRoutes);
     app.register(daemonRoutes);
+    app.register(adapterTestRoutes);
     app.register(notificationRoutes);
     app.register(projectSkillRoutes);
     app.register(bundledAgentRoutes);

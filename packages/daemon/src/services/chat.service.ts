@@ -10,26 +10,46 @@ import {
 import type { ExtractedCard } from "@orch/shared";
 import type { SchemaDb } from "../db/client.js";
 import type {
-  ClaudeLocalAdapter,
   RunAgentInstructions,
-} from "../adapter/claude-local-adapter.js";
+  AgentAdapter,
+  RuntimeStreamEvent,
+} from "../adapter/types.js";
+import type { ClaudeLocalAdapterConfig } from "../adapter/types.js";
+import type { CodexLocalAdapterConfig } from "../adapter/codex-local/types.js";
 import type { SessionManager } from "../adapter/session-manager.js";
 import type { BroadcastService } from "./broadcast.service.js";
 import { extractCards } from "./chat-card-parser.js";
+import { resolveAdapter, type AdapterMap } from "../adapter/registry.js";
 
 type Chat = typeof chats.$inferSelect;
 type ChatMessage = typeof chatMessages.$inferSelect;
 
 export class ChatService {
   private logger?: FastifyBaseLogger;
+  private adapters: AdapterMap;
 
   constructor(
     private db: SchemaDb,
-    private adapter: ClaudeLocalAdapter,
+    adapters: AdapterMap | AgentAdapter,
     private sessionManager: SessionManager,
     private broadcast: BroadcastService,
     private apiUrl: string,
-  ) {}
+  ) {
+    this.adapters = isAdapterMap(adapters)
+      ? adapters
+      : { claude_local: adapters, codex_local: adapters };
+  }
+
+  setAdapter(adapter: AgentAdapter): void {
+    this.adapters = {
+      claude_local: adapter,
+      codex_local: adapter,
+    };
+  }
+
+  setAdapters(adapters: AdapterMap): void {
+    this.adapters = adapters;
+  }
 
   setLogger(logger: FastifyBaseLogger) {
     this.logger = logger;
@@ -221,6 +241,7 @@ export class ChatService {
 
       const agent = await this.getAgent(chat.agentId, chat.projectId);
       if (!agent) throw new Error(`Chat agent ${chat.agentId} not found`);
+      const adapter = resolveAdapter(agent.adapterType, this.adapters, this.logger);
 
       // 1. Insert placeholder assistant message row (status=streaming)
       const [assistantRow] = await this.db
@@ -263,7 +284,7 @@ export class ChatService {
         apiUrl: this.apiUrl,
         cwd: project.homeDir,
         sessionKey: chat.id,
-        onEvent: (event: unknown) => {
+        onEvent: (event: RuntimeStreamEvent) => {
           // Accumulate assistant text chunks and broadcast them live.
           const maybeText = extractStreamText(event);
           if (!maybeText) return;
@@ -287,19 +308,14 @@ export class ChatService {
       };
 
       // 5. Execute the run.
-      const adapterConfig = {
-        model: agent.model,
-        effort: (agent.effort as "low" | "medium" | "high" | "xhigh" | "max" | undefined) ?? undefined,
-        maxTurnsPerRun: agent.maxTurns,
-        cwd: project.homeDir,
-      };
+      const adapterConfig = this.buildAdapterConfig(agent, project.homeDir, adapter.type);
 
       // Cast ctx — the full RunContext type lives in the adapter module
       // and we intentionally keep the chat-side type minimal. The adapter
       // treats missing optional fields as undefined.
-      const result = await this.adapter.runAgent(
+      const result = await adapter.runAgent(
         adapterConfig,
-        ctx as unknown as Parameters<ClaudeLocalAdapter["runAgent"]>[1],
+        ctx,
         instructions,
       );
 
@@ -502,10 +518,11 @@ export class ChatService {
   async invalidateSession(chatId: string): Promise<void> {
     const chat = await this.getChat(chatId);
     if (!chat) return;
+    const agent = await this.getAgent(chat.agentId, chat.projectId);
     await this.sessionManager.clearSession({
       agentId: chat.agentId,
       taskKey: chat.id,
-      adapterType: "claude_local",
+      adapterType: agent?.adapterType ?? "claude_local",
     });
   }
 
@@ -595,6 +612,37 @@ export class ChatService {
       .where(and(eq(agentsTable.id, agentId), eq(agentsTable.projectId, projectId)));
     return row ?? null;
   }
+
+  private buildAdapterConfig(
+    agent: typeof agentsTable.$inferSelect,
+    cwd: string,
+    adapterType: string,
+  ): ClaudeLocalAdapterConfig | CodexLocalAdapterConfig {
+    const baseConfig = (agent.adapterConfig ?? {}) as Record<string, unknown>;
+    const env = {
+      ...((baseConfig.env as Record<string, string> | undefined) ?? {}),
+      ...((agent.envVars as Record<string, string> | null) ?? {}),
+    };
+
+    if (adapterType === "codex_local") {
+      return {
+        ...(baseConfig as CodexLocalAdapterConfig),
+        model: (baseConfig as CodexLocalAdapterConfig).model ?? agent.model ?? undefined,
+        cwd,
+        env,
+      };
+    }
+
+    return {
+      ...(baseConfig as ClaudeLocalAdapterConfig),
+      model: agent.model ?? (baseConfig as ClaudeLocalAdapterConfig).model,
+      effort: (agent.effort as ClaudeLocalAdapterConfig["effort"] | null)
+        ?? (baseConfig as ClaudeLocalAdapterConfig).effort,
+      maxTurnsPerRun: agent.maxTurns ?? (baseConfig as ClaudeLocalAdapterConfig).maxTurnsPerRun,
+      cwd,
+      env,
+    };
+  }
 }
 
 /**
@@ -604,6 +652,9 @@ export class ChatService {
  */
 function extractStreamText(event: unknown): string | null {
   if (typeof event !== "object" || event === null) return null;
+  const runtime = event as RuntimeStreamEvent;
+  if (runtime.kind === "assistant_text") return runtime.text;
+
   const e = event as { type?: string; message?: { content?: unknown } };
   if (e.type !== "assistant") return null;
   const content = e.message?.content;
@@ -634,4 +685,8 @@ export function deriveChatTitle(raw: string): string {
   if (truncated.length === 0) return "New chat";
   const capitalised = truncated[0].toUpperCase() + truncated.slice(1);
   return capitalised.length === 60 ? capitalised + "…" : capitalised;
+}
+
+function isAdapterMap(value: AdapterMap | AgentAdapter): value is AdapterMap {
+  return "claude_local" in value && "codex_local" in value;
 }

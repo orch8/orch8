@@ -4,9 +4,10 @@ import {
 } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import { checkBudget, autoPauseIfExhausted } from "./budget.service.js";
-import type { ClaudeLocalAdapter, RunAgentInstructions } from "../adapter/claude-local-adapter.js";
+import type { AgentAdapter, RunAgentInstructions } from "../adapter/types.js";
 import type { WakeReason } from "../adapter/prompt-builder.js";
-import type { ClaudeLocalAdapterConfig, RunContext, RunResult } from "../adapter/types.js";
+import type { ClaudeLocalAdapterConfig, RunContext, RunResult, RuntimeStreamEvent } from "../adapter/types.js";
+import type { CodexLocalAdapterConfig } from "../adapter/codex-local/types.js";
 import type { MemoryExtractionService } from "./memory-extraction.service.js";
 import type { BroadcastService } from "./broadcast.service.js";
 import type { PipelineService } from "./pipeline.service.js";
@@ -19,6 +20,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 import { mapStreamEvent } from "../adapter/tool-mapper.js";
 import { SessionManager } from "../adapter/session-manager.js";
+import { resolveAdapter, type AdapterMap } from "../adapter/registry.js";
 
 type Agent = typeof agents.$inferSelect;
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
@@ -69,7 +71,7 @@ export class HeartbeatService {
   // Per-agent start locks to prevent race conditions
   private agentStartLocks = new Map<string, Promise<void>>();
 
-  private adapter: ClaudeLocalAdapter | null = null;
+  private adapters: AdapterMap | null = null;
   private extractionService: MemoryExtractionService | null = null;
   private logger: FastifyBaseLogger | null = null;
   private onRunCompleted?: (taskId: string, status: string) => Promise<void>;
@@ -96,8 +98,15 @@ export class HeartbeatService {
     return path.join(projectHomeDir, ".orch8", "logs");
   }
 
-  setAdapter(adapter: ClaudeLocalAdapter): void {
-    this.adapter = adapter;
+  setAdapter(adapter: AgentAdapter): void {
+    this.adapters = {
+      claude_local: adapter,
+      codex_local: adapter,
+    };
+  }
+
+  setAdapters(adapters: AdapterMap): void {
+    this.adapters = adapters;
   }
 
   setExtractionService(service: MemoryExtractionService): void {
@@ -481,10 +490,11 @@ export class HeartbeatService {
       }
 
       // 7. Invoke adapter
-      if (!this.adapter) {
-        await this.failRun(runId, "No adapter configured", "no_adapter");
+      if (!this.adapters) {
+        await this.failRun(runId, "No adapters configured", "no_adapter");
         return;
       }
+      const adapter = resolveAdapter(agent.adapterType, this.adapters, this.logger ?? undefined);
 
       // 7b. Setup run log capture (spec §14 §2.2) — after adapter check
       const logDir = this.getLogDir(cwd);
@@ -492,17 +502,7 @@ export class HeartbeatService {
       runLogger = new RunLogger(logDir);
       logHandle = runLogger.create(runId);
 
-      const adapterConfig: ClaudeLocalAdapterConfig = {
-        ...(agent.adapterConfig as ClaudeLocalAdapterConfig ?? {}),
-        model: agent.model,
-        effort: agent.effort as ClaudeLocalAdapterConfig["effort"],
-        maxTurnsPerRun: agent.maxTurns,
-        cwd,
-        env: {
-          ...(agent.adapterConfig as ClaudeLocalAdapterConfig ?? {}).env,
-          ...(agent.envVars as Record<string, string> ?? {}),
-        },
-      };
+      const adapterConfig = this.buildAdapterConfig(agent, cwd, adapter.type);
 
       // Real-time event emission (run viewer spec).
       //
@@ -518,7 +518,7 @@ export class HeartbeatService {
       // bounds promise accumulation, provides backpressure naturally, and
       // funnels any insert failure through the structured logger.
       let eventSeq = 0;
-      const onEvent = (rawEvent: import("../adapter/types.js").StreamEvent): void => {
+      const onEvent = (rawEvent: RuntimeStreamEvent): void => {
         const mapped = mapStreamEvent(rawEvent);
         for (const m of mapped) {
           const seq = eventSeq++;
@@ -532,7 +532,7 @@ export class HeartbeatService {
             eventType: m.eventType,
             toolName: m.toolName,
             summary: m.summary,
-            payload: rawEvent,
+            payload: rawEvent.rawPayload,
           });
 
           this.broadcastService.runEvent(claimedRun.projectId, {
@@ -542,7 +542,7 @@ export class HeartbeatService {
             toolName: m.toolName,
             summary: m.summary,
             timestamp,
-            payload: rawEvent,
+            payload: rawEvent.rawPayload,
           });
         }
       };
@@ -659,7 +659,7 @@ export class HeartbeatService {
         try {
           const taskKey = claimedRun.taskId;
           const stats = await this.sessionManager.getSessionStats(
-            agent.id, taskKey, "claude_local",
+            agent.id, taskKey, adapter.type,
           );
 
           if (stats) {
@@ -690,7 +690,7 @@ export class HeartbeatService {
               await this.sessionManager.clearSession({
                 agentId: agent.id,
                 taskKey,
-                adapterType: "claude_local",
+                adapterType: adapter.type,
               });
 
               // Set sessionHandoff on instructions so the adapter includes it
@@ -705,7 +705,7 @@ export class HeartbeatService {
         }
       }
 
-      const result = await this.adapter.runAgent(adapterConfig, ctx, instructions);
+      const result = await adapter.runAgent(adapterConfig, ctx, instructions);
 
       // 8. Record results AND update budget atomically.
       //
@@ -1089,6 +1089,37 @@ export class HeartbeatService {
       .from(agents)
       .where(and(eq(agents.id, agentId), eq(agents.projectId, projectId)));
     return agent ?? null;
+  }
+
+  private buildAdapterConfig(
+    agent: Agent,
+    cwd: string,
+    adapterType: string,
+  ): ClaudeLocalAdapterConfig | CodexLocalAdapterConfig {
+    const baseConfig = (agent.adapterConfig ?? {}) as Record<string, unknown>;
+    const env = {
+      ...((baseConfig.env as Record<string, string> | undefined) ?? {}),
+      ...((agent.envVars as Record<string, string> | null) ?? {}),
+    };
+
+    if (adapterType === "codex_local") {
+      return {
+        ...(baseConfig as CodexLocalAdapterConfig),
+        model: (baseConfig as CodexLocalAdapterConfig).model ?? agent.model ?? undefined,
+        cwd,
+        env,
+      };
+    }
+
+    return {
+      ...(baseConfig as ClaudeLocalAdapterConfig),
+      model: agent.model ?? (baseConfig as ClaudeLocalAdapterConfig).model,
+      effort: (agent.effort as ClaudeLocalAdapterConfig["effort"] | null)
+        ?? (baseConfig as ClaudeLocalAdapterConfig).effort,
+      maxTurnsPerRun: agent.maxTurns ?? (baseConfig as ClaudeLocalAdapterConfig).maxTurnsPerRun,
+      cwd,
+      env,
+    };
   }
 
   private async recordWakeup(

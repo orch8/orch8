@@ -3,6 +3,10 @@ import { FormField } from "../shared/FormField.js";
 import type { Agent } from "../../types.js";
 import type { UseMutationResult } from "@tanstack/react-query";
 
+const CODEX_MODELS = ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex"];
+const CODEX_EFFORTS = ["minimal", "low", "medium", "high", "xhigh"];
+const CODEX_SANDBOXES = ["read-only", "workspace-write", "danger-full-access"];
+
 interface ExecutionTabProps {
   agent: Agent;
   projectId: string;
@@ -38,8 +42,18 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
   const [sessionMaxAgeHours, setSessionMaxAgeHours] = useState(
     agent.sessionMaxAgeHours?.toString() ?? "",
   );
+  const [codexModel, setCodexModel] = useState("");
+  const [codexReasoningEffort, setCodexReasoningEffort] = useState("");
+  const [codexSandbox, setCodexSandbox] = useState("");
+  const [codexBypass, setCodexBypass] = useState(true);
+  const [codexFullAuto, setCodexFullAuto] = useState(false);
+  const [codexSearch, setCodexSearch] = useState(false);
+  const [codexProfile, setCodexProfile] = useState("");
+  const [codexAddDirs, setCodexAddDirs] = useState("");
+  const [codexExtraArgs, setCodexExtraArgs] = useState("");
 
   useEffect(() => {
+    const config = (agent.adapterConfig ?? {}) as Record<string, unknown>;
     setMaxTurns(agent.maxTurns.toString());
     setMaxConcurrentRuns(agent.maxConcurrentRuns.toString());
     setMaxConcurrentTasks((agent.maxConcurrentTasks ?? 1).toString());
@@ -54,10 +68,19 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
     setSessionMaxRuns(agent.sessionMaxRuns?.toString() ?? "");
     setSessionMaxInputTokens(agent.sessionMaxInputTokens?.toString() ?? "");
     setSessionMaxAgeHours(agent.sessionMaxAgeHours?.toString() ?? "");
+    setCodexModel(asString(config.model) || "gpt-5.5");
+    setCodexReasoningEffort(asString(config.modelReasoningEffort));
+    setCodexSandbox(asString(config.sandbox));
+    setCodexBypass(config.dangerouslyBypassApprovalsAndSandbox !== false);
+    setCodexFullAuto(config.fullAuto === true);
+    setCodexSearch(config.search === true);
+    setCodexProfile(asString(config.profile));
+    setCodexAddDirs(asStringList(config.addDirs).join("\n"));
+    setCodexExtraArgs(asStringList(config.extraArgs).join("\n"));
   }, [agent]);
 
   function handleSave() {
-    updateAgent.mutate({
+    const patch: Record<string, unknown> = {
       agentId: agent.id,
       projectId,
       maxTurns: parseInt(maxTurns, 10),
@@ -74,7 +97,24 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
       sessionMaxRuns: sessionMaxRuns ? parseInt(sessionMaxRuns, 10) : null,
       sessionMaxInputTokens: sessionMaxInputTokens ? parseInt(sessionMaxInputTokens, 10) : null,
       sessionMaxAgeHours: sessionMaxAgeHours ? parseInt(sessionMaxAgeHours, 10) : null,
-    });
+    };
+
+    if (agent.adapterType === "codex_local") {
+      patch.adapterConfig = {
+        ...((agent.adapterConfig ?? {}) as Record<string, unknown>),
+        model: codexModel || undefined,
+        modelReasoningEffort: codexReasoningEffort || undefined,
+        sandbox: codexSandbox || undefined,
+        dangerouslyBypassApprovalsAndSandbox: codexBypass,
+        fullAuto: codexFullAuto,
+        search: codexSearch,
+        profile: codexProfile || undefined,
+        addDirs: lines(codexAddDirs),
+        extraArgs: lines(codexExtraArgs),
+      };
+    }
+
+    updateAgent.mutate(patch);
   }
 
   const inputClass =
@@ -167,6 +207,67 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
         </div>
       )}
 
+      {agent.adapterType === "codex_local" && (
+        <div className="flex flex-col gap-4 rounded-lg border border-zinc-800 p-3">
+          <p className="text-sm font-medium text-zinc-300">Codex Runtime</p>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Model">
+              <select value={codexModel} onChange={(e) => setCodexModel(e.target.value)} className={inputClass}>
+                {CODEX_MODELS.map((model) => (
+                  <option key={model} value={model}>{model}</option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Reasoning Effort">
+              <select value={codexReasoningEffort} onChange={(e) => setCodexReasoningEffort(e.target.value)} className={inputClass}>
+                <option value="">Default</option>
+                {CODEX_EFFORTS.map((effort) => (
+                  <option key={effort} value={effort}>{effort}</option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Sandbox">
+              <select value={codexSandbox} onChange={(e) => setCodexSandbox(e.target.value)} className={inputClass}>
+                <option value="">Default</option>
+                {CODEX_SANDBOXES.map((sandbox) => (
+                  <option key={sandbox} value={sandbox}>{sandbox}</option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Profile">
+              <input value={codexProfile} onChange={(e) => setCodexProfile(e.target.value)} className={inputClass} />
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input type="checkbox" checked={codexBypass} onChange={(e) => setCodexBypass(e.target.checked)} className="rounded border-zinc-700" />
+              Bypass approvals and sandbox
+            </label>
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input type="checkbox" checked={codexFullAuto} onChange={(e) => setCodexFullAuto(e.target.checked)} className="rounded border-zinc-700" />
+              Full auto
+            </label>
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input type="checkbox" checked={codexSearch} onChange={(e) => setCodexSearch(e.target.checked)} className="rounded border-zinc-700" />
+              Search
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Additional Directories">
+              <textarea value={codexAddDirs} onChange={(e) => setCodexAddDirs(e.target.value)} rows={3} className={inputClass} />
+            </FormField>
+            <FormField label="Extra Args">
+              <textarea value={codexExtraArgs} onChange={(e) => setCodexExtraArgs(e.target.value)} rows={3} className={inputClass} />
+            </FormField>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         <p className="text-sm font-medium text-zinc-300">Wake Triggers</p>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
@@ -196,4 +297,16 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
       </button>
     </div>
   );
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function asStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function lines(value: string): string[] {
+  return value.split("\n").map((line) => line.trim()).filter(Boolean);
 }

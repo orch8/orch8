@@ -50,6 +50,17 @@ describe("Agent Schemas", () => {
       expect(result.success).toBe(true);
     });
 
+    it("rejects invalid adapter types", () => {
+      const result = CreateAgentSchema.safeParse({
+        id: "bad-adapter",
+        projectId: "proj_abc",
+        name: "Bad Adapter",
+        role: "engineer",
+        adapterType: "not_real",
+      });
+      expect(result.success).toBe(false);
+    });
+
     it("rejects missing required fields", () => {
       const result = CreateAgentSchema.safeParse({
         name: "Missing Fields",
@@ -107,6 +118,14 @@ describe("Agent Schemas", () => {
       const result = UpdateAgentSchema.safeParse({
         heartbeatEnabled: true,
         heartbeatIntervalSec: 60,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("validates codex adapter update", () => {
+      const result = UpdateAgentSchema.safeParse({
+        adapterType: "codex_local",
+        adapterConfig: { model: "gpt-5.5" },
       });
       expect(result.success).toBe(true);
     });

@@ -12,6 +12,7 @@ import type { MemoryExtractionService } from "./services/memory-extraction.servi
 import type { BroadcastService } from "./services/broadcast.service.js";
 import type { NotificationService } from "./services/notification.service.js";
 import type { SeedingService } from "./services/seeding.service.js";
+import type { AdapterMap } from "./adapter/registry.js";
 
 export type SchemaDb = PostgresJsDatabase<typeof schema>;
 
@@ -34,6 +35,7 @@ declare module "fastify" {
     pipelineService: import("./services/pipeline.service.js").PipelineService;
     pipelineTemplateService: import("./services/pipeline-template.service.js").PipelineTemplateService;
     chatService: import("./services/chat.service.js").ChatService;
+    adapters: AdapterMap;
     /**
      * Resolves once cold-start initialization (global skills populate,
      * per-project skill sync, chat-agent backfill) has finished. The
