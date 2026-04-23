@@ -79,3 +79,20 @@ export {
   AlertDialogTrigger,
   AlertDialogViewport,
 } from "./AlertDialog.js";
+export {
+  Popover,
+  PopoverClose,
+  PopoverContent,
+  PopoverCreateHandle,
+  PopoverDescription,
+  PopoverPopup,
+  PopoverTitle,
+  PopoverTrigger,
+} from "./Popover.js";
+export {
+  Tooltip,
+  TooltipCreateHandle,
+  TooltipPopup,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./Tooltip.js";
