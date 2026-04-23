@@ -34,23 +34,22 @@ export function Drawer({ open, onClose, children, side = "left" }: DrawerProps) 
   if (!open) return null;
 
   const sideClass = side === "left" ? "left-0" : "right-0";
+  const borderClass = side === "left" ? "border-r" : "border-l";
 
   return (
     <div className="fixed inset-0 z-40">
-      {/* Backdrop */}
       <div
         data-testid="drawer-backdrop"
-        className="absolute inset-0 bg-black/45"
+        className="absolute inset-0 bg-black/32 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
-      {/* Panel */}
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         tabIndex={-1}
-        className={`absolute top-0 ${sideClass} h-full w-[min(320px,85vw)] bg-sidebar transition-transform duration-[120ms] ease-out`}
+        className={`absolute top-0 ${sideClass} ${borderClass} h-full w-[min(var(--size-drawer-width),85vw)] bg-popover text-popover-foreground shadow-lg/5 transition-transform duration-[var(--duration-fast)] ease-[var(--ease-standard)]`}
       >
         {children}
       </div>

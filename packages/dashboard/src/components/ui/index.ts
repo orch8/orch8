@@ -32,6 +32,21 @@ export { SectionLabel } from "./SectionLabel.js";
 export { Drawer } from "./Drawer.js";
 export { Modal } from "./Modal.js";
 export {
+  Sheet,
+  SheetBackdrop,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetOverlay,
+  SheetPanel,
+  SheetPopup,
+  SheetPortal,
+  SheetTitle,
+  SheetTrigger,
+} from "./Sheet.js";
+export {
   Dialog,
   DialogBackdrop,
   DialogClose,
