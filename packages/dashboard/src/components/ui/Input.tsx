@@ -1,33 +1,95 @@
-import type { InputHTMLAttributes } from "react";
+"use client";
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  error?: string;
+import { Input as InputPrimitive } from "@base-ui/react/input";
+import type * as React from "react";
+import type { ReactNode } from "react";
+
+import { cn } from "../../lib/utils.js";
+
+type BaseInputProps = Omit<InputPrimitive.Props & React.RefAttributes<HTMLInputElement>, "size"> & {
+  size?: "sm" | "default" | "lg" | number;
+  unstyled?: boolean;
+  nativeInput?: boolean;
+};
+
+interface InputProps extends BaseInputProps {
+  label?: ReactNode;
+  error?: ReactNode;
 }
 
-export function Input({
-  label,
-  error,
-  className = "",
-  id,
-  ...rest
-}: InputProps) {
+function InputControl({
+  className,
+  size = "default",
+  unstyled = false,
+  nativeInput = false,
+  ...props
+}: BaseInputProps) {
+  const nativeProps = props as React.ComponentProps<"input">;
+  const inputClassName = cn(
+    "h-8.5 w-full min-w-0 rounded-[inherit] px-[calc(--spacing(3)-1px)] leading-8.5 outline-none placeholder:text-muted-foreground/72 [transition:background-color_5000000s_ease-in-out_0s] sm:h-7.5 sm:leading-7.5",
+    size === "sm" && "h-7.5 px-[calc(--spacing(2.5)-1px)] leading-7.5 sm:h-6.5 sm:leading-6.5",
+    size === "lg" && "h-9.5 leading-9.5 sm:h-8.5 sm:leading-8.5",
+    props.type === "search" &&
+      "[&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none [&::-webkit-search-results-button]:appearance-none [&::-webkit-search-results-decoration]:appearance-none",
+    props.type === "file" &&
+      "text-muted-foreground file:me-3 file:bg-transparent file:font-medium file:text-foreground file:text-sm",
+  );
+
+  return (
+    <span
+      className={
+        cn(
+          !unstyled &&
+            "relative inline-flex w-full rounded-lg border border-input bg-background text-base text-foreground shadow-xs/5 ring-ring/24 transition-shadow before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] has-autofill:bg-foreground/4 has-disabled:opacity-64 has-aria-invalid:border-destructive/36 has-focus-visible:border-ring has-focus-visible:ring-[3px] has-focus-visible:has-aria-invalid:border-destructive/64 has-focus-visible:has-aria-invalid:ring-destructive/16 has-[:disabled,:focus-visible,[aria-invalid]]:shadow-none not-has-disabled:not-has-focus-visible:not-has-aria-invalid:before:shadow-[0_1px_--theme(--color-black/4%)] not-dark:bg-clip-padding sm:text-sm dark:bg-input/32 dark:has-autofill:bg-foreground/8 dark:has-aria-invalid:ring-destructive/24 dark:not-has-disabled:not-has-focus-visible:not-has-aria-invalid:before:shadow-[0_-1px_--theme(--color-white/6%)]",
+          className,
+        ) || undefined
+      }
+      data-size={size}
+      data-slot="input-control"
+    >
+      {nativeInput ? (
+        <input
+          className={inputClassName}
+          data-slot="input"
+          size={typeof size === "number" ? size : undefined}
+          {...nativeProps}
+        />
+      ) : (
+        <InputPrimitive
+          className={inputClassName}
+          data-slot="input"
+          size={typeof size === "number" ? size : undefined}
+          {...props}
+        />
+      )}
+    </span>
+  );
+}
+
+function Input({ label, error, className, id, "aria-invalid": ariaInvalid, ...props }: InputProps) {
   const generatedId =
     id ??
-    (label ? `input-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined);
+    (typeof label === "string"
+      ? `input-${label.replace(/\s+/g, "-").toLowerCase()}`
+      : undefined);
+  const control = (
+    <InputControl
+      id={generatedId}
+      className={className}
+      aria-invalid={ariaInvalid ?? (error ? true : undefined)}
+      {...props}
+    />
+  );
+
+  if (!label && !error) return control;
+
   return (
     <label className="flex flex-col gap-1.5">
-      {label && (
-        <span className="type-label text-mute">{label}</span>
-      )}
-      <input
-        id={generatedId}
-        className={`focus-ring h-9 rounded-sm border bg-canvas px-3 type-body text-ink placeholder:text-whisper ${
-          error ? "border-red" : "border-edge"
-        } ${className}`}
-        {...rest}
-      />
-      {error && <span className="type-micro text-red">{error}</span>}
+      {label && <span className="type-label text-mute">{label}</span>}
+      {control}
+      {error && <span className="type-micro text-destructive-foreground">{error}</span>}
     </label>
   );
 }
+
+export { Input, InputControl, type InputProps };
