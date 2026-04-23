@@ -31,3 +31,36 @@ export { PageHeader } from "./PageHeader.js";
 export { SectionLabel } from "./SectionLabel.js";
 export { Drawer } from "./Drawer.js";
 export { Modal } from "./Modal.js";
+export {
+  Dialog,
+  DialogBackdrop,
+  DialogClose,
+  DialogContent,
+  DialogCreateHandle,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPanel,
+  DialogPopup,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
+  DialogViewport,
+} from "./Dialog.js";
+export {
+  AlertDialog,
+  AlertDialogBackdrop,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogCreateHandle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
+  AlertDialogPopup,
+  AlertDialogPortal,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+  AlertDialogViewport,
+} from "./AlertDialog.js";
