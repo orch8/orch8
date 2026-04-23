@@ -1,5 +1,19 @@
 export { Button } from "./Button.js";
-export { Card } from "./Card.js";
+export {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardFrame,
+  CardFrameDescription,
+  CardFrameFooter,
+  CardFrameHeader,
+  CardFrameTitle,
+  CardHeader,
+  CardPanel,
+  CardTitle,
+} from "./Card.js";
 export { Chip, type ChipStatus } from "./Chip.js";
 export { Pill } from "./Pill.js";
 export { StatGrid, type StatItem } from "./StatGrid.js";

@@ -1,28 +1,221 @@
+"use client";
+
+import { mergeProps } from "@base-ui/react/merge-props";
+import { useRender } from "@base-ui/react/use-render";
 import type { ReactNode } from "react";
 
-interface CardProps {
+import { cn } from "../../lib/utils.js";
+
+interface CardProps extends Omit<useRender.ComponentProps<"div">, "title"> {
   title?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
   children?: ReactNode;
-  className?: string;
 }
 
-export function Card({ title, meta, actions, children, className = "" }: CardProps) {
-  return (
-    <div
-      className={`rounded-md border border-edge-soft bg-surface transition-colors hover:border-edge ${className}`}
-    >
-      {(title || meta || actions) && (
-        <div className="flex items-start justify-between gap-[var(--gap-inline)] border-b border-edge-soft px-[var(--gap-block)] py-[calc(var(--gap-block)*0.75)]">
+function CardBase({ className, render, ...props }: useRender.ComponentProps<"div">) {
+  const defaultProps = {
+    className: cn(
+      "relative flex flex-col rounded-2xl border bg-card text-card-foreground shadow-xs/5 before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-2xl)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)] not-dark:bg-clip-padding",
+      className,
+    ),
+    "data-slot": "card",
+  };
+
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(defaultProps, props),
+    render,
+  });
+}
+
+function Card({ title, meta, actions, children, className, render, ...props }: CardProps) {
+  if (title || meta || actions) {
+    return (
+      <CardBase className={className} render={render} {...props}>
+        <CardHeader className="border-b border-border px-[var(--gap-block)] py-3">
           <div className="min-w-0">
-            {title && <div className="type-section text-ink">{title}</div>}
-            {meta && <div className="type-label text-whisper">{meta}</div>}
+            {title && <CardTitle className="type-section truncate">{title}</CardTitle>}
+            {meta && <CardDescription className="type-label truncate">{meta}</CardDescription>}
           </div>
-          {actions && <div className="shrink-0">{actions}</div>}
-        </div>
-      )}
-      <div className="p-[var(--gap-block)] type-body text-ink">{children}</div>
-    </div>
+          {actions && <CardAction>{actions}</CardAction>}
+        </CardHeader>
+        <CardPanel className="p-[var(--gap-block)]">{children}</CardPanel>
+      </CardBase>
+    );
+  }
+
+  return (
+    <CardBase className={className} render={render} {...props}>
+      <CardPanel className="p-[var(--gap-block)]">{children}</CardPanel>
+    </CardBase>
   );
 }
+
+function CardFrame({ className, render, ...props }: useRender.ComponentProps<"div">) {
+  const defaultProps = {
+    className: cn(
+      "[--clip-top:-1rem] [--clip-bottom:-1rem] *:data-[slot=card]:first:[--clip-top:1px] *:data-[slot=card]:last:[--clip-bottom:1px] relative flex flex-col rounded-2xl border bg-card text-card-foreground shadow-xs/5 before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-2xl)-1px)] before:bg-muted/72 before:shadow-[0_1px_--theme(--color-black/4%)] *:data-[slot=card]:-m-px *:data-[slot=card]:bg-clip-padding *:data-[slot=card]:shadow-none *:data-[slot=card]:[clip-path:inset(var(--clip-top)_1px_var(--clip-bottom)_1px_round_calc(var(--radius-2xl)-1px))] *:data-[slot=card]:before:hidden *:not-first:data-[slot=card]:rounded-t-xl *:not-first:data-[slot=card]:before:rounded-t-[calc(var(--radius-xl)-1px)] *:not-last:data-[slot=card]:rounded-b-xl *:not-last:data-[slot=card]:before:rounded-b-[calc(var(--radius-xl)-1px)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)] not-dark:bg-clip-padding",
+      className,
+    ),
+    "data-slot": "card-frame",
+  };
+
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(defaultProps, props),
+    render,
+  });
+}
+
+function CardFrameHeader({ className, render, ...props }: useRender.ComponentProps<"div">) {
+  const defaultProps = {
+    className: cn("relative flex flex-col px-6 py-4", className),
+    "data-slot": "card-frame-header",
+  };
+
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(defaultProps, props),
+    render,
+  });
+}
+
+function CardFrameTitle({ className, render, ...props }: useRender.ComponentProps<"div">) {
+  const defaultProps = {
+    className: cn("text-sm font-semibold", className),
+    "data-slot": "card-frame-title",
+  };
+
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(defaultProps, props),
+    render,
+  });
+}
+
+function CardFrameDescription({ className, render, ...props }: useRender.ComponentProps<"div">) {
+  const defaultProps = {
+    className: cn("text-sm text-muted-foreground", className),
+    "data-slot": "card-frame-description",
+  };
+
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(defaultProps, props),
+    render,
+  });
+}
+
+function CardFrameFooter({ className, render, ...props }: useRender.ComponentProps<"div">) {
+  const defaultProps = {
+    className: cn("px-6 py-4", className),
+    "data-slot": "card-frame-footer",
+  };
+
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(defaultProps, props),
+    render,
+  });
+}
+
+function CardHeader({ className, render, ...props }: useRender.ComponentProps<"div">) {
+  const defaultProps = {
+    className: cn(
+      "grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 p-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] in-[[data-slot=card]:has(>[data-slot=card-panel])]:pb-4",
+      className,
+    ),
+    "data-slot": "card-header",
+  };
+
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(defaultProps, props),
+    render,
+  });
+}
+
+function CardTitle({ className, render, ...props }: useRender.ComponentProps<"div">) {
+  const defaultProps = {
+    className: cn("text-lg font-semibold leading-none", className),
+    "data-slot": "card-title",
+  };
+
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(defaultProps, props),
+    render,
+  });
+}
+
+function CardDescription({ className, render, ...props }: useRender.ComponentProps<"div">) {
+  const defaultProps = {
+    className: cn("text-sm text-muted-foreground", className),
+    "data-slot": "card-description",
+  };
+
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(defaultProps, props),
+    render,
+  });
+}
+
+function CardAction({ className, render, ...props }: useRender.ComponentProps<"div">) {
+  const defaultProps = {
+    className: cn("col-start-2 row-span-2 row-start-1 inline-flex self-start justify-self-end", className),
+    "data-slot": "card-action",
+  };
+
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(defaultProps, props),
+    render,
+  });
+}
+
+function CardPanel({ className, render, ...props }: useRender.ComponentProps<"div">) {
+  const defaultProps = {
+    className: cn(
+      "flex-1 p-6 in-[[data-slot=card]:has(>[data-slot=card-footer]:not(.border-t))]:pb-0 in-[[data-slot=card]:has(>[data-slot=card-header]:not(.border-b))]:pt-0",
+      className,
+    ),
+    "data-slot": "card-panel",
+  };
+
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(defaultProps, props),
+    render,
+  });
+}
+
+function CardFooter({ className, render, ...props }: useRender.ComponentProps<"div">) {
+  const defaultProps = {
+    className: cn("flex items-center p-6 in-[[data-slot=card]:has(>[data-slot=card-panel])]:pt-4", className),
+    "data-slot": "card-footer",
+  };
+
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(defaultProps, props),
+    render,
+  });
+}
+
+export {
+  Card,
+  CardFrame,
+  CardFrameHeader,
+  CardFrameTitle,
+  CardFrameDescription,
+  CardFrameFooter,
+  CardAction,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardPanel,
+  CardPanel as CardContent,
+  CardTitle,
+};
