@@ -25,6 +25,8 @@ export { Textarea, type TextareaProps } from "./Textarea.js";
 export { Table, THead, TBody, TR, TH, TD } from "./Table.js";
 export { EmptyState } from "./EmptyState.js";
 export { Skeleton } from "./Skeleton.js";
+export { Spinner } from "./Spinner.js";
+export { Separator } from "./Separator.js";
 export { TextLink } from "./TextLink.js";
 export { EntityLink } from "./EntityLink.js";
 export { PageHeader } from "./PageHeader.js";
