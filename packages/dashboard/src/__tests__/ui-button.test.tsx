@@ -11,20 +11,19 @@ describe("Button", () => {
   it("uses the secondary variant by default", () => {
     render(<Button>Default</Button>);
     const btn = screen.getByRole("button");
-    expect(btn.className).toMatch(/bg-surface/);
-    expect(btn.className).toMatch(/border-edge/);
+    expect(btn.className).toMatch(/bg-secondary/);
+    expect(btn.className).toMatch(/text-secondary-foreground/);
   });
 
-  it("applies the primary variant when requested", () => {
+  it("maps the legacy primary variant to the t3code default variant", () => {
     render(<Button variant="primary">Go</Button>);
-    expect(screen.getByRole("button").className).toMatch(/bg-accent/);
+    expect(screen.getByRole("button").className).toMatch(/bg-primary/);
   });
 
-  it("applies the danger variant as outline-only (no fill)", () => {
+  it("maps the legacy danger variant to an outline-only destructive variant", () => {
     render(<Button variant="danger">Delete</Button>);
     const cls = screen.getByRole("button").className;
-    expect(cls).toMatch(/border-red/);
-    expect(cls).toMatch(/text-red/);
-    expect(cls).not.toMatch(/bg-red/);
+    expect(cls).toMatch(/destructive-foreground/);
+    expect(cls).not.toMatch(/bg-destructive /);
   });
 });
