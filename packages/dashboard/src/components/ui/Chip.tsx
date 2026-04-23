@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Badge } from "./Badge.js";
 
 export type ChipStatus =
   | "running"
@@ -30,10 +31,19 @@ interface ChipProps {
 }
 
 export function Chip({ status, children, className = "" }: ChipProps) {
+  const variant =
+    status === "failed" || status === "err"
+      ? "error"
+      : status === "warn"
+        ? "warning"
+        : status === "info" || status === "queued"
+          ? "info"
+          : status === "running" || status === "ok"
+            ? "success"
+            : "outline";
+
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-xs border border-edge-soft bg-surface px-1.5 py-0.5 type-label text-mute ${className}`}
-    >
+    <Badge variant={variant} size="sm" className={`type-label gap-1.5 ${className}`}>
       {status && (
         <span
           aria-hidden
@@ -41,6 +51,6 @@ export function Chip({ status, children, className = "" }: ChipProps) {
         />
       )}
       {children}
-    </span>
+    </Badge>
   );
 }

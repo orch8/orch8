@@ -16,6 +16,7 @@ export {
 } from "./Card.js";
 export { Chip, type ChipStatus } from "./Chip.js";
 export { Pill } from "./Pill.js";
+export { Badge, badgeVariants } from "./Badge.js";
 export { StatGrid, type StatItem } from "./StatGrid.js";
 export { ActivityItem, type ActivityTagVariant } from "./ActivityItem.js";
 export { Alert, type AlertVariant } from "./Alert.js";
