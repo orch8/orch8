@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useCreateChat } from "../../../../hooks/useChats.js";
 
 function NewChatPage() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   const navigate = useNavigate();
   const createChat = useCreateChat();
   const fired = useRef(false);
@@ -28,8 +28,8 @@ function NewChatPage() {
       .mutateAsync({ projectId })
       .then((chat) => {
         navigate({
-          to: "/projects/$projectId/chat/$chatId",
-          params: { projectId, chatId: chat.id },
+          to: "/projects/$projectSlug/chat/$chatId",
+          params: { projectSlug: projectId, chatId: chat.id },
           replace: true,
         });
       })
@@ -58,6 +58,6 @@ function NewChatPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/chat/new")({
+export const Route = createFileRoute("/projects/$projectSlug/chat/new")({
   component: NewChatPage,
 });

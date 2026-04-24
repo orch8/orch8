@@ -98,6 +98,8 @@ export const projects = pgTable("projects", {
   id: text("id").primaryKey().$defaultFn(() => `proj_${randomUUID()}`),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
+  key: text("key").notNull().unique().$defaultFn(() => `P${randomUUID().replace(/-/g, "").slice(0, 4).toUpperCase()}`),
+  nextTaskNumber: integer("next_task_number").notNull().default(1),
   description: text("description").default(""),
 
   homeDir: text("home_dir").notNull(),
@@ -193,7 +195,7 @@ export const agents = pgTable("agents", {
 // ─── Tasks ────────────────────────────────────────────────
 
 export const tasks = pgTable("tasks", {
-  id: text("id").primaryKey().$defaultFn(() => `task_${randomUUID()}`),
+  id: text("id").primaryKey().$defaultFn(() => `T${randomUUID().replace(/-/g, "").slice(0, 4).toUpperCase()}-1`),
   projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description").default(""),

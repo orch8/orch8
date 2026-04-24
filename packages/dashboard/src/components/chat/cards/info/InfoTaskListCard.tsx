@@ -18,8 +18,8 @@ export function InfoTaskListCard({
         {tasks.map((t) => (
           <li key={t.id} className="flex items-center gap-2">
             <Link
-              to="/projects/$projectId/tasks/$taskId"
-              params={{ projectId, taskId: t.id }}
+              to="/projects/$projectSlug/tasks/$taskId"
+              params={{ projectSlug: projectId, taskId: t.id }}
               className="font-mono text-sky-400 hover:text-sky-300"
             >
               {t.id}

@@ -3,7 +3,7 @@ import { CostDashboard } from "../../../components/cost/CostDashboard.js";
 import { PageHeader } from "../../../components/ui/PageHeader.js";
 
 function CostPage() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
 
   return (
     <div className="h-full">
@@ -16,6 +16,6 @@ function CostPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/cost")({
+export const Route = createFileRoute("/projects/$projectSlug/cost")({
   component: CostPage,
 });

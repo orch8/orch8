@@ -71,8 +71,8 @@ function DeepLink({
     case "task":
       return (
         <Link
-          to="/projects/$projectId/tasks/$taskId"
-          params={{ projectId, taskId: id }}
+          to="/projects/$projectSlug/tasks/$taskId"
+          params={{ projectSlug: projectId, taskId: id }}
           className="font-mono text-sky-400 hover:text-sky-300"
         >
           {id}
@@ -81,8 +81,8 @@ function DeepLink({
     case "agent":
       return (
         <Link
-          to="/projects/$projectId/agents/$agentId"
-          params={{ projectId, agentId: id }}
+          to="/projects/$projectSlug/agents/$agentId"
+          params={{ projectSlug: projectId, agentId: id }}
           className="font-mono text-sky-400 hover:text-sky-300"
         >
           {id}

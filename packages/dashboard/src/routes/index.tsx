@@ -1,21 +1,21 @@
 import { createFileRoute, isRedirect, redirect } from "@tanstack/react-router";
 import { api } from "../api/client.js";
 
-const STORAGE_KEY = "orch8:lastProjectId";
+const STORAGE_KEY = "orch8:lastProjectSlug";
 
 export const Route = createFileRoute("/")({
   beforeLoad: async () => {
-    const lastProjectId = localStorage.getItem(STORAGE_KEY);
+    const lastProjectSlug = localStorage.getItem(STORAGE_KEY);
 
-    if (lastProjectId) {
-      throw redirect({ to: "/projects/$projectId", params: { projectId: lastProjectId } });
+    if (lastProjectSlug) {
+      throw redirect({ to: "/projects/$projectSlug", params: { projectSlug: lastProjectSlug } });
     }
 
     // No last project — check if any projects exist
     try {
-      const projects = await api.get<Array<{ id: string }>>("/projects");
+      const projects = await api.get<Array<{ slug: string }>>("/projects");
       if (projects.length > 0) {
-        throw redirect({ to: "/projects/$projectId", params: { projectId: projects[0].id } });
+        throw redirect({ to: "/projects/$projectSlug", params: { projectSlug: projects[0].slug } });
       }
     } catch (e) {
       if (isRedirect(e)) throw e;

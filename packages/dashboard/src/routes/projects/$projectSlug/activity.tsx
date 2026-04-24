@@ -12,7 +12,7 @@ const LEVEL_COLORS: Record<string, string> = {
 const PAGE_SIZE = 50;
 
 function ActivityPage() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   const [levelFilter, setLevelFilter] = useState("");
   const [agentFilter, setAgentFilter] = useState("");
   const [offset, setOffset] = useState(0);
@@ -123,6 +123,6 @@ function ActivityPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/activity")({
+export const Route = createFileRoute("/projects/$projectSlug/activity")({
   component: ActivityPage,
 });

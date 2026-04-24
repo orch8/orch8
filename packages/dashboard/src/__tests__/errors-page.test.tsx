@@ -4,7 +4,7 @@ import { renderWithProviders, screen, waitFor } from "../test-utils.js";
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: (_path: string) => (opts: any) => ({
     ...opts,
-    useParams: () => ({ projectId: "proj_1" }),
+    useParams: () => ({ projectSlug: "proj_1" }),
     useSearch: () => ({}),
   }),
   Link: ({ children, to, ...props }: any) => (
@@ -80,7 +80,7 @@ beforeEach(() => {
   });
 });
 
-import { Route as ErrorsRoute } from "../routes/projects/$projectId/errors.js";
+import { Route as ErrorsRoute } from "../routes/projects/$projectSlug/errors.js";
 
 const ErrorsPage = (ErrorsRoute as any).component;
 

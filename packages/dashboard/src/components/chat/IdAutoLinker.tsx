@@ -10,44 +10,44 @@ const ID_PATTERNS: Array<{
   {
     prefix: "task_",
     build: (projectId, id) => ({
-      to: "/projects/$projectId/tasks/$taskId",
-      params: { projectId, taskId: id },
+      to: "/projects/$projectSlug/tasks/$taskId",
+      params: { projectSlug: projectId, taskId: id },
     }),
   },
   {
     prefix: "agent_",
     build: (projectId, id) => ({
-      to: "/projects/$projectId/agents/$agentId",
-      params: { projectId, agentId: id },
+      to: "/projects/$projectSlug/agents/$agentId",
+      params: { projectSlug: projectId, agentId: id },
     }),
   },
   {
     prefix: "run_",
     build: (projectId, id) => ({
-      to: "/projects/$projectId/runs",
-      params: { projectId },
+      to: "/projects/$projectSlug/runs",
+      params: { projectSlug: projectId },
       // The runs page handles ?runId for deep-link selection.
     }),
   },
   {
     prefix: "pipe_",
     build: (projectId, id) => ({
-      to: "/projects/$projectId/pipelines/$pipelineId",
-      params: { projectId, pipelineId: id },
+      to: "/projects/$projectSlug/pipelines/$pipelineId",
+      params: { projectSlug: projectId, pipelineId: id },
     }),
   },
   {
     prefix: "pipeline_",
     build: (projectId, id) => ({
-      to: "/projects/$projectId/pipelines/$pipelineId",
-      params: { projectId, pipelineId: id },
+      to: "/projects/$projectSlug/pipelines/$pipelineId",
+      params: { projectSlug: projectId, pipelineId: id },
     }),
   },
   {
     prefix: "chat_",
     build: (projectId, id) => ({
-      to: "/projects/$projectId/chat/$chatId",
-      params: { projectId, chatId: id },
+      to: "/projects/$projectSlug/chat/$chatId",
+      params: { projectSlug: projectId, chatId: id },
     }),
   },
 ];
@@ -57,7 +57,7 @@ const ID_PATTERNS: Array<{
 // alternation of all prefixes to avoid worst-case re-scans.
 const PREFIX_ALTERNATION = ID_PATTERNS.map((p) => p.prefix).join("|");
 const ID_REGEX = new RegExp(
-  `(?:^|(?<=[\\s.,;:!?()\\[\\]{}'"]))(${PREFIX_ALTERNATION})([a-zA-Z0-9_-]+)`,
+  `(?:^|(?<=[\\s.,;:!?()\\[\\]{}'"]))(?:(CATKEY)([A-Z][A-Z0-9]{1,4}-\\d+)|(${PREFIX_ALTERNATION})([a-zA-Z0-9_-]+))`,
   "g",
 );
 
@@ -69,8 +69,9 @@ export function autoLinkIds(text: string, projectId: string): ReactNode[] {
 
   ID_REGEX.lastIndex = 0;
   while ((match = ID_REGEX.exec(text)) !== null) {
-    const [full, prefix] = match;
-    const id = `${prefix}${match[2]}`;
+    const [full] = match;
+    const prefix = match[1] === "CATKEY" ? "task_" : match[3];
+    const id = match[1] === "CATKEY" ? match[2] : `${prefix}${match[4]}`;
 
     if (match.index > lastIdx) {
       out.push(text.slice(lastIdx, match.index));

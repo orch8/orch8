@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { CreateProjectSchema, UpdateProjectSchema, ProjectFilterSchema } from "@orch/shared";
 import { isUniqueViolation } from "../utils/db-errors.js";
+import { resolveProjectParam } from "../utils/project-resolver.js";
 import "../../types.js";
 
 export async function projectRoutes(app: FastifyInstance) {
@@ -19,8 +20,14 @@ export async function projectRoutes(app: FastifyInstance) {
       const project = await app.projectService.create(parsed.data);
       return reply.code(201).send(project);
     } catch (err) {
-      if (isUniqueViolation(err)) {
+      if (isUniqueViolation(err, "projects_key_unique")) {
+        return reply.code(409).send({ error: "conflict", message: "Project key already in use, pick another" });
+      }
+      if (isUniqueViolation(err, "projects_slug_unique") || isUniqueViolation(err)) {
         return reply.code(409).send({ error: "conflict", message: "Project with this slug already exists" });
+      }
+      if ((err as Error).message.includes("Project key")) {
+        return reply.code(400).send({ error: "validation_error", message: (err as Error).message });
       }
       throw err;
     }
@@ -35,7 +42,9 @@ export async function projectRoutes(app: FastifyInstance) {
 
   // GET /api/projects/:id — Get project
   app.get("/api/projects/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const project = await app.projectService.getById(request.params.id);
+    const projectId = await resolveProjectParam(app, request.params.id, reply);
+    if (!projectId) return reply;
+    const project = await app.projectService.getById(projectId);
     if (!project) {
       return reply.code(404).send({ error: "not_found", message: "Project not found" });
     }
@@ -54,7 +63,9 @@ export async function projectRoutes(app: FastifyInstance) {
     }
 
     try {
-      const project = await app.projectService.update(request.params.id, parsed.data);
+      const projectId = await resolveProjectParam(app, request.params.id, reply);
+      if (!projectId) return reply;
+      const project = await app.projectService.update(projectId, parsed.data);
       return project;
     } catch (err) {
       if ((err as Error).message === "Project not found") {
@@ -71,7 +82,9 @@ export async function projectRoutes(app: FastifyInstance) {
     }
 
     try {
-      const project = await app.projectService.archive(request.params.id);
+      const projectId = await resolveProjectParam(app, request.params.id, reply);
+      if (!projectId) return reply;
+      const project = await app.projectService.archive(projectId);
       return project;
     } catch (err) {
       if ((err as Error).message === "Project not found") {

@@ -4,6 +4,7 @@ import {
   UpdatePipelineTemplateSchema,
   PipelineTemplateFilterSchema,
 } from "@orch/shared";
+import { resolveProjectParam, resolveProjectValue } from "../utils/project-resolver.js";
 
 export async function pipelineTemplateRoutes(app: FastifyInstance) {
   // POST /api/pipeline-templates
@@ -12,7 +13,9 @@ export async function pipelineTemplateRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
     }
-    const tpl = await app.pipelineTemplateService.create(parsed.data);
+    const projectId = await resolveProjectParam(app, parsed.data.projectId, reply);
+    if (!projectId) return reply;
+    const tpl = await app.pipelineTemplateService.create({ ...parsed.data, projectId });
     return reply.code(201).send(tpl);
   });
 
@@ -20,6 +23,9 @@ export async function pipelineTemplateRoutes(app: FastifyInstance) {
   app.get("/api/pipeline-templates", async (request: FastifyRequest) => {
     const parsed = PipelineTemplateFilterSchema.safeParse(request.query);
     const filter = parsed.success ? parsed.data : {};
+    if (filter.projectId) {
+      filter.projectId = await resolveProjectValue(app, filter.projectId);
+    }
     return app.pipelineTemplateService.list(filter);
   });
 

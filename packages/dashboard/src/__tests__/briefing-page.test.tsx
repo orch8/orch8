@@ -8,7 +8,7 @@ vi.mock("@tanstack/react-router", () => ({
       {children}
     </a>
   ),
-  useParams: () => ({ projectId: "proj_1" }),
+  useParams: () => ({ projectSlug: "proj_1" }),
 }));
 
 const mockFetch = vi.fn();

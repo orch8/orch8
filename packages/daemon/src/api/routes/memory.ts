@@ -3,6 +3,7 @@ import { EntityFilterSchema, KnowledgeSearchSchema, CreateFactSchema, CreateEnti
 import { eq, and } from "drizzle-orm";
 import { agents, projects } from "@orch/shared/db";
 import { isUniqueViolation } from "../utils/db-errors.js";
+import { resolveProjectValue } from "../utils/project-resolver.js";
 import "../../types.js";
 
 export async function memoryRoutes(app: FastifyInstance) {
@@ -46,7 +47,8 @@ export async function memoryRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
     }
-    return app.memoryService.searchFacts(parsed.data);
+    const projectId = await resolveProjectValue(app, parsed.data.projectId) ?? request.projectId;
+    return app.memoryService.searchFacts({ ...parsed.data, projectId });
   });
 
   // GET /api/memory/knowledge/:id — Entity summary

@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { KanbanBoard } from "../../../components/kanban/KanbanBoard.js";
 
 function BoardPage() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   const navigate = useNavigate();
 
   return (
@@ -12,8 +12,8 @@ function BoardPage() {
           projectId={projectId}
           onTaskSelect={(taskId) =>
             navigate({
-              to: "/projects/$projectId/tasks/$taskId",
-              params: { projectId, taskId },
+              to: "/projects/$projectSlug/tasks/$taskId",
+              params: { projectSlug: projectId, taskId },
             })
           }
         />
@@ -22,6 +22,6 @@ function BoardPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/board")({
+export const Route = createFileRoute("/projects/$projectSlug/board")({
   component: BoardPage,
 });

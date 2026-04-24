@@ -4,7 +4,7 @@ import { useChats, useCreateChat } from "../../../../hooks/useChats.js";
 import { EmptyState } from "../../../../components/ui/EmptyState.js";
 
 function ChatIndexPage() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   const navigate = useNavigate();
   const { data: chats, isLoading } = useChats(projectId);
   const createChat = useCreateChat();
@@ -17,8 +17,8 @@ function ChatIndexPage() {
     if (chats.length > 0) {
       const target = chats[0]; // pinned-first ordering enforced by backend
       navigate({
-        to: "/projects/$projectId/chat/$chatId",
-        params: { projectId, chatId: target.id },
+        to: "/projects/$projectSlug/chat/$chatId",
+        params: { projectSlug: projectId, chatId: target.id },
         replace: true,
       });
       return;
@@ -38,8 +38,8 @@ function ChatIndexPage() {
       {
         onSuccess: (chat) => {
           navigate({
-            to: "/projects/$projectId/chat/$chatId",
-            params: { projectId, chatId: chat.id },
+            to: "/projects/$projectSlug/chat/$chatId",
+            params: { projectSlug: projectId, chatId: chat.id },
             replace: true,
           });
         },
@@ -61,6 +61,6 @@ function ChatIndexPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/chat/")({
+export const Route = createFileRoute("/projects/$projectSlug/chat/")({
   component: ChatIndexPage,
 });

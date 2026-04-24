@@ -6,7 +6,7 @@ import { ChatMessageStream } from "../../../../components/chat/ChatMessageStream
 import { ChatInput } from "../../../../components/chat/ChatInput.js";
 
 function ChatThreadPage() {
-  const { projectId, chatId } = Route.useParams();
+  const { projectSlug: projectId, chatId } = Route.useParams();
   const { data: chat, isLoading: chatLoading, isError } = useChat(chatId);
   const { data: messages, isLoading: msgsLoading } = useChatMessages(chatId);
 
@@ -39,6 +39,6 @@ function ChatThreadPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/chat/$chatId")({
+export const Route = createFileRoute("/projects/$projectSlug/chat/$chatId")({
   component: ChatThreadPage,
 });

@@ -23,7 +23,7 @@ const SEVERITY_DOT: Record<ErrorLogSeverity, string> = {
 };
 
 function ErrorsPage() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   const [severityFilter, setSeverityFilter] = useState<ErrorLogSeverity | "">("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [codeFilter, setCodeFilter] = useState("");
@@ -293,6 +293,6 @@ function formatJson(value: unknown) {
   }
 }
 
-export const Route = createFileRoute("/projects/$projectId/errors")({
+export const Route = createFileRoute("/projects/$projectSlug/errors")({
   component: ErrorsPage,
 });

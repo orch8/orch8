@@ -1,5 +1,5 @@
 import { eq, and, sql } from "drizzle-orm";
-import { tasks, taskDependencies } from "@orch/shared/db";
+import { projects, tasks, taskDependencies } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { CreateTaskInput, UpdateTask, TaskFilter } from "@orch/shared";
 
@@ -12,13 +12,29 @@ type Task = typeof tasks.$inferSelect;
 // call sites readable and lets us pass either the root db or a tx.
 type TxOrDb = SchemaDb | Parameters<Parameters<SchemaDb["transaction"]>[0]>[0];
 
+export async function allocateTaskId(db: TxOrDb, projectId: string): Promise<string> {
+  const [row] = await db
+    .update(projects)
+    .set({ nextTaskNumber: sql`${projects.nextTaskNumber} + 1` })
+    .where(eq(projects.id, projectId))
+    .returning({
+      key: projects.key,
+      n: sql<number>`${projects.nextTaskNumber} - 1`,
+    });
+
+  if (!row) throw new Error("Project not found");
+  return `${row.key}-${row.n}`;
+}
+
 export class TaskService {
   constructor(private db: SchemaDb) {}
 
   async create(input: CreateTaskInput): Promise<Task> {
-    const values = this.buildInsertValues(input);
-    const [task] = await this.db.insert(tasks).values(values).returning();
-    return task;
+    return this.db.transaction(async (tx) => {
+      const values = await this.buildInsertValues(tx, input);
+      const [task] = await tx.insert(tasks).values(values).returning();
+      return task;
+    });
   }
 
   /**
@@ -39,7 +55,7 @@ export class TaskService {
     dependsOn: string[],
   ): Promise<Task> {
     return this.db.transaction(async (tx) => {
-      const values = this.buildInsertValues(input);
+      const values = await this.buildInsertValues(tx, input);
       const [task] = await tx.insert(tasks).values(values).returning();
 
       for (const depId of dependsOn) {
@@ -56,8 +72,12 @@ export class TaskService {
     });
   }
 
-  private buildInsertValues(input: CreateTaskInput): typeof tasks.$inferInsert {
+  private async buildInsertValues(
+    db: TxOrDb,
+    input: CreateTaskInput,
+  ): Promise<typeof tasks.$inferInsert> {
     const values: typeof tasks.$inferInsert = {
+      id: await allocateTaskId(db, input.projectId),
       projectId: input.projectId,
       title: input.title,
       description: input.description,

@@ -49,6 +49,7 @@ describe("Project Routes", () => {
       const body = res.json();
       expect(body.finishStrategy).toBe("merge");
       expect(body.id).toMatch(/^proj_/);
+      expect(body.key).toBe("TES");
     });
 
     it("accepts an explicit finishStrategy", async () => {
@@ -110,6 +111,23 @@ describe("Project Routes", () => {
 
       expect(res.statusCode).toBe(409);
     });
+
+    it("returns 409 for duplicate project key", async () => {
+      await app.inject({
+        method: "POST",
+        url: "/api/projects",
+        payload: { name: "A", slug: "alpha", key: "ALP", homeDir: "/tmp/a" },
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/projects",
+        payload: { name: "B", slug: "beta", key: "ALP", homeDir: "/tmp/b" },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().message).toContain("Project key");
+    });
   });
 
   describe("GET /api/projects", () => {
@@ -145,6 +163,21 @@ describe("Project Routes", () => {
       expect(res.json().slug).toBe("detail");
     });
 
+    it("returns a project by slug", async () => {
+      await testDb.db.insert(projects).values({
+        name: "Slug Detail", slug: "slug-detail",
+        homeDir: "/d",
+      }).returning();
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/projects/slug-detail",
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().slug).toBe("slug-detail");
+    });
+
     it("returns 404 for nonexistent project", async () => {
       const res = await app.inject({
         method: "GET",
@@ -170,6 +203,22 @@ describe("Project Routes", () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.json().name).toBe("New Name");
+    });
+
+    it("updates a project by slug", async () => {
+      await testDb.db.insert(projects).values({
+        name: "Old", slug: "upd-slug",
+        homeDir: "/u",
+      }).returning();
+
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/api/projects/upd-slug",
+        payload: { name: "New Slug Name" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().name).toBe("New Slug Name");
     });
   });
 });

@@ -21,6 +21,7 @@ describe("Database Schema", () => {
     }).returning();
 
     expect(project.id).toMatch(/^proj_/);
+    expect(project.key).toMatch(/^[A-Z][A-Z0-9]{1,4}$/);
     expect(project.name).toBe("Test Project");
     expect(project.active).toBe(true);
   });
@@ -54,7 +55,7 @@ describe("Database Schema", () => {
       taskType: "quick",
     }).returning();
 
-    expect(task.id).toMatch(/^task_/);
+    expect(task.id).toMatch(/^[A-Z][A-Z0-9]{1,4}-\d+$/);
     expect(task.taskType).toBe("quick");
     expect(task.column).toBe("backlog");
   });

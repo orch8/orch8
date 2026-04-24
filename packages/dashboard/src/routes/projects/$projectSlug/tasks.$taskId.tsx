@@ -4,7 +4,7 @@ import { TaskPage } from "../../../components/task-page/TaskPage.js";
 import { PageHeader } from "../../../components/ui/PageHeader.js";
 
 function TaskDetailRoute() {
-  const { projectId, taskId } = Route.useParams();
+  const { projectSlug: projectId, taskId } = Route.useParams();
   const { data: task, isLoading } = useTask(taskId);
 
   if (isLoading) {
@@ -20,8 +20,8 @@ function TaskDetailRoute() {
       <PageHeader title="Task detail" subtitle={task.title} />
       <div className="mb-4">
         <Link
-          to="/projects/$projectId/board"
-          params={{ projectId }}
+          to="/projects/$projectSlug/board"
+          params={{ projectSlug: projectId }}
           className="focus-ring type-ui text-mute hover:text-ink"
         >
           ← Back to board
@@ -32,6 +32,6 @@ function TaskDetailRoute() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/tasks/$taskId")({
+export const Route = createFileRoute("/projects/$projectSlug/tasks/$taskId")({
   component: TaskDetailRoute,
 });

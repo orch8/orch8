@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { agents } from "@orch/shared/db";
 import { adminTokenMatches, extractBearerToken } from "./admin-token.js";
 import { hashAgentToken } from "./agent-token.js";
+import { resolveProjectValue } from "../utils/project-resolver.js";
 import "../../types.js";
 
 export interface AuthPluginOptions {
@@ -34,6 +35,20 @@ export const authPlugin = fp<AuthPluginOptions>(async function authPlugin(
     const runId = request.headers["x-run-id"] as string | undefined;
     const authHeader = request.headers["authorization"] as string | undefined;
     const suppliedBearer = extractBearerToken(authHeader);
+    const resolveAdminProjectId = async () => {
+      try {
+        return await resolveProjectValue(
+          app,
+          projectId ?? (request.query as Record<string, string>)?.projectId ?? undefined,
+        );
+      } catch (err) {
+        if ((err as Error).message === "Project not found") {
+          reply.code(404).send({ error: "not_found", message: "Project not found" });
+          return null;
+        }
+        throw err;
+      }
+    };
 
     // Agent auth path: the bearer token identifies the agent and project.
     if (suppliedBearer) {
@@ -55,8 +70,9 @@ export const authPlugin = fp<AuthPluginOptions>(async function authPlugin(
     // 1. Bearer-token match is the primary, secure path.
     if (adminToken && suppliedBearer && adminTokenMatches(suppliedBearer, adminToken)) {
       request.isAdmin = true;
-      request.projectId =
-        projectId ?? (request.query as Record<string, string>)?.projectId ?? undefined;
+      const resolvedProjectId = await resolveAdminProjectId();
+      if (resolvedProjectId === null) return reply;
+      request.projectId = resolvedProjectId;
       return;
     }
 
@@ -71,8 +87,9 @@ export const authPlugin = fp<AuthPluginOptions>(async function authPlugin(
         remoteIp === "::ffff:127.0.0.1";
       if (isLocalhost) {
         request.isAdmin = true;
-        request.projectId =
-          projectId ?? (request.query as Record<string, string>)?.projectId ?? undefined;
+        const resolvedProjectId = await resolveAdminProjectId();
+        if (resolvedProjectId === null) return reply;
+        request.projectId = resolvedProjectId;
         return;
       }
     }

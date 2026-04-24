@@ -5,6 +5,7 @@ import {
   SendChatMessageSchema,
   CardDecisionSchema,
 } from "@orch/shared";
+import { resolveProjectParam } from "../utils/project-resolver.js";
 import "../../types.js";
 
 export async function chatsRoutes(app: FastifyInstance) {
@@ -18,9 +19,12 @@ export async function chatsRoutes(app: FastifyInstance) {
         Params: { projectId: string };
         Querystring: { includeArchived?: string };
       }>,
+      reply: FastifyReply,
     ) => {
       const includeArchived = request.query.includeArchived === "true";
-      return app.chatService.listChats(request.params.projectId, { includeArchived });
+      const projectId = await resolveProjectParam(app, request.params.projectId, reply);
+      if (!projectId) return reply;
+      return app.chatService.listChats(projectId, { includeArchived });
     },
   );
 
@@ -31,9 +35,11 @@ export async function chatsRoutes(app: FastifyInstance) {
       request: FastifyRequest<{ Params: { projectId: string } }>,
       reply: FastifyReply,
     ) => {
+      const projectId = await resolveProjectParam(app, request.params.projectId, reply);
+      if (!projectId) return reply;
       const parsed = CreateChatSchema.safeParse({
         ...(typeof request.body === "object" && request.body !== null ? request.body : {}),
-        projectId: request.params.projectId,
+        projectId,
       });
       if (!parsed.success) {
         return reply

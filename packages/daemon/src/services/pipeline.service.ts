@@ -3,6 +3,7 @@ import { pipelines, pipelineSteps, tasks } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { PipelineTemplateService } from "./pipeline-template.service.js";
 import type { CreatePipeline, PipelineFilter, UpdatePipelineStep } from "@orch/shared";
+import { allocateTaskId } from "./task.service.js";
 
 type Pipeline = typeof pipelines.$inferSelect;
 type PipelineStep = typeof pipelineSteps.$inferSelect;
@@ -97,6 +98,7 @@ export class PipelineService {
 
       const firstStep = stepRows[0];
       const [firstTask] = await tx.insert(tasks).values({
+        id: await allocateTaskId(tx, input.projectId),
         projectId: input.projectId,
         title: `[${pipeline.name}] ${firstStep.label}`,
         description: firstStep.promptOverride ?? `Pipeline step: ${firstStep.label}`,
@@ -428,6 +430,7 @@ export class PipelineService {
 
       // 5. Create new task for target step
       const [newTask] = await tx.insert(tasks).values({
+        id: await allocateTaskId(tx, updatedPipeline.projectId),
         projectId: updatedPipeline.projectId,
         title: `[${updatedPipeline.name}] ${targetStep.label}`,
         description: taskDescription,
@@ -517,6 +520,7 @@ export class PipelineService {
     step: PipelineStep,
   ): Promise<Task> {
     const [task] = await this.db.insert(tasks).values({
+      id: await allocateTaskId(this.db, projectId),
       projectId,
       title: `[${pipeline.name}] ${step.label}`,
       description: step.promptOverride ?? `Pipeline step: ${step.label}`,

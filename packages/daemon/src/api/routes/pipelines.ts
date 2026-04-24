@@ -5,6 +5,7 @@ import {
   UpdatePipelineStepSchema,
   RejectPipelineStepSchema,
 } from "@orch/shared";
+import { resolveProjectParam, resolveProjectValue } from "../utils/project-resolver.js";
 
 export async function pipelineRoutes(app: FastifyInstance) {
   // POST /api/pipelines — Create pipeline
@@ -14,12 +15,15 @@ export async function pipelineRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
     }
     try {
-      const result = await app.pipelineService.create(parsed.data);
+      const projectId = await resolveProjectParam(app, parsed.data.projectId, reply);
+      if (!projectId) return reply;
+      const input = { ...parsed.data, projectId };
+      const result = await app.pipelineService.create(input);
 
       // Wake first step's agent if assigned
       const firstStep = result.steps[0];
       if (firstStep?.agentId && firstStep.taskId) {
-        await app.heartbeatService.enqueueWakeup(firstStep.agentId, parsed.data.projectId, {
+        await app.heartbeatService.enqueueWakeup(firstStep.agentId, projectId, {
           source: "automation",
           taskId: firstStep.taskId,
           reason: "pipeline_step_ready",
@@ -43,6 +47,9 @@ export async function pipelineRoutes(app: FastifyInstance) {
   app.get("/api/pipelines", async (request: FastifyRequest) => {
     const parsed = PipelineFilterSchema.safeParse(request.query);
     const filter = parsed.success ? parsed.data : {};
+    if (filter.projectId) {
+      filter.projectId = await resolveProjectValue(app, filter.projectId);
+    }
     return app.pipelineService.list(filter);
   });
 

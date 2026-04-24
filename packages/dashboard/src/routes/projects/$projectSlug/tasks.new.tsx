@@ -9,7 +9,7 @@ import { PageHeader } from "../../../components/ui/PageHeader.js";
 import type { CreateTask } from "@orch/shared";
 
 function NewTaskRoute() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   const navigate = useNavigate();
   const createTask = useCreateTask();
 
@@ -33,8 +33,8 @@ function NewTaskRoute() {
 
     const task = await createTask.mutateAsync(payload);
     navigate({
-      to: "/projects/$projectId/tasks/$taskId",
-      params: { projectId, taskId: task.id },
+      to: "/projects/$projectSlug/tasks/$taskId",
+      params: { projectSlug: projectId, taskId: task.id },
     });
   }
 
@@ -43,8 +43,8 @@ function NewTaskRoute() {
       <PageHeader title="New task" />
       <div className="mb-4">
         <Link
-          to="/projects/$projectId/board"
-          params={{ projectId }}
+          to="/projects/$projectSlug/board"
+          params={{ projectSlug: projectId }}
           className="focus-ring type-ui text-mute hover:text-ink"
         >
           ← Back to board
@@ -58,8 +58,8 @@ function NewTaskRoute() {
           onSubmit={handleSubmit}
           onCancel={() =>
             navigate({
-              to: "/projects/$projectId/board",
-              params: { projectId },
+              to: "/projects/$projectSlug/board",
+              params: { projectSlug: projectId },
             })
           }
           isSubmitting={createTask.isPending}
@@ -69,6 +69,6 @@ function NewTaskRoute() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/tasks/new")({
+export const Route = createFileRoute("/projects/$projectSlug/tasks/new")({
   component: NewTaskRoute,
 });

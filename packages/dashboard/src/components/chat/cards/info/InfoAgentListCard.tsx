@@ -13,8 +13,8 @@ export function InfoAgentListCard({
         {agents.map((a) => (
           <li key={a.id} className="flex items-center gap-2">
             <Link
-              to="/projects/$projectId/agents/$agentId"
-              params={{ projectId, agentId: a.id }}
+              to="/projects/$projectSlug/agents/$agentId"
+              params={{ projectSlug: projectId, agentId: a.id }}
               className="font-mono text-sky-400 hover:text-sky-300"
             >
               {a.id}

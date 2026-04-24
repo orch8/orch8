@@ -38,7 +38,7 @@ describe("TaskService", () => {
         taskType: "quick",
       });
 
-      expect(task.id).toMatch(/^task_/);
+      expect(task.id).toMatch(/^[A-Z][A-Z0-9]{1,4}-\d+$/);
       expect(task.taskType).toBe("quick");
       expect(task.column).toBe("backlog");
       expect(task.brainstormStatus).toBeNull();
@@ -86,6 +86,16 @@ describe("TaskService", () => {
       expect(task.autoPr).toBe(true);
       expect(task.finishStrategy).toBeNull();
       expect(task.mcpTools).toEqual([]);
+    });
+
+    it("allocates sequential task IDs per project", async () => {
+      const first = await service.create({ title: "First", projectId, taskType: "quick" });
+      const second = await service.create({ title: "Second", projectId, taskType: "quick" });
+
+      const [firstPrefix, firstNumber] = first.id.split("-");
+      const [secondPrefix, secondNumber] = second.id.split("-");
+      expect(secondPrefix).toBe(firstPrefix);
+      expect(Number(secondNumber)).toBe(Number(firstNumber) + 1);
     });
   });
 

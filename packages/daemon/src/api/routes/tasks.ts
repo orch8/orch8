@@ -5,6 +5,7 @@ import { TaskService } from "../../services/task.service.js";
 import { CommentService } from "../../services/comment.service.js";
 import type { TaskColumn } from "../../services/task-transitions.js";
 import { requirePermission } from "../middleware/permissions.js";
+import { resolveProjectParam, resolveProjectValue } from "../utils/project-resolver.js";
 
 export async function taskRoutes(app: FastifyInstance) {
   const taskService = new TaskService(app.db);
@@ -22,7 +23,9 @@ export async function taskRoutes(app: FastifyInstance) {
       });
     }
 
-    const { dependsOn, ...taskData } = parsed.data;
+    const projectId = await resolveProjectParam(app, parsed.data.projectId, reply);
+    if (!projectId) return reply;
+    const { dependsOn, ...taskData } = { ...parsed.data, projectId };
 
     // Insert the task row and attach its initial dependencies in a single
     // transaction. A cycle detected on dep #2 previously left the task
@@ -57,6 +60,9 @@ export async function taskRoutes(app: FastifyInstance) {
   app.get("/api/tasks", async (request: FastifyRequest) => {
     const parsed = TaskFilterSchema.safeParse(request.query);
     const filter = parsed.success ? parsed.data : {};
+    if (filter.projectId) {
+      filter.projectId = await resolveProjectValue(app, filter.projectId);
+    }
     return taskService.list(filter);
   });
 

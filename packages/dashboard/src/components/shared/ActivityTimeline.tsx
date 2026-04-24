@@ -77,8 +77,8 @@ export function ActivityTimeline({
 
       {compact && (
         <Link
-          to="/projects/$projectId/activity"
-          params={{ projectId }}
+          to="/projects/$projectSlug/activity"
+          params={{ projectSlug: projectId }}
           className="mt-1 block text-xs text-blue-400 hover:text-blue-300"
         >
           View all activity →

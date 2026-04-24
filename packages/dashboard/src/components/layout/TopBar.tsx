@@ -9,7 +9,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ primaryAction }: TopBarProps) {
-  const params = useParams({ strict: false }) as { projectId?: string };
+  const params = useParams({ strict: false }) as { projectSlug?: string };
 
   return (
     <header className="flex h-[var(--size-topbar-height)] shrink-0 items-center justify-between gap-4 border-b border-edge-soft bg-background px-[var(--pad-page)]">
@@ -25,7 +25,7 @@ export function TopBar({ primaryAction }: TopBarProps) {
           className="focus-ring hidden h-8 w-52 rounded-sm border border-edge bg-surface px-3 type-ui text-ink placeholder:text-whisper md:block"
         />
         {primaryAction}
-        {params.projectId ? <NotificationBell projectId={params.projectId} /> : null}
+        {params.projectSlug ? <NotificationBell projectId={params.projectSlug} /> : null}
       </div>
     </header>
   );

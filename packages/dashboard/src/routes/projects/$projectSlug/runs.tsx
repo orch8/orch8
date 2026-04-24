@@ -3,7 +3,7 @@ import { RunInspector } from "../../../components/runs/RunInspector.js";
 import { PageHeader } from "../../../components/ui/PageHeader.js";
 
 function RunsPage() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
 
   return (
     <div className="h-full">
@@ -16,7 +16,7 @@ function RunsPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/runs")({
+export const Route = createFileRoute("/projects/$projectSlug/runs")({
   component: RunsPage,
   validateSearch: (search: Record<string, unknown>) => ({
     run: typeof search.run === "string" ? search.run : undefined,

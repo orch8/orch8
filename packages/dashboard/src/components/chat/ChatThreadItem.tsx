@@ -12,8 +12,8 @@ export function ChatThreadItem({ projectId, chat }: ChatThreadItemProps) {
 
   return (
     <Link
-      to="/projects/$projectId/chat/$chatId"
-      params={{ projectId, chatId: chat.id }}
+      to="/projects/$projectSlug/chat/$chatId"
+      params={{ projectSlug: projectId, chatId: chat.id }}
       className={`block rounded-md px-3 py-2 text-sm transition-colors ${
         isActive
           ? "bg-zinc-800 text-zinc-100"

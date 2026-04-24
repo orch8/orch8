@@ -9,9 +9,9 @@ import { useCreateTask } from "../../hooks/useTasks.js";
 import { useCreateChat } from "../../hooks/useChats.js";
 
 interface WelcomeWizardProps {
-  onComplete: (projectId: string) => void;
+  onComplete: (projectSlug: string) => void;
   /** Navigate to chat after conversational setup. */
-  onChatNavigate: (projectId: string, chatId: string) => void;
+  onChatNavigate: (projectSlug: string, chatId: string) => void;
   /** Show the intro "Welcome" step (defaults to true). */
   showIntro?: boolean;
 }
@@ -240,7 +240,7 @@ export function WelcomeWizard({ onComplete, onChatNavigate, showIntro = true }: 
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
-    let project: { id: string };
+    let project: { id: string; slug: string };
     try {
       project = await createProject.mutateAsync({
         name: projectName,
@@ -265,7 +265,7 @@ export function WelcomeWizard({ onComplete, onChatNavigate, showIntro = true }: 
           seedMessage: SEED_MESSAGE,
         });
         setSubmitting(false);
-        onChatNavigate(project.id, chat.id);
+        onChatNavigate(project.slug, chat.id);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to create chat");
         setSubmitting(false);
@@ -303,7 +303,7 @@ export function WelcomeWizard({ onComplete, onChatNavigate, showIntro = true }: 
     }
 
     setSubmitting(false);
-    onComplete(project.id);
+    onComplete(project.slug);
   }
 
   return (

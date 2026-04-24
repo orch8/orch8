@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { NotificationFilterSchema, MarkNotificationsReadSchema } from "@orch/shared";
+import { resolveProjectValue } from "../utils/project-resolver.js";
 import "../../types.js";
 
 export async function notificationRoutes(app: FastifyInstance) {
@@ -7,7 +8,7 @@ export async function notificationRoutes(app: FastifyInstance) {
   app.get("/api/notifications", async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = NotificationFilterSchema.safeParse(request.query);
     const filter = parsed.success ? parsed.data : { limit: 50, offset: 0 };
-    const projectId = filter.projectId ?? request.projectId;
+    const projectId = await resolveProjectValue(app, filter.projectId) ?? request.projectId;
 
     if (!projectId) {
       return reply.code(400).send({ error: "validation_error", message: "projectId is required" });

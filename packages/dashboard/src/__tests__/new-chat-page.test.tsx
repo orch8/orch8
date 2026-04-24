@@ -35,7 +35,7 @@ vi.mock("@tanstack/react-router", () => ({
     options: config,
     // NewChatPage calls `Route.useParams()` inside its body. Return a
     // fixed projectId so the component can render without a real router.
-    useParams: () => ({ projectId: "proj_1" }),
+    useParams: () => ({ projectSlug: "proj_1" }),
   }),
   useNavigate: () => navigateSpy,
 }));
@@ -69,7 +69,7 @@ describe("NewChatPage", () => {
 
     // Import dynamically so the mocks above are in place before the module
     // is evaluated.
-    const mod = await import("../routes/projects/$projectId/chat/new.js");
+    const mod = await import("../routes/projects/$projectSlug/chat/new.js");
     const NewChatPage = mod.Route.options.component as React.ComponentType;
 
     render(
@@ -91,8 +91,8 @@ describe("NewChatPage", () => {
     await waitFor(
       () => {
         expect(navigateSpy).toHaveBeenCalledWith({
-          to: "/projects/$projectId/chat/$chatId",
-          params: { projectId: "proj_1", chatId: "chat_abc" },
+          to: "/projects/$projectSlug/chat/$chatId",
+          params: { projectSlug: "proj_1", chatId: "chat_abc" },
           replace: true,
         });
       },
@@ -103,7 +103,7 @@ describe("NewChatPage", () => {
   it("shows an error state when the create call fails (does not get stuck on 'Creating new chat…')", async () => {
     (api.post as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("boom"));
 
-    const mod = await import("../routes/projects/$projectId/chat/new.js");
+    const mod = await import("../routes/projects/$projectSlug/chat/new.js");
     const NewChatPage = mod.Route.options.component as React.ComponentType;
 
     const { findByText } = render(

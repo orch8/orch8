@@ -8,7 +8,7 @@ const navigateSpy = vi.fn();
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: (_path: string) => (opts: any) => ({
     ...opts,
-    useParams: () => ({ projectId: "proj_1" }),
+    useParams: () => ({ projectSlug: "proj_1" }),
   }),
   Navigate: (props: any) => {
     navigateSpy(props);
@@ -17,7 +17,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 // Import the route module after mocks are set up (vi.mock is hoisted)
-import { Route as HomeRoute } from "../routes/projects/$projectId/index.js";
+import { Route as HomeRoute } from "../routes/projects/$projectSlug/index.js";
 
 const ProjectIndexRedirect = (HomeRoute as any).component;
 
@@ -26,8 +26,8 @@ describe("ProjectIndexRedirect", () => {
     renderWithProviders(<ProjectIndexRedirect />);
     expect(navigateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        to: "/projects/$projectId/chat",
-        params: { projectId: "proj_1" },
+        to: "/projects/$projectSlug/chat",
+        params: { projectSlug: "proj_1" },
         replace: true,
       }),
     );

@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AgentWizard } from "../../../../components/agent-editor/AgentWizard.js";
 
 function NewAgentPage() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   const navigate = useNavigate();
 
   return (
@@ -12,8 +12,8 @@ function NewAgentPage() {
         projectId={projectId}
         onCreated={(agentId) =>
           navigate({
-            to: "/projects/$projectId/agents/$agentId",
-            params: { projectId, agentId },
+            to: "/projects/$projectSlug/agents/$agentId",
+            params: { projectSlug: projectId, agentId },
           })
         }
       />
@@ -21,6 +21,6 @@ function NewAgentPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/agents/new")({
+export const Route = createFileRoute("/projects/$projectSlug/agents/new")({
   component: NewAgentPage,
 });

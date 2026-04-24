@@ -8,7 +8,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function AgentsListPage() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   const { data: agents, isLoading } = useAgents(projectId);
 
   return (
@@ -17,8 +17,8 @@ function AgentsListPage() {
         <h2 className="type-section font-semibold">Agents</h2>
         <div className="flex gap-2">
           <Link
-            to="/projects/$projectId/agents/new"
-            params={{ projectId }}
+            to="/projects/$projectSlug/agents/new"
+            params={{ projectSlug: projectId }}
             className="rounded-md bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600"
           >
             + New Agent
@@ -32,8 +32,8 @@ function AgentsListPage() {
         {agents?.map((agent) => (
           <Link
             key={agent.id}
-            to="/projects/$projectId/agents/$agentId"
-            params={{ projectId, agentId: agent.id }}
+            to="/projects/$projectSlug/agents/$agentId"
+            params={{ projectSlug: projectId, agentId: agent.id }}
             className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-4 transition-colors hover:border-zinc-700"
           >
             <div>
@@ -61,6 +61,6 @@ function AgentsListPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/agents/")({
+export const Route = createFileRoute("/projects/$projectSlug/agents/")({
   component: AgentsListPage,
 });

@@ -28,8 +28,8 @@ export function ChatThreadList({ projectId }: ChatThreadListProps) {
     <div className="flex h-full w-64 shrink-0 flex-col border-r border-edge-soft bg-sidebar">
       <div className="border-b border-edge-soft px-3 py-3">
         <Link
-          to="/projects/$projectId/chat/new"
-          params={{ projectId }}
+          to="/projects/$projectSlug/chat/new"
+          params={{ projectSlug: projectId }}
           className="focus-ring block w-full rounded-sm bg-accent px-3 py-2 text-center type-ui text-canvas hover:bg-[color:var(--color-accent-hover)]"
         >
           + New chat

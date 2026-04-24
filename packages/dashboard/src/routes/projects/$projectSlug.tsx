@@ -2,10 +2,10 @@ import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useProject } from "../../hooks/useProjects.js";
 
-const STORAGE_KEY = "orch8:lastProjectId";
+const STORAGE_KEY = "orch8:lastProjectSlug";
 
 function ProjectLayout() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   const navigate = useNavigate();
   const { data: project, isLoading, isError } = useProject(projectId);
 
@@ -44,6 +44,6 @@ function ProjectLayout() {
   return <Outlet />;
 }
 
-export const Route = createFileRoute("/projects/$projectId")({
+export const Route = createFileRoute("/projects/$projectSlug")({
   component: ProjectLayout,
 });

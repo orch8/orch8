@@ -2,6 +2,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { AddBundledAgentsSchema } from "@orch/shared";
 import { isUniqueViolation } from "../utils/db-errors.js";
+import { resolveProjectParam } from "../utils/project-resolver.js";
 import "../../types.js";
 
 export async function bundledAgentRoutes(app: FastifyInstance) {
@@ -21,7 +22,9 @@ export async function bundledAgentRoutes(app: FastifyInstance) {
           .send({ error: "validation_error", details: parsed.error.issues });
       }
 
-      const { projectId, agentIds } = parsed.data;
+      const { agentIds } = parsed.data;
+      const projectId = await resolveProjectParam(app, parsed.data.projectId, reply);
+      if (!projectId) return reply;
 
       // Verify project exists and get homeDir for file seeding
       const project = await app.projectService.getById(projectId);

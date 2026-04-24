@@ -1,7 +1,7 @@
 import { BaseInfoCard } from "../BaseInfoCard.js";
 import type { CardComponentProps } from "../cardTypes.js";
 
-// Note: Plan 05 specified a Link to `/projects/$projectId/pipelines/$pipelineId`,
+// Note: Plan 05 specified a Link to `/projects/$projectSlug/pipelines/$pipelineId`,
 // but no pipeline-detail route exists in the dashboard yet. Render the id as
 // plain text for now, matching the `InfoRunListCard` pattern — we can swap this
 // for a Link once a pipeline detail route is added.

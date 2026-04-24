@@ -5,7 +5,7 @@ import { renderWithProviders, screen, waitFor } from "../test-utils.js";
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: (_path: string) => (opts: any) => ({
     ...opts,
-    useParams: () => ({ projectId: "proj_1" }),
+    useParams: () => ({ projectSlug: "proj_1" }),
     useSearch: () => ({}),
   }),
   Link: ({ children, to, ...props }: any) => (
@@ -32,7 +32,7 @@ const mockEntries = [
 ];
 
 // Import the route module after mocks are set up (vi.mock is hoisted)
-import { Route as ActivityRoute } from "../routes/projects/$projectId/activity.js";
+import { Route as ActivityRoute } from "../routes/projects/$projectSlug/activity.js";
 
 const ActivityPage = (ActivityRoute as any).component;
 

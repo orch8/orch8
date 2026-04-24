@@ -3,7 +3,7 @@ import { BriefingPage } from "../../../components/briefing/BriefingPage.js";
 import { PageHeader } from "../../../components/ui/PageHeader.js";
 
 function BriefingRoute() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   return (
     <div>
       <PageHeader
@@ -15,6 +15,6 @@ function BriefingRoute() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/briefing")({
+export const Route = createFileRoute("/projects/$projectSlug/briefing")({
   component: BriefingRoute,
 });

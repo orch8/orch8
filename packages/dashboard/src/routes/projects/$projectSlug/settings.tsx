@@ -5,21 +5,21 @@ import { PageHeader } from "../../../components/ui/PageHeader.js";
 import type { Project } from "../../../types.js";
 
 function ProjectSettingsPage() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   const { data: project, isLoading } = useProject(projectId);
   const archiveProject = useArchiveProject();
   const navigate = useNavigate();
 
   const handleSuccess = (_project: Project) => {
-    navigate({ to: "/projects/$projectId", params: { projectId } });
+    navigate({ to: "/projects/$projectSlug", params: { projectSlug: projectId } });
   };
 
   const handleArchive = async () => {
     if (!project) return;
     await archiveProject.mutateAsync(project.id);
     // Clear localStorage if this was the last-used project
-    if (localStorage.getItem("orch8:lastProjectId") === projectId) {
-      localStorage.removeItem("orch8:lastProjectId");
+    if (localStorage.getItem("orch8:lastProjectSlug") === projectId) {
+      localStorage.removeItem("orch8:lastProjectSlug");
     }
     navigate({ to: "/" });
   };
@@ -60,6 +60,6 @@ function ProjectSettingsPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/settings")({
+export const Route = createFileRoute("/projects/$projectSlug/settings")({
   component: ProjectSettingsPage,
 });

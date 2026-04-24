@@ -13,7 +13,7 @@ type LinkTo = ComponentProps<typeof Link>["to"];
 type Tab = "active" | "history" | "templates";
 
 function PipelinesTemplatesPage() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   const { data: templates, isLoading } = usePipelineTemplates(projectId);
   const deleteMutation = useDeletePipelineTemplate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -115,6 +115,6 @@ function PipelinesTemplatesPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/pipelines/templates")({
+export const Route = createFileRoute("/projects/$projectSlug/pipelines/templates")({
   component: PipelinesTemplatesPage,
 });

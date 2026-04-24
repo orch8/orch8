@@ -3,7 +3,7 @@ import { useAgent } from "../../../../hooks/useAgents.js";
 import { AgentSettingsPage } from "../../../../components/agent-settings/AgentSettingsPage.js";
 
 function AgentDetailPage() {
-  const { projectId, agentId } = Route.useParams();
+  const { projectSlug: projectId, agentId } = Route.useParams();
   const { data: agent, isLoading } = useAgent(agentId, projectId);
 
   if (isLoading) {
@@ -18,8 +18,8 @@ function AgentDetailPage() {
     <div className="mx-auto max-w-4xl">
       <div className="mb-4">
         <Link
-          to="/projects/$projectId/agents"
-          params={{ projectId }}
+          to="/projects/$projectSlug/agents"
+          params={{ projectSlug: projectId }}
           className="text-sm text-zinc-500 hover:text-zinc-300"
         >
           ← Back to agents
@@ -30,6 +30,6 @@ function AgentDetailPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/agents/$agentId")({
+export const Route = createFileRoute("/projects/$projectSlug/agents/$agentId")({
   component: AgentDetailPage,
 });

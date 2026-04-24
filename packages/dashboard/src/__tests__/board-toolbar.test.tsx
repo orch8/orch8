@@ -24,8 +24,8 @@ describe("BoardToolbar", () => {
     );
     await userEvent.click(screen.getByText("+ New task"));
     expect(navigateMock).toHaveBeenCalledWith({
-      to: "/projects/$projectId/tasks/new",
-      params: { projectId: "proj_1" },
+      to: "/projects/$projectSlug/tasks/new",
+      params: { projectSlug: "proj_1" },
     });
   });
 

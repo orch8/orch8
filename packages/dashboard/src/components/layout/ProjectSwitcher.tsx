@@ -5,14 +5,14 @@ import { useProjects } from "../../hooks/useProjects.js";
 
 export function ProjectSwitcher() {
   const { data: projects, isLoading } = useProjects();
-  const params = useParams({ strict: false }) as { projectId?: string };
-  const currentProjectId = params.projectId;
+  const params = useParams({ strict: false }) as { projectSlug?: string };
+  const currentProjectSlug = params.projectSlug;
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const currentProject = projects?.find((p) => p.id === currentProjectId);
+  const currentProject = projects?.find((p) => p.slug === currentProjectSlug);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -24,11 +24,11 @@ export function ProjectSwitcher() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  function switchProject(newProjectId: string) {
-    const currentSuffix = currentProjectId
-      ? pathname.replace(`/projects/${currentProjectId}`, "")
+  function switchProject(newProjectSlug: string) {
+    const currentSuffix = currentProjectSlug
+      ? pathname.replace(`/projects/${currentProjectSlug}`, "")
       : "";
-    const target = `/projects/${newProjectId}${currentSuffix || ""}`;
+    const target = `/projects/${newProjectSlug}${currentSuffix || ""}`;
     navigate({ to: target as any });
     setOpen(false);
   }
@@ -49,7 +49,7 @@ export function ProjectSwitcher() {
             className={`size-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
           />
         </span>
-        {currentProjectId && (
+        {currentProjectSlug && (
           <span className="flex items-center gap-1.5">
             <span
               aria-hidden
@@ -67,13 +67,13 @@ export function ProjectSwitcher() {
             <div
               key={project.id}
               className={`flex items-center justify-between px-2 py-1.5 ${
-                project.id === currentProjectId
+                project.slug === currentProjectSlug
                   ? "bg-surface-2"
                   : "hover:bg-surface-2"
               }`}
             >
               <button
-                onClick={() => switchProject(project.id)}
+                onClick={() => switchProject(project.slug)}
                 className="focus-ring flex-1 truncate text-left type-body text-ink"
               >
                 {project.name}
@@ -82,9 +82,9 @@ export function ProjectSwitcher() {
                 {!project.active && (
                   <span className="type-label text-whisper">archived</span>
                 )}
-                {project.id === currentProjectId && (
+                {project.slug === currentProjectSlug && (
                   <Link
-                    to={`/projects/${project.id}/settings` as any}
+                    to={`/projects/${project.slug}/settings` as any}
                     onClick={() => setOpen(false)}
                     className="focus-ring rounded-sm p-0.5 text-whisper hover:text-mute"
                     aria-label="Project settings"

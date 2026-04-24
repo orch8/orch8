@@ -69,8 +69,8 @@ export function ChatHeader({ projectId, chat }: ChatHeaderProps) {
           </button>
         )}
         <Link
-          to="/projects/$projectId/agents/$agentId"
-          params={{ projectId, agentId: chat.agentId }}
+          to="/projects/$projectSlug/agents/$agentId"
+          params={{ projectSlug: projectId, agentId: chat.agentId }}
           className="focus-ring type-mono text-blue underline decoration-blue/40 decoration-dotted underline-offset-2 hover:decoration-blue"
         >
           {chat.agentId}

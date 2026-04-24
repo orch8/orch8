@@ -2,7 +2,7 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { ChatLayout } from "../../../components/chat/ChatLayout.js";
 
 function ChatRouteLayout() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
   return (
     <ChatLayout projectId={projectId}>
       <Outlet />
@@ -10,6 +10,6 @@ function ChatRouteLayout() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/chat")({
+export const Route = createFileRoute("/projects/$projectSlug/chat")({
   component: ChatRouteLayout,
 });

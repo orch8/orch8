@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { projects, agents } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { CreateProject, UpdateProject, ProjectFilter } from "@orch/shared";
@@ -6,11 +6,31 @@ import { PipelineTemplateService } from "./pipeline-template.service.js";
 
 type Project = typeof projects.$inferSelect;
 
+const PROJECT_KEY_RE = /^[A-Z][A-Z0-9]{1,4}$/;
+const PROJECT_ID_RE = /^proj_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function deriveProjectKey(slug: string): string {
+  const key = slug.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3);
+  if (key.length < 2 || !/^[A-Z]/.test(key)) {
+    throw new Error("Project key is required for this slug");
+  }
+  return key;
+}
+
+function validateProjectKey(key: string): string {
+  if (!PROJECT_KEY_RE.test(key)) {
+    throw new Error("Project key must be 2-5 uppercase alphanumeric characters and start with a letter");
+  }
+  return key;
+}
+
 export class ProjectService {
   constructor(private db: SchemaDb) {}
 
   async create(input: CreateProject): Promise<Project> {
-    const [project] = await this.db.insert(projects).values(input).returning();
+    const key = validateProjectKey(input.key ?? deriveProjectKey(input.slug));
+    const [project] = await this.db.insert(projects).values({ ...input, key }).returning();
     await this.seedDefaultPipelineTemplate(project.id);
 
     // Provision the default chat agent for this project. Failure here
@@ -47,6 +67,24 @@ export class ProjectService {
   async getById(id: string): Promise<Project | null> {
     const result = await this.db.select().from(projects).where(eq(projects.id, id));
     return result[0] ?? null;
+  }
+
+  async getBySlug(slug: string): Promise<Project | null> {
+    const result = await this.db.select().from(projects).where(eq(projects.slug, slug));
+    return result[0] ?? null;
+  }
+
+  async resolveProjectId(idOrSlug: string): Promise<string> {
+    const looksLikeId = PROJECT_ID_RE.test(idOrSlug) || UUID_RE.test(idOrSlug);
+    const result = await this.db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(looksLikeId ? eq(projects.id, idOrSlug) : or(eq(projects.slug, idOrSlug), eq(projects.id, idOrSlug)))
+      .limit(1);
+
+    const id = result[0]?.id;
+    if (!id) throw new Error("Project not found");
+    return id;
   }
 
   async list(filter: ProjectFilter = {}): Promise<Project[]> {

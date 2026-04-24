@@ -6,13 +6,13 @@ import { describe, it, expect } from "vitest";
  * the root index route share for "last used project" tracking.
  */
 describe("ProjectLayoutRoute", () => {
-  const STORAGE_KEY = "orch8:lastProjectId";
+  const STORAGE_KEY = "orch8:lastProjectSlug";
 
   it("storage key follows the orch8: namespace convention", () => {
     expect(STORAGE_KEY).toMatch(/^orch8:/);
   });
 
-  it("storage key is orch8:lastProjectId", () => {
-    expect(STORAGE_KEY).toBe("orch8:lastProjectId");
+  it("storage key is orch8:lastProjectSlug", () => {
+    expect(STORAGE_KEY).toBe("orch8:lastProjectSlug");
   });
 });

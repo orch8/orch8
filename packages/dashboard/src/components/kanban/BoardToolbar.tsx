@@ -71,8 +71,8 @@ export function BoardToolbar({ projectId, onFilterChange }: BoardToolbarProps) {
         variant="primary"
         onClick={() =>
           navigate({
-            to: "/projects/$projectId/tasks/new",
-            params: { projectId },
+            to: "/projects/$projectSlug/tasks/new",
+            params: { projectSlug: projectId },
           })
         }
       >

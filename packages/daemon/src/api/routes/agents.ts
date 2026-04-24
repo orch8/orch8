@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { CreateAgentSchema, UpdateAgentSchema, AgentFilterSchema, CloneAgentSchema } from "@orch/shared";
 import { isUniqueViolation } from "../utils/db-errors.js";
+import { resolveProjectParam, resolveProjectValue } from "../utils/project-resolver.js";
 import "../../types.js";
 
 export async function agentRoutes(app: FastifyInstance) {
@@ -15,7 +16,12 @@ export async function agentRoutes(app: FastifyInstance) {
     }
 
     try {
-      const { agent, rawToken } = await app.agentService.createWithToken(parsed.data);
+      const projectId = await resolveProjectParam(app, parsed.data.projectId, reply);
+      if (!projectId) return reply;
+      const { agent, rawToken } = await app.agentService.createWithToken({
+        ...parsed.data,
+        projectId,
+      });
       return reply.code(201).send({ ...agent, rawToken });
     } catch (err) {
       if (isUniqueViolation(err)) {
@@ -29,6 +35,9 @@ export async function agentRoutes(app: FastifyInstance) {
   app.get("/api/agents", async (request: FastifyRequest) => {
     const parsed = AgentFilterSchema.safeParse(request.query);
     const filter = parsed.success ? parsed.data : {};
+    if (filter.projectId) {
+      filter.projectId = await resolveProjectValue(app, filter.projectId);
+    }
     return app.agentService.list(filter);
   });
 
@@ -196,10 +205,12 @@ export async function agentRoutes(app: FastifyInstance) {
     }
 
     try {
+      const targetProjectId = await resolveProjectParam(app, parsed.data.targetProjectId, reply);
+      if (!targetProjectId) return reply;
       const cloned = await app.agentService.clone(
         request.params.id,
         projectId,
-        parsed.data,
+        { ...parsed.data, targetProjectId },
       );
       return reply.code(201).send(cloned);
     } catch (err) {

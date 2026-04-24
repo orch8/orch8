@@ -3,7 +3,7 @@ import { MemoryBrowser } from "../../../components/memory/MemoryBrowser.js";
 import { PageHeader } from "../../../components/ui/PageHeader.js";
 
 function MemoryPage() {
-  const { projectId } = Route.useParams();
+  const { projectSlug: projectId } = Route.useParams();
 
   return (
     <div className="h-full">
@@ -16,7 +16,7 @@ function MemoryPage() {
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/memory")({
+export const Route = createFileRoute("/projects/$projectSlug/memory")({
   component: MemoryPage,
   validateSearch: (search: Record<string, unknown>) => ({
     entity: typeof search.entity === "string" ? search.entity : undefined,

@@ -1,10 +1,12 @@
 import { z } from "zod";
 
 export const FinishStrategySchema = z.enum(["pr", "merge", "none"]);
+export const ProjectKeySchema = z.string().regex(/^[A-Z][A-Z0-9]{1,4}$/);
 
 export const CreateProjectSchema = z.object({
   name: z.string().min(1).max(200),
   slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/),
+  key: ProjectKeySchema.optional(),
   description: z.string().max(5000).default(""),
   homeDir: z.string().min(1),
   repoUrl: z.string().optional(),

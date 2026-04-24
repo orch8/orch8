@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { eq, and, desc } from "drizzle-orm";
 import { activityLog } from "@orch/shared/db";
 import { CreateLogEntrySchema, LogFilterSchema } from "@orch/shared";
+import { resolveProjectValue } from "../utils/project-resolver.js";
 import "../../types.js";
 
 export async function activityRoutes(app: FastifyInstance) {
@@ -9,7 +10,7 @@ export async function activityRoutes(app: FastifyInstance) {
   app.get("/api/log", async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = LogFilterSchema.safeParse(request.query);
     const filter = parsed.success ? parsed.data : { limit: 100, offset: 0 };
-    const projectId = filter.projectId ?? request.projectId;
+    const projectId = await resolveProjectValue(app, filter.projectId) ?? request.projectId;
 
     if (!projectId) {
       return reply.code(400).send({ error: "validation_error", message: "projectId is required" });
@@ -47,8 +48,9 @@ export async function activityRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
     }
 
+    const projectId = await resolveProjectValue(app, parsed.data.projectId);
     const [entry] = await app.db.insert(activityLog).values({
-      projectId: parsed.data.projectId,
+      projectId: projectId!,
       agentId: parsed.data.agentId ?? null,
       taskId: parsed.data.taskId ?? null,
       runId: parsed.data.runId ?? null,

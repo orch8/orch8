@@ -26,7 +26,7 @@ import {
   useSidebar,
 } from "../ui/Sidebar.js";
 
-// Sidebar builds target routes at runtime by concatenating the active projectId
+// Sidebar builds target routes at runtime by concatenating the active project slug
 // (e.g. `/projects/${id}/board`). TanStack Router's Link component checks the
 // `to` prop against the generated route-tree literal type, which cannot match a
 // template string at compile time. We widen to the prop type rather than `any`
@@ -47,9 +47,9 @@ interface NavSection {
 }
 
 function useProjectSections(): NavSection[] {
-  const params = useParams({ strict: false }) as { projectId?: string };
-  const projectId = params.projectId;
-  const prefix = projectId ? `/projects/${projectId}` : "";
+  const params = useParams({ strict: false }) as { projectSlug?: string };
+  const projectSlug = params.projectSlug;
+  const prefix = projectSlug ? `/projects/${projectSlug}` : "";
 
   return [
     {
@@ -84,7 +84,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onClose }: SidebarProps = {}) {
-  const params = useParams({ strict: false }) as { projectId?: string };
+  const params = useParams({ strict: false }) as { projectSlug?: string };
   const pathname = useRouterState({
     select: (s) => s.location.pathname,
   });
@@ -104,22 +104,22 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
       </div>
 
       <nav className="flex flex-1 flex-col overflow-y-auto px-2 py-3">
-        {params.projectId && (
+        {params.projectSlug && (
           <SidebarGroup>
             <SidebarMenu>
               <NavLink
-                active={pathname.startsWith(`/projects/${params.projectId}/chat`)}
+                active={pathname.startsWith(`/projects/${params.projectSlug}/chat`)}
                 icon={MessageSquareTextIcon}
                 label="Chat"
                 onClose={onClose}
-                to={`/projects/${params.projectId}/chat`}
+                to={`/projects/${params.projectSlug}/chat`}
               />
               <NavLink
-                active={pathname.startsWith(`/projects/${params.projectId}/briefing`)}
+                active={pathname.startsWith(`/projects/${params.projectSlug}/briefing`)}
                 icon={BriefcaseBusinessIcon}
                 label="Briefing"
                 onClose={onClose}
-                to={`/projects/${params.projectId}/briefing`}
+                to={`/projects/${params.projectSlug}/briefing`}
               />
             </SidebarMenu>
           </SidebarGroup>
@@ -158,8 +158,8 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
               daemon{daemonStatus?.uptimeFormatted ? ` ${daemonStatus.uptimeFormatted}` : ""}
             </span>
           </SidebarMenuButton>
-          {params.projectId && state !== "collapsed" ? (
-            <NotificationBell projectId={params.projectId} />
+          {params.projectSlug && state !== "collapsed" ? (
+            <NotificationBell projectId={params.projectSlug} />
           ) : null}
         </div>
       </div>

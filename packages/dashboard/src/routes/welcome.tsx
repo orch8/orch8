@@ -7,12 +7,12 @@ function WelcomePage() {
     <div className="mx-auto max-w-2xl py-12">
       <WelcomeWizard
         onComplete={(projectId) =>
-          navigate({ to: "/projects/$projectId", params: { projectId } })
+          navigate({ to: "/projects/$projectSlug", params: { projectSlug: projectId } })
         }
         onChatNavigate={(projectId, chatId) =>
           navigate({
-            to: "/projects/$projectId/chat/$chatId",
-            params: { projectId, chatId },
+            to: "/projects/$projectSlug/chat/$chatId",
+            params: { projectSlug: projectId, chatId },
           })
         }
       />

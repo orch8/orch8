@@ -7,10 +7,12 @@ import {
   ErrorLogFilterSchema,
   ResolveErrorLogSchema,
 } from "@orch/shared";
+import { resolveProjectValue } from "../utils/project-resolver.js";
 import "../../types.js";
 
-function projectScopeFor(request: FastifyRequest, queryProjectId?: string) {
-  return request.agent ? request.projectId : queryProjectId ?? request.projectId;
+async function projectScopeFor(app: FastifyInstance, request: FastifyRequest, queryProjectId?: string) {
+  if (request.agent) return request.projectId;
+  return await resolveProjectValue(app, queryProjectId) ?? request.projectId;
 }
 
 function requireAgentProject(
@@ -82,7 +84,7 @@ export async function errorRoutes(app: FastifyInstance) {
   app.get("/api/errors", async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = ErrorLogFilterSchema.safeParse(request.query);
     const filter = parsed.success ? parsed.data : { limit: 100, offset: 0 };
-    const projectId = projectScopeFor(request, filter.projectId);
+    const projectId = await projectScopeFor(app, request, filter.projectId);
 
     if (!requireAgentProject(request, reply, projectId)) return reply;
 
@@ -102,7 +104,7 @@ export async function errorRoutes(app: FastifyInstance) {
   app.get("/api/errors/summary", async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = ErrorLogFilterSchema.safeParse(request.query);
     const filter = parsed.success ? parsed.data : { limit: 100, offset: 0 };
-    const projectId = projectScopeFor(request, filter.projectId);
+    const projectId = await projectScopeFor(app, request, filter.projectId);
 
     if (!requireAgentProject(request, reply, projectId)) return reply;
 
@@ -126,7 +128,7 @@ export async function errorRoutes(app: FastifyInstance) {
   app.get(
     "/api/errors/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const projectId = projectScopeFor(request);
+      const projectId = await projectScopeFor(app, request);
 
       if (!requireAgentProject(request, reply, projectId)) return reply;
 
@@ -150,7 +152,7 @@ export async function errorRoutes(app: FastifyInstance) {
   app.patch(
     "/api/errors/:id/resolve",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const projectId = projectScopeFor(request);
+      const projectId = await projectScopeFor(app, request);
 
       if (!requireAgentProject(request, reply, projectId)) return reply;
 
@@ -183,7 +185,7 @@ export async function errorRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
     }
 
-    const projectId = projectScopeFor(request, parsed.data.projectId);
+    const projectId = await projectScopeFor(app, request, parsed.data.projectId);
     if (!requireAgentProject(request, reply, projectId)) return reply;
 
     const code = clientCode(parsed.data.code);

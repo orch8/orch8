@@ -5,6 +5,7 @@ interface Project {
   id: string;
   name: string;
   slug: string;
+  key: string;
   homeDir: string;
   active: boolean;
   budgetLimitUsd: string | null;
@@ -47,7 +48,7 @@ export function registerProjectCommands(
           p.budgetLimitUsd != null
             ? ` ($${p.budgetSpentUsd}/$${p.budgetLimitUsd})`
             : "";
-        console.log(`  ${p.slug} — ${p.name}${status}${budget}`);
+        console.log(`  ${p.slug} [${p.key}] — ${p.name}${status}${budget}`);
       }
     });
 
@@ -58,6 +59,7 @@ export function registerProjectCommands(
     .requiredOption("--name <name>", "Project name")
     .requiredOption("--home <path>", "Git repo home directory")
     .option("--slug <slug>", "URL-safe slug (auto-generated from name)")
+    .option("--key <KEY>", "Task key prefix, e.g. CAT")
     .option("--branch <branch>", "Default branch", "main")
     .option(
       "--finish-strategy <mode>",
@@ -78,6 +80,7 @@ export function registerProjectCommands(
       const project = await client.post<Project>("/projects", {
         name: opts.name,
         slug,
+        key: opts.key,
         homeDir: opts.home,
         defaultBranch: opts.branch,
         finishStrategy: opts.finishStrategy,
@@ -87,7 +90,7 @@ export function registerProjectCommands(
       if (opts.json) {
         console.log(JSON.stringify(project, null, 2));
       } else {
-        console.log(`Created project "${project.name}" (${project.id})`);
+        console.log(`Created project "${project.name}" (${project.slug}, ${project.key})`);
       }
     });
 
@@ -115,7 +118,7 @@ export function registerProjectCommands(
       if (opts.json) {
         console.log(JSON.stringify(found, null, 2));
       } else {
-        console.log(`Active project: ${found.name} (${found.id})`);
+        console.log(`Active project: ${found.name} (${found.slug}, ${found.key})`);
         console.log(`  Home: ${found.homeDir}`);
       }
     });

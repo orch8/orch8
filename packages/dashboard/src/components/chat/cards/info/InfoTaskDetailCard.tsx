@@ -13,8 +13,8 @@ export function InfoTaskDetailCard({
         <dt className="text-zinc-500">id</dt>
         <dd>
           <Link
-            to="/projects/$projectId/tasks/$taskId"
-            params={{ projectId, taskId: task.id }}
+            to="/projects/$projectSlug/tasks/$taskId"
+            params={{ projectSlug: projectId, taskId: task.id }}
             className="font-mono text-sky-400 hover:text-sky-300"
           >
             {task.id}

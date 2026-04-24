@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { heartbeatRuns } from "@orch/shared/db";
 import { CostSummaryQuerySchema, CostTimeseriesQuerySchema } from "@orch/shared";
+import { resolveProjectValue } from "../utils/project-resolver.js";
 import "../../types.js";
 
 export async function costRoutes(app: FastifyInstance) {
@@ -9,7 +10,7 @@ export async function costRoutes(app: FastifyInstance) {
   app.get("/api/cost/summary", async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = CostSummaryQuerySchema.safeParse(request.query);
     const filter = parsed.success ? parsed.data : {};
-    const projectId = filter.projectId ?? request.projectId;
+    const projectId = await resolveProjectValue(app, filter.projectId) ?? request.projectId;
 
     // Agents must have a projectId; admins can omit for cross-project view
     if (request.agent && !projectId) {
@@ -46,7 +47,8 @@ export async function costRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
     }
 
-    const { projectId, days } = parsed.data;
+    const { days } = parsed.data;
+    const projectId = await resolveProjectValue(app, parsed.data.projectId);
 
     // Enforce project scoping for agent callers
     if (request.agent && request.projectId && projectId !== request.projectId) {

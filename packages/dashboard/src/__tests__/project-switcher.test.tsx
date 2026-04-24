@@ -10,7 +10,7 @@ vi.mock("@tanstack/react-router", () => ({
     <a href={to} {...props}>{children}</a>
   ),
   useNavigate: () => mockNavigate,
-  useParams: () => ({ projectId: "proj_1" }),
+  useParams: () => ({ projectSlug: "proj_1" }),
   useRouterState: ({ select }: any) =>
     select
       ? select({ location: { pathname: "/projects/proj_1/board" } })

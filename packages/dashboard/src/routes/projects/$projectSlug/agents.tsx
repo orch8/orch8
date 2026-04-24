@@ -1,18 +1,18 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { PageHeader } from "../../../components/ui/PageHeader.js";
 
-function PipelinesLayout() {
+function AgentsLayout() {
   return (
     <div>
       <PageHeader
-        title="Pipelines"
-        subtitle="Templates that drive task execution"
+        title="Agents"
+        subtitle="Configure the agents that work on this project"
       />
       <Outlet />
     </div>
   );
 }
 
-export const Route = createFileRoute("/projects/$projectId/pipelines")({
-  component: PipelinesLayout,
+export const Route = createFileRoute("/projects/$projectSlug/agents")({
+  component: AgentsLayout,
 });
