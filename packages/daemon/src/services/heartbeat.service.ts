@@ -11,6 +11,7 @@ import type { CodexLocalAdapterConfig } from "../adapter/codex-local/types.js";
 import type { MemoryExtractionService } from "./memory-extraction.service.js";
 import type { BroadcastService } from "./broadcast.service.js";
 import type { PipelineService } from "./pipeline.service.js";
+import type { ErrorLoggerService } from "./error-logger.service.js";
 import type { FastifyBaseLogger } from "fastify";
 import { RunLogger, type LogHandle } from "./run-logger.js";
 import { mkdir } from "node:fs/promises";
@@ -79,9 +80,14 @@ export class HeartbeatService {
   private sessionManager: SessionManager | null = null;
   private apiUrl: string = "http://localhost:3847";
   private pipelineService: PipelineService | null = null;
+  private errorLogger: ErrorLoggerService | null = null;
 
   setLogger(logger: FastifyBaseLogger): void {
     this.logger = logger;
+  }
+
+  setErrorLogger(errorLogger: ErrorLoggerService): void {
+    this.errorLogger = errorLogger;
   }
 
   constructor(
@@ -545,6 +551,27 @@ export class HeartbeatService {
             timestamp,
             payload: rawEvent.rawPayload,
           });
+
+          if (rawEvent.kind === "tool_result" && rawEvent.isError) {
+            void this.errorLogger?.record({
+              severity: "error",
+              source: "tool",
+              code: "tool_errored",
+              message: m.summary,
+              projectId: claimedRun.projectId,
+              agentId: agent.id,
+              taskId: claimedRun.taskId ?? undefined,
+              runId,
+              metadata: {
+                seq,
+                toolName: m.toolName,
+                toolUseId: rawEvent.toolUseId,
+                output: rawEvent.output,
+              },
+              actorType: "agent",
+              actorId: agent.id,
+            });
+          }
         }
       };
 
@@ -717,6 +744,32 @@ export class HeartbeatService {
       }
 
       const result = await adapter.runAgent(adapterConfig, ctx, instructions);
+      if (result.errorCode) {
+        void this.errorLogger?.record({
+          severity: "error",
+          source: result.errorCode === "auth_required" || result.errorCode === "transient_upstream"
+            ? "provider"
+            : "heartbeat",
+          code: result.errorCode === "auth_required"
+            ? "auth_required"
+            : result.errorCode === "transient_upstream"
+              ? "upstream_transient"
+              : result.errorCode,
+          message: result.error ?? `Run failed with ${result.errorCode}`,
+          projectId: claimedRun.projectId,
+          agentId: agent.id,
+          taskId: claimedRun.taskId ?? undefined,
+          runId,
+          metadata: {
+            exitCode: result.exitCode,
+            signal: result.signal,
+            model: result.model,
+            billingType: result.billingType,
+          },
+          actorType: "agent",
+          actorId: agent.id,
+        });
+      }
 
       // 8. Record results AND update budget atomically.
       //
@@ -847,6 +900,17 @@ export class HeartbeatService {
         try {
           await this.db.insert(runEvents).values(pendingRunEventInserts);
         } catch (eventsErr) {
+          void this.errorLogger?.record({
+            severity: "error",
+            source: "heartbeat",
+            code: "run_events_flush_failed",
+            message: "Failed to flush buffered run_events at stream end",
+            err: eventsErr,
+            projectId: claimedRun.projectId,
+            agentId: claimedRun.agentId,
+            runId,
+            metadata: { count: pendingRunEventInserts.length },
+          });
           this.logger?.error(
             {
               err: eventsErr,
@@ -862,7 +926,17 @@ export class HeartbeatService {
       if (logHandle && runLogger) {
         try {
           await runLogger.finalize(logHandle);
-        } catch {
+        } catch (logErr) {
+          void this.errorLogger?.record({
+            severity: "warn",
+            source: "heartbeat",
+            code: "log_finalize_failed",
+            message: "Failed to finalize run log during cleanup",
+            err: logErr,
+            projectId: claimedRun.projectId,
+            agentId: claimedRun.agentId,
+            runId,
+          });
           // Best-effort cleanup — don't let log finalization crash the run cleanup
         }
       }
@@ -876,6 +950,16 @@ export class HeartbeatService {
           await this.releaseTaskLock(t.id);
         }
       } catch (lockErr) {
+        void this.errorLogger?.record({
+          severity: "error",
+          source: "heartbeat",
+          code: "lock_release_failed",
+          message: "Failed to release task locks during run cleanup",
+          err: lockErr,
+          projectId: claimedRun.projectId,
+          agentId: claimedRun.agentId,
+          runId,
+        });
         this.logger?.error(
           { err: lockErr, runId },
           "Failed to release task locks during run cleanup",

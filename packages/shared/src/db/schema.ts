@@ -83,6 +83,15 @@ export const chatMessageStatusEnum = pgEnum("chat_message_status", [
   "streaming", "complete", "error",
 ]);
 
+export const errorSeverityEnum = pgEnum("error_severity", [
+  "warn", "error", "fatal",
+]);
+
+export const errorSourceEnum = pgEnum("error_source", [
+  "daemon", "api", "ws", "agent", "provider", "tool", "heartbeat", "chat",
+  "memory", "budget", "pipeline", "scheduler", "adapter", "db", "fs", "config",
+]);
+
 // ─── Projects ─────────────────────────────────────────────
 
 export const projects = pgTable("projects", {
@@ -414,6 +423,54 @@ export const activityLog = pgTable("activity_log", {
   level: logLevelEnum("level").notNull().default("info"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Error Log ────────────────────────────────────────────
+
+export const errorLog = pgTable("error_log", {
+  id: text("id").primaryKey().$defaultFn(() => `err_${randomUUID()}`),
+  projectId: text("project_id").references(() => projects.id, { onDelete: "cascade" }),
+  agentId: text("agent_id"),
+  taskId: text("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  runId: text("run_id").references(() => heartbeatRuns.id, { onDelete: "set null" }),
+  chatId: text("chat_id").references(() => chats.id, { onDelete: "set null" }),
+  requestId: text("request_id"),
+
+  severity: errorSeverityEnum("severity").notNull(),
+  source: errorSourceEnum("source").notNull(),
+  code: text("code").notNull(),
+
+  message: text("message").notNull(),
+  stack: text("stack"),
+  cause: jsonb("cause"),
+  metadata: jsonb("metadata").default({}),
+
+  httpMethod: text("http_method"),
+  httpPath: text("http_path"),
+  httpStatus: integer("http_status"),
+
+  actorType: text("actor_type"),
+  actorId: text("actor_id"),
+
+  fingerprint: text("fingerprint").notNull(),
+  occurrences: integer("occurrences").notNull().default(1),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  resolvedBy: text("resolved_by"),
+
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("err_project_time_idx").on(table.projectId, table.lastSeenAt.desc()),
+  index("err_severity_idx").on(table.severity, table.lastSeenAt.desc()),
+  index("err_source_time_idx").on(table.source, table.lastSeenAt.desc()),
+  index("err_run_idx").on(table.runId),
+  index("err_task_idx").on(table.taskId),
+  index("err_chat_idx").on(table.chatId),
+  index("err_request_idx").on(table.requestId),
+  uniqueIndex("err_fingerprint_uniq").on(table.projectId, table.fingerprint),
+]);
 
 // ─── MCP Tool Registry (global) ───────────────────────────
 

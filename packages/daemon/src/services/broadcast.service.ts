@@ -77,6 +77,12 @@ export interface DaemonLogPayload {
   level: string;
   message: string;
   timestamp: string;
+  source?: string;
+  code?: string;
+  errorId?: string;
+  projectId?: string;
+  runId?: string;
+  taskId?: string;
 }
 
 export interface DaemonStatsPayload {

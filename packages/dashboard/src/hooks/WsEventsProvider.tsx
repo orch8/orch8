@@ -52,6 +52,8 @@ const TOAST_TYPES = new Set([
 export function WsEventsProvider({ children }: { children: ReactNode }) {
   const addToast = useToastStore((s) => s.add);
   const qc = useQueryClient();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const projectId = extractProjectIdFromPath(pathname);
   // Typed as a loose handler set internally; `subscribe` gates insertion
   // to the narrow generic signature so each call site remains type-safe.
   const handlersRef = useRef<Map<string, Set<(event: WsEvent) => void>>>(new Map());
@@ -100,6 +102,7 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
         case "run_failed":
           qc.invalidateQueries({ queryKey: ["runs"] });
           qc.invalidateQueries({ queryKey: ["run", event.runId] });
+          invalidateErrorQueries(qc, projectId);
           break;
         case "budget_alert":
           qc.invalidateQueries({ queryKey: ["cost-summary"] });
@@ -149,23 +152,24 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
           break;
         case "chat_message_error":
           qc.invalidateQueries({ queryKey: ["chat-messages", event.chatId] });
+          invalidateErrorQueries(qc, projectId);
           break;
         case "chat_card_decision":
           qc.invalidateQueries({ queryKey: ["chat-messages", event.chatId] });
           break;
         case "daemon:log":
-          // Pure live log stream consumed by DaemonPage subscribers.
+          if (isErrorLogEvent(event)) {
+            invalidateErrorQueries(qc, event.projectId ?? projectId);
+          }
           break;
       }
     },
-    [qc, addToast],
+    [qc, addToast, projectId],
   );
 
   // Current projectId drives the WebSocket scope. When the user navigates
   // between projects, the URL changes, this re-renders, and useWebSocket closes
   // the old socket + opens a new one scoped to the new project.
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const projectId = extractProjectIdFromPath(pathname);
   const wsUrl = projectId ? `/ws?projectId=${encodeURIComponent(projectId)}` : "/ws";
 
   const { connected, send } = useWebSocket({
@@ -182,6 +186,30 @@ export function WsEventsProvider({ children }: { children: ReactNode }) {
     <WsEventsContext.Provider value={value}>
       {children}
     </WsEventsContext.Provider>
+  );
+}
+
+function invalidateErrorQueries(
+  qc: ReturnType<typeof useQueryClient>,
+  projectId: string | null,
+) {
+  qc.invalidateQueries({ queryKey: projectId ? ["errors", projectId] : ["errors"] });
+  qc.invalidateQueries({
+    queryKey: projectId ? ["errors-summary", projectId] : ["errors-summary"],
+  });
+}
+
+function isErrorLogEvent(event: WsEventByType<"daemon:log">): event is WsEventByType<"daemon:log"> & {
+  projectId?: string;
+  errorId?: string;
+  code?: string;
+  source?: string;
+} {
+  return (
+    event.level === "error" ||
+    event.level === "fatal" ||
+    "errorId" in event ||
+    "code" in event
   );
 }
 

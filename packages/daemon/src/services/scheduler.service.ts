@@ -5,6 +5,7 @@ import type { HeartbeatService } from "./heartbeat.service.js";
 import type { SummaryService } from "./summary.service.js";
 import type { TaskService } from "./task.service.js";
 import type { FastifyBaseLogger } from "fastify";
+import type { ErrorLoggerService } from "./error-logger.service.js";
 
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
 
@@ -18,6 +19,7 @@ export class SchedulerService {
   private summaryTimer: ReturnType<typeof setInterval> | null = null;
   private summaryService: SummaryService | null = null;
   private logger: FastifyBaseLogger | null = null;
+  private errorLogger: ErrorLoggerService | null = null;
 
   constructor(
     private db: SchemaDb,
@@ -41,6 +43,10 @@ export class SchedulerService {
     this.logger = logger;
   }
 
+  setErrorLogger(errorLogger: ErrorLoggerService): void {
+    this.errorLogger = errorLogger;
+  }
+
   setSummaryService(summaryService: SummaryService): void {
     this.summaryService = summaryService;
   }
@@ -55,6 +61,13 @@ export class SchedulerService {
     if (this.timer) return;
     this.timer = setInterval(() => {
       this.tick().catch((err) => {
+        void this.errorLogger?.record({
+          severity: "error",
+          source: "scheduler",
+          code: "tick_failed",
+          message: "Scheduler tick failed",
+          err,
+        });
         this.logger?.error({ err }, "tick error");
       });
     }, this.config.intervalMs);
@@ -64,6 +77,13 @@ export class SchedulerService {
       const weekMs = 7 * 24 * 60 * 60 * 1000;
       this.summaryTimer = setInterval(() => {
         this.regenerateAllProjectSummaries().catch((err) => {
+          void this.errorLogger?.record({
+            severity: "error",
+            source: "scheduler",
+            code: "summary_regen_failed",
+            message: "Project summary regeneration failed",
+            err,
+          });
           this.logger?.error({ err }, "summary regeneration error");
         });
       }, weekMs);
@@ -106,7 +126,18 @@ export class SchedulerService {
                 taskId: task.id,
                 reason: "task_unblocked",
               });
-            } catch {
+            } catch (err) {
+              void this.errorLogger?.record({
+                severity: "warn",
+                source: "scheduler",
+                code: "wakeup_enqueue_failed",
+                message: "Failed to enqueue wakeup for unblocked task",
+                err,
+                projectId: project.id,
+                agentId: task.assignee,
+                taskId: task.id,
+                metadata: { reason: "task_unblocked" },
+              });
               // Skip tasks that fail to enqueue (agent may be paused/terminated)
             }
           }
@@ -283,7 +314,17 @@ export class SchedulerService {
           reason: "heartbeat_interval",
         });
         woken.push({ agentId: agent.id, projectId: agent.projectId });
-      } catch {
+      } catch (err) {
+        void this.errorLogger?.record({
+          severity: "warn",
+          source: "scheduler",
+          code: "wakeup_enqueue_failed",
+          message: "Failed to enqueue timer wakeup",
+          err,
+          projectId: agent.projectId,
+          agentId: agent.id,
+          metadata: { reason: "heartbeat_interval" },
+        });
         // Skip agents that fail to enqueue (e.g., budget blocked)
       }
     }

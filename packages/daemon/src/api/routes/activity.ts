@@ -56,6 +56,15 @@ export async function activityRoutes(app: FastifyInstance) {
       level: parsed.data.level,
     }).returning();
 
+    app.broadcastService.activityNew(entry.projectId, {
+      id: entry.id,
+      level: entry.level,
+      agentId: entry.agentId,
+      taskId: entry.taskId,
+      message: entry.message,
+      timestamp: entry.createdAt.toISOString(),
+    });
+
     return reply.code(201).send(entry);
   });
 }

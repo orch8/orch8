@@ -77,9 +77,27 @@ export const authPlugin = fp<AuthPluginOptions>(async function authPlugin(
       }
     }
 
+    void app.errorLogger.record({
+      severity: "warn",
+      source: "api",
+      code: "auth_denied",
+      message: "Admin authentication required",
+      requestId: request.id,
+      httpMethod: request.method,
+      httpPath: request.url,
+      httpStatus: 401,
+      projectId,
+      actorType: "system",
+      metadata: {
+        hasBearer: Boolean(suppliedBearer),
+        allowLocalhostAdmin,
+      },
+    });
+
     return reply.code(401).send({
       error: "unauthorized",
       message: "Admin authentication required",
+      requestId: request.id,
     });
   });
 });

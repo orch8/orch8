@@ -74,6 +74,16 @@ import type {
 export type CreateLogEntry = z.infer<typeof CreateLogEntrySchema>;
 export type LogFilter = z.infer<typeof LogFilterSchema>;
 
+// Error log types
+export type {
+  ErrorSeverity,
+  ErrorSource,
+  ErrorLog,
+  ErrorLogFilter,
+  ResolveErrorLog,
+  CreateClientErrorLog,
+} from "../schemas/error-log.js";
+
 // Bundled agent types
 import type { AddBundledAgentsSchema } from "../schemas/index.js";
 

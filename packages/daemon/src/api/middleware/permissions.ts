@@ -1,4 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
+import "../../types.js";
 
 type Permission = "create_task" | "move_task" | "assign_task";
 
@@ -9,12 +10,38 @@ export function requirePermission(permission: Permission) {
 
     const agent = request.agent;
     if (!agent) {
+      void request.server.errorLogger.record({
+        severity: "warn",
+        source: "api",
+        code: "auth_denied",
+        message: "Authentication required",
+        requestId: request.id,
+        httpMethod: request.method,
+        httpPath: request.url,
+        httpStatus: 401,
+        projectId: request.projectId,
+        actorType: "system",
+      });
       return reply.code(401).send({ error: "unauthorized", message: "Authentication required" });
     }
 
     switch (permission) {
       case "create_task": {
         if (!agent.canCreateTasks) {
+          void request.server.errorLogger.record({
+            severity: "warn",
+            source: "api",
+            code: "auth_denied",
+            message: `Agent '${agent.id}' does not have task creation permission`,
+            requestId: request.id,
+            httpMethod: request.method,
+            httpPath: request.url,
+            httpStatus: 403,
+            projectId: request.projectId,
+            agentId: agent.id,
+            actorType: "agent",
+            actorId: agent.id,
+          });
           return reply.code(403).send({
             error: "forbidden",
             message: `Agent '${agent.id}' does not have task creation permission`,
@@ -29,6 +56,21 @@ export function requirePermission(permission: Permission) {
         const allowedColumns = agent.canMoveTo ?? [];
         type TaskColumn = NonNullable<typeof agent.canMoveTo>[number];
         if (targetColumn && !allowedColumns.includes(targetColumn as TaskColumn)) {
+          void request.server.errorLogger.record({
+            severity: "warn",
+            source: "api",
+            code: "auth_denied",
+            message: `Agent '${agent.id}' cannot move tasks to '${targetColumn}'`,
+            requestId: request.id,
+            httpMethod: request.method,
+            httpPath: request.url,
+            httpStatus: 403,
+            projectId: request.projectId,
+            agentId: agent.id,
+            actorType: "agent",
+            actorId: agent.id,
+            metadata: { targetColumn },
+          });
           return reply.code(403).send({
             error: "forbidden",
             message: `Agent '${agent.id}' cannot move tasks to '${targetColumn}'`,
@@ -43,6 +85,21 @@ export function requirePermission(permission: Permission) {
         const allowed = agent.canAssignTo ?? [];
         // "*" acts as a wildcard — grants assignment to any agent ID.
         if (targetAgent && !allowed.includes("*") && !allowed.includes(targetAgent)) {
+          void request.server.errorLogger.record({
+            severity: "warn",
+            source: "api",
+            code: "auth_denied",
+            message: `Agent '${agent.id}' cannot assign tasks to '${targetAgent}'`,
+            requestId: request.id,
+            httpMethod: request.method,
+            httpPath: request.url,
+            httpStatus: 403,
+            projectId: request.projectId,
+            agentId: agent.id,
+            actorType: "agent",
+            actorId: agent.id,
+            metadata: { targetAgent },
+          });
           return reply.code(403).send({
             error: "forbidden",
             message: `Agent '${agent.id}' cannot assign tasks to '${targetAgent}'`,

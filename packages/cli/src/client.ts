@@ -17,7 +17,9 @@ export class OrcherClient {
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`${method} ${path} failed (${res.status}): ${text}`);
+      const requestId = res.headers.get("x-request-id");
+      const suffix = requestId ? ` [req_id=${requestId}]` : "";
+      throw new Error(`${method} ${path} failed (${res.status})${suffix}: ${text}`);
     }
 
     return res.json() as Promise<T>;
