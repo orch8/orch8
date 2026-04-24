@@ -21,6 +21,7 @@ You are an agent managed by the **orch8** orchestration daemon. You operate in d
 | Variable | Description |
 |----------|-------------|
 | `ORCH_API_URL` | Daemon API base URL — always read from env, never hard-code |
+| `ORCH_AGENT_TOKEN` | Bearer credential for calls to `${ORCH_API_URL}`. Never echo to logs or commit to the repo. |
 | `ORCH_AGENT_ID` | Your unique agent identifier |
 | `ORCH_PROJECT_ID` | Current project scope |
 | `ORCH_RUN_ID` | Current heartbeat run identifier |
@@ -49,18 +50,17 @@ These variables provide workspace context so you don't need to run git commands:
 
 ### Standard Request Pattern
 
-Every API call MUST include identity headers. Include `X-Run-Id` on mutating requests for audit traceability.
+Every API call MUST include the bearer token. Include `X-Run-Id` on mutating requests for audit traceability.
 
 ```bash
 curl -s "${ORCH_API_URL}/api/<endpoint>" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
-  -H "X-Run-Id: ${ORCH_RUN_ID}"
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}"
 ```
 
 For mutating requests (POST/PATCH/DELETE), add:
 
 ```bash
+-H "X-Run-Id: ${ORCH_RUN_ID}" \
 -H "Content-Type: application/json" \
 -d '{ ... }'
 ```
@@ -75,8 +75,7 @@ This is your core operating loop. Follow it every time you wake.
 
 ```bash
 curl -s "${ORCH_API_URL}/api/identity" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}"
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}"
 ```
 
 Response includes your agent config, permissions, current task (if any), project info, and budget.
@@ -112,8 +111,7 @@ Then, **ALWAYS** checkout a task before doing any work on it:
 
 ```bash
 curl -s -X POST "${ORCH_API_URL}/api/tasks/${TASK_ID}/checkout" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" \
   -H "X-Run-Id: ${ORCH_RUN_ID}"
 ```
 
@@ -134,16 +132,14 @@ After working, update the task and leave a comment:
 ```bash
 # Update task status (e.g., mark as done)
 curl -s -X PATCH "${ORCH_API_URL}/api/tasks/${TASK_ID}" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" \
   -H "X-Run-Id: ${ORCH_RUN_ID}" \
   -H "Content-Type: application/json" \
   -d '{ "column": "done" }'
 
 # Add a comment
 curl -s -X POST "${ORCH_API_URL}/api/tasks/${TASK_ID}/comments" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" \
   -H "X-Run-Id: ${ORCH_RUN_ID}" \
   -H "Content-Type: application/json" \
   -d '{ "content": "Completed: implemented feature X.\n- Modified src/foo.ts\n- Added tests in tests/foo.test.ts\n- All tests passing" }'
@@ -153,15 +149,13 @@ If you are stuck, set the task as **blocked** with a comment explaining the bloc
 
 ```bash
 curl -s -X PATCH "${ORCH_API_URL}/api/tasks/${TASK_ID}" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" \
   -H "X-Run-Id: ${ORCH_RUN_ID}" \
   -H "Content-Type: application/json" \
   -d '{ "column": "blocked" }'
 
 curl -s -X POST "${ORCH_API_URL}/api/tasks/${TASK_ID}/comments" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" \
   -H "X-Run-Id: ${ORCH_RUN_ID}" \
   -H "Content-Type: application/json" \
   -d '{ "content": "BLOCKED: Cannot proceed — missing API credentials for external service.\n- Need STRIPE_API_KEY env var\n- Blocked on task_abc123 completion" }'
@@ -202,8 +196,7 @@ Complex tasks flow through four phases: **research → plan → implement → re
 
 ```bash
 curl -s -X POST "${ORCH_API_URL}/api/tasks/${TASK_ID}/complete" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" \
   -H "X-Run-Id: ${ORCH_RUN_ID}" \
   -H "Content-Type: application/json" \
   -d '{ "output": "## Research Findings\n\n- Finding 1: ...\n- Finding 2: ..." }'
@@ -281,8 +274,7 @@ Use the `dependsOn` field in the create payload:
 
 ```bash
 curl -s -X POST "${ORCH_API_URL}/api/tasks" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" \
   -H "X-Run-Id: ${ORCH_RUN_ID}" \
   -H "Content-Type: application/json" \
   -d '{

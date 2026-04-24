@@ -4,7 +4,16 @@ import { projects, agents, tasks } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { requirePermission } from "../api/middleware/permissions.js";
+import { hashAgentToken } from "../api/middleware/agent-token.js";
 import "../types.js";
+
+function tokenFor(agentId: string): string {
+  return `${agentId}-token`;
+}
+
+function agentHeaders(agentId: string): Record<string, string> {
+  return { authorization: `Bearer ${tokenFor(agentId)}` };
+}
 
 describe("Permission Middleware", () => {
   let testDb: TestDb;
@@ -64,16 +73,14 @@ describe("Permission Middleware", () => {
         name: "Creator",
         role: "cto",
         canCreateTasks: true,
+        agentTokenHash: hashAgentToken(tokenFor("creator")),
       });
 
       const app = buildApp("create_task");
       const response = await app.inject({
         method: "POST",
         url: "/test",
-        headers: {
-          "x-agent-id": "creator",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("creator"),
         payload: {},
       });
 
@@ -88,16 +95,14 @@ describe("Permission Middleware", () => {
         name: "No Create",
         role: "engineer",
         canCreateTasks: false,
+        agentTokenHash: hashAgentToken(tokenFor("no-create")),
       });
 
       const app = buildApp("create_task");
       const response = await app.inject({
         method: "POST",
         url: "/test",
-        headers: {
-          "x-agent-id": "no-create",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("no-create"),
         payload: {},
       });
 
@@ -116,16 +121,14 @@ describe("Permission Middleware", () => {
         name: "Mover",
         role: "engineer",
         canMoveTo: ["done"],
+        agentTokenHash: hashAgentToken(tokenFor("mover")),
       });
 
       const app = buildApp("move_task");
       const response = await app.inject({
         method: "POST",
         url: "/test",
-        headers: {
-          "x-agent-id": "mover",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("mover"),
         payload: { column: "done" },
       });
 
@@ -140,16 +143,14 @@ describe("Permission Middleware", () => {
         name: "Limited",
         role: "engineer",
         canMoveTo: ["done"],
+        agentTokenHash: hashAgentToken(tokenFor("limited-mover")),
       });
 
       const app = buildApp("move_task");
       const response = await app.inject({
         method: "POST",
         url: "/test",
-        headers: {
-          "x-agent-id": "limited-mover",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("limited-mover"),
         payload: { column: "in_progress" },
       });
 
@@ -166,16 +167,14 @@ describe("Permission Middleware", () => {
         name: "Assigner",
         role: "cto",
         canAssignTo: ["fe-eng", "be-eng"],
+        agentTokenHash: hashAgentToken(tokenFor("assigner")),
       });
 
       const app = buildApp("assign_task");
       const response = await app.inject({
         method: "POST",
         url: "/test",
-        headers: {
-          "x-agent-id": "assigner",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("assigner"),
         payload: { assignee: "fe-eng" },
       });
 
@@ -190,16 +189,14 @@ describe("Permission Middleware", () => {
         name: "Limited",
         role: "engineer",
         canAssignTo: ["qa"],
+        agentTokenHash: hashAgentToken(tokenFor("limited-assigner")),
       });
 
       const app = buildApp("assign_task");
       const response = await app.inject({
         method: "POST",
         url: "/test",
-        headers: {
-          "x-agent-id": "limited-assigner",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("limited-assigner"),
         payload: { assignee: "cto" },
       });
 
@@ -214,6 +211,7 @@ describe("Permission Middleware", () => {
         name: "Super",
         role: "custom",
         canAssignTo: ["*"],
+        agentTokenHash: hashAgentToken(tokenFor("super-assigner")),
       });
 
       const app = buildApp("assign_task");
@@ -222,10 +220,7 @@ describe("Permission Middleware", () => {
       const r1 = await app.inject({
         method: "POST",
         url: "/test",
-        headers: {
-          "x-agent-id": "super-assigner",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("super-assigner"),
         payload: { assignee: "implementer" },
       });
       expect(r1.statusCode).toBe(200);
@@ -234,10 +229,7 @@ describe("Permission Middleware", () => {
       const r2 = await app.inject({
         method: "POST",
         url: "/test",
-        headers: {
-          "x-agent-id": "super-assigner",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("super-assigner"),
         payload: { assignee: "some-agent-that-does-not-exist" },
       });
       expect(r2.statusCode).toBe(200);

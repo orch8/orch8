@@ -71,7 +71,7 @@ renders as normal markdown.
 4. You will see this system message on your next turn.
 5. **Only after seeing the approval system message** should you call
    the API endpoint. Use Bash + curl. The `orch8` skill has the URL
-   patterns and identity headers.
+   patterns and bearer auth header.
 6. After the API call, emit a `result_*` card with the outcome.
 7. If the API call fails, emit a `result_error` card with the error
    details — do **not** retry without the user's go-ahead.

@@ -6,7 +6,16 @@ import { authPlugin } from "../api/middleware/auth.js";
 import { taskRoutes } from "../api/routes/tasks.js";
 import { TaskService } from "../services/task.service.js";
 import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
+import { hashAgentToken } from "../api/middleware/agent-token.js";
 import "../types.js";
+
+function tokenFor(agentId: string): string {
+  return `${agentId}-token`;
+}
+
+function agentHeaders(agentId: string): Record<string, string> {
+  return { authorization: `Bearer ${tokenFor(agentId)}` };
+}
 
 describe("Task Routes Permission Enforcement", () => {
   let testDb: TestDb;
@@ -43,6 +52,7 @@ describe("Task Routes Permission Enforcement", () => {
         canCreateTasks: true,
         canAssignTo: ["eng-agent"],
         canMoveTo: ["in_progress", "done"],
+        agentTokenHash: hashAgentToken(tokenFor("cto-agent")),
       },
       {
         id: "eng-agent",
@@ -52,6 +62,7 @@ describe("Task Routes Permission Enforcement", () => {
         canCreateTasks: false,
         canAssignTo: [],
         canMoveTo: ["done"],
+        agentTokenHash: hashAgentToken(tokenFor("eng-agent")),
       },
     ]);
 
@@ -73,10 +84,7 @@ describe("Task Routes Permission Enforcement", () => {
       const response = await app.inject({
         method: "POST",
         url: "/api/tasks",
-        headers: {
-          "x-agent-id": "cto-agent",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("cto-agent"),
         payload: {
           title: "New task",
           projectId,
@@ -92,10 +100,7 @@ describe("Task Routes Permission Enforcement", () => {
       const response = await app.inject({
         method: "POST",
         url: "/api/tasks",
-        headers: {
-          "x-agent-id": "eng-agent",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("eng-agent"),
         payload: {
           title: "Unauthorized task",
           projectId,
@@ -135,10 +140,7 @@ describe("Task Routes Permission Enforcement", () => {
       const response = await app.inject({
         method: "PATCH",
         url: `/api/tasks/${task.id}`,
-        headers: {
-          "x-agent-id": "cto-agent",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("cto-agent"),
         payload: { assignee: "eng-agent" },
       });
 
@@ -156,10 +158,7 @@ describe("Task Routes Permission Enforcement", () => {
       const response = await app.inject({
         method: "PATCH",
         url: `/api/tasks/${task.id}`,
-        headers: {
-          "x-agent-id": "eng-agent",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("eng-agent"),
         payload: { assignee: "cto-agent" },
       });
 
@@ -180,10 +179,7 @@ describe("Task Routes Permission Enforcement", () => {
       const response = await app.inject({
         method: "POST",
         url: `/api/tasks/${task.id}/transition`,
-        headers: {
-          "x-agent-id": "eng-agent",
-          "x-project-id": projectId,
-        },
+        headers: agentHeaders("eng-agent"),
         payload: { column: "in_progress" },
       });
 

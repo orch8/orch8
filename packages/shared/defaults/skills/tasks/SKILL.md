@@ -16,7 +16,7 @@ columns (`backlog`, `blocked`, `in_progress`, `done`) and has a type
 (`quick` or `brainstorm`). This skill teaches you how to manipulate
 them via the orch8 REST API.
 
-## Endpoints (all require X-Project-Id and X-Agent-Id headers)
+## Endpoints (all require `Authorization: Bearer ${ORCH_AGENT_TOKEN}`)
 
 | Action | Method | Endpoint |
 |---|---|---|
@@ -85,8 +85,8 @@ done, the system automatically unblocks it and wakes the billing-engineer.
 
 ```bash
 curl -s -X POST "${ORCH_API_URL}/api/tasks/${TASK_ID}/dependencies" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" \
+  -H "X-Run-Id: ${ORCH_RUN_ID}" \
   -H "Content-Type: application/json" \
   -d '{ "dependsOnId": "task_abc123" }'
 ```
@@ -97,8 +97,8 @@ If the task is in `backlog`, it will be automatically moved to `blocked`.
 
 ```bash
 curl -s -X DELETE "${ORCH_API_URL}/api/tasks/${TASK_ID}/dependencies/${DEP_TASK_ID}" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}"
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" \
+  -H "X-Run-Id: ${ORCH_RUN_ID}"
 ```
 
 ### Rules

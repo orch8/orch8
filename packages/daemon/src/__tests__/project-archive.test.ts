@@ -7,7 +7,10 @@ import { authPlugin } from "../api/middleware/auth.js";
 import { projectRoutes } from "../api/routes/projects.js";
 import { ProjectService } from "../services/project.service.js";
 import { AgentService } from "../services/agent.service.js";
+import { hashAgentToken } from "../api/middleware/agent-token.js";
 import "../types.js";
+
+const AGENT_TOKEN = "archive-agent-token";
 
 describe("Project Archive", () => {
   let testDb: TestDb;
@@ -161,11 +164,18 @@ describe("Project Archive", () => {
           homeDir: "/tmp/na",
         })
         .returning();
+      await testDb.db.insert(agents).values({
+        id: "some-agent",
+        projectId: proj.id,
+        name: "Some Agent",
+        role: "engineer",
+        agentTokenHash: hashAgentToken(AGENT_TOKEN),
+      });
 
       const res = await app.inject({
         method: "POST",
         url: `/api/projects/${proj.id}/archive`,
-        headers: { "x-agent-id": "some-agent", "x-project-id": proj.id },
+        headers: { authorization: `Bearer ${AGENT_TOKEN}` },
       });
       expect(res.statusCode).toBe(403);
     });

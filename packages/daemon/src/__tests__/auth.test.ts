@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import Fastify from "fastify";
-import { eq } from "drizzle-orm";
 import { projects, agents } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin, type AuthPluginOptions } from "../api/middleware/auth.js";
@@ -12,7 +11,6 @@ const ADMIN_TOKEN = "a".repeat(64);
 describe("Auth Middleware", () => {
   let testDb: TestDb;
   let projectId: string;
-  let legacyAgentId: string;
   let tokenedAgentId: string;
   let agentRawToken: string;
 
@@ -26,16 +24,6 @@ describe("Auth Middleware", () => {
     }).returning();
     projectId = project.id;
 
-    // Legacy agent with no token hash (migration-window compatibility path).
-    legacyAgentId = "legacy-agent";
-    await testDb.db.insert(agents).values({
-      id: legacyAgentId,
-      projectId,
-      name: "Legacy Agent",
-      role: "engineer",
-    });
-
-    // Agent with a hashed bearer token set (the new, preferred path).
     tokenedAgentId = "tokened-agent";
     agentRawToken = generateAgentToken();
     await testDb.db.insert(agents).values({
@@ -48,12 +36,6 @@ describe("Auth Middleware", () => {
   }, 60_000);
 
   afterAll(async () => {
-    // Clear hash to avoid conflicting with other test suites sharing
-    // the embedded postgres instance.
-    await testDb.db
-      .update(agents)
-      .set({ agentTokenHash: null })
-      .where(eq(agents.id, tokenedAgentId));
     await teardownTestDb(testDb);
   });
 
@@ -72,82 +54,69 @@ describe("Auth Middleware", () => {
 
   // ─── Agent auth ────────────────────────────────────────
 
-  it("authenticates legacy agent with no token on record (migration window)", async () => {
+  it("authenticates an agent by bearer token only", async () => {
     const app = buildApp();
     const response = await app.inject({
       method: "GET",
       url: "/test",
       headers: {
-        "x-agent-id": legacyAgentId,
-        "x-project-id": projectId,
+        authorization: `Bearer ${agentRawToken}`,
         "x-run-id": "run_abc123",
       },
     });
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
-    expect(body.agentId).toBe(legacyAgentId);
+    expect(body.agentId).toBe(tokenedAgentId);
+    expect(body.projectId).toBe(projectId);
     expect(body.runId).toBe("run_abc123");
     expect(body.isAdmin).toBe(false);
     await app.close();
   });
 
-  it("rejects agent that does not belong to project", async () => {
-    const app = buildApp();
+  it("falls through to admin auth and returns 401 for an unknown bearer", async () => {
+    const app = buildApp({ adminToken: ADMIN_TOKEN });
     const response = await app.inject({
       method: "GET",
       url: "/test",
       headers: {
-        "x-agent-id": "nonexistent-agent",
-        "x-project-id": projectId,
+        authorization: "Bearer totally-wrong-token",
       },
     });
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(401);
+    const body = JSON.parse(response.body);
+    expect(body.message).toBe("Admin authentication required");
     await app.close();
   });
 
-  it("accepts an agent whose stored token hash matches the supplied bearer", async () => {
-    const app = buildApp();
+  it("does not authenticate agents from x-agent-id and x-project-id headers", async () => {
+    const app = buildApp({ adminToken: ADMIN_TOKEN });
     const response = await app.inject({
       method: "GET",
       url: "/test",
       headers: {
         "x-agent-id": tokenedAgentId,
+        "x-project-id": projectId,
+      },
+    });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("prefers agent auth when an agent token is supplied with x-project-id", async () => {
+    const app = buildApp({ adminToken: ADMIN_TOKEN });
+    const response = await app.inject({
+      method: "GET",
+      url: "/test",
+      headers: {
         "x-project-id": projectId,
         authorization: `Bearer ${agentRawToken}`,
       },
     });
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
+    expect(body.isAdmin).toBe(false);
     expect(body.agentId).toBe(tokenedAgentId);
-    await app.close();
-  });
-
-  it("rejects an agent whose token hash does not match", async () => {
-    const app = buildApp();
-    const response = await app.inject({
-      method: "GET",
-      url: "/test",
-      headers: {
-        "x-agent-id": tokenedAgentId,
-        "x-project-id": projectId,
-        authorization: "Bearer wrong-token",
-      },
-    });
-    expect(response.statusCode).toBe(401);
-    await app.close();
-  });
-
-  it("rejects an agent with a token on record but no bearer supplied", async () => {
-    const app = buildApp();
-    const response = await app.inject({
-      method: "GET",
-      url: "/test",
-      headers: {
-        "x-agent-id": tokenedAgentId,
-        "x-project-id": projectId,
-      },
-    });
-    expect(response.statusCode).toBe(401);
+    expect(body.projectId).toBe(projectId);
     await app.close();
   });
 

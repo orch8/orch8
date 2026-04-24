@@ -23,6 +23,16 @@ describe("buildEnv", () => {
     expect(env.ORCH_WORKSPACE_CWD).toBe("/tmp/workspace");
   });
 
+  it("injects ORCH_AGENT_TOKEN when present", () => {
+    const env = buildEnv({}, { ...baseContext, agentToken: "raw-token" }, {});
+    expect(env.ORCH_AGENT_TOKEN).toBe("raw-token");
+  });
+
+  it("does not inject ORCH_AGENT_TOKEN when absent", () => {
+    const env = buildEnv({}, baseContext, {});
+    expect(env.ORCH_AGENT_TOKEN).toBeUndefined();
+  });
+
   it("injects ORCH_TASK_ID when present", () => {
     const env = buildEnv({}, { ...baseContext, taskId: "task-5" }, {});
     expect(env.ORCH_TASK_ID).toBe("task-5");

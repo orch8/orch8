@@ -4,7 +4,10 @@ import { projects, agents, activityLog } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { activityRoutes } from "../api/routes/activity.js";
+import { hashAgentToken } from "../api/middleware/agent-token.js";
 import "../types.js";
+
+const ENG_TOKEN = "activity-eng-token";
 
 describe("Activity Log Routes", () => {
   let testDb: TestDb;
@@ -22,7 +25,11 @@ describe("Activity Log Routes", () => {
     projectId = project.id;
 
     await testDb.db.insert(agents).values({
-      id: "eng-1", projectId, name: "Engineer", role: "engineer",
+      id: "eng-1",
+      projectId,
+      name: "Engineer",
+      role: "engineer",
+      agentTokenHash: hashAgentToken(ENG_TOKEN),
     });
   }, 60_000);
 
@@ -45,7 +52,7 @@ describe("Activity Log Routes", () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/log",
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: {
           projectId,
           message: "Started working on auth fix",
@@ -61,7 +68,7 @@ describe("Activity Log Routes", () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/log",
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: {
           projectId,
           message: "Agent action",

@@ -94,16 +94,14 @@ them and avoid duplication:
 
 ```bash
 curl -s "${ORCH_API_URL}/api/agents?projectId=${ORCH_PROJECT_ID}" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}"
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}"
 ```
 
 Also fetch bundled templates for reference:
 
 ```bash
 curl -s "${ORCH_API_URL}/api/bundled-agents" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}"
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}"
 ```
 
 Do NOT emit info cards for these fetches — they are internal reconnaissance.
@@ -227,8 +225,7 @@ cards.
 
 ```bash
 curl -s "${ORCH_API_URL}/api/tasks?projectId=${ORCH_PROJECT_ID}" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}"
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}"
 ```
 
 Example card:

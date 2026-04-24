@@ -38,6 +38,22 @@ describe("buildCodexEnv", () => {
     expect(env.ORCH_AGENT_ID).toBe("agent-1");
     expect(env.CUSTOM).toBe("ok");
   });
+
+  it("injects ORCH_AGENT_TOKEN when present", () => {
+    const env = buildCodexEnv(
+      {},
+      { ...baseContext, agentToken: "raw-token" },
+      "/home/codex",
+      {},
+    );
+
+    expect(env.ORCH_AGENT_TOKEN).toBe("raw-token");
+  });
+
+  it("does not inject ORCH_AGENT_TOKEN when absent", () => {
+    const env = buildCodexEnv({}, baseContext, "/home/codex", {});
+    expect(env.ORCH_AGENT_TOKEN).toBeUndefined();
+  });
 });
 
 describe("resolveCodexBillingType", () => {

@@ -116,6 +116,7 @@ export function buildServer(options: ServerOptions = {}) {
 
     // Agent service
     const agentService = new AgentService(dbClient.db, broadcastService);
+    agentService.setLogger(app.log);
     app.decorate("agentService", agentService);
 
     // Project skill service
@@ -220,6 +221,7 @@ export function buildServer(options: ServerOptions = {}) {
     // on cold-start installs.
     const initPromise = (async () => {
       try {
+        await agentService.rehydrateMissingAgentTokens();
         await seedingService.populateGlobalSkills();
         app.log.info("Global skills directory populated");
 
@@ -277,11 +279,11 @@ export function buildServer(options: ServerOptions = {}) {
     // Enrich request-scoped logger with correlation IDs (spec §14 §2.2)
     app.addHook("onRequest", async (request) => {
       const childBindings: Record<string, string> = {};
-      if (request.headers["x-agent-id"]) {
-        childBindings.agentId = request.headers["x-agent-id"] as string;
+      if (request.agent) {
+        childBindings.agentId = request.agent.id;
       }
-      if (request.headers["x-project-id"]) {
-        childBindings.projectId = request.headers["x-project-id"] as string;
+      if (request.projectId) {
+        childBindings.projectId = request.projectId;
       }
       if (request.headers["x-run-id"]) {
         childBindings.runId = request.headers["x-run-id"] as string;

@@ -17,6 +17,7 @@ describe("Agent envVars injection", () => {
       agentName: "Engineer",
       projectId: "proj_1",
       runId: "run_1",
+      agentToken: "agent-token",
       wakeReason: "assignment",
       apiUrl: "http://localhost:3000",
       cwd: "/tmp",
@@ -27,6 +28,7 @@ describe("Agent envVars injection", () => {
     expect(env.CUSTOM_API_KEY).toBe("sk-test-123");
     expect(env.FEATURE_FLAG).toBe("true");
     expect(env.ORCH_AGENT_ID).toBe("eng");
+    expect(env.ORCH_AGENT_TOKEN).toBe("agent-token");
   });
 
   it("agent env vars do not override ORCH_* identity vars", () => {

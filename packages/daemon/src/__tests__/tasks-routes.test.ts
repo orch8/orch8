@@ -6,7 +6,10 @@ import { authPlugin } from "../api/middleware/auth.js";
 import { taskRoutes } from "../api/routes/tasks.js";
 import { TaskService } from "../services/task.service.js";
 import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
+import { hashAgentToken } from "../api/middleware/agent-token.js";
 import "../types.js";
+
+const AGENT_TOKEN = "tasks-agent-token";
 
 describe("Task API Routes", () => {
   let testDb: TestDb;
@@ -28,6 +31,7 @@ describe("Task API Routes", () => {
       projectId,
       name: "Agent One",
       role: "engineer",
+      agentTokenHash: hashAgentToken(AGENT_TOKEN),
     });
   }, 60_000);
 
@@ -429,8 +433,7 @@ describe("Task API Routes", () => {
         method: "POST",
         url: `/api/tasks/${task.id}/checkout`,
         headers: {
-          "x-agent-id": "agent-1",
-          "x-project-id": projectId,
+          authorization: `Bearer ${AGENT_TOKEN}`,
           "x-run-id": "run-1",
         },
       });
@@ -456,8 +459,7 @@ describe("Task API Routes", () => {
         method: "POST",
         url: `/api/tasks/${task.id}/checkout`,
         headers: {
-          "x-agent-id": "agent-1",
-          "x-project-id": projectId,
+          authorization: `Bearer ${AGENT_TOKEN}`,
           "x-run-id": "run-1",
         },
       });
@@ -472,8 +474,7 @@ describe("Task API Routes", () => {
         method: "POST",
         url: "/api/tasks/task_nonexistent/checkout",
         headers: {
-          "x-agent-id": "agent-1",
-          "x-project-id": projectId,
+          authorization: `Bearer ${AGENT_TOKEN}`,
           "x-run-id": "run-1",
         },
       });
@@ -509,8 +510,7 @@ describe("Task API Routes", () => {
         method: "POST",
         url: `/api/tasks/${task.id}/release`,
         headers: {
-          "x-agent-id": "agent-1",
-          "x-project-id": projectId,
+          authorization: `Bearer ${AGENT_TOKEN}`,
         },
       });
 
@@ -534,8 +534,7 @@ describe("Task API Routes", () => {
         method: "POST",
         url: `/api/tasks/${task.id}/release`,
         headers: {
-          "x-agent-id": "agent-1",
-          "x-project-id": projectId,
+          authorization: `Bearer ${AGENT_TOKEN}`,
         },
       });
 
@@ -547,8 +546,7 @@ describe("Task API Routes", () => {
         method: "POST",
         url: "/api/tasks/task_nonexistent/release",
         headers: {
-          "x-agent-id": "agent-1",
-          "x-project-id": projectId,
+          authorization: `Bearer ${AGENT_TOKEN}`,
         },
       });
 

@@ -21,6 +21,7 @@ const execFileAsync = promisify(execFile);
 import { mapStreamEvent } from "../adapter/tool-mapper.js";
 import { SessionManager } from "../adapter/session-manager.js";
 import { resolveAdapter, type AdapterMap } from "../adapter/registry.js";
+import { readAgentToken } from "./agent-token-store.js";
 
 type Agent = typeof agents.$inferSelect;
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
@@ -558,6 +559,15 @@ export class HeartbeatService {
       }
 
       const workspaceRepoUrl = await getRepoUrl(cwd);
+      const agentToken = await readAgentToken(project.homeDir, agent.id);
+      if (!agentToken && agent.agentTokenHash) {
+        await this.failRun(
+          runId,
+          "Agent token file missing - rotate the agent's token",
+          "missing_agent_token",
+        );
+        return;
+      }
 
       const finishStrategy = taskData?.taskType !== "brainstorm"
         ? (taskData?.finishStrategy ?? project.finishStrategy ?? "merge") as "pr" | "merge" | "none"
@@ -572,6 +582,7 @@ export class HeartbeatService {
         taskId: claimedRun.taskId ?? undefined,
         wakeReason: claimedRun.invocationSource,
         apiUrl: process.env.ORCH_API_URL ?? this.apiUrl,
+        agentToken: agentToken ?? undefined,
         cwd,
         logStream: logHandle.stream,
         taskTitle: taskData?.title,

@@ -1,9 +1,9 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import fp from "fastify-plugin";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { agents } from "@orch/shared/db";
 import { adminTokenMatches, extractBearerToken } from "./admin-token.js";
-import { agentTokenMatches } from "./agent-token.js";
+import { hashAgentToken } from "./agent-token.js";
 import "../../types.js";
 
 export interface AuthPluginOptions {
@@ -30,42 +30,25 @@ export const authPlugin = fp<AuthPluginOptions>(async function authPlugin(
   const allowLocalhostAdmin = opts.allowLocalhostAdmin ?? false;
 
   app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
-    const agentIdHeader = request.headers["x-agent-id"] as string | undefined;
     const projectId = request.headers["x-project-id"] as string | undefined;
     const runId = request.headers["x-run-id"] as string | undefined;
     const authHeader = request.headers["authorization"] as string | undefined;
     const suppliedBearer = extractBearerToken(authHeader);
 
-    // Agent auth path
-    if (agentIdHeader && projectId) {
+    // Agent auth path: the bearer token identifies the agent and project.
+    if (suppliedBearer) {
+      const suppliedHash = hashAgentToken(suppliedBearer);
       const [agent] = await app.db
         .select()
         .from(agents)
-        .where(and(eq(agents.id, agentIdHeader), eq(agents.projectId, projectId)));
+        .where(eq(agents.agentTokenHash, suppliedHash));
 
-      if (!agent) {
-        return reply.code(403).send({
-          error: "forbidden",
-          message: `Agent '${agentIdHeader}' does not belong to project '${projectId}'`,
-        });
+      if (agent) {
+        request.agent = agent;
+        request.projectId = agent.projectId;
+        request.runId = runId;
+        return;
       }
-
-      // If the agent has a token hash on record, a matching Bearer token
-      // is REQUIRED. Agents that still have NULL agent_token_hash (the
-      // narrow migration window) fall back to the legacy id-only check.
-      if (agent.agentTokenHash) {
-        if (!suppliedBearer || !agentTokenMatches(suppliedBearer, agent.agentTokenHash)) {
-          return reply.code(401).send({
-            error: "unauthorized",
-            message: "Invalid or missing agent token",
-          });
-        }
-      }
-
-      request.agent = agent;
-      request.projectId = projectId;
-      request.runId = runId;
-      return;
     }
 
     // Admin auth path

@@ -5,10 +5,14 @@ import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { memoryRoutes } from "../api/routes/memory.js";
 import { MemoryService } from "../services/memory.service.js";
+import { hashAgentToken } from "../api/middleware/agent-token.js";
 import "../types.js";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+
+const ENG_TOKEN = "memory-eng-token";
+const ENG2_TOKEN = "memory-eng-2-token";
 
 describe("Memory Routes — Knowledge", () => {
   let testDb: TestDb;
@@ -26,10 +30,18 @@ describe("Memory Routes — Knowledge", () => {
     projectId = project.id;
 
     await testDb.db.insert(agents).values({
-      id: "eng-1", projectId, name: "Engineer", role: "engineer",
+      id: "eng-1",
+      projectId,
+      name: "Engineer",
+      role: "engineer",
+      agentTokenHash: hashAgentToken(ENG_TOKEN),
     });
     await testDb.db.insert(agents).values({
-      id: "eng-2", projectId, name: "Engineer 2", role: "engineer",
+      id: "eng-2",
+      projectId,
+      name: "Engineer 2",
+      role: "engineer",
+      agentTokenHash: hashAgentToken(ENG2_TOKEN),
     });
   }, 60_000);
 
@@ -55,7 +67,7 @@ describe("Memory Routes — Knowledge", () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/memory/knowledge",
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: { slug: "auth-system", name: "Auth System", entityType: "area" },
       });
 
@@ -75,7 +87,7 @@ describe("Memory Routes — Knowledge", () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/memory/knowledge",
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: { slug: "existing", name: "Duplicate", entityType: "area" },
       });
 
@@ -86,7 +98,7 @@ describe("Memory Routes — Knowledge", () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/memory/knowledge",
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: { slug: "INVALID SLUG!", name: "Bad", entityType: "area" },
       });
 
@@ -104,7 +116,7 @@ describe("Memory Routes — Knowledge", () => {
       const res = await app.inject({
         method: "GET",
         url: `/api/memory/knowledge?projectId=${projectId}`,
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
       });
 
       expect(res.statusCode).toBe(200);
@@ -121,7 +133,7 @@ describe("Memory Routes — Knowledge", () => {
       const res = await app.inject({
         method: "GET",
         url: `/api/memory/knowledge/${entity.id}`,
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
       });
 
       expect(res.statusCode).toBe(200);
@@ -143,7 +155,7 @@ describe("Memory Routes — Knowledge", () => {
       const res = await app.inject({
         method: "GET",
         url: `/api/memory/knowledge/${entity.id}/facts`,
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
       });
 
       expect(res.statusCode).toBe(200);
@@ -160,7 +172,7 @@ describe("Memory Routes — Knowledge", () => {
       const res = await app.inject({
         method: "POST",
         url: `/api/memory/knowledge/${entity.id}/facts`,
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: { content: "New fact from eng-1", category: "observation" },
       });
 
@@ -198,7 +210,7 @@ describe("Memory Routes — Knowledge", () => {
       const res = await app.inject({
         method: "POST",
         url: `/api/memory/knowledge/${entity.id}/facts/${fact.id}/supersede`,
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: { content: "Migrated to JWT v2 with rotation", category: "decision" },
       });
 
@@ -221,7 +233,7 @@ describe("Memory Routes — Knowledge", () => {
       const res = await app.inject({
         method: "POST",
         url: `/api/memory/knowledge/${entity.id}/facts/${fact.id}/supersede`,
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: { content: "New fact", category: "status" },
       });
 
@@ -236,7 +248,7 @@ describe("Memory Routes — Knowledge", () => {
       const res = await app.inject({
         method: "POST",
         url: `/api/memory/knowledge/${entity.id}/facts/nonexistent/supersede`,
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: { content: "New", category: "status" },
       });
 
@@ -258,7 +270,7 @@ describe("Memory Routes — Knowledge", () => {
       const res = await app.inject({
         method: "GET",
         url: `/api/memory/knowledge/search?query=CSRF&projectId=${projectId}`,
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
       });
 
       expect(res.statusCode).toBe(200);
@@ -291,6 +303,7 @@ describe("Memory Routes — Worklog + Lessons", () => {
       role: "engineer",
       workLogDir: path.join(tmpDir, "worklogs/eng-1"),
       lessonsFile: path.join(tmpDir, "lessons/eng-1.md"),
+      agentTokenHash: hashAgentToken(ENG_TOKEN),
     });
 
     await testDb.db.insert(agents).values({
@@ -298,6 +311,7 @@ describe("Memory Routes — Worklog + Lessons", () => {
       role: "engineer",
       workLogDir: path.join(tmpDir, "worklogs/eng-2"),
       lessonsFile: path.join(tmpDir, "lessons/eng-2.md"),
+      agentTokenHash: hashAgentToken(ENG2_TOKEN),
     });
   }, 60_000);
 
@@ -321,7 +335,7 @@ describe("Memory Routes — Worklog + Lessons", () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/memory/worklog",
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: { content: "## Session 1\n- Fixed auth bug" },
       });
 
@@ -340,14 +354,14 @@ describe("Memory Routes — Worklog + Lessons", () => {
       await app.inject({
         method: "POST",
         url: "/api/memory/worklog",
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: { content: "## Session\n- Did stuff" },
       });
 
       const res = await app.inject({
         method: "GET",
         url: "/api/memory/worklog?agentId=eng-1",
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
       });
 
       expect(res.statusCode).toBe(200);
@@ -360,7 +374,7 @@ describe("Memory Routes — Worklog + Lessons", () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/memory/lessons",
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: { content: "Always use (page - 1) * limit for offset." },
       });
 
@@ -377,14 +391,14 @@ describe("Memory Routes — Worklog + Lessons", () => {
       await app.inject({
         method: "POST",
         url: "/api/memory/lessons",
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
         payload: { content: "Lesson learned" },
       });
 
       const res = await app.inject({
         method: "GET",
         url: "/api/memory/lessons?agentId=eng-1",
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
       });
 
       expect(res.statusCode).toBe(200);
@@ -397,7 +411,7 @@ describe("Memory Routes — Worklog + Lessons", () => {
       const res = await app.inject({
         method: "GET",
         url: "/api/memory/worklog?agentId=eng-2",
-        headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+        headers: { authorization: `Bearer ${ENG_TOKEN}` },
       });
 
       // Agents can read other agents' worklogs (knowledge is shared),
@@ -423,7 +437,11 @@ describe("Memory Routes — Full Integration", () => {
     projectId = project.id;
 
     await testDb.db.insert(agents).values({
-      id: "eng-1", projectId, name: "Engineer", role: "engineer",
+      id: "eng-1",
+      projectId,
+      name: "Engineer",
+      role: "engineer",
+      agentTokenHash: hashAgentToken(ENG_TOKEN),
     });
   }, 60_000);
 
@@ -452,7 +470,7 @@ describe("Memory Routes — Full Integration", () => {
     const createRes = await app.inject({
       method: "POST",
       url: "/api/memory/knowledge",
-      headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      headers: { authorization: `Bearer ${ENG_TOKEN}` },
       payload: { slug: "e2e-test", name: "E2E Test", entityType: "area" },
     });
     expect(createRes.statusCode).toBe(201);
@@ -462,7 +480,7 @@ describe("Memory Routes — Full Integration", () => {
     const factRes = await app.inject({
       method: "POST",
       url: `/api/memory/knowledge/${entity.id}/facts`,
-      headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      headers: { authorization: `Bearer ${ENG_TOKEN}` },
       payload: { content: "Original fact", category: "status" },
     });
     expect(factRes.statusCode).toBe(201);
@@ -472,7 +490,7 @@ describe("Memory Routes — Full Integration", () => {
     const supersedeRes = await app.inject({
       method: "POST",
       url: `/api/memory/knowledge/${entity.id}/facts/${originalFact.id}/supersede`,
-      headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      headers: { authorization: `Bearer ${ENG_TOKEN}` },
       payload: { content: "Updated fact", category: "status" },
     });
     expect(supersedeRes.statusCode).toBe(201);
@@ -481,7 +499,7 @@ describe("Memory Routes — Full Integration", () => {
     const listRes = await app.inject({
       method: "GET",
       url: `/api/memory/knowledge/${entity.id}/facts`,
-      headers: { "x-agent-id": "eng-1", "x-project-id": projectId },
+      headers: { authorization: `Bearer ${ENG_TOKEN}` },
     });
     expect(listRes.statusCode).toBe(200);
     const facts = listRes.json();

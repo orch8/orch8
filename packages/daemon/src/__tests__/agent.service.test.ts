@@ -6,20 +6,23 @@ import { eq, and } from "drizzle-orm";
 import { projects, agents, wakeupRequests } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { AgentService } from "../services/agent.service.js";
+import { readAgentToken } from "../services/agent-token-store.js";
 
 describe("AgentService", () => {
   let testDb: TestDb;
   let service: AgentService;
   let projectId: string;
+  let projectHomeDir: string;
 
   beforeAll(async () => {
     testDb = await setupTestDb();
     service = new AgentService(testDb.db);
+    projectHomeDir = await mkdtemp(join(tmpdir(), "agent-service-"));
 
     const [project] = await testDb.db.insert(projects).values({
       name: "Agent Test",
       slug: "agent-test",
-      homeDir: "/tmp/agent-test",
+      homeDir: projectHomeDir,
     }).returning();
     projectId = project.id;
   }, 60_000);
@@ -245,9 +248,10 @@ describe("AgentService", () => {
       expect(rawToken).toMatch(/^[0-9a-f]{32}$/);
       expect(agent.agentTokenHash).toMatch(/^[0-9a-f]{64}$/);
       expect(agent.agentTokenHash).not.toBe(rawToken);
+      expect(await readAgentToken(projectHomeDir, "cwt-eng")).toBe(rawToken);
     });
 
-    it("rotateAgentToken changes the hash and returns a new raw token", async () => {
+    it("rotateAgentToken changes the hash and writes the new raw token", async () => {
       const created = await service.createWithToken({
         id: "rot-eng",
         projectId,
@@ -262,12 +266,43 @@ describe("AgentService", () => {
       expect(rawToken).not.toBe(created.rawToken);
       expect(agent.agentTokenHash).toMatch(/^[0-9a-f]{64}$/);
       expect(agent.agentTokenHash).not.toBe(originalHash);
+      expect(await readAgentToken(projectHomeDir, "rot-eng")).toBe(rawToken);
     });
 
     it("rotateAgentToken throws when the agent does not exist", async () => {
       await expect(
         service.rotateAgentToken("nope", projectId),
       ).rejects.toThrow("Agent not found");
+    });
+
+    it("clone writes a fresh token for the cloned agent", async () => {
+      await service.createWithToken({
+        id: "clone-src",
+        projectId,
+        name: "Clone Source",
+        role: "engineer",
+      });
+
+      await service.clone("clone-src", projectId, {
+        targetProjectId: projectId,
+        newId: "clone-dest",
+      });
+
+      expect(await readAgentToken(projectHomeDir, "clone-dest")).toMatch(/^[0-9a-f]{32}$/);
+    });
+
+    it("delete removes the token file", async () => {
+      const { rawToken } = await service.createWithToken({
+        id: "delete-token",
+        projectId,
+        name: "Delete Token",
+        role: "engineer",
+      });
+      expect(await readAgentToken(projectHomeDir, "delete-token")).toBe(rawToken);
+
+      await service.delete("delete-token", projectId);
+
+      expect(await readAgentToken(projectHomeDir, "delete-token")).toBeNull();
     });
   });
 

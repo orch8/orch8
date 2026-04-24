@@ -30,6 +30,9 @@ export function buildEnv(
   env.ORCH_PROJECT_ID = ctx.projectId;
   env.ORCH_RUN_ID = ctx.runId;
   env.ORCH_API_URL = ctx.apiUrl;
+  if (ctx.agentToken) {
+    env.ORCH_AGENT_TOKEN = ctx.agentToken;
+  }
   env.ORCH_WAKE_REASON = ctx.wakeReason;
   env.ORCH_WORKSPACE_CWD = ctx.cwd;
 

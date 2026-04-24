@@ -1,16 +1,22 @@
 import path from "node:path";
 import { writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNotNull } from "drizzle-orm";
 import { agents, projects } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { CreateAgent, UpdateAgent, AgentFilter } from "@orch/shared";
 import type { BroadcastService } from "./broadcast.service.js";
+import type { FastifyBaseLogger } from "fastify";
 import {
   generateAgentToken,
   hashAgentToken,
 } from "../api/middleware/agent-token.js";
 import { agentDir, agentsMdPath, heartbeatMdPath } from "./agent-files.js";
+import {
+  deleteAgentToken,
+  readAgentToken,
+  writeAgentToken,
+} from "./agent-token-store.js";
 
 async function seedStubFiles(
   projectHomeDir: string,
@@ -135,10 +141,16 @@ export const ROLE_DEFAULTS: Record<string, Partial<typeof agents.$inferInsert>> 
 };
 
 export class AgentService {
+  private logger?: FastifyBaseLogger;
+
   constructor(
     private db: SchemaDb,
     private broadcastService?: BroadcastService,
   ) {}
+
+  setLogger(logger: FastifyBaseLogger): void {
+    this.logger = logger;
+  }
 
   static getRoleDefaults(role: string): Partial<typeof agents.$inferInsert> {
     return ROLE_DEFAULTS[role] ?? ROLE_DEFAULTS.custom;
@@ -185,6 +197,7 @@ export class AgentService {
 
     if (project) {
       await seedStubFiles(project.homeDir, input.id, input.name);
+      await writeAgentToken(project.homeDir, input.id, rawToken);
     }
 
     return { agent, rawToken };
@@ -211,7 +224,38 @@ export class AgentService {
       .where(and(eq(agents.id, agentId), eq(agents.projectId, projectId)))
       .returning();
 
+    const [project] = await this.db
+      .select({ homeDir: projects.homeDir })
+      .from(projects)
+      .where(eq(projects.id, projectId));
+    if (project) {
+      await writeAgentToken(project.homeDir, agentId, rawToken);
+    }
+
     return { agent: updated, rawToken };
+  }
+
+  async rehydrateMissingAgentTokens(): Promise<void> {
+    const rows = await this.db
+      .select({
+        id: agents.id,
+        projectId: agents.projectId,
+        homeDir: projects.homeDir,
+      })
+      .from(agents)
+      .innerJoin(projects, eq(agents.projectId, projects.id))
+      .where(isNotNull(agents.agentTokenHash));
+
+    for (const row of rows) {
+      const existingToken = await readAgentToken(row.homeDir, row.id);
+      if (existingToken !== null) continue;
+
+      await this.rotateAgentToken(row.id, row.projectId);
+      this.logger?.info(
+        { agentId: row.id, projectId: row.projectId },
+        `rotated agent token for ${row.id} - no file found on disk`,
+      );
+    }
   }
 
   async getById(id: string, projectId: string): Promise<Agent | null> {
@@ -246,11 +290,20 @@ export class AgentService {
   }
 
   async delete(id: string, projectId: string): Promise<void> {
+    const [project] = await this.db
+      .select({ homeDir: projects.homeDir })
+      .from(projects)
+      .where(eq(projects.id, projectId));
+
     const result = await this.db
       .delete(agents)
       .where(and(eq(agents.id, id), eq(agents.projectId, projectId)))
       .returning();
     if (result.length === 0) throw new Error("Agent not found");
+
+    if (project) {
+      await deleteAgentToken(project.homeDir, id);
+    }
   }
 
   async pause(id: string, projectId: string, reason?: string): Promise<Agent> {
@@ -323,6 +376,7 @@ export class AgentService {
       ...definition
     } = source;
 
+    const rawToken = generateAgentToken();
     const [cloned] = await this.db
       .insert(agents)
       .values({
@@ -334,9 +388,17 @@ export class AgentService {
         budgetSpentUsd: 0,
         budgetPaused: false,
         lastHeartbeat: null,
-        agentTokenHash: hashAgentToken(generateAgentToken()),
+        agentTokenHash: hashAgentToken(rawToken),
       })
       .returning();
+
+    const [targetProject] = await this.db
+      .select({ homeDir: projects.homeDir })
+      .from(projects)
+      .where(eq(projects.id, opts.targetProjectId));
+    if (targetProject) {
+      await writeAgentToken(targetProject.homeDir, opts.newId, rawToken);
+    }
 
     return cloned;
   }

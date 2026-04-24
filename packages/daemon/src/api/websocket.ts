@@ -6,7 +6,7 @@ import type { FastifyInstance } from "fastify";
  * Auth model (runs after the auth plugin's onRequest hook, which has already
  * populated request.agent / request.isAdmin):
  *
- *   - Agent-authenticated clients (x-agent-id + x-project-id headers): the socket
+ *   - Agent-authenticated clients (Authorization: Bearer agent token): the socket
  *     is scoped to the agent's own projectId. A projectId query param, if given,
  *     must match.
  *   - Admin clients (currently localhost): the socket is scoped to the projectId

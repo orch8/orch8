@@ -87,11 +87,9 @@ project context in parallel via Bash and curl:
 
 ```bash
 curl -s "${ORCH_API_URL}/api/bundled-agents" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" &
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" &
 curl -s "${ORCH_API_URL}/api/agents?projectId=${ORCH_PROJECT_ID}" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" &
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" &
 wait
 ```
 
@@ -201,15 +199,15 @@ the `result_create_agent` card:
 ```bash
 # Step 6a — create the agent row
 curl -s -X POST "${ORCH_API_URL}/api/agents" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" \
+  -H "X-Run-Id: ${ORCH_RUN_ID}" \
   -H "Content-Type: application/json" \
   -d @agent-config.json
 
 # Step 6b — write the drafted instructions
 curl -s -X PUT "${ORCH_API_URL}/api/agents/${AGENT_ID}/instructions" \
-  -H "X-Agent-Id: ${ORCH_AGENT_ID}" \
-  -H "X-Project-Id: ${ORCH_PROJECT_ID}" \
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" \
+  -H "X-Run-Id: ${ORCH_RUN_ID}" \
   -H "Content-Type: application/json" \
   -d @instructions.json
 ```

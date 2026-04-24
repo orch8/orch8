@@ -181,7 +181,7 @@ export async function chatsRoutes(app: FastifyInstance) {
       if (!projectId) {
         return reply
           .code(400)
-          .send({ error: "project_required", message: "x-project-id header is required" });
+          .send({ error: "project_required", message: "project scope is required" });
       }
       try {
         const updated = await app.chatService.decideCard(

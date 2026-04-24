@@ -8,6 +8,7 @@ import { vi } from "vitest";
 import { AgentService } from "../services/agent.service.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
+import { hashAgentToken } from "../api/middleware/agent-token.js";
 import "../types.js";
 
 describe("Agent API Routes", () => {
@@ -70,6 +71,8 @@ describe("Agent API Routes", () => {
       expect(body.id).toBe("fe-eng");
       expect(body.role).toBe("engineer");
       expect(body.status).toBe("active");
+      expect(body.rawToken).toEqual(expect.any(String));
+      expect(body.rawToken).toHaveLength(32);
 
       await app.close();
     });
@@ -104,6 +107,8 @@ describe("Agent API Routes", () => {
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body).toHaveLength(2);
+      expect(body[0]).not.toHaveProperty("rawToken");
+      expect(body[1]).not.toHaveProperty("rawToken");
 
       await app.close();
     });
@@ -124,6 +129,7 @@ describe("Agent API Routes", () => {
       const body = JSON.parse(response.body);
       expect(body).toHaveLength(1);
       expect(body[0].role).toBe("qa");
+      expect(body[0]).not.toHaveProperty("rawToken");
 
       await app.close();
     });
@@ -147,6 +153,7 @@ describe("Agent API Routes", () => {
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.id).toBe("get-test");
+      expect(body).not.toHaveProperty("rawToken");
 
       await app.close();
     });
@@ -184,6 +191,48 @@ describe("Agent API Routes", () => {
       const body = JSON.parse(response.body);
       expect(body.name).toBe("Updated");
       expect(body.maxTurns).toBe(50);
+
+      await app.close();
+    });
+  });
+
+  describe("POST /api/agents/:id/rotate-token", () => {
+    it("rotates an agent token and returns the new raw token", async () => {
+      const oldRawToken = "old-token";
+      await testDb.db.insert(agents).values({
+        id: "rotate-test",
+        projectId,
+        name: "Rotate Test",
+        role: "engineer",
+        agentTokenHash: hashAgentToken(oldRawToken),
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/agents/rotate-test/rotate-token",
+        headers: { "x-project-id": projectId },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.id).toBe("rotate-test");
+      expect(body.rawToken).toEqual(expect.any(String));
+      expect(body.rawToken).not.toBe(oldRawToken);
+
+      const [agent] = await testDb.db.select().from(agents);
+      expect(agent.agentTokenHash).toBe(hashAgentToken(body.rawToken));
+
+      await app.close();
+    });
+
+    it("returns 404 when rotating a nonexistent agent token", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/agents/missing/rotate-token",
+        headers: { "x-project-id": projectId },
+      });
+
+      expect(response.statusCode).toBe(404);
 
       await app.close();
     });

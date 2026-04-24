@@ -4,7 +4,11 @@ import { projects, agents, tasks } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { identityRoutes } from "../api/routes/identity.js";
+import { hashAgentToken } from "../api/middleware/agent-token.js";
 import "../types.js";
+
+const FE_TOKEN = "identity-fe-token";
+const ENG_TOKEN = "identity-eng-token";
 
 describe("Identity Route", () => {
   let testDb: TestDb;
@@ -50,14 +54,14 @@ describe("Identity Route", () => {
       canAssignTo: ["qa-eng"],
       budgetLimitUsd: 50,
       budgetSpentUsd: 10,
+      agentTokenHash: hashAgentToken(FE_TOKEN),
     });
 
     const res = await app.inject({
       method: "GET",
       url: "/api/identity",
       headers: {
-        "x-agent-id": "fe-eng",
-        "x-project-id": projectId,
+        authorization: `Bearer ${FE_TOKEN}`,
         "x-run-id": "run_abc",
       },
     });
@@ -81,6 +85,7 @@ describe("Identity Route", () => {
       projectId,
       name: "Engineer",
       role: "engineer",
+      agentTokenHash: hashAgentToken(ENG_TOKEN),
     });
 
     const [task] = await testDb.db.insert(tasks).values({
@@ -95,8 +100,7 @@ describe("Identity Route", () => {
       method: "GET",
       url: "/api/identity",
       headers: {
-        "x-agent-id": "eng-1",
-        "x-project-id": projectId,
+        authorization: `Bearer ${ENG_TOKEN}`,
       },
     });
 

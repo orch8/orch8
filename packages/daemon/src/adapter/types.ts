@@ -139,6 +139,7 @@ export interface RunContext {
 
   wakeReason: "timer" | "assignment" | "on_demand" | "automation";
   apiUrl: string;
+  agentToken?: string;
   cwd: string;
 
   // Prompt data
