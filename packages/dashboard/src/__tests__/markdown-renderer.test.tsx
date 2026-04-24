@@ -37,6 +37,20 @@ describe("MarkdownRenderer", () => {
     expect(link).toHaveAttribute("href", "/board?task=42");
   });
 
+  it("renders agent mentions as links when projectSlug is provided", () => {
+    renderWithProviders(
+      <MarkdownRenderer content="@qa-bot please review" projectSlug="proj_a" />,
+    );
+    const link = screen.getByRole("link", { name: "@qa-bot" });
+    expect(link).toHaveAttribute("href", "/projects/proj_a/agents/qa-bot");
+  });
+
+  it("leaves agent mentions as text without projectSlug", () => {
+    renderWithProviders(<MarkdownRenderer content="@qa-bot please review" />);
+    expect(screen.queryByRole("link", { name: "@qa-bot" })).toBeNull();
+    expect(screen.getByText("@qa-bot please review")).toBeInTheDocument();
+  });
+
   it("renders external links with target=_blank", () => {
     renderWithProviders(
       <MarkdownRenderer content="[Example](https://example.com)" />,

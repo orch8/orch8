@@ -49,8 +49,9 @@ export interface CompactionResult {
 }
 
 export interface WakeupOpts {
-  source: "timer" | "assignment" | "on_demand" | "automation";
+  source: "timer" | "assignment" | "on_demand" | "automation" | "mention";
   taskId?: string;
+  commentId?: string;
   reason?: string;
   payload?: unknown;
   idempotencyKey?: string;
@@ -63,6 +64,31 @@ async function getRepoUrl(cwd: string): Promise<string | undefined> {
   } catch {
     return undefined;
   }
+}
+
+function formatMentionWakeMessage(wakeupReq: WakeupRequest | undefined): string {
+  if (
+    wakeupReq?.payload
+    && typeof wakeupReq.payload === "object"
+    && !Array.isArray(wakeupReq.payload)
+  ) {
+    const payload = wakeupReq.payload as Record<string, unknown>;
+    const content = typeof payload.content === "string" ? payload.content : undefined;
+    const chatId = typeof payload.chatId === "string" ? payload.chatId : undefined;
+    const messageId = typeof payload.messageId === "string" ? payload.messageId : undefined;
+
+    const header = [
+      "You were mentioned in a chat message.",
+      chatId ? `Chat: ${chatId}` : undefined,
+      messageId ? `Message: ${messageId}` : undefined,
+    ].filter(Boolean).join("\n");
+
+    return content ? `${header}\n\n${content}` : header;
+  }
+
+  return typeof wakeupReq?.reason === "string"
+    ? wakeupReq.reason
+    : "You were mentioned in a chat message.";
 }
 
 export class HeartbeatService {
@@ -682,6 +708,11 @@ export class HeartbeatService {
                 payload: typeof wakeupReq?.payload === "string" ? wakeupReq.payload : undefined,
               },
             };
+          case "mention":
+            return {
+              source: "mention",
+              userMessage: formatMentionWakeMessage(wakeupReq),
+            };
         }
       })();
 
@@ -1165,6 +1196,7 @@ export class HeartbeatService {
       case "timer":
         return agent.heartbeatEnabled;
       case "assignment":
+      case "mention":
         return agent.wakeOnAssignment;
       case "on_demand":
         return agent.wakeOnOnDemand;
@@ -1232,6 +1264,7 @@ export class HeartbeatService {
         taskId: opts.taskId ?? null,
         source: opts.source,
         reason: opts.reason ?? null,
+        commentId: opts.commentId ?? null,
         payload: opts.payload ?? null,
         idempotencyKey: opts.idempotencyKey ?? null,
         status,

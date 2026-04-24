@@ -1,4 +1,4 @@
-import { eq, and, desc, lt } from "drizzle-orm";
+import { eq, and, desc, lt, inArray } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import {
   chats,
@@ -18,11 +18,15 @@ import type { ClaudeLocalAdapterConfig } from "../adapter/types.js";
 import type { CodexLocalAdapterConfig } from "../adapter/codex-local/types.js";
 import type { SessionManager } from "../adapter/session-manager.js";
 import type { BroadcastService } from "./broadcast.service.js";
+import type { HeartbeatService } from "./heartbeat.service.js";
+import { extractMentionSlugs } from "@orch/shared";
 import { extractCards } from "./chat-card-parser.js";
+import { resolveWakeTargets } from "./wake-targets.js";
 import { resolveAdapter, type AdapterMap } from "../adapter/registry.js";
 
 type Chat = typeof chats.$inferSelect;
 type ChatMessage = typeof chatMessages.$inferSelect;
+type WakeupEnqueuer = Pick<HeartbeatService, "enqueueWakeup">;
 
 export class ChatService {
   private logger?: FastifyBaseLogger;
@@ -34,6 +38,7 @@ export class ChatService {
     private sessionManager: SessionManager,
     private broadcast: BroadcastService,
     private apiUrl: string,
+    private heartbeat?: WakeupEnqueuer,
   ) {
     this.adapters = isAdapterMap(adapters)
       ? adapters
@@ -190,10 +195,17 @@ export class ChatService {
   async sendUserMessage(
     chatId: string,
     content: string,
+    opts: { notify?: boolean } = {},
   ): Promise<ChatMessage> {
     const chat = await this.getChat(chatId);
     if (!chat) throw new Error("Chat not found");
     if (chat.archived) throw new Error("Chat is archived");
+
+    const mentionSlugs = extractMentionSlugs(content);
+    const mentionedAgentIds = await this.resolveMentionedAgentIds(
+      chat.projectId,
+      mentionSlugs,
+    );
 
     const [userRow] = await this.db
       .insert(chatMessages)
@@ -201,6 +213,7 @@ export class ChatService {
         chatId,
         role: "user",
         content,
+        mentions: mentionedAgentIds,
         status: "complete",
       })
       .returning();
@@ -209,6 +222,8 @@ export class ChatService {
       .update(chats)
       .set({ lastMessageAt: new Date(), updatedAt: new Date() })
       .where(eq(chats.id, chatId));
+
+    await this.enqueueMentionWakeups(chat, userRow, mentionedAgentIds, opts.notify ?? true);
 
     // Fire-and-forget the assistant turn. Errors are surfaced over
     // the websocket chat_message_error event, not the HTTP response.
@@ -220,6 +235,56 @@ export class ChatService {
     });
 
     return userRow;
+  }
+
+  private async resolveMentionedAgentIds(
+    projectId: string,
+    slugs: string[],
+  ): Promise<string[]> {
+    if (slugs.length === 0) return [];
+
+    const rows = await this.db
+      .select({ id: agentsTable.id })
+      .from(agentsTable)
+      .where(
+        and(
+          eq(agentsTable.projectId, projectId),
+          inArray(agentsTable.id, slugs),
+        ),
+      );
+    const found = new Set(rows.map((row) => row.id));
+    return slugs.filter((slug) => found.has(slug));
+  }
+
+  private async enqueueMentionWakeups(
+    chat: Chat,
+    userRow: ChatMessage,
+    mentionedAgentIds: string[],
+    notifyEnabled: boolean,
+  ): Promise<void> {
+    if (!this.heartbeat) return;
+
+    const targets = resolveWakeTargets({
+      authorAgentId: null,
+      mentionedAgentIds,
+      notifyEnabled,
+    }).filter((target) => target.agentId !== chat.agentId);
+
+    await Promise.all(
+      targets.map((target) => this.heartbeat!.enqueueWakeup(
+        target.agentId,
+        chat.projectId,
+        {
+          source: "mention",
+          reason: `Mentioned in chat ${chat.id}`,
+          payload: {
+            chatId: chat.id,
+            messageId: userRow.id,
+            content: userRow.content,
+          },
+        },
+      )),
+    );
   }
 
   /**

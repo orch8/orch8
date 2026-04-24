@@ -5,6 +5,7 @@ import { projects, agents, chats, chatMessages, heartbeatRuns } from "@orch/shar
 import { ChatService } from "../services/chat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
 import { SessionManager } from "../adapter/session-manager.js";
+import { ProjectService } from "../services/project.service.js";
 import { chatsRoutes } from "../api/routes/chats.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import type { ExtractedCard } from "@orch/shared";
@@ -86,6 +87,7 @@ describe("Chat API Routes", () => {
 
     app = Fastify();
     app.decorate("db", testDb.db);
+    app.decorate("projectService", new ProjectService(testDb.db));
     app.decorate("chatService", chatService);
     app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(chatsRoutes);
@@ -267,6 +269,7 @@ describe("Chat API Routes", () => {
 
     const localApp = Fastify();
     localApp.decorate("db", testDb.db);
+    localApp.decorate("projectService", new ProjectService(testDb.db));
     localApp.decorate("chatService", chatService);
     localApp.register(authPlugin, { allowLocalhostAdmin: true });
     localApp.register(chatsRoutes);

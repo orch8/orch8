@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useComments, useCreateComment } from "../../hooks/useComments.js";
 import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
 import { MarkdownEditor } from "../shared/MarkdownEditor.js";
+import { Switch } from "../ui/Switch.js";
 
 interface CommentThreadProps {
   taskId: string;
+  projectId: string;
 }
 
 const TYPE_STYLES: Record<string, { border: string; badge?: { text: string; color: string } }> = {
@@ -14,15 +16,16 @@ const TYPE_STYLES: Record<string, { border: string; badge?: { text: string; colo
   inline: { border: "" },
 };
 
-export function CommentThread({ taskId }: CommentThreadProps) {
+export function CommentThread({ taskId, projectId }: CommentThreadProps) {
   const { data: comments, isLoading } = useComments(taskId);
   const createComment = useCreateComment();
   const [body, setBody] = useState("");
+  const [notify, setNotify] = useState(true);
 
   function handleSubmit() {
     if (!body.trim()) return;
     createComment.mutate(
-      { taskId, author: "admin", body: body.trim() },
+      { taskId, author: "admin", body: body.trim(), notify },
       { onSuccess: () => setBody("") },
     );
   }
@@ -58,11 +61,16 @@ export function CommentThread({ taskId }: CommentThreadProps) {
                   {new Date(comment.createdAt).toLocaleString()}
                 </span>
               </div>
-              <MarkdownRenderer content={comment.body} />
+              <MarkdownRenderer content={comment.body} projectSlug={projectId} />
             </div>
           );
         })}
       </div>
+
+      <label className="flex items-center gap-2 text-xs text-zinc-400">
+        <Switch checked={notify} onCheckedChange={setNotify} aria-label="Notify agent" />
+        Notify agent
+      </label>
 
       <MarkdownEditor
         value={body}

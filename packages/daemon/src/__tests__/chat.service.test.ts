@@ -186,6 +186,113 @@ describe("ChatService", () => {
     expect(msgs[1].runId).toBeTruthy();
   });
 
+  it("sendUserMessage stores resolved mentions and wakes mentioned agents", async () => {
+    const adapter = makeMockAdapter("ok");
+    const heartbeat = { enqueueWakeup: vi.fn(async () => ({ id: "wake_1" })) };
+    service = new ChatService(
+      testDb.db,
+      adapter as any,
+      sessionMgr,
+      broadcast,
+      TEST_API_URL,
+      heartbeat as any,
+    );
+    await testDb.db.insert(agents).values([
+      {
+        id: "alice",
+        projectId,
+        name: "Alice",
+        role: "custom",
+        model: "claude-sonnet-4-6",
+      },
+      {
+        id: "bob",
+        projectId,
+        name: "Bob",
+        role: "custom",
+        model: "claude-sonnet-4-6",
+      },
+    ]);
+    const chat = await service.createChat({ projectId, agentId });
+
+    const userRow = await service.sendUserMessage(
+      chat.id,
+      "@alice @bob @alice @unknown please look",
+    );
+
+    expect(userRow.mentions).toEqual(["alice", "bob"]);
+    expect(heartbeat.enqueueWakeup).toHaveBeenCalledTimes(2);
+    expect(heartbeat.enqueueWakeup).toHaveBeenNthCalledWith(
+      1,
+      "alice",
+      projectId,
+      expect.objectContaining({
+        source: "mention",
+        payload: expect.objectContaining({
+          chatId: chat.id,
+          messageId: userRow.id,
+        }),
+      }),
+    );
+    expect(heartbeat.enqueueWakeup).toHaveBeenNthCalledWith(
+      2,
+      "bob",
+      projectId,
+      expect.objectContaining({ source: "mention" }),
+    );
+
+    const [stored] = await testDb.db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.id, userRow.id));
+    expect(stored.mentions).toEqual(["alice", "bob"]);
+  });
+
+  it("sendUserMessage suppresses mention wakes when notify is false", async () => {
+    const adapter = makeMockAdapter("ok");
+    const heartbeat = { enqueueWakeup: vi.fn(async () => ({ id: "wake_1" })) };
+    service = new ChatService(
+      testDb.db,
+      adapter as any,
+      sessionMgr,
+      broadcast,
+      TEST_API_URL,
+      heartbeat as any,
+    );
+    await testDb.db.insert(agents).values({
+      id: "alice",
+      projectId,
+      name: "Alice",
+      role: "custom",
+      model: "claude-sonnet-4-6",
+    });
+    const chat = await service.createChat({ projectId, agentId });
+
+    const userRow = await service.sendUserMessage(chat.id, "@alice", { notify: false });
+
+    expect(userRow.mentions).toEqual(["alice"]);
+    expect(heartbeat.enqueueWakeup).not.toHaveBeenCalled();
+  });
+
+  it("sendUserMessage does not enqueue a mention wake for the chat agent", async () => {
+    const adapter = makeMockAdapter("ok");
+    const heartbeat = { enqueueWakeup: vi.fn(async () => ({ id: "wake_1" })) };
+    service = new ChatService(
+      testDb.db,
+      adapter as any,
+      sessionMgr,
+      broadcast,
+      TEST_API_URL,
+      heartbeat as any,
+    );
+    const chat = await service.createChat({ projectId, agentId });
+
+    const userRow = await service.sendUserMessage(chat.id, "@chat can you answer?");
+
+    expect(userRow.mentions).toEqual(["chat"]);
+    expect(heartbeat.enqueueWakeup).not.toHaveBeenCalled();
+  });
+
   it("extracts cards from assistant output", async () => {
     const fenced = [
       "Sure, I'll create that agent.",

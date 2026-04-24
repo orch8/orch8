@@ -8,6 +8,7 @@ export const CreateCommentSchema = z.object({
   body: z.string().min(1).max(50000),
   type: CommentTypeSchema.default("inline"),
   lineRef: z.string().max(500).optional(),
+  notify: z.boolean().default(true).optional(),
 });
 
 export const CommentFilterSchema = z.object({

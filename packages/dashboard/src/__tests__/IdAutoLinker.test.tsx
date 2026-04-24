@@ -54,6 +54,19 @@ describe("autoLinkIds", () => {
     expect(screen.getByText("chat_abc").tagName.toLowerCase()).toBe("a");
   });
 
+  it("wraps agent mentions in links", () => {
+    renderSpans("Please ask @qa-bot.");
+    const link = screen.getByText("@qa-bot");
+    expect(link.tagName.toLowerCase()).toBe("a");
+    expect(link.getAttribute("href")).toContain("agents/qa-bot");
+    expect(link.getAttribute("href")).toContain("proj_a");
+  });
+
+  it("does not wrap email-like or repeated-at mention text", () => {
+    renderSpans("Email a@qa-bot or type @@qa-bot");
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
   it("does not wrap IDs adjacent to alphanumeric characters", () => {
     renderSpans("subtask_abc is not a task_id");
     // "subtask_abc" should remain plain text — no link wrapping the inner

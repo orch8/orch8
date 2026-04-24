@@ -137,7 +137,7 @@ export interface RunContext {
    */
   sessionKey?: string;
 
-  wakeReason: "timer" | "assignment" | "on_demand" | "automation";
+  wakeReason: "timer" | "assignment" | "on_demand" | "automation" | "mention";
   apiUrl: string;
   agentToken?: string;
   cwd: string;

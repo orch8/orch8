@@ -152,6 +152,7 @@ export async function chatsRoutes(app: FastifyInstance) {
         const msg = await app.chatService.sendUserMessage(
           request.params.chatId,
           parsed.data.content,
+          { notify: parsed.data.notify ?? true },
         );
         return reply.code(202).send(msg); // 202: accepted, assistant run spawning
       } catch (err) {

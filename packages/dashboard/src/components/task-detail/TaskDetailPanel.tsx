@@ -153,7 +153,7 @@ export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelP
       </div>
 
       {/* Comments */}
-      <CommentThread taskId={taskId} />
+      <CommentThread taskId={taskId} projectId={projectId} />
     </div>
   );
 }

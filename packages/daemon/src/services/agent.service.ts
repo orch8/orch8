@@ -1,7 +1,7 @@
 import path from "node:path";
 import { writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { eq, and, isNotNull } from "drizzle-orm";
+import { eq, and, inArray, isNotNull } from "drizzle-orm";
 import { agents, projects } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { CreateAgent, UpdateAgent, AgentFilter } from "@orch/shared";
@@ -264,6 +264,14 @@ export class AgentService {
       .from(agents)
       .where(and(eq(agents.id, id), eq(agents.projectId, projectId)));
     return result[0] ?? null;
+  }
+
+  async findByIds(projectId: string, ids: string[]): Promise<Agent[]> {
+    if (ids.length === 0) return [];
+    return this.db
+      .select()
+      .from(agents)
+      .where(and(eq(agents.projectId, projectId), inArray(agents.id, ids)));
   }
 
   async list(filter: AgentFilter): Promise<Agent[]> {

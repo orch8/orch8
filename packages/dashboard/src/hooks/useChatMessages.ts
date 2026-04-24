@@ -13,6 +13,7 @@ export interface ChatMessage {
   runId: string | null;
   status: "streaming" | "complete" | "error";
   createdAt: string;
+  mentions?: string[];
 }
 
 export function useChatMessages(chatId: string) {
@@ -28,10 +29,10 @@ export function useSendChatMessage() {
   return useMutation<
     ChatMessage,
     Error,
-    { chatId: string; content: string }
+    { chatId: string; content: string; notify?: boolean }
   >({
-    mutationFn: ({ chatId, content }) =>
-      api.post<ChatMessage>(`/chats/${chatId}/messages`, { content }),
+    mutationFn: ({ chatId, content, notify }) =>
+      api.post<ChatMessage>(`/chats/${chatId}/messages`, { content, notify }),
     onSuccess: (_message, { chatId }) => {
       // Refetch messages so the user row appears immediately. The
       // assistant row arrives via WebSocket and the chat_message_complete

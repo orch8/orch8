@@ -14,6 +14,7 @@ import type { NotificationService } from "./services/notification.service.js";
 import type { ErrorLoggerService } from "./services/error-logger.service.js";
 import type { SeedingService } from "./services/seeding.service.js";
 import type { AdapterMap } from "./adapter/registry.js";
+import type { CommentService } from "./services/comment.service.js";
 
 export type SchemaDb = PostgresJsDatabase<typeof schema>;
 
@@ -26,6 +27,7 @@ declare module "fastify" {
     heartbeatService: HeartbeatService;
     schedulerService: SchedulerService;
     projectService: ProjectService;
+    commentService: CommentService;
     memoryService: MemoryService;
     summaryService: SummaryService;
     memoryExtractionService: MemoryExtractionService;
