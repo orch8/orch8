@@ -7,6 +7,11 @@ export type WakeReason =
   | { source: "on_demand"; userMessage: string }
   | { source: "automation"; automation: { trigger: string; payload?: string } };
 
+const ORCH8_SKILL_PREAMBLE =
+  "Invoke the `orch8` skill first to load the task lifecycle procedure " +
+  "(checkout → work → mark done), then handle the task below. Without " +
+  "checkout and the final PATCH column:\"done\", your task stays in backlog.";
+
 export function buildStdinPrompt(
   wake: WakeReason,
   projectRoot: string,
@@ -29,11 +34,11 @@ export function buildStdinPrompt(
       }
     }
     case "assignment":
-      return formatTaskPayload(wake.task);
+      return `${ORCH8_SKILL_PREAMBLE}\n\n${formatTaskPayload(wake.task)}`;
     case "on_demand":
       return wake.userMessage;
     case "automation":
-      return formatAutomationPayload(wake.automation);
+      return `${ORCH8_SKILL_PREAMBLE}\n\n${formatAutomationPayload(wake.automation)}`;
   }
 }
 

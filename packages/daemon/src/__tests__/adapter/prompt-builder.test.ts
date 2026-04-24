@@ -37,7 +37,7 @@ describe("buildStdinPrompt", () => {
     expect(() => buildStdinPrompt(wake, tempRoot, "cto")).toThrow(/heartbeat\.md/);
   });
 
-  it("formats task payload for assignment wakes", () => {
+  it("formats task payload for assignment wakes and prepends the orch8 skill reminder", () => {
     const wake: WakeReason = {
       source: "assignment",
       task: { title: "Fix login bug", description: "Crashes on submit" },
@@ -45,6 +45,8 @@ describe("buildStdinPrompt", () => {
     const out = buildStdinPrompt(wake, tempRoot, "cto");
     expect(out).toContain("Fix login bug");
     expect(out).toContain("Crashes on submit");
+    expect(out).toMatch(/orch8.*skill/i);
+    expect(out.indexOf("orch8")).toBeLessThan(out.indexOf("Fix login bug"));
   });
 
   it("returns the user message verbatim for on_demand wakes", () => {
@@ -53,7 +55,7 @@ describe("buildStdinPrompt", () => {
     expect(out).toBe("hi there");
   });
 
-  it("formats automation payload for automation wakes", () => {
+  it("formats automation payload for automation wakes and prepends the orch8 skill reminder", () => {
     const wake: WakeReason = {
       source: "automation",
       automation: { trigger: "pr_opened", payload: "#42" },
@@ -61,5 +63,7 @@ describe("buildStdinPrompt", () => {
     const out = buildStdinPrompt(wake, tempRoot, "cto");
     expect(out).toContain("pr_opened");
     expect(out).toContain("#42");
+    expect(out).toMatch(/orch8.*skill/i);
+    expect(out.indexOf("orch8")).toBeLessThan(out.indexOf("pr_opened"));
   });
 });
