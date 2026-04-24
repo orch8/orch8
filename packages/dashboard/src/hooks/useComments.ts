@@ -18,12 +18,14 @@ export function useCreateComment() {
       author,
       body,
       type,
+      notify,
     }: {
       taskId: string;
       author: string;
       body: string;
       type?: string;
-    }) => api.post<Comment>(`/tasks/${taskId}/comments`, { author, body, type }),
+      notify?: boolean;
+    }) => api.post<Comment>(`/tasks/${taskId}/comments`, { author, body, type, notify }),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["comments", vars.taskId] });
     },

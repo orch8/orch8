@@ -50,7 +50,7 @@ export const runStatusEnum = pgEnum("run_status", [
 ]);
 
 export const wakeupSourceEnum = pgEnum("wakeup_source", [
-  "timer", "assignment", "on_demand", "automation",
+  "timer", "assignment", "on_demand", "automation", "mention",
 ]);
 
 export const wakeupStatusEnum = pgEnum("wakeup_status", [
@@ -249,6 +249,7 @@ export const comments = pgTable("comments", {
   body: text("body").notNull(),
   type: commentTypeEnum("type").notNull().default("inline"),
   lineRef: text("line_ref"),
+  mentions: text("mentions").array().notNull().default(sql`'{}'`),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -543,6 +544,7 @@ export const chatMessages = pgTable("chat_messages", {
   chatId: text("chat_id").notNull().references(() => chats.id, { onDelete: "cascade" }),
   role: chatMessageRoleEnum("role").notNull(),
   content: text("content").notNull().default(""),
+  mentions: text("mentions").array().notNull().default(sql`'{}'`),
   cards: jsonb("cards").notNull().default([]),
   skillInvoked: text("skill_invoked"),
   runId: text("run_id").references(() => heartbeatRuns.id, { onDelete: "set null" }),

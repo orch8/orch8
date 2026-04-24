@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { projects, tasks, comments } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { CommentService } from "../services/comment.service.js";
@@ -8,10 +9,19 @@ describe("CommentService", () => {
   let service: CommentService;
   let projectId: string;
   let taskId: string;
+  let wakeups: Array<{
+    agentId: string;
+    projectId: string;
+    opts: {
+      source: "mention" | "assignment";
+      taskId?: string;
+      commentId?: string;
+      reason?: string;
+    };
+  }>;
 
   beforeAll(async () => {
     testDb = await setupTestDb();
-    service = new CommentService(testDb.db);
 
     const [project] = await testDb.db.insert(projects).values({
       name: "Comment Test",
@@ -28,6 +38,19 @@ describe("CommentService", () => {
   beforeEach(async () => {
     await testDb.db.delete(comments);
     await testDb.db.delete(tasks);
+    wakeups = [];
+    service = new CommentService(
+      testDb.db,
+      {
+        enqueueWakeup: async (agentId, wakeProjectId, opts) => {
+          wakeups.push({ agentId, projectId: wakeProjectId, opts });
+          return {};
+        },
+      },
+      {
+        commentNew: () => undefined,
+      } as never,
+    );
 
     const [task] = await testDb.db.insert(tasks).values({
       projectId,
@@ -53,6 +76,7 @@ describe("CommentService", () => {
       expect(comment.body).toBe("This function needs refactoring");
       expect(comment.type).toBe("inline");
       expect(comment.lineRef).toBe("src/main.ts:42");
+      expect(comment.mentions).toEqual([]);
     });
 
     it("creates a system comment without lineRef", async () => {
@@ -65,6 +89,88 @@ describe("CommentService", () => {
 
       expect(comment.type).toBe("system");
       expect(comment.lineRef).toBeNull();
+    });
+
+    it("wakes resolved mentioned agents instead of the assignee", async () => {
+      await testDb.db.update(tasks).set({ assignee: "bob" }).where(
+        eq(tasks.id, taskId),
+      );
+
+      const comment = await service.create({
+        taskId,
+        author: "user",
+        body: "@alice please look",
+        mentions: ["alice"],
+      });
+
+      expect(comment.mentions).toEqual(["alice"]);
+      expect(wakeups).toEqual([
+        {
+          agentId: "alice",
+          projectId,
+          opts: expect.objectContaining({
+            source: "mention",
+            taskId,
+            commentId: comment.id,
+          }),
+        },
+      ]);
+    });
+
+    it("does not fall through to assignment for self-mentions", async () => {
+      await testDb.db.update(tasks).set({ assignee: "bob" }).where(
+        eq(tasks.id, taskId),
+      );
+
+      await service.create({
+        taskId,
+        author: "alice",
+        body: "@alice",
+        mentions: ["alice"],
+      });
+
+      expect(wakeups).toEqual([]);
+    });
+
+    it("wakes the assignee when there are no resolved mentions", async () => {
+      await testDb.db.update(tasks).set({ assignee: "bob" }).where(
+        eq(tasks.id, taskId),
+      );
+
+      const comment = await service.create({
+        taskId,
+        author: "user",
+        body: "@unknown",
+        mentions: [],
+      });
+
+      expect(wakeups).toEqual([
+        {
+          agentId: "bob",
+          projectId,
+          opts: expect.objectContaining({
+            source: "assignment",
+            taskId,
+            commentId: comment.id,
+          }),
+        },
+      ]);
+    });
+
+    it("does not wake anyone when notify is disabled", async () => {
+      await testDb.db.update(tasks).set({ assignee: "bob" }).where(
+        eq(tasks.id, taskId),
+      );
+
+      await service.create({
+        taskId,
+        author: "user",
+        body: "@alice",
+        notify: false,
+        mentions: ["alice"],
+      });
+
+      expect(wakeups).toEqual([]);
     });
   });
 

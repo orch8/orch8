@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { MENTION_SLUG_PATTERN } from "../shared/mentionAutoLink.js";
 
 // Order matters: longer prefixes first so `pipe_` doesn't accidentally
 // match a substring of `pipeline_`.
@@ -57,7 +58,7 @@ const ID_PATTERNS: Array<{
 // alternation of all prefixes to avoid worst-case re-scans.
 const PREFIX_ALTERNATION = ID_PATTERNS.map((p) => p.prefix).join("|");
 const ID_REGEX = new RegExp(
-  `(?:^|(?<=[\\s.,;:!?()\\[\\]{}'"]))(?:(CATKEY)([A-Z][A-Z0-9]{1,4}-\\d+)|(${PREFIX_ALTERNATION})([a-zA-Z0-9_-]+))`,
+  `(?:^|(?<=[\\s.,;:!?()\\[\\]{}'"]))(?:(CATKEY)([A-Z][A-Z0-9]{1,4}-\\d+)|(${PREFIX_ALTERNATION})([a-zA-Z0-9_-]+))|(?<![\\w/.@])@(${MENTION_SLUG_PATTERN})\\b`,
   "g",
 );
 
@@ -70,6 +71,25 @@ export function autoLinkIds(text: string, projectId: string): ReactNode[] {
   ID_REGEX.lastIndex = 0;
   while ((match = ID_REGEX.exec(text)) !== null) {
     const [full] = match;
+    const mentionSlug = match[5];
+    if (mentionSlug) {
+      if (match.index > lastIdx) {
+        out.push(text.slice(lastIdx, match.index));
+      }
+      out.push(
+        <Link
+          key={`mention-${key++}`}
+          to="/projects/$projectSlug/agents/$agentId"
+          params={{ projectSlug: projectId, agentId: mentionSlug }}
+          className="text-sky-400 underline decoration-dotted hover:text-sky-300"
+        >
+          @{mentionSlug}
+        </Link>,
+      );
+      lastIdx = match.index + full.length;
+      continue;
+    }
+
     const prefix = match[1] === "CATKEY" ? "task_" : match[3];
     const id = match[1] === "CATKEY" ? match[2] : `${prefix}${match[4]}`;
 

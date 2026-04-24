@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import Fastify from "fastify";
-import { projects, tasks, comments } from "@orch/shared/db";
+import { projects, tasks, comments, agents } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { commentRoutes } from "../api/routes/comments.js";
+import { ProjectService } from "../services/project.service.js";
 import "../types.js";
 
 describe("Comment API Routes", () => {
@@ -31,6 +32,7 @@ describe("Comment API Routes", () => {
   beforeEach(async () => {
     await testDb.db.delete(comments);
     await testDb.db.delete(tasks);
+    await testDb.db.delete(agents);
 
     const [task] = await testDb.db.insert(tasks).values({
       projectId,
@@ -41,6 +43,7 @@ describe("Comment API Routes", () => {
 
     app = Fastify();
     app.decorate("db", testDb.db);
+    app.decorate("projectService", new ProjectService(testDb.db));
     app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(commentRoutes);
     await app.ready();
@@ -65,6 +68,29 @@ describe("Comment API Routes", () => {
       expect(body.id).toMatch(/^cmt_/);
       expect(body.taskId).toBe(taskId);
       expect(body.body).toBe("Looks good");
+      expect(body.mentions).toEqual([]);
+    });
+
+    it("resolves mentions against agents in the task project", async () => {
+      await testDb.db.insert(agents).values([
+        { id: "alice", projectId, name: "Alice", role: "engineer" },
+        { id: "bob", projectId, name: "Bob", role: "engineer" },
+      ]);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/tasks/${taskId}/comments`,
+        headers: { "x-project-id": projectId },
+        payload: {
+          author: "user",
+          body: "@alice and @bob, please look. @alice again, @unknown nope.",
+          notify: false,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+      expect(body.mentions).toEqual(["alice", "bob"]);
     });
 
     it("rejects missing body", async () => {

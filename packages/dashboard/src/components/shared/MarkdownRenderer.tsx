@@ -2,10 +2,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import type { Components } from "react-markdown";
+import { mentionAutoLink } from "./mentionAutoLink.js";
 
 interface MarkdownRendererProps {
   content: string;
   className?: string;
+  projectSlug?: string;
 }
 
 const TASK_REF_REGEX = /TASK-(\d+)/g;
@@ -20,8 +22,8 @@ function preprocessRuns(content: string): string {
   return content.replace(RUN_REF_REGEX, "[Run #$1](/runs/$1)");
 }
 
-function preprocess(content: string): string {
-  return preprocessRuns(preprocessContent(content));
+function preprocess(content: string, projectSlug?: string): string {
+  return mentionAutoLink(preprocessRuns(preprocessContent(content)), projectSlug);
 }
 
 const components: Components = {
@@ -40,7 +42,7 @@ const components: Components = {
   },
 };
 
-export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, className, projectSlug }: MarkdownRendererProps) {
   return (
     <div className={`prose prose-invert prose-zinc max-w-none text-sm ${className ?? ""}`}>
       <ReactMarkdown
@@ -48,7 +50,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
         rehypePlugins={[rehypeHighlight]}
         components={components}
       >
-        {preprocess(content)}
+        {preprocess(content, projectSlug)}
       </ReactMarkdown>
     </div>
   );

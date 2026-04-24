@@ -22,6 +22,7 @@ export type UpdateChat = z.infer<typeof UpdateChatSchema>;
 
 export const SendChatMessageSchema = z.object({
   content: z.string().min(1).max(100_000),
+  notify: z.boolean().default(true).optional(),
 });
 export type SendChatMessage = z.infer<typeof SendChatMessageSchema>;
 

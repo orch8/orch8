@@ -5,6 +5,7 @@ export type WakeReason =
   | { source: "timer" }
   | { source: "assignment"; task: { title: string; description?: string } }
   | { source: "on_demand"; userMessage: string }
+  | { source: "mention"; userMessage: string }
   | { source: "automation"; automation: { trigger: string; payload?: string } };
 
 const ORCH8_SKILL_PREAMBLE =
@@ -36,6 +37,7 @@ export function buildStdinPrompt(
     case "assignment":
       return `${ORCH8_SKILL_PREAMBLE}\n\n${formatTaskPayload(wake.task)}`;
     case "on_demand":
+    case "mention":
       return wake.userMessage;
     case "automation":
       return `${ORCH8_SKILL_PREAMBLE}\n\n${formatAutomationPayload(wake.automation)}`;

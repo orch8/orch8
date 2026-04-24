@@ -15,7 +15,7 @@ export function ActivityTab({ taskId, projectId }: ActivityTabProps) {
       </div>
 
       <div>
-        <CommentThread taskId={taskId} />
+        <CommentThread taskId={taskId} projectId={projectId} />
       </div>
     </div>
   );

@@ -161,6 +161,7 @@ export function buildServer(options: ServerOptions = {}) {
       sessionMgr,
       broadcastService,
       `http://${apiHost}:${apiPort}`,
+      heartbeatService,
     );
     chatService.setLogger(app.log);
     app.decorate("chatService", chatService);
@@ -274,7 +275,12 @@ export function buildServer(options: ServerOptions = {}) {
     app.decorate("initPromise", initPromise);
 
     // Comment service
-    const commentService = new CommentService(dbClient.db);
+    const commentService = new CommentService(
+      dbClient.db,
+      heartbeatService,
+      broadcastService,
+    );
+    app.decorate("commentService", commentService);
 
     // Notification service
     const notificationService = new NotificationService(dbClient.db);
