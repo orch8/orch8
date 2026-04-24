@@ -57,6 +57,22 @@ export {
 } from "./notification.js";
 export type { NotificationType, NotificationFilter, MarkNotificationsRead } from "./notification.js";
 export {
+  ErrorSeveritySchema,
+  ErrorSourceSchema,
+  ErrorLogSchema,
+  ErrorLogFilterSchema,
+  ResolveErrorLogSchema,
+  CreateClientErrorLogSchema,
+} from "./error-log.js";
+export type {
+  ErrorSeverity,
+  ErrorSource,
+  ErrorLog,
+  ErrorLogFilter,
+  ResolveErrorLog,
+  CreateClientErrorLog,
+} from "./error-log.js";
+export {
   DaemonLogFilterSchema,
   DaemonConfigPatchSchema,
 } from "./daemon.js";

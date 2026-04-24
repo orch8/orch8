@@ -15,6 +15,13 @@
       "when": 1779062400000,
       "tag": "0001_agent_managed_worktrees",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779408000000,
+      "tag": "0002_error_log",
+      "breakpoints": true
     }
   ]
 }
