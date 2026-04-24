@@ -15,6 +15,11 @@ const taskBase = {
   priority: TaskPrioritySchema.default("medium"),
   assignee: z.string().optional(),
   dependsOn: z.array(z.string().min(1)).optional(),
+  autoCommit: z.boolean().optional(),
+  autoPr: z.boolean().optional(),
+  finishStrategy: FinishStrategySchema.nullable().optional(),
+  mcpTools: z.array(z.string()).optional(),
+  linkedIssueIds: z.array(z.string()).optional(),
 };
 
 export const CreateQuickTaskSchema = z.object({
@@ -42,6 +47,7 @@ export const UpdateTaskSchema = z.object({
   autoPr: z.boolean().optional(),
   finishStrategy: FinishStrategySchema.nullable().optional(),
   mcpTools: z.array(z.string()).optional(),
+  linkedIssueIds: z.array(z.string()).nullable().optional(),
 });
 
 export const ConvertTaskSchema = z.object({

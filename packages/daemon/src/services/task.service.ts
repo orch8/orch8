@@ -16,19 +16,7 @@ export class TaskService {
   constructor(private db: SchemaDb) {}
 
   async create(input: CreateTaskInput): Promise<Task> {
-    const values: typeof tasks.$inferInsert = {
-      projectId: input.projectId,
-      title: input.title,
-      description: input.description,
-      taskType: input.taskType,
-      priority: input.priority,
-      assignee: input.assignee,
-    };
-
-    if (input.taskType === "brainstorm") {
-      values.brainstormStatus = "active";
-    }
-
+    const values = this.buildInsertValues(input);
     const [task] = await this.db.insert(tasks).values(values).returning();
     return task;
   }
@@ -51,19 +39,7 @@ export class TaskService {
     dependsOn: string[],
   ): Promise<Task> {
     return this.db.transaction(async (tx) => {
-      const values: typeof tasks.$inferInsert = {
-        projectId: input.projectId,
-        title: input.title,
-        description: input.description,
-        taskType: input.taskType,
-        priority: input.priority,
-        assignee: input.assignee,
-      };
-
-      if (input.taskType === "brainstorm") {
-        values.brainstormStatus = "active";
-      }
-
+      const values = this.buildInsertValues(input);
       const [task] = await tx.insert(tasks).values(values).returning();
 
       for (const depId of dependsOn) {
@@ -78,6 +54,29 @@ export class TaskService {
 
       return task;
     });
+  }
+
+  private buildInsertValues(input: CreateTaskInput): typeof tasks.$inferInsert {
+    const values: typeof tasks.$inferInsert = {
+      projectId: input.projectId,
+      title: input.title,
+      description: input.description,
+      taskType: input.taskType,
+      priority: input.priority,
+      assignee: input.assignee,
+    };
+
+    if (input.autoCommit !== undefined) values.autoCommit = input.autoCommit;
+    if (input.autoPr !== undefined) values.autoPr = input.autoPr;
+    if (input.finishStrategy !== undefined) values.finishStrategy = input.finishStrategy;
+    if (input.mcpTools !== undefined) values.mcpTools = input.mcpTools;
+    if (input.linkedIssueIds !== undefined) values.linkedIssueIds = input.linkedIssueIds;
+
+    if (input.taskType === "brainstorm") {
+      values.brainstormStatus = "active";
+    }
+
+    return values;
   }
 
   async getById(id: string): Promise<Task | null> {

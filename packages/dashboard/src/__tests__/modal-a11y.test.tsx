@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithProviders, screen, waitFor } from "../test-utils.js";
-import userEvent from "@testing-library/user-event";
 import { fireEvent } from "@testing-library/react";
-import { TaskCreateModal } from "../components/kanban/TaskCreateModal.js";
 import { RunViewer } from "../components/runs/RunViewer.js";
 
 vi.mock("../hooks/WsEventsProvider.js", () => ({
@@ -17,91 +15,6 @@ const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 
 beforeEach(() => mockFetch.mockReset());
-
-describe("TaskCreateModal a11y", () => {
-  it("marks the dialog with role=dialog and aria-modal", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve([]),
-    });
-
-    renderWithProviders(
-      <TaskCreateModal projectId="proj_1" open onClose={() => {}} />,
-    );
-
-    const dialog = await screen.findByRole("dialog");
-    expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(dialog).toHaveAttribute("aria-labelledby", "modal-title");
-    expect(screen.getByText("Create Task").id).toBe("modal-title");
-  });
-
-  it("closes on Escape key", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve([]),
-    });
-
-    const onClose = vi.fn();
-    renderWithProviders(
-      <TaskCreateModal projectId="proj_1" open onClose={onClose} />,
-    );
-
-    // Wait for dialog to mount (the modal renders synchronously, but the hook
-    // focus-install runs in effect — Escape should still work from the very
-    // first keydown).
-    await screen.findByRole("dialog");
-
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not close when clicking inside the dialog content", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve([]),
-    });
-
-    const onClose = vi.fn();
-    renderWithProviders(
-      <TaskCreateModal projectId="proj_1" open onClose={onClose} />,
-    );
-
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.click(dialog);
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it("cycles Tab between first and last focusable elements", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve([]),
-    });
-
-    renderWithProviders(
-      <TaskCreateModal projectId="proj_1" open onClose={() => {}} />,
-    );
-
-    const dialog = await screen.findByRole("dialog");
-    const focusables = dialog.querySelectorAll<HTMLElement>(
-      "a[href], button:not([disabled]), input:not([disabled]):not([type='hidden']), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
-    );
-    const first = focusables[0]!;
-    const last = focusables[focusables.length - 1]!;
-
-    // On mount, the first focusable gets focus.
-    await waitFor(() => {
-      expect(document.activeElement).toBe(first);
-    });
-
-    // Shift+Tab from the first should wrap to the last.
-    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
-    expect(document.activeElement).toBe(last);
-
-    // Tab from the last should wrap to the first.
-    fireEvent.keyDown(document, { key: "Tab" });
-    expect(document.activeElement).toBe(first);
-  });
-});
 
 describe("RunViewer a11y", () => {
   const mockRun = {

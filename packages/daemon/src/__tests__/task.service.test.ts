@@ -56,6 +56,37 @@ describe("TaskService", () => {
       expect(task.column).toBe("backlog");
     });
 
+    it("persists git and tooling config supplied at create time", async () => {
+      const task = await service.create({
+        title: "With full config",
+        projectId,
+        taskType: "quick",
+        autoCommit: true,
+        autoPr: false,
+        finishStrategy: "pr",
+        mcpTools: ["gh", "linear"],
+        linkedIssueIds: ["LIN-1", "GH-42"],
+      });
+
+      expect(task.autoCommit).toBe(true);
+      expect(task.autoPr).toBe(false);
+      expect(task.finishStrategy).toBe("pr");
+      expect(task.mcpTools).toEqual(["gh", "linear"]);
+      expect(task.linkedIssueIds).toEqual(["LIN-1", "GH-42"]);
+    });
+
+    it("applies DB defaults when config fields are omitted", async () => {
+      const task = await service.create({
+        title: "No config",
+        projectId,
+        taskType: "quick",
+      });
+
+      expect(task.autoCommit).toBe(false);
+      expect(task.autoPr).toBe(true);
+      expect(task.finishStrategy).toBeNull();
+      expect(task.mcpTools).toEqual([]);
+    });
   });
 
   describe("getById", () => {
