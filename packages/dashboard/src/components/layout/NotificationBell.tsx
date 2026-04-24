@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "@tanstack/react-router";
+import { BellIcon } from "lucide-react";
 import {
   useNotifications,
   useMarkNotificationsRead,
@@ -50,20 +51,7 @@ export function NotificationBell({ projectId }: NotificationBellProps) {
         onClick={() => setOpen(!open)}
         className="focus-ring relative rounded-sm p-1.5 text-mute hover:bg-surface-2 hover:text-ink"
       >
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path
-            d="M9 2a5 5 0 0 0-5 5v2.5L3 11v1h12v-1l-1-1.5V7a5 5 0 0 0-5-5Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M7 13a2 2 0 1 0 4 0"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
+        <BellIcon className="size-4.5" />
 
         {/* Spec: amber dot for unread. No count, no filled red badge. */}
         {unreadCount > 0 && (

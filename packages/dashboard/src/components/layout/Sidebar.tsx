@@ -1,8 +1,29 @@
 import { Link, useRouterState, useParams } from "@tanstack/react-router";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ComponentType } from "react";
+import {
+  ActivityIcon,
+  BotIcon,
+  BriefcaseBusinessIcon,
+  CircleDollarSignIcon,
+  ClipboardListIcon,
+  CpuIcon,
+  GitBranchIcon,
+  MessageSquareTextIcon,
+  RadioIcon,
+  SettingsIcon,
+} from "lucide-react";
 import { useDaemonStatus } from "../../hooks/useDaemon.js";
 import { ProjectSwitcher } from "./ProjectSwitcher.js";
 import { NotificationBell } from "./NotificationBell.js";
+import {
+  Sidebar as SidebarPrimitive,
+  SidebarGroup,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  useSidebar,
+} from "../ui/Sidebar.js";
 
 // Sidebar builds target routes at runtime by concatenating the active projectId
 // (e.g. `/projects/${id}/board`). TanStack Router's Link component checks the
@@ -16,6 +37,7 @@ interface NavItem {
   to: string;
   label: string;
   count?: number;
+  icon: ComponentType<{ className?: string }>;
 }
 
 interface NavSection {
@@ -32,36 +54,27 @@ function useProjectSections(): NavSection[] {
     {
       title: "WORK",
       items: [
-        { to: `${prefix}/board`, label: "Board" },
-        { to: `${prefix}/pipelines`, label: "Pipelines" },
+        { to: `${prefix}/board`, label: "Board", icon: ClipboardListIcon },
+        { to: `${prefix}/pipelines`, label: "Pipelines", icon: GitBranchIcon },
       ],
     },
     {
       title: "SETUP",
       items: [
-        { to: `${prefix}/agents`, label: "Agents" },
-        { to: `${prefix}/settings`, label: "Settings" },
+        { to: `${prefix}/agents`, label: "Agents", icon: BotIcon },
+        { to: `${prefix}/settings`, label: "Settings", icon: SettingsIcon },
       ],
     },
     {
       title: "MONITOR",
       items: [
-        { to: `${prefix}/runs`, label: "Runs" },
-        { to: `${prefix}/cost`, label: "Cost" },
-        { to: `${prefix}/memory`, label: "Memory" },
-        { to: `${prefix}/activity`, label: "Activity" },
+        { to: `${prefix}/runs`, label: "Runs", icon: RadioIcon },
+        { to: `${prefix}/cost`, label: "Cost", icon: CircleDollarSignIcon },
+        { to: `${prefix}/memory`, label: "Memory", icon: CpuIcon },
+        { to: `${prefix}/activity`, label: "Activity", icon: ActivityIcon },
       ],
     },
   ];
-}
-
-function navItemClass(active: boolean): string {
-  // 2px left stripe carries active state. No rounded-pill background.
-  const base =
-    "focus-ring relative flex items-center justify-between pl-3 pr-3 py-1.5 type-ui transition-colors";
-  return active
-    ? `${base} bg-surface text-ink before:absolute before:left-0 before:top-0 before:h-full before:w-[2px] before:bg-accent`
-    : `${base} text-mute hover:bg-surface-2 hover:text-ink`;
 }
 
 interface SidebarProps {
@@ -75,6 +88,7 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
   });
   const sections = useProjectSections();
   const { data: daemonStatus } = useDaemonStatus();
+  const { state } = useSidebar();
 
   function isActive(to: string) {
     if (to === "/") return pathname === "/";
@@ -82,80 +96,103 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
   }
 
   return (
-    <aside className="flex w-52 shrink-0 flex-col border-r border-edge-soft bg-sidebar">
-      {/* Project Switcher */}
-      <div className="border-b border-edge-soft p-4">
+    <SidebarPrimitive collapsible="icon">
+      <div className="border-b border-edge-soft p-3 group-data-[collapsible=icon]:p-2">
         <ProjectSwitcher />
       </div>
 
-      {/* Navigation */}
       <nav className="flex flex-1 flex-col overflow-y-auto px-2 py-3">
-        {/* Chat + Briefing — top of nav, no group label, no glyph.
-            Chat is the project landing (routes/$projectId/index.tsx still
-            redirects to /chat). Briefing is a separate destination below it. */}
         {params.projectId && (
-          <>
-            <Link
-              to={`/projects/${params.projectId}/chat` as LinkTo}
-              className={navItemClass(
-                pathname.startsWith(`/projects/${params.projectId}/chat`),
-              )}
-            >
-              <span>Chat</span>
-            </Link>
-            <Link
-              to={`/projects/${params.projectId}/briefing` as LinkTo}
-              className={navItemClass(
-                pathname.startsWith(`/projects/${params.projectId}/briefing`),
-              )}
-            >
-              <span>Briefing</span>
-            </Link>
-          </>
+          <SidebarGroup>
+            <SidebarMenu>
+              <NavLink
+                active={pathname.startsWith(`/projects/${params.projectId}/chat`)}
+                icon={MessageSquareTextIcon}
+                label="Chat"
+                onClose={onClose}
+                to={`/projects/${params.projectId}/chat`}
+              />
+              <NavLink
+                active={pathname.startsWith(`/projects/${params.projectId}/briefing`)}
+                icon={BriefcaseBusinessIcon}
+                label="Briefing"
+                onClose={onClose}
+                to={`/projects/${params.projectId}/briefing`}
+              />
+            </SidebarMenu>
+          </SidebarGroup>
         )}
 
-        {/* Grouped sections */}
         {sections.map((section) => (
-          <div key={section.title} className="mt-5">
-            <span className="px-3 type-label text-whisper">{section.title}</span>
-            <div className="mt-1 flex flex-col">
+          <SidebarGroup key={section.title} className="mt-2">
+            <span className="px-2 type-label text-whisper group-data-[collapsible=icon]:sr-only">
+              {section.title}
+            </span>
+            <SidebarMenu className="mt-1">
               {section.items.map((item) => (
-                <Link
+                <NavLink
+                  active={isActive(item.to)}
+                  count={item.count}
+                  icon={item.icon}
                   key={item.to}
+                  label={item.label}
+                  onClose={onClose}
                   to={item.to as LinkTo}
-                  className={navItemClass(isActive(item.to))}
-                >
-                  <span>{item.label}</span>
-                  {item.count != null && (
-                    <span className="type-mono text-whisper">{item.count}</span>
-                  )}
-                </Link>
+                />
               ))}
-            </div>
-          </div>
+            </SidebarMenu>
+          </SidebarGroup>
         ))}
       </nav>
 
-      {/* Footer: daemon link (sage pulse) + notification bell */}
-      <div className="border-t border-edge-soft px-3 py-3">
-        <div className="flex items-center justify-between">
-          <Link
-            to="/daemon"
-            className="focus-ring flex items-center gap-2 text-mute hover:text-ink"
+      <div className="border-t border-edge-soft p-2">
+        <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
+          <SidebarMenuButton
+            render={<Link to="/daemon" />}
+            tooltip="Daemon"
           >
-            <span
-              aria-hidden
-              className="inline-block h-1.5 w-1.5 rounded-full bg-accent"
-            />
-            <span className="type-mono">
+            <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
+            <span className="type-mono truncate">
               daemon{daemonStatus?.uptimeFormatted ? ` ${daemonStatus.uptimeFormatted}` : ""}
             </span>
-          </Link>
-          {params.projectId ? (
+          </SidebarMenuButton>
+          {params.projectId && state !== "collapsed" ? (
             <NotificationBell projectId={params.projectId} />
           ) : null}
         </div>
       </div>
-    </aside>
+      <SidebarRail />
+    </SidebarPrimitive>
+  );
+}
+
+function NavLink({
+  active,
+  count,
+  icon: Icon,
+  label,
+  onClose,
+  to,
+}: {
+  active: boolean;
+  count?: number;
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  onClose?: () => void;
+  to: LinkTo;
+}) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        isActive={active}
+        onClick={onClose}
+        render={<Link to={to} />}
+        tooltip={label}
+      >
+        <Icon />
+        <span>{label}</span>
+        {count != null && <span className="ml-auto type-mono text-whisper">{count}</span>}
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }

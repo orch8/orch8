@@ -1,29 +1,23 @@
 import type { ReactNode } from "react";
+import { useParams } from "@tanstack/react-router";
 import { Breadcrumbs } from "./Breadcrumbs.js";
+import { NotificationBell } from "./NotificationBell.js";
+import { SidebarTrigger } from "../ui/Sidebar.js";
 
 interface TopBarProps {
   primaryAction?: ReactNode;
-  onHamburgerClick?: () => void;
 }
 
-export function TopBar({ primaryAction, onHamburgerClick }: TopBarProps) {
+export function TopBar({ primaryAction }: TopBarProps) {
+  const params = useParams({ strict: false }) as { projectId?: string };
+
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-edge-soft bg-canvas px-[var(--pad-page)]">
-      {/* Left: hamburger (narrow only) + breadcrumbs */}
+    <header className="flex h-[var(--size-topbar-height)] shrink-0 items-center justify-between gap-4 border-b border-edge-soft bg-background px-[var(--pad-page)]">
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        {onHamburgerClick && (
-          <button
-            onClick={onHamburgerClick}
-            className="focus-ring shrink-0 rounded-sm px-2 py-1 type-ui text-mute hover:text-ink"
-            aria-label="Open menu"
-          >
-            Menu
-          </button>
-        )}
-        <Breadcrumbs compact={!!onHamburgerClick} />
+        <SidebarTrigger className="shrink-0" />
+        <Breadcrumbs />
       </div>
 
-      {/* Right: search (hidden on <md via CSS) + optional primary action */}
       <div className="flex items-center gap-2">
         <input
           type="text"
@@ -31,6 +25,7 @@ export function TopBar({ primaryAction, onHamburgerClick }: TopBarProps) {
           className="focus-ring hidden h-8 w-52 rounded-sm border border-edge bg-surface px-3 type-ui text-ink placeholder:text-whisper md:block"
         />
         {primaryAction}
+        {params.projectId ? <NotificationBell projectId={params.projectId} /> : null}
       </div>
     </header>
   );

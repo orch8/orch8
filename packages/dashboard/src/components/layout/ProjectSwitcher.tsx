@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
+import { ChevronDownIcon, PlusIcon, SettingsIcon } from "lucide-react";
 import { useProjects } from "../../hooks/useProjects.js";
 
 export function ProjectSwitcher() {
@@ -44,21 +45,9 @@ export function ProjectSwitcher() {
           <span className="min-w-0 truncate type-section text-ink">
             {isLoading ? "Loading…" : currentProject?.name ?? "Select Project"}
           </span>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            fill="none"
-            className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-          >
-            <path
-              d="M3 4.5l3 3 3-3"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <ChevronDownIcon
+            className={`size-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          />
         </span>
         {currentProjectId && (
           <span className="flex items-center gap-1.5">
@@ -98,17 +87,9 @@ export function ProjectSwitcher() {
                     to={`/projects/${project.id}/settings` as any}
                     onClick={() => setOpen(false)}
                     className="focus-ring rounded-sm p-0.5 text-whisper hover:text-mute"
-                    title="Project settings"
+                    aria-label="Project settings"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2" />
-                      <path
-                        d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.17 2.17l1.06 1.06M8.77 8.77l1.06 1.06M9.83 2.17l-1.06 1.06M3.23 8.77l-1.06 1.06"
-                        stroke="currentColor"
-                        strokeWidth="1.2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
+                    <SettingsIcon className="size-3" />
                   </Link>
                 )}
               </div>
@@ -121,9 +102,7 @@ export function ProjectSwitcher() {
               onClick={() => setOpen(false)}
               className="focus-ring flex items-center gap-1 rounded-sm px-1 py-1.5 type-body text-mute hover:text-ink"
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
+              <PlusIcon className="size-3.5" />
               New Project
             </Link>
           </div>

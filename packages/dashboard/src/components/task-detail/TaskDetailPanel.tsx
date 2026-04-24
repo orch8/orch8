@@ -1,3 +1,4 @@
+import { XIcon } from "lucide-react";
 import { useTask, useTasks, useUpdateTask } from "../../hooks/useTasks.js";
 import { useAgents } from "../../hooks/useAgents.js";
 import { useTaskCost } from "../../hooks/useCost.js";
@@ -41,14 +42,7 @@ export function TaskDetailPanel({ taskId, projectId, onClose }: TaskDetailPanelP
           aria-label="Close panel"
           className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M4 4l8 8M12 4l-8 8"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
+          <XIcon className="size-4" />
         </button>
       </div>
 

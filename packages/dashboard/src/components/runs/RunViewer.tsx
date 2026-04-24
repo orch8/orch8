@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { XIcon } from "lucide-react";
 import { useRun, useRunLog } from "../../hooks/useRuns.js";
 import { useRunEvents, useRunEventStream } from "../../hooks/useRunEvents.js";
 import { useModalA11y } from "../../hooks/useModalA11y.js";
@@ -86,11 +87,10 @@ export function RunViewer({ runId, projectId, onClose }: RunViewerProps) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Close run viewer"
             className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <XIcon className="size-4" />
           </button>
         </div>
 
