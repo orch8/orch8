@@ -2,6 +2,7 @@
 import Fastify from "fastify";
 import websocket from "@fastify/websocket";
 import cors from "@fastify/cors";
+import { randomUUID } from "node:crypto";
 import { spawn as nodeSpawn } from "node:child_process";
 import { registerSwagger } from "./api/swagger.js";
 import { healthRoutes } from "./api/routes/health.js";
@@ -28,6 +29,7 @@ import { activityRoutes } from "./api/routes/activity.js";
 import { daemonRoutes } from "./api/routes/daemon.js";
 import { adapterTestRoutes } from "./api/routes/adapter-test.js";
 import { notificationRoutes } from "./api/routes/notifications.js";
+import { errorRoutes } from "./api/routes/errors.js";
 import { createDbClient } from "./db/client.js";
 import { ProjectService } from "./services/project.service.js";
 import { MemoryService } from "./services/memory.service.js";
@@ -36,6 +38,7 @@ import { SummaryService } from "./services/summary.service.js";
 import { MemoryExtractionService } from "./services/memory-extraction.service.js";
 import { BroadcastService } from "./services/broadcast.service.js";
 import { NotificationService } from "./services/notification.service.js";
+import { ErrorLoggerService } from "./services/error-logger.service.js";
 import { projectSkillRoutes } from "./api/routes/project-skills.js";
 import { ProjectSkillService } from "./services/project-skill.service.js";
 import { SeedingService } from "./services/seeding.service.js";
@@ -69,6 +72,7 @@ export function buildServer(options: ServerOptions = {}) {
     ?? "info";
 
   const app = Fastify({
+    genReqId: () => `req_${randomUUID()}`,
     logger: {
       level: logLevel,
     },
@@ -90,6 +94,11 @@ export function buildServer(options: ServerOptions = {}) {
 
   registerSwagger(app);
 
+  app.addHook("onSend", async (request, reply, payload) => {
+    reply.header("x-request-id", request.id);
+    return payload;
+  });
+
   // Health check is always available (no auth required)
   app.register(healthRoutes);
 
@@ -103,6 +112,9 @@ export function buildServer(options: ServerOptions = {}) {
     // WebSocket broadcast service (owns its own socket registry — see /ws handler)
     const broadcastService = new BroadcastService();
     app.decorate("broadcastService", broadcastService);
+
+    const errorLogger = new ErrorLoggerService(dbClient.db, app.log, broadcastService);
+    app.decorate("errorLogger", errorLogger);
 
     // Core services
     const taskService = new TaskService(dbClient.db);
@@ -138,6 +150,7 @@ export function buildServer(options: ServerOptions = {}) {
     const apiPort = Number(process.env.ORCH_PORT ?? options.config?.api.port ?? 3847);
     heartbeatService.setApiUrl(`http://${apiHost}:${apiPort}`);
     heartbeatService.setLogger(app.log);
+    heartbeatService.setErrorLogger(errorLogger);
     heartbeatService.setPipelineService(pipelineService);
     app.decorate("heartbeatService", heartbeatService);
 
@@ -159,6 +172,7 @@ export function buildServer(options: ServerOptions = {}) {
       stalenessThresholdMs: (options.config?.orphan_detection.staleness_threshold_sec ?? 300) * 1000,
     });
     schedulerService.setLogger(app.log);
+    schedulerService.setErrorLogger(errorLogger);
     app.decorate("schedulerService", schedulerService);
 
     app.addHook("onClose", async () => {
@@ -265,6 +279,7 @@ export function buildServer(options: ServerOptions = {}) {
     // Notification service
     const notificationService = new NotificationService(dbClient.db);
     app.decorate("notificationService", notificationService);
+    errorLogger.setNotificationService(notificationService);
 
     // Lifecycle service
     const lifecycleService = new TaskLifecycleService(dbClient.db, taskService, broadcastService);
@@ -278,7 +293,7 @@ export function buildServer(options: ServerOptions = {}) {
 
     // Enrich request-scoped logger with correlation IDs (spec §14 §2.2)
     app.addHook("onRequest", async (request) => {
-      const childBindings: Record<string, string> = {};
+      const childBindings: Record<string, string> = { requestId: request.id };
       if (request.agent) {
         childBindings.agentId = request.agent.id;
       }
@@ -291,6 +306,49 @@ export function buildServer(options: ServerOptions = {}) {
       if (Object.keys(childBindings).length > 0) {
         request.log = request.log.child(childBindings);
       }
+    });
+
+    app.setErrorHandler((err, request, reply) => {
+      const routeError = err as Error & { code?: string; statusCode?: number };
+      const statusCode = routeError.statusCode ?? 500;
+      void app.errorLogger.record({
+        severity: statusCode >= 500 ? "error" : "warn",
+        source: "api",
+        code: routeError.code ?? routeError.name ?? "unhandled_route_error",
+        message: routeError.message,
+        err,
+        requestId: request.id,
+        httpMethod: request.method,
+        httpPath: request.routeOptions.url ?? request.url,
+        httpStatus: statusCode,
+        projectId: request.projectId,
+        agentId: request.agent?.id,
+        actorType: request.agent ? "agent" : "admin",
+        actorId: request.agent?.id,
+      });
+      return reply.code(statusCode).send({
+        error: routeError.code ?? (statusCode >= 500 ? "internal_error" : "request_error"),
+        message: statusCode >= 500 ? "Internal Server Error" : routeError.message,
+        requestId: request.id,
+      });
+    });
+
+    app.setNotFoundHandler((request, reply) => {
+      void app.errorLogger.record({
+        severity: "warn",
+        source: "api",
+        code: "route_not_found",
+        message: `${request.method} ${request.url}`,
+        requestId: request.id,
+        httpMethod: request.method,
+        httpPath: request.url,
+        httpStatus: 404,
+        projectId: request.projectId,
+        agentId: request.agent?.id,
+        actorType: request.agent ? "agent" : "admin",
+        actorId: request.agent?.id,
+      });
+      return reply.code(404).send({ error: "not_found", message: "Route not found", requestId: request.id });
     });
 
     app.register(taskRoutes);
@@ -307,6 +365,7 @@ export function buildServer(options: ServerOptions = {}) {
     app.register(daemonRoutes);
     app.register(adapterTestRoutes);
     app.register(notificationRoutes);
+    app.register(errorRoutes);
     app.register(projectSkillRoutes);
     app.register(bundledAgentRoutes);
     app.register(pipelineTemplateRoutes);
