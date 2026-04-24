@@ -69,10 +69,11 @@ describe("Sidebar", () => {
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
-  it("renders MONITOR section with Runs, Cost, Memory, Activity", () => {
+  it("renders MONITOR section with Runs, Errors, Cost, Memory, Activity", () => {
     renderSidebar();
     expect(screen.getByText("MONITOR")).toBeInTheDocument();
     expect(screen.getByText("Runs")).toBeInTheDocument();
+    expect(screen.getByText("Errors")).toBeInTheDocument();
     expect(screen.getByText("Cost")).toBeInTheDocument();
     expect(screen.getByText("Memory")).toBeInTheDocument();
     expect(screen.getByText("Activity")).toBeInTheDocument();

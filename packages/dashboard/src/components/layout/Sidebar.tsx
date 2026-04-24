@@ -2,6 +2,7 @@ import { Link, useRouterState, useParams } from "@tanstack/react-router";
 import type { ComponentProps, ComponentType } from "react";
 import {
   ActivityIcon,
+  AlertTriangleIcon,
   BotIcon,
   BriefcaseBusinessIcon,
   CircleDollarSignIcon,
@@ -69,6 +70,7 @@ function useProjectSections(): NavSection[] {
       title: "MONITOR",
       items: [
         { to: `${prefix}/runs`, label: "Runs", icon: RadioIcon },
+        { to: `${prefix}/errors`, label: "Errors", icon: AlertTriangleIcon },
         { to: `${prefix}/cost`, label: "Cost", icon: CircleDollarSignIcon },
         { to: `${prefix}/memory`, label: "Memory", icon: CpuIcon },
         { to: `${prefix}/activity`, label: "Activity", icon: ActivityIcon },
