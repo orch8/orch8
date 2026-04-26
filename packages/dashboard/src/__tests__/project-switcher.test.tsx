@@ -10,11 +10,11 @@ vi.mock("@tanstack/react-router", () => ({
     <a href={to} {...props}>{children}</a>
   ),
   useNavigate: () => mockNavigate,
-  useParams: () => ({ projectSlug: "proj_1" }),
+  useParams: () => ({ projectSlug: "alpha" }),
   useRouterState: ({ select }: any) =>
     select
-      ? select({ location: { pathname: "/projects/proj_1/board" } })
-      : { location: { pathname: "/projects/proj_1/board" } },
+      ? select({ location: { pathname: "/projects/alpha/board" } })
+      : { location: { pathname: "/projects/alpha/board" } },
 }));
 
 const mockFetch = vi.fn();

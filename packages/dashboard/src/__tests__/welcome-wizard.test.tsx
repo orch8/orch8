@@ -126,8 +126,9 @@ describe("WelcomeWizard", () => {
     expect(screen.queryByText("Create Project")).not.toBeInTheDocument();
   });
 
-  it("manual path creates project and calls onComplete with the project id", async () => {
+  it("manual path creates project and calls onComplete with the project slug", async () => {
     const projectId = "proj_manual_1";
+    const projectSlug = "manual-project";
 
     mockFetch.mockImplementation((input: any, init?: RequestInit) => {
       const url = String(input ?? "");
@@ -136,8 +137,8 @@ describe("WelcomeWizard", () => {
         return Promise.resolve({
           ok: true,
           status: 201,
-          text: () => Promise.resolve(JSON.stringify({ id: projectId })),
-          json: () => Promise.resolve({ id: projectId }),
+          text: () => Promise.resolve(JSON.stringify({ id: projectId, slug: projectSlug })),
+          json: () => Promise.resolve({ id: projectId, slug: projectSlug }),
         });
       }
       return Promise.resolve({
@@ -170,7 +171,7 @@ describe("WelcomeWizard", () => {
     await userEvent.click(screen.getByText("Finish Setup"));
 
     await waitFor(() => {
-      expect(onComplete).toHaveBeenCalledWith(projectId);
+      expect(onComplete).toHaveBeenCalledWith(projectSlug);
     });
     // onChatNavigate should NOT be called for the manual path
     expect(onChatNavigate).not.toHaveBeenCalled();
@@ -178,6 +179,7 @@ describe("WelcomeWizard", () => {
 
   it("conversational path creates project and chat, then calls onChatNavigate", async () => {
     const projectId = "proj_test123";
+    const projectSlug = "test-project";
     const chatId = "chat_test456";
 
     mockFetch.mockImplementation((input: any, init?: RequestInit) => {
@@ -198,8 +200,8 @@ describe("WelcomeWizard", () => {
         return Promise.resolve({
           ok: true,
           status: 201,
-          text: () => Promise.resolve(JSON.stringify({ id: projectId })),
-          json: () => Promise.resolve({ id: projectId }),
+          text: () => Promise.resolve(JSON.stringify({ id: projectId, slug: projectSlug })),
+          json: () => Promise.resolve({ id: projectId, slug: projectSlug }),
         });
       }
       return Promise.resolve({
@@ -228,7 +230,7 @@ describe("WelcomeWizard", () => {
     await userEvent.click(screen.getByText("Finish Setup"));
 
     await waitFor(() => {
-      expect(onChatNavigate).toHaveBeenCalledWith(projectId, chatId);
+      expect(onChatNavigate).toHaveBeenCalledWith(projectSlug, chatId);
     });
     // onComplete should NOT be called for the conversational path
     expect(onComplete).not.toHaveBeenCalled();
