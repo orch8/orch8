@@ -147,8 +147,21 @@ config in the payload:
 - `canAssignTo`: lead gets `["*"]`; workers get `[]` or specific agent IDs
 - `canMoveTo`: lead gets all columns; workers get `["in_progress", "done"]`
 - `allowedTools`: `["Bash", "Read", "Edit", "Write", "Grep", "Glob"]`
+- `desiredSkills`: **REQUIRED — never omit, never leave empty.** The `role`
+  field does NOT auto-populate skills; an agent created without
+  `desiredSkills` ships with only the auto-injected `orch8` baseline and
+  cannot verify its work, use worktrees, or finish a branch cleanly. Pick
+  the row from the matrix in the `agents` skill (`SKILL.md`, "Required and
+  optional fields" → `desiredSkills`) that matches the agent's role shape,
+  then add any extras the conversation surfaced. If the agent started from
+  a bundled template (`/api/bundled-agents`), copy that template's skill
+  list verbatim instead.
 - `budgetLimitUsd`: derive from project budget. Lead gets a larger share.
   State the allocation so the user can adjust.
+
+**Before emitting any `confirm_create_agent` card, verify its payload has
+a non-empty `desiredSkills` array.** A card without it is a bug — go back
+to the matrix and pick the right row.
 
 Example card:
 
@@ -172,6 +185,12 @@ Example card:
     "canAssignTo": ["*"],
     "canMoveTo": ["backlog", "blocked", "in_progress", "done"],
     "allowedTools": ["Bash", "Read", "Edit", "Write", "Grep", "Glob"],
+    "desiredSkills": [
+      "verification",
+      "parallel-decomposition",
+      "using-git-worktrees",
+      "finishing-a-development-branch"
+    ],
     "budgetLimitUsd": 10
   }
 }
@@ -193,6 +212,22 @@ Present all agent cards at once with a brief introduction: "Here's the team
 I'd put together for this."
 
 The user approves, edits, or cancels each card individually.
+
+### Step 4 — Audit after creation
+
+After every `result_create_agent` card has fired, fetch the project's
+agents and confirm each one has a non-empty `desiredSkills`:
+
+```bash
+curl -s "${ORCH_API_URL}/api/agents?projectId=${ORCH_PROJECT_ID}" \
+  -H "Authorization: Bearer ${ORCH_AGENT_TOKEN}" \
+  | jq '.[] | {id, role, desiredSkills}'
+```
+
+If any agent has `desiredSkills: null` or `[]`, that's a bug from the
+create flow — patch it immediately with `PATCH /api/agents/{id}` using
+the matrix row for that role. Surface this as an `info_*` card so the
+user sees what was repaired and why.
 
 ### Partial approval handling
 
