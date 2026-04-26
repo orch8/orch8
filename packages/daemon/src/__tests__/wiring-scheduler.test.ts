@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
-import { projects, agents, tasks, taskDependencies, heartbeatRuns, wakeupRequests } from "@orch/shared/db";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { projects, agents, tasks, taskDependencies } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { SchedulerService } from "../services/scheduler.service.js";
@@ -22,14 +22,6 @@ describe("Wiring: Scheduler Unblock Dispatch", () => {
 
   afterAll(async () => {
     await teardownTestDb(testDb);
-  });
-
-  beforeEach(async () => {
-    await testDb.db.delete(wakeupRequests);
-    await testDb.db.delete(heartbeatRuns);
-    await testDb.db.delete(taskDependencies);
-    await testDb.db.delete(tasks);
-    await testDb.db.delete(agents);
   });
 
   it("enqueues wakeup for assigned agent when task is unblocked", async () => {

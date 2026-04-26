@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
-import { projects, agents, chats, chatMessages, heartbeatRuns } from "@orch/shared/db";
+import { projects, agents } from "@orch/shared/db";
 import { ChatService } from "../services/chat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
 import { SessionManager } from "../adapter/session-manager.js";
@@ -20,12 +20,6 @@ describe("Chat message replay (end-to-end)", () => {
   });
 
   beforeEach(async () => {
-    await testDb.db.delete(chatMessages);
-    await testDb.db.delete(chats);
-    await testDb.db.delete(heartbeatRuns);
-    await testDb.db.delete(agents);
-    await testDb.db.delete(projects);
-
     const [project] = await testDb.db
       .insert(projects)
       .values({

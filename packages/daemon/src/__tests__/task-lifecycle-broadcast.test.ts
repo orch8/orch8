@@ -3,7 +3,7 @@ import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { TaskLifecycleService } from "../services/task-lifecycle.service.js";
 import { TaskService } from "../services/task.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
-import { projects, tasks, agents } from "@orch/shared/db";
+import { projects, tasks } from "@orch/shared/db";
 
 describe("TaskLifecycleService broadcast", () => {
   let testDb: TestDb;
@@ -27,9 +27,6 @@ describe("TaskLifecycleService broadcast", () => {
   });
 
   beforeEach(async () => {
-    await testDb.db.delete(tasks);
-    await testDb.db.delete(agents);
-    await testDb.db.delete(projects);
     mockSocket.send.mockClear();
 
     const [project] = await testDb.db.insert(projects).values({
