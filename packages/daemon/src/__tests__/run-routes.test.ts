@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import Fastify from "fastify";
 import { projects, agents, heartbeatRuns } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import { runRoutes } from "../api/routes/runs.js";
 import { authPlugin } from "../api/middleware/auth.js";
 
@@ -30,7 +31,7 @@ describe("Run Routes", () => {
     await testDb.db.delete(agents);
 
     app = Fastify();
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
     app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(runRoutes);
   });

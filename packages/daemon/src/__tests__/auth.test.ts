@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import Fastify from "fastify";
 import { projects, agents } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import { authPlugin, type AuthPluginOptions } from "../api/middleware/auth.js";
 import { generateAgentToken, hashAgentToken } from "../api/middleware/agent-token.js";
 import "../types.js";
@@ -41,7 +42,7 @@ describe("Auth Middleware", () => {
 
   function buildApp(opts: AuthPluginOptions = {}) {
     const app = Fastify();
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
     app.register(authPlugin, opts);
     app.get("/test", async (request) => ({
       isAdmin: request.isAdmin ?? false,

@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import Fastify from "fastify";
 import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
 import { authPlugin } from "../api/middleware/auth.js";
@@ -132,7 +133,7 @@ describe("Wiring: Dispatch", () => {
       const enqueueSpy = vi.spyOn(heartbeatService, "enqueueWakeup");
 
       const app = Fastify();
-      app.decorate("db", testDb.db);
+      decorateTestApp(app, testDb.db);
       app.decorate("heartbeatService", heartbeatService);
 
       const taskService = new TaskService(testDb.db);
@@ -194,7 +195,7 @@ describe("Wiring: Dispatch", () => {
       const enqueueSpy = vi.spyOn(heartbeatService, "enqueueWakeup");
 
       const app = Fastify();
-      app.decorate("db", testDb.db);
+      decorateTestApp(app, testDb.db);
       app.decorate("heartbeatService", heartbeatService);
 
       const taskService = new TaskService(testDb.db);
@@ -249,7 +250,7 @@ describe("Wiring: Dispatch", () => {
       const enqueueSpy = vi.spyOn(heartbeatService, "enqueueWakeup");
 
       const app = Fastify();
-      app.decorate("db", testDb.db);
+      decorateTestApp(app, testDb.db);
       app.decorate("heartbeatService", heartbeatService);
 
       const taskService = new TaskService(testDb.db);
@@ -399,11 +400,11 @@ describe("Wiring: Dispatch", () => {
       const taskService = new TaskService(testDb.db);
 
       const app = Fastify();
-      app.decorate("db", testDb.db);
       app.decorate("agentService", agentService);
       app.decorate("heartbeatService", heartbeatService);
       app.decorate("taskService", taskService);
       app.decorate("broadcastService", broadcastService);
+      decorateTestApp(app, testDb.db);
 
       app.register(authPlugin, { allowLocalhostAdmin: true });
       app.register(agentRoutes);

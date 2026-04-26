@@ -5,6 +5,7 @@ import { authPlugin } from "../api/middleware/auth.js";
 import { hashAgentToken } from "../api/middleware/agent-token.js";
 import { errorRoutes } from "../api/routes/errors.js";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import "../types.js";
 
 const ENG_TOKEN = "errors-eng-token";
@@ -49,7 +50,7 @@ describe("Error Routes", () => {
     await testDb.db.delete(errorLog);
 
     app = Fastify();
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
     app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(errorRoutes);
     await app.ready();

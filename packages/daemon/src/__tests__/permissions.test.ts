@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import Fastify from "fastify";
 import { projects, agents, tasks } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { requirePermission } from "../api/middleware/permissions.js";
 import { hashAgentToken } from "../api/middleware/agent-token.js";
@@ -41,7 +42,7 @@ describe("Permission Middleware", () => {
 
   function buildApp(permission: "create_task" | "move_task" | "assign_task") {
     const app = Fastify();
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
     app.register(authPlugin, { allowLocalhostAdmin: true });
     app.post("/test", {
       preHandler: requirePermission(permission),

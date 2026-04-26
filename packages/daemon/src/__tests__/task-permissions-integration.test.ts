@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vites
 import Fastify from "fastify";
 import { projects, agents, tasks, taskDependencies } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { taskRoutes } from "../api/routes/tasks.js";
 import { TaskService } from "../services/task.service.js";
@@ -67,7 +68,7 @@ describe("Task Routes Permission Enforcement", () => {
     ]);
 
     app = Fastify();
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
 
     const taskService = new TaskService(testDb.db);
     const lifecycleService = new TaskLifecycleService(testDb.db, taskService);

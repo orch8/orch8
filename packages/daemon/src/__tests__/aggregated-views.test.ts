@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import Fastify, { type FastifyInstance } from "fastify";
 import { projects, agents, heartbeatRuns } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { runRoutes } from "../api/routes/runs.js";
 import { costRoutes } from "../api/routes/cost.js";
@@ -45,7 +46,7 @@ describe("Aggregated Cross-Project Views", () => {
     ]);
 
     app = Fastify();
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
     app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(runRoutes);
     app.register(costRoutes);

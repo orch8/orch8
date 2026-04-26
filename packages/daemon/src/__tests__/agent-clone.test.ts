@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import Fastify from "fastify";
 import { projects, agents } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { agentRoutes } from "../api/routes/agents.js";
 import { AgentService } from "../services/agent.service.js";
@@ -132,7 +133,7 @@ describe("Agent Clone", () => {
       targetProjectId = tgtProj.id;
 
       app = Fastify();
-      app.decorate("db", testDb.db);
+      decorateTestApp(app, testDb.db);
       const as = new AgentService(testDb.db);
       app.decorate("agentService", as);
 

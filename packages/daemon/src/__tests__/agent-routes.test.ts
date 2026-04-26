@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import Fastify from "fastify";
 import { projects, agents, wakeupRequests } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { agentRoutes } from "../api/routes/agents.js";
 import { vi } from "vitest";
@@ -36,7 +37,7 @@ describe("Agent API Routes", () => {
     await testDb.db.delete(agents);
 
     app = Fastify();
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
 
     const agentService = new AgentService(testDb.db);
     app.decorate("agentService", agentService);

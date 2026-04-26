@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vites
 import Fastify from "fastify";
 import { projects, tasks, agents, taskDependencies } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { taskRoutes } from "../api/routes/tasks.js";
 import { TaskService } from "../services/task.service.js";
@@ -45,7 +46,7 @@ describe("Task API Routes", () => {
     await testDb.db.delete(tasks);
 
     app = Fastify();
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
 
     const taskService = new TaskService(testDb.db);
     const lifecycleService = new TaskLifecycleService(testDb.db, taskService);
@@ -74,7 +75,7 @@ describe("Task API Routes", () => {
 
       expect(response.statusCode).toBe(201);
       const body = JSON.parse(response.body);
-      expect(body.id).toMatch(/^task_/);
+      expect(body.id).toMatch(/^[A-Z0-9]+-\d+$/);
       expect(body.taskType).toBe("quick");
       expect(body.column).toBe("backlog");
     });

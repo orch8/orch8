@@ -6,6 +6,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { projects, agents, heartbeatRuns } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import { runRoutes } from "../api/routes/runs.js";
 import { authPlugin } from "../api/middleware/auth.js";
 
@@ -44,7 +45,7 @@ describe("GET /api/runs/:id/log — path safety and IO error handling", () => {
     projectId = project.id;
 
     app = Fastify();
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
     app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(runRoutes);
     await app.ready();

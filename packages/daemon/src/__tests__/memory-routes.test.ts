@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import Fastify from "fastify";
 import { projects, agents, knowledgeEntities, knowledgeFacts } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { memoryRoutes } from "../api/routes/memory.js";
 import { MemoryService } from "../services/memory.service.js";
@@ -54,7 +55,7 @@ describe("Memory Routes — Knowledge", () => {
     await testDb.db.delete(knowledgeEntities);
 
     app = Fastify();
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
     const memoryService = new MemoryService(testDb.db);
     app.decorate("memoryService", memoryService);
     app.register(authPlugin, { allowLocalhostAdmin: true });
@@ -322,7 +323,7 @@ describe("Memory Routes — Worklog + Lessons", () => {
 
   beforeEach(async () => {
     app = Fastify();
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
     const memoryService = new MemoryService(testDb.db);
     app.decorate("memoryService", memoryService);
     app.register(authPlugin, { allowLocalhostAdmin: true });
@@ -452,7 +453,7 @@ describe("Memory Routes — Full Integration", () => {
     await testDb.db.delete(knowledgeEntities);
 
     app = Fastify();
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
     const memoryService = new MemoryService(testDb.db);
     app.decorate("memoryService", memoryService);
 

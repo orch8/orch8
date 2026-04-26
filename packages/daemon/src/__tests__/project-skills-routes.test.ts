@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
+import { decorateTestApp } from "./helpers/test-app.js";
 import { projects, projectSkills } from "@orch/shared/db";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { mkdtemp } from "node:fs/promises";
@@ -40,7 +41,7 @@ describe("project-skills routes", () => {
 
     app = Fastify();
     const skillService = new ProjectSkillService(testDb.db);
-    app.decorate("db", testDb.db);
+    decorateTestApp(app, testDb.db);
     app.decorate("projectSkillService", skillService);
     app.register(projectSkillRoutes);
     await app.ready();
