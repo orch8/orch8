@@ -1,4 +1,9 @@
-import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes } from "react";
+import type {
+  HTMLAttributes,
+  ReactNode,
+  ThHTMLAttributes,
+  TdHTMLAttributes,
+} from "react";
 
 export function Table({
   children,
@@ -25,13 +30,12 @@ export function TBody({ children }: { children: ReactNode }) {
 export function TR({
   children,
   className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+  ...rest
+}: HTMLAttributes<HTMLTableRowElement> & { children: ReactNode }) {
   return (
     <tr
       className={`border-b border-dashed border-edge-soft last:border-0 hover:bg-surface-2 ${className}`}
+      {...rest}
     >
       {children}
     </tr>

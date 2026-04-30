@@ -1,6 +1,6 @@
 import { eq, and, or } from "drizzle-orm";
-import { readdir, readFile } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { join, extname, relative, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { projectSkills, agents } from "@orch/shared/db";
 import { GLOBAL_SKILLS_DIR } from "@orch/shared/defaults";
@@ -33,6 +33,60 @@ export function deriveTrustLevel(filenames: string[]): TrustLevel {
 }
 
 type ProjectSkill = typeof projectSkills.$inferSelect;
+
+export interface EditableProjectSkillInput {
+  name: string;
+  description?: string | null;
+  markdown?: string;
+  assignedAgentIds?: string[];
+}
+
+function slugifySkillName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+function stripFrontmatter(markdown: string): string {
+  if (!markdown.startsWith("---")) return markdown;
+  const end = markdown.indexOf("\n---", 3);
+  if (end === -1) return markdown;
+  return markdown.slice(end + 4).trimStart();
+}
+
+function yamlString(value: string): string {
+  return JSON.stringify(value);
+}
+
+function buildSkillMarkdown(input: {
+  name: string;
+  description?: string | null;
+  markdown?: string;
+}): string {
+  const body = stripFrontmatter(input.markdown ?? "").trimStart();
+  const description = input.description?.trim();
+  const fm = [
+    "---",
+    `name: ${yamlString(input.name.trim())}`,
+    ...(description ? [`description: ${yamlString(description)}`] : []),
+    "---",
+    "",
+  ].join("\n");
+
+  return `${fm}${body || `# ${input.name.trim()}\n\nDescribe when and how agents should use this skill.`}\n`;
+}
+
+function projectSkillDir(projectHomeDir: string, slug: string): string {
+  return join(projectHomeDir, ".orch8", "skills", slug);
+}
+
+function isInside(parent: string, child: string): boolean {
+  const rel = relative(resolve(parent), resolve(child));
+  return Boolean(rel) && !rel.startsWith("..") && !rel.startsWith("/");
+}
 
 export class ProjectSkillService {
   constructor(private db: SchemaDb) {}
@@ -96,7 +150,55 @@ export class ProjectSkillService {
     return row;
   }
 
-  async delete(projectId: string, slugOrId: string): Promise<void> {
+  async createLocal(
+    projectId: string,
+    projectHomeDir: string,
+    input: EditableProjectSkillInput & { slug?: string },
+  ): Promise<ProjectSkill> {
+    const slug = slugifySkillName(input.slug || input.name);
+    if (!slug) throw new Error("Skill slug is required");
+    if (await this.get(projectId, slug)) throw new Error("Skill already exists");
+
+    const sourceLocator = projectSkillDir(projectHomeDir, slug);
+    await mkdir(sourceLocator, { recursive: true });
+    await writeFile(
+      join(sourceLocator, "SKILL.md"),
+      buildSkillMarkdown(input),
+      "utf-8",
+    );
+
+    const skill = await this.upsertFromDirectory(projectId, slug, sourceLocator, "local_path");
+    if (input.assignedAgentIds) {
+      await this.setAgentAssignments(projectId, slug, input.assignedAgentIds);
+    }
+    return (await this.get(projectId, skill.id)) ?? skill;
+  }
+
+  async update(
+    projectId: string,
+    projectHomeDir: string,
+    slugOrId: string,
+    input: EditableProjectSkillInput,
+  ): Promise<ProjectSkill> {
+    const existing = await this.get(projectId, slugOrId);
+    if (!existing) throw new Error("Skill not found");
+
+    const sourceLocator = projectSkillDir(projectHomeDir, existing.slug);
+    await mkdir(sourceLocator, { recursive: true });
+    await writeFile(
+      join(sourceLocator, "SKILL.md"),
+      buildSkillMarkdown(input),
+      "utf-8",
+    );
+
+    const skill = await this.upsertFromDirectory(projectId, existing.slug, sourceLocator, "local_path");
+    if (input.assignedAgentIds) {
+      await this.setAgentAssignments(projectId, existing.slug, input.assignedAgentIds);
+    }
+    return (await this.get(projectId, skill.id)) ?? skill;
+  }
+
+  async delete(projectId: string, slugOrId: string, projectHomeDir?: string): Promise<void> {
     const skill = await this.get(projectId, slugOrId);
     if (!skill) return;
 
@@ -118,6 +220,87 @@ export class ProjectSkillService {
             .set({ desiredSkills: updated, updatedAt: new Date() })
             .where(and(eq(agents.id, agent.id), eq(agents.projectId, projectId)));
         }
+      }
+    });
+
+    if (projectHomeDir && skill.sourceLocator) {
+      const skillsRoot = join(projectHomeDir, ".orch8", "skills");
+      if (isInside(skillsRoot, skill.sourceLocator)) {
+        await rm(skill.sourceLocator, { recursive: true, force: true });
+      }
+    }
+  }
+
+  private async upsertFromDirectory(
+    projectId: string,
+    slug: string,
+    sourceLocator: string,
+    sourceType: string,
+  ): Promise<ProjectSkill> {
+    const skillMdPath = join(sourceLocator, "SKILL.md");
+    const content = await readFile(skillMdPath, "utf-8");
+    const { data: fm } = matter(content);
+    const files = await readdir(sourceLocator);
+    const fileInventory = files.map((f) => ({
+      path: f,
+      kind: extname(f).toLowerCase().replace(".", "") || "unknown",
+    }));
+    const values = {
+      name: (fm.name as string) ?? slug,
+      description: (fm.description as string) ?? null,
+      markdown: content,
+      sourceType,
+      sourceLocator,
+      trustLevel: deriveTrustLevel(files),
+      fileInventory,
+      updatedAt: new Date(),
+    };
+
+    const [existing] = await this.db
+      .select()
+      .from(projectSkills)
+      .where(and(eq(projectSkills.projectId, projectId), eq(projectSkills.slug, slug)));
+
+    if (existing) {
+      const [row] = await this.db
+        .update(projectSkills)
+        .set(values)
+        .where(eq(projectSkills.id, existing.id))
+        .returning();
+      return row;
+    }
+
+    const [row] = await this.db
+      .insert(projectSkills)
+      .values({ projectId, slug, ...values })
+      .returning();
+    return row;
+  }
+
+  private async setAgentAssignments(
+    projectId: string,
+    slug: string,
+    assignedAgentIds: string[],
+  ): Promise<void> {
+    const assigned = new Set(assignedAgentIds);
+    const projectAgents = await this.db
+      .select()
+      .from(agents)
+      .where(eq(agents.projectId, projectId));
+
+    await this.db.transaction(async (tx) => {
+      for (const agent of projectAgents) {
+        const current = agent.desiredSkills ?? [];
+        const shouldHave = assigned.has(agent.id);
+        const hasSkill = current.includes(slug);
+        if (shouldHave === hasSkill) continue;
+        const desiredSkills = shouldHave
+          ? [...current, slug]
+          : current.filter((s) => s !== slug);
+        await tx
+          .update(agents)
+          .set({ desiredSkills, updatedAt: new Date() })
+          .where(and(eq(agents.id, agent.id), eq(agents.projectId, projectId)));
       }
     });
   }

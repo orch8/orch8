@@ -11,6 +11,7 @@ import type {
   pipelines,
   pipelineSteps,
   pipelineTemplates,
+  projectSkills,
 } from "@orch/shared/db";
 
 // Row types inferred from Drizzle schema
@@ -26,6 +27,7 @@ export type Notification = typeof notifications.$inferSelect;
 export type Pipeline = typeof pipelines.$inferSelect;
 export type PipelineStep = typeof pipelineSteps.$inferSelect;
 export type PipelineTemplate = typeof pipelineTemplates.$inferSelect;
+export type ProjectSkill = typeof projectSkills.$inferSelect;
 
 export type ErrorLogSeverity = "warn" | "error" | "fatal";
 

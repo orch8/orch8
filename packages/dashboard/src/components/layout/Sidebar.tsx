@@ -5,6 +5,7 @@ import {
   AlertTriangleIcon,
   BotIcon,
   BriefcaseBusinessIcon,
+  BookOpenIcon,
   CircleDollarSignIcon,
   ClipboardListIcon,
   CpuIcon,
@@ -63,6 +64,7 @@ function useProjectSections(): NavSection[] {
       title: "SETUP",
       items: [
         { to: `${prefix}/agents`, label: "Agents", icon: BotIcon },
+        { to: `${prefix}/skills`, label: "Skills", icon: BookOpenIcon },
         { to: `${prefix}/settings`, label: "Settings", icon: SettingsIcon },
       ],
     },

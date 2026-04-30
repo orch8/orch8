@@ -62,10 +62,11 @@ describe("Sidebar", () => {
     expect(screen.getByText("Pipelines")).toBeInTheDocument();
   });
 
-  it("renders SETUP section with Agents and Settings", () => {
+  it("renders SETUP section with Agents, Skills, and Settings", () => {
     renderSidebar();
     expect(screen.getByText("SETUP")).toBeInTheDocument();
     expect(screen.getByText("Agents")).toBeInTheDocument();
+    expect(screen.getByText("Skills")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
@@ -90,10 +91,9 @@ describe("Sidebar", () => {
     expect(daemonLink?.getAttribute("href")).toBe("/daemon");
   });
 
-  it("does NOT render Brainstorms or Skills nav items", () => {
+  it("does NOT render Brainstorms nav item", () => {
     renderSidebar();
     expect(screen.queryByText("Brainstorms")).not.toBeInTheDocument();
-    expect(screen.queryByText("Skills")).not.toBeInTheDocument();
   });
 
   it("generates project-scoped links for project pages", () => {

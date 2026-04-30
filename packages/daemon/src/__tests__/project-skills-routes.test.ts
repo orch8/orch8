@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { decorateTestApp } from "./helpers/test-app.js";
-import { projects, projectSkills } from "@orch/shared/db";
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import { agents, projects, projectSkills } from "@orch/shared/db";
+import { eq } from "drizzle-orm";
+import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -78,6 +79,45 @@ describe("project-skills routes", () => {
     expect(body.name).toBe("Test Skill");
   });
 
+  it("POST /api/projects/:projectId/skills creates a project-local skill and assigns it to agents", async () => {
+    await testDb.db.insert(agents).values({
+      id: "agent-1",
+      projectId,
+      name: "Agent One",
+      role: "engineer",
+      status: "active",
+      model: "opus",
+      desiredSkills: [],
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/skills`,
+      payload: {
+        name: "Review Helper",
+        description: "Review pull requests",
+        markdown: "# Procedure\n\nRead the diff.",
+        assignedAgentIds: ["agent-1"],
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.slug).toBe("review-helper");
+    expect(body.sourceType).toBe("local_path");
+    expect(body.markdown).toContain("Read the diff.");
+
+    const skillFile = join(projectHomeDir, ".orch8", "skills", "review-helper", "SKILL.md");
+    const content = await readFile(skillFile, "utf-8");
+    expect(content).toContain('name: "Review Helper"');
+
+    const [agent] = await testDb.db
+      .select()
+      .from(agents)
+      .where(eq(agents.id, "agent-1"));
+    expect(agent.desiredSkills).toContain("review-helper");
+  });
+
   it("GET /api/projects/:projectId/skills/:slug returns a skill", async () => {
     const skillDir = join(projectHomeDir, ".orch8", "skills", "fetch-me");
     await mkdir(skillDir, { recursive: true });
@@ -142,6 +182,35 @@ describe("project-skills routes", () => {
 
     expect(res.statusCode).toBe(403);
     expect(res.json().error).toContain("global");
+  });
+
+  it("PATCH /api/projects/:projectId/skills/:slug edits a global skill as a local override", async () => {
+    await testDb.db.insert(projectSkills).values({
+      projectId,
+      slug: "global-tdd",
+      name: "TDD",
+      markdown: "---\nname: TDD\n---\n# Old",
+      sourceType: "global",
+      sourceLocator: "/global/tdd",
+      trustLevel: "markdown_only",
+    });
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/api/projects/${projectId}/skills/global-tdd`,
+      payload: {
+        name: "TDD Local",
+        description: "Project version",
+        markdown: "# New\nLocal procedure",
+        assignedAgentIds: [],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.sourceType).toBe("local_path");
+    expect(body.sourceLocator).toContain(join(".orch8", "skills", "global-tdd"));
+    expect(body.markdown).toContain("Local procedure");
   });
 
   it("POST /api/projects/:projectId/skills/sync triggers disk sync", async () => {
