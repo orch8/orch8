@@ -28,6 +28,42 @@ export function useSyncProjectSkills(projectId: string) {
   });
 }
 
+export interface SaveProjectSkillInput {
+  name: string;
+  description?: string | null;
+  markdown?: string;
+  assignedAgentIds?: string[];
+}
+
+export function useCreateProjectSkill(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SaveProjectSkillInput & { slug?: string }) =>
+      api.post<ProjectSkill>(`/projects/${projectId}/skills`, input),
+    onSuccess: (skill) => {
+      qc.invalidateQueries({ queryKey: ["project-skills", projectId] });
+      qc.invalidateQueries({ queryKey: ["agents", projectId] });
+      qc.setQueryData(["project-skill", projectId, skill.id], skill);
+    },
+  });
+}
+
+export function useUpdateProjectSkill(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skillId, ...input }: SaveProjectSkillInput & { skillId: string }) =>
+      api.patch<ProjectSkill>(`/projects/${projectId}/skills/${skillId}`, input),
+    onSuccess: (skill, variables) => {
+      qc.invalidateQueries({ queryKey: ["project-skills", projectId] });
+      qc.invalidateQueries({ queryKey: ["agents", projectId] });
+      qc.setQueryData(["project-skill", projectId, skill.id], skill);
+      if (variables.skillId !== skill.id) {
+        qc.setQueryData(["project-skill", projectId, variables.skillId], skill);
+      }
+    },
+  });
+}
+
 export function useDeleteProjectSkill(projectId: string) {
   const qc = useQueryClient();
   return useMutation({

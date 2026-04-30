@@ -4,6 +4,8 @@ import {
   AlertTriangleIcon,
   BookOpenIcon,
   FileTextIcon,
+  Loader2Icon,
+  PlusIcon,
   RefreshCwIcon,
   SearchIcon,
   ShieldAlertIcon,
@@ -12,6 +14,7 @@ import {
 } from "lucide-react";
 import { useAgents } from "../../../../hooks/useAgents.js";
 import {
+  useCreateProjectSkill,
   useProjectSkills,
   useSyncProjectSkills,
 } from "../../../../hooks/useProjectSkills.js";
@@ -19,9 +22,19 @@ import { Button } from "../../../../components/ui/Button.js";
 import { Badge } from "../../../../components/ui/Badge.js";
 import { EmptyState } from "../../../../components/ui/EmptyState.js";
 import { Input } from "../../../../components/ui/Input.js";
+import { Textarea } from "../../../../components/ui/Textarea.js";
 import { PageHeader } from "../../../../components/ui/PageHeader.js";
 import { Skeleton } from "../../../../components/ui/Skeleton.js";
 import { Table, TBody, TD, TH, THead, TR } from "../../../../components/ui/Table.js";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogTitle,
+} from "../../../../components/ui/Dialog.js";
 import type { Agent, ProjectSkill } from "../../../../types.js";
 
 type FilterKey = "all" | "used" | "unused" | "project" | "global";
@@ -49,6 +62,7 @@ function SkillsPage() {
   const syncSkills = useSyncProjectSkills(projectId);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [createOpen, setCreateOpen] = useState(false);
 
   const assignments = useMemo(() => buildAssignments(agents), [agents]);
 
@@ -100,15 +114,21 @@ function SkillsPage() {
         title="Skills"
         subtitle="Project and global instructions your agents can opt into."
         actions={
-          <Button
-            onClick={() => syncSkills.mutate()}
-            disabled={syncSkills.isPending}
-            variant="outline"
-            size="sm"
-          >
-            <RefreshCwIcon className={syncSkills.isPending ? "animate-spin" : ""} />
-            {syncSkills.isPending ? "Syncing" : "Sync from disk"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => syncSkills.mutate()}
+              disabled={syncSkills.isPending}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCwIcon className={syncSkills.isPending ? "animate-spin" : ""} />
+              {syncSkills.isPending ? "Syncing" : "Sync from disk"}
+            </Button>
+            <Button onClick={() => setCreateOpen(true)} size="sm" variant="primary">
+              <PlusIcon />
+              New skill
+            </Button>
+          </div>
         }
       />
 
@@ -190,6 +210,183 @@ function SkillsPage() {
             </TBody>
           </Table>
         )}
+      </div>
+
+      <CreateSkillDialog
+        agents={agents}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(skill) => {
+          setCreateOpen(false);
+          navigate({
+            to: "/projects/$projectSlug/skills/$skillId",
+            params: { projectSlug: projectId, skillId: skill.id },
+          });
+        }}
+        open={createOpen}
+        projectId={projectId}
+      />
+    </div>
+  );
+}
+
+function CreateSkillDialog({
+  agents,
+  onClose,
+  onCreated,
+  open,
+  projectId,
+}: {
+  agents: Agent[];
+  onClose: () => void;
+  onCreated: (skill: ProjectSkill) => void;
+  open: boolean;
+  projectId: string;
+}) {
+  const createSkill = useCreateProjectSkill(projectId);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [markdown, setMarkdown] = useState("");
+  const [assignedAgentIds, setAssignedAgentIds] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  function reset() {
+    setName("");
+    setDescription("");
+    setMarkdown("");
+    setAssignedAgentIds([]);
+    setError(null);
+  }
+
+  function close() {
+    reset();
+    onClose();
+  }
+
+  async function submit() {
+    setError(null);
+    try {
+      const skill = await createSkill.mutateAsync({
+        name,
+        description,
+        markdown,
+        assignedAgentIds,
+      });
+      reset();
+      onCreated(skill);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create skill");
+    }
+  }
+
+  function toggleAgent(agentId: string) {
+    setAssignedAgentIds((current) =>
+      current.includes(agentId)
+        ? current.filter((id) => id !== agentId)
+        : [...current, agentId],
+    );
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          reset();
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>New skill</DialogTitle>
+          <DialogDescription>
+            Create a project-local SKILL.md and choose which agents should receive it.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogPanel className="space-y-4">
+          <Input
+            autoFocus
+            label="Name"
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Review helper"
+            value={name}
+          />
+          <Textarea
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="When should agents use this skill?"
+            rows={3}
+            value={description}
+          />
+          <Textarea
+            className="font-mono"
+            onChange={(event) => setMarkdown(event.target.value)}
+            placeholder={"# Instructions\n\nWrite the reusable procedure here."}
+            rows={10}
+            value={markdown}
+          />
+          <AgentChecklist
+            agents={agents}
+            selectedAgentIds={assignedAgentIds}
+            toggleAgent={toggleAgent}
+          />
+          {error ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 type-body text-destructive-foreground">
+              {error}
+            </p>
+          ) : null}
+        </DialogPanel>
+        <DialogFooter>
+          <Button onClick={close} variant="ghost" disabled={createSkill.isPending}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!name.trim() || createSkill.isPending}
+            onClick={submit}
+            variant="primary"
+          >
+            {createSkill.isPending ? <Loader2Icon className="animate-spin" /> : <PlusIcon />}
+            Create skill
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AgentChecklist({
+  agents,
+  selectedAgentIds,
+  toggleAgent,
+}: {
+  agents: Agent[];
+  selectedAgentIds: string[];
+  toggleAgent: (agentId: string) => void;
+}) {
+  if (agents.length === 0) {
+    return <p className="type-body text-mute">No agents in this project yet.</p>;
+  }
+
+  return (
+    <div>
+      <p className="mb-2 type-label text-mute">Assign to agents</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {agents.map((agent) => (
+          <label
+            className="flex cursor-pointer items-center gap-2 rounded-lg border border-edge-soft bg-surface px-3 py-2 hover:bg-surface-2"
+            key={agent.id}
+          >
+            <input
+              checked={selectedAgentIds.includes(agent.id)}
+              className="size-4 accent-primary"
+              onChange={() => toggleAgent(agent.id)}
+              type="checkbox"
+            />
+            <span className="min-w-0">
+              <span className="block truncate type-body font-medium text-ink">{agent.name}</span>
+              <span className="block truncate type-micro">{agent.role}</span>
+            </span>
+          </label>
+        ))}
       </div>
     </div>
   );
