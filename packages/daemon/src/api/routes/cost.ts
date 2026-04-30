@@ -25,6 +25,7 @@ export async function costRoutes(app: FastifyInstance) {
       .select({
         agentId: heartbeatRuns.agentId,
         totalCost: sql<number>`COALESCE(SUM(${heartbeatRuns.costUsd}), 0)`.as("totalCost"),
+        totalTokens: sql<number>`COALESCE(SUM(COALESCE((${heartbeatRuns.usageJson}->>'input_tokens')::int, 0) + COALESCE((${heartbeatRuns.usageJson}->>'output_tokens')::int, 0)), 0)`.as("totalTokens"),
         runCount: sql<number>`COUNT(*)`.as("runCount"),
       })
       .from(heartbeatRuns);
@@ -36,8 +37,9 @@ export async function costRoutes(app: FastifyInstance) {
     const byAgent = await query.groupBy(heartbeatRuns.agentId);
 
     const total = byAgent.reduce((sum, row) => sum + Number(row.totalCost), 0);
+    const totalTokens = byAgent.reduce((sum, row) => sum + Number(row.totalTokens), 0);
 
-    return { total, byAgent };
+    return { total, totalTokens, byAgent };
   });
 
   // GET /api/cost/timeseries — Time-series cost data

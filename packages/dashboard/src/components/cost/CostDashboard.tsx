@@ -35,6 +35,13 @@ export function CostDashboard({ projectId }: CostDashboardProps) {
           </p>
         </div>
 
+        <div className="rounded-md border border-edge-soft bg-surface p-4">
+          <span className="type-micro text-whisper">Total Tokens</span>
+          <p className="mt-1 type-numeral text-ink">
+            {summary?.totalTokens.toLocaleString() ?? "\u2014"}
+          </p>
+        </div>
+
         {project?.budgetLimitUsd != null && (
           <BudgetGauge
             label="Project Budget"
