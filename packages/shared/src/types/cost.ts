@@ -6,9 +6,11 @@
 
 export interface CostSummary {
   total: number;
+  totalTokens: number;
   byAgent: Array<{
     agentId: string;
     totalCost: number;
+    totalTokens: number;
     runCount: number;
   }>;
 }

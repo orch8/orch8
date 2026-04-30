@@ -48,9 +48,9 @@ describe("Cost Routes", () => {
   describe("GET /api/cost/summary", () => {
     it("returns aggregated cost by agent", async () => {
       await testDb.db.insert(heartbeatRuns).values([
-        { agentId: "eng-1", projectId, invocationSource: "on_demand", status: "succeeded", costUsd: 0.05, finishedAt: new Date() },
-        { agentId: "eng-1", projectId, invocationSource: "on_demand", status: "succeeded", costUsd: 0.10, finishedAt: new Date() },
-        { agentId: "eng-2", projectId, invocationSource: "on_demand", status: "succeeded", costUsd: 0.20, finishedAt: new Date() },
+        { agentId: "eng-1", projectId, invocationSource: "on_demand", status: "succeeded", costUsd: 0.05, usageJson: { input_tokens: 100, output_tokens: 20 }, finishedAt: new Date() },
+        { agentId: "eng-1", projectId, invocationSource: "on_demand", status: "succeeded", costUsd: 0.10, usageJson: { input_tokens: 200, output_tokens: 30 }, finishedAt: new Date() },
+        { agentId: "eng-2", projectId, invocationSource: "on_demand", status: "succeeded", costUsd: 0.20, usageJson: { input_tokens: 300, output_tokens: 40 }, finishedAt: new Date() },
       ]);
 
       const res = await app.inject({
@@ -62,6 +62,7 @@ describe("Cost Routes", () => {
       expect(res.statusCode).toBe(200);
       const body = res.json();
       expect(body.total).toBeCloseTo(0.35, 2);
+      expect(body.totalTokens).toBe(690);
       expect(body.byAgent).toHaveLength(2);
     });
   });

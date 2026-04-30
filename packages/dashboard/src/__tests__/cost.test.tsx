@@ -24,6 +24,7 @@ beforeEach(() => mockFetch.mockReset());
 
 const mockSummary = {
   total: 15.5,
+  totalTokens: 34500,
   byAgent: [
     { agentId: "eng", totalCost: 10.0, runCount: 25 },
     { agentId: "qa", totalCost: 5.5, runCount: 12 },
@@ -74,6 +75,29 @@ describe("CostDashboard", () => {
 
     await waitFor(() => {
       expect(screen.getByText("$15.50")).toBeInTheDocument();
+    });
+  });
+
+  it("renders total tokens next to total cost", async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSummary),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTimeseries),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ budgetLimitUsd: 100, budgetSpentUsd: 15.5 }),
+      });
+
+    renderWithProviders(<CostDashboard projectId="proj_1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Total Tokens")).toBeInTheDocument();
+      expect(screen.getByText("34,500")).toBeInTheDocument();
     });
   });
 
