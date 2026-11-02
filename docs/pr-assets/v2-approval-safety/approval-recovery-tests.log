@@ -1,0 +1,218 @@
+RUN  v3.2.4 /home/hermes/projects/orch8-approval-safety/packages/daemon
+
+The files belonging to this database system will be owned by user "hermes".
+This user must also own the server process.
+
+
+The database cluster will be initialized with this locale configuration:
+  locale provider:   libc
+  LC_COLLATE:  C
+  LC_CTYPE:    C
+  LC_MESSAGES: en_US.UTF-8
+  LC_MONETARY: C
+  LC_NUMERIC:  C
+  LC_TIME:     C
+The default database encoding has accordingly been set to "SQL_ASCII".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /tmp/orch8-test-bb36f462-1e92-42f7-8f25-9abc56edc5f4 ... ok
+creating subdirectories ...
+ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ...
+100
+selecting default "shared_buffers" ...
+128MB
+selecting default time zone ...
+Etc/UTC
+creating configuration files ...
+ok
+running bootstrap script ...
+ok
+performing post-bootstrap initialization ...
+ok
+syncing data to disk ...
+ok
+
+Success. You can now start the database server using:
+
+    '/home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/@embedded-postgres+linux-x64@18.3.0-beta.16/node_modules/@embedded-postgres/linux-x64/native/bin/pg_ctl' -D /tmp/orch8-test-bb36f462-1e92-42f7-8f25-9abc56edc5f4 -l logfile start
+
+
+2026-11-02 23:31:39.772 UTC [3223135] LOG:  starting PostgreSQL 18.3 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit
+2026-11-02 23:31:39.772 UTC [3223135] LOG:  listening on IPv6 address "::1", port 42209
+2026-11-02 23:31:39.772 UTC [3223135] LOG:  listening on IPv4 address "127.0.0.1", port 42209
+
+2026-11-02 23:31:39.774 UTC [3223135] LOG:  listening on Unix socket "/tmp/.s.PGSQL.42209"
+
+2026-11-02 23:31:39.780 UTC [3223141] LOG:  database system was shut down at 2026-11-02 23:31:39 UTC
+
+2026-11-02 23:31:39.783 UTC [3223135] LOG:  database system is ready to accept connections
+
+{"level":30,"time":1793662302387,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","agentId":"approval-agent","projectId":"proj_27ea277a-96ad-45e1-8a09-235cac16cc13","msg":"rotated agent token for approval-agent - no file found on disk"}
+{"level":30,"time":1793662302428,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_88bc9e81-6994-4254-8766-7e418792c7aa","req":{"method":"POST","url":"/api/pipelines/pipe_cf231089-96a9-4e80-8602-48c64ff071bd/steps/pstep_8747b711-3b9d-42dc-9fc9-eae308f5f8f3/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662302449,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_88bc9e81-6994-4254-8766-7e418792c7aa","res":{"statusCode":200},"responseTime":21.15269660949707,"msg":"request completed"}
+{"level":30,"time":1793662302470,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_e0d4b3bb-4c79-4f56-b979-d1012f812d6f","req":{"method":"POST","url":"/api/pipelines/missing/steps/missing/approve","host":"localhost:80","remoteAddress":"192.0.2.1"},"msg":"incoming request"}
+{"level":40,"time":1793662302470,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","severity":"warn","source":"api","code":"auth_denied","message":"Admin authentication required","requestId":"req_e0d4b3bb-4c79-4f56-b979-d1012f812d6f","httpMethod":"POST","httpPath":"/api/pipelines/missing/steps/missing/approve","httpStatus":401,"actorType":"system","metadata":{"hasBearer":false,"allowLocalhostAdmin":true},"msg":"Admin authentication required"}
+{"level":30,"time":1793662302471,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_e0d4b3bb-4c79-4f56-b979-d1012f812d6f","res":{"statusCode":401},"responseTime":1.7669000625610352,"msg":"request completed"}
+{"level":30,"time":1793662302496,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","msg":"Global skills directory populated"}
+{"level":30,"time":1793662302516,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_d0166dcd-f079-4349-966b-282a48e8cd4d","req":{"method":"POST","url":"/api/pipelines/pipe_aa02aa22-148b-4786-8ec7-078aca0fc5d6/steps/pstep_52fa5788-41f5-4e72-909a-64093843f6ac/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662302519,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_d0166dcd-f079-4349-966b-282a48e8cd4d","res":{"statusCode":400},"responseTime":2.278289794921875,"msg":"request completed"}
+{"level":30,"time":1793662302559,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_772a47c3-8ac9-413c-a19a-9df3a195482d","req":{"method":"POST","url":"/api/pipelines/pipe_9afce5f8-05f8-4fdf-ba7d-ea82ded8733c/steps/pstep_46ae3fb4-868e-4a4b-8881-4c75b2b18c8c/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662302565,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_772a47c3-8ac9-413c-a19a-9df3a195482d","res":{"statusCode":400},"responseTime":5.338161468505859,"msg":"request completed"}
+{"level":30,"time":1793662302601,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","count":1,"msg":"Synced skills for all projects"}
+{"level":30,"time":1793662302614,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_41524766-8aee-4207-8d02-1f4065520555","req":{"method":"POST","url":"/api/pipelines/pipe_72c472e0-b341-4217-9f9b-fd756ea33461/steps/pstep_54e34ee3-f5be-4936-8c99-1e1d46b5b163/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662302617,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_41524766-8aee-4207-8d02-1f4065520555","res":{"statusCode":400},"responseTime":2.5465011596679688,"msg":"request completed"}
+{"level":30,"time":1793662302627,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","scanned":1,"provisioned":1,"msg":"Chat-agent backfill complete"}
+{"level":30,"time":1793662302650,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_2a96169e-81e9-4df3-8501-7fcb69211063","req":{"method":"POST","url":"/api/pipelines/pipe_4844345b-9768-46e9-8b8e-dd163ad08b13/steps/pstep_02d568cd-7ca6-4386-be04-29a5265c04a9/reject","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662302660,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_2a96169e-81e9-4df3-8501-7fcb69211063","res":{"statusCode":200},"responseTime":9.581393241882324,"msg":"request completed"}
+{"level":30,"time":1793662302665,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_02d43bb1-0fa7-48e8-a5b4-e073e64cf3bc","req":{"method":"POST","url":"/api/pipelines/missing/steps/missing/reject","host":"localhost:80","remoteAddress":"192.0.2.1"},"msg":"incoming request"}
+{"level":40,"time":1793662302665,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","severity":"warn","source":"api","code":"auth_denied","message":"Admin authentication required","requestId":"req_02d43bb1-0fa7-48e8-a5b4-e073e64cf3bc","httpMethod":"POST","httpPath":"/api/pipelines/missing/steps/missing/reject","httpStatus":401,"actorType":"system","metadata":{"hasBearer":false,"allowLocalhostAdmin":true},"msg":"Admin authentication required"}
+{"level":30,"time":1793662302666,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_02d43bb1-0fa7-48e8-a5b4-e073e64cf3bc","res":{"statusCode":401},"responseTime":0.8517494201660156,"msg":"request completed"}
+{"level":30,"time":1793662302700,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_0fe338b0-aab4-4281-9eda-d9a64c7c90d7","req":{"method":"POST","url":"/api/pipelines/pipe_2ba4f8dd-8765-4a4b-9ea4-6de75fe9e9b5/steps/pstep_2cde5e3c-56d3-4315-a544-7c738ae43b67/reject","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662302703,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_0fe338b0-aab4-4281-9eda-d9a64c7c90d7","res":{"statusCode":400},"responseTime":2.8897294998168945,"msg":"request completed"}
+{"level":30,"time":1793662302727,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_38c93e1e-af50-4666-aa31-6936917b145b","req":{"method":"POST","url":"/api/pipelines/pipe_beef86ee-3dd3-4d53-89f3-1d46bf5d4ddc/steps/pstep_f0c7bd6b-634b-4158-b038-53d7cb9712fc/reject","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662302730,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_38c93e1e-af50-4666-aa31-6936917b145b","res":{"statusCode":400},"responseTime":2.544590950012207,"msg":"request completed"}
+{"level":30,"time":1793662302771,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_1b94ea41-c17d-4ada-94c3-d1a16f728425","req":{"method":"POST","url":"/api/pipelines/pipe_3b19b8e4-1bc6-4f81-980e-a623eaac3cab/steps/pstep_a23367cc-5e98-4044-8b8a-9587d23f0f59/reject","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662302773,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_1b94ea41-c17d-4ada-94c3-d1a16f728425","res":{"statusCode":400},"responseTime":2.0747900009155273,"msg":"request completed"}
+{"level":30,"time":1793662303160,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_31d38306-d044-4925-bae2-11ea2993f232","req":{"method":"POST","url":"/api/pipelines/pipe_7a82d802-8139-4647-bae5-a29a666485fb/steps/pstep_2d01db1a-a6cf-4d47-a066-6f5d571502b3/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662303160,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_4e164e04-1882-47b3-b31a-d7df8dbdbf49","req":{"method":"POST","url":"/api/pipelines/pipe_7a82d802-8139-4647-bae5-a29a666485fb/steps/pstep_2d01db1a-a6cf-4d47-a066-6f5d571502b3/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662303160,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_71a5cf17-6c93-4162-962c-e5a2be6ff350","req":{"method":"POST","url":"/api/pipelines/pipe_7a82d802-8139-4647-bae5-a29a666485fb/steps/pstep_2d01db1a-a6cf-4d47-a066-6f5d571502b3/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662303160,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_9dfeb105-005a-4dff-924a-ebf0ce72928f","req":{"method":"POST","url":"/api/pipelines/pipe_7a82d802-8139-4647-bae5-a29a666485fb/steps/pstep_2d01db1a-a6cf-4d47-a066-6f5d571502b3/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662303160,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_3806aa96-b37b-4d61-849a-e209d9ebfec9","req":{"method":"POST","url":"/api/pipelines/pipe_7a82d802-8139-4647-bae5-a29a666485fb/steps/pstep_2d01db1a-a6cf-4d47-a066-6f5d571502b3/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662303160,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_57ed8db3-cb32-4aac-bdb1-ff648d5a283f","req":{"method":"POST","url":"/api/pipelines/pipe_7a82d802-8139-4647-bae5-a29a666485fb/steps/pstep_2d01db1a-a6cf-4d47-a066-6f5d571502b3/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662303160,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_691a4b39-61f8-494f-b5c0-2033b0abfd9d","req":{"method":"POST","url":"/api/pipelines/pipe_7a82d802-8139-4647-bae5-a29a666485fb/steps/pstep_2d01db1a-a6cf-4d47-a066-6f5d571502b3/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662303160,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_4fbeba36-3932-4cfd-93c7-1e5c94ab428d","req":{"method":"POST","url":"/api/pipelines/pipe_7a82d802-8139-4647-bae5-a29a666485fb/steps/pstep_2d01db1a-a6cf-4d47-a066-6f5d571502b3/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662303190,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_31d38306-d044-4925-bae2-11ea2993f232","res":{"statusCode":200},"responseTime":29.845409393310547,"msg":"request completed"}
+{"level":30,"time":1793662303193,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_4e164e04-1882-47b3-b31a-d7df8dbdbf49","res":{"statusCode":400},"responseTime":33.307440757751465,"msg":"request completed"}
+{"level":30,"time":1793662303194,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_4fbeba36-3932-4cfd-93c7-1e5c94ab428d","res":{"statusCode":400},"responseTime":34.173001289367676,"msg":"request completed"}
+{"level":30,"time":1793662303196,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_71a5cf17-6c93-4162-962c-e5a2be6ff350","res":{"statusCode":400},"responseTime":35.9667911529541,"msg":"request completed"}
+{"level":30,"time":1793662303198,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_9dfeb105-005a-4dff-924a-ebf0ce72928f","res":{"statusCode":400},"responseTime":37.64769172668457,"msg":"request completed"}
+{"level":30,"time":1793662303199,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_3806aa96-b37b-4d61-849a-e209d9ebfec9","res":{"statusCode":400},"responseTime":38.96210193634033,"msg":"request completed"}
+{"level":30,"time":1793662303201,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_691a4b39-61f8-494f-b5c0-2033b0abfd9d","res":{"statusCode":400},"responseTime":40.44528293609619,"msg":"request completed"}
+{"level":30,"time":1793662303202,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_57ed8db3-cb32-4aac-bdb1-ff648d5a283f","res":{"statusCode":400},"responseTime":41.43173313140869,"msg":"request completed"}
+{"level":30,"time":1793662303204,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_0586826c-3643-4700-ad6a-5b996d38c0eb","req":{"method":"POST","url":"/api/pipelines/pipe_7a82d802-8139-4647-bae5-a29a666485fb/steps/pstep_2d01db1a-a6cf-4d47-a066-6f5d571502b3/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662303206,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_0586826c-3643-4700-ad6a-5b996d38c0eb","res":{"statusCode":400},"responseTime":1.6136798858642578,"msg":"request completed"}
+{"level":30,"time":1793662303369,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_92ad1920-1edc-4790-91de-04ac2103711b","req":{"method":"POST","url":"/api/pipelines/pipe_c8e88988-730f-4af0-9909-f296d74646e3/steps/pstep_5ee0de9e-2e98-4e48-9f2f-190b66f33958/reject","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662303378,"pid":3223148,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_92ad1920-1edc-4790-91de-04ac2103711b","res":{"statusCode":200},"responseTime":8.77557373046875,"msg":"request completed"}
+2026-11-02 23:31:43.405 UTC [3223139] LOG:  checkpoint starting: immediate force wait
+
+2026-11-02 23:31:43.632 UTC [3223139] LOG:  checkpoint complete: wrote 1948 buffers (11.9%), wrote 4 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.075 s, sync=0.147 s, total=0.228 s; sync files=721, longest=0.003 s, average=0.001 s; distance=14717 kB, estimate=14717 kB; lsn=0/25AB050, redo lsn=0/25AAFF8
+
+ ❯ src/__tests__/pipeline-approval-safety.test.ts (25 tests | 2 failed) 1834ms
+   × pipeline approval safety > denies agent approve without writes or wakeups 95ms
+     → expected 200 to be 403 // Object.is equality
+   ✓ pipeline approval safety > denies unauthenticated approve 13ms
+   ✓ pipeline approval safety > refuses approve on completed pipeline 50ms
+   ✓ pipeline approval safety > refuses approve on failed pipeline 48ms
+   ✓ pipeline approval safety > refuses approve on cancelled pipeline 52ms
+   × pipeline approval safety > denies agent reject without writes or wakeups 38ms
+     → expected 200 to be 403 // Object.is equality
+   ✓ pipeline approval safety > denies unauthenticated reject 5ms
+   ✓ pipeline approval safety > refuses reject on completed pipeline 39ms
+   ✓ pipeline approval safety > refuses reject on failed pipeline 28ms
+   ✓ pipeline approval safety > refuses reject on cancelled pipeline 44ms
+   ✓ pipeline approval safety > refuses approve of a stale non-current gate 38ms
+   ✓ pipeline approval safety > refuses reject of a stale non-current gate 32ms
+   ✓ pipeline approval safety > refuses rejection of a completed step 32ms
+   ✓ pipeline approval safety > refuses rejection of a failed step 44ms
+   ✓ pipeline approval safety > refuses rejection of a skipped step 34ms
+   ✓ pipeline approval safety > concurrent approve and reject accept only one decision 51ms
+   ✓ pipeline approval safety > refuses foreign approval step without mutations 49ms
+   ✓ pipeline approval safety > refuses missing approval pipeline without mutations 27ms
+   ✓ pipeline approval safety > refuses foreign rejection source and target without mutations 59ms
+   ✓ pipeline approval safety > concurrent approvals create exactly one successor and replay does not dispatch 62ms
+   ✓ pipeline approval safety > rolls back approval on failed pipeline update 27ms
+   ✓ pipeline approval safety > rolls back approval on failed successor insert 35ms
+   ✓ pipeline approval safety > rolls back approval on failed successor backlink 49ms
+   ✓ pipeline approval safety > rolls back last-step approval if final pipeline update fails 29ms
+   ✓ pipeline approval safety > admin rejection preserves response shape 33ms
+{"level":30,"time":1793662305125,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_c9be2d61-d5ba-4d5c-b5ea-9d248814602c","req":{"method":"POST","url":"/api/pipeline-templates","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305133,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_c9be2d61-d5ba-4d5c-b5ea-9d248814602c","res":{"statusCode":201},"responseTime":7.939182281494141,"msg":"request completed"}
+{"level":30,"time":1793662305138,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_de8f024f-7508-4cab-b06b-f9fb9a164c7d","req":{"method":"POST","url":"/api/pipeline-templates","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305139,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","msg":"Global skills directory populated"}
+{"level":30,"time":1793662305146,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_de8f024f-7508-4cab-b06b-f9fb9a164c7d","res":{"statusCode":201},"responseTime":8.258913040161133,"msg":"request completed"}
+{"level":30,"time":1793662305147,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_a4e6ef22-708d-45fc-9975-503f62914c34","req":{"method":"GET","url":"/api/pipeline-templates?projectId=proj_18225bf8-9fd2-451a-85a6-bd71fbd0cfb4","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305151,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_a4e6ef22-708d-45fc-9975-503f62914c34","res":{"statusCode":200},"responseTime":4.108281135559082,"msg":"request completed"}
+{"level":30,"time":1793662305155,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_b4e452d6-4f9e-4f49-93fc-9c17ed427857","req":{"method":"POST","url":"/api/pipelines","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305194,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_b4e452d6-4f9e-4f49-93fc-9c17ed427857","res":{"statusCode":201},"responseTime":39.33391189575195,"msg":"request completed"}
+{"level":30,"time":1793662305205,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_08ff0ac8-eba4-42e6-8514-b782d87dae07","req":{"method":"POST","url":"/api/pipelines","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305239,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_08ff0ac8-eba4-42e6-8514-b782d87dae07","res":{"statusCode":201},"responseTime":33.57554054260254,"msg":"request completed"}
+{"level":30,"time":1793662305239,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_1404124d-da4d-4976-9eb1-b3ece368c2a9","req":{"method":"GET","url":"/api/pipelines/pipe_16257d0f-49e5-42c1-9837-dfcaf356e37d","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305243,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_1404124d-da4d-4976-9eb1-b3ece368c2a9","res":{"statusCode":200},"responseTime":3.420639991760254,"msg":"request completed"}
+{"level":30,"time":1793662305248,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","count":1,"msg":"Synced skills for all projects"}
+{"level":30,"time":1793662305250,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_3b67bcb3-6ac0-4979-bb5b-b84c4f8e76ea","req":{"method":"POST","url":"/api/pipelines","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305277,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","scanned":1,"provisioned":1,"msg":"Chat-agent backfill complete"}
+{"level":30,"time":1793662305294,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_3b67bcb3-6ac0-4979-bb5b-b84c4f8e76ea","res":{"statusCode":201},"responseTime":43.66980457305908,"msg":"request completed"}
+{"level":30,"time":1793662305295,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_a08db843-166a-432c-b5fb-e7a1706b39d4","req":{"method":"POST","url":"/api/pipelines/pipe_0d7c00f8-e6d5-4fcd-8351-6ce6d2228ca6/cancel","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305299,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_a08db843-166a-432c-b5fb-e7a1706b39d4","res":{"statusCode":200},"responseTime":3.591381072998047,"msg":"request completed"}
+{"level":30,"time":1793662305306,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_14ff12df-b573-4605-bce9-7c9581529a6f","req":{"method":"POST","url":"/api/pipelines","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305344,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_14ff12df-b573-4605-bce9-7c9581529a6f","res":{"statusCode":201},"responseTime":37.68370056152344,"msg":"request completed"}
+{"level":30,"time":1793662305344,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_ae15ec51-80c8-461b-9907-897fd520be36","req":{"method":"PATCH","url":"/api/pipelines/pipe_a8a7bef7-be29-47db-976c-9e17e91d945d/steps/pstep_e7fda227-4257-4ead-a50b-c1dcf03dfb43","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305358,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_ae15ec51-80c8-461b-9907-897fd520be36","res":{"statusCode":200},"responseTime":13.573633193969727,"msg":"request completed"}
+{"level":30,"time":1793662305365,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_c6567016-057c-476b-8097-a6595438cf01","req":{"method":"POST","url":"/api/pipelines","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305393,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_c6567016-057c-476b-8097-a6595438cf01","res":{"statusCode":201},"responseTime":27.985648155212402,"msg":"request completed"}
+{"level":30,"time":1793662305402,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_ef6d7299-b7a1-4b26-95e0-3b4ae352f2aa","req":{"method":"POST","url":"/api/pipelines/pipe_7c28d32d-b569-4e27-8aee-bd933d64815c/steps/pstep_6575a179-5a7d-4b0a-a67d-5461de74edb5/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305452,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_ef6d7299-b7a1-4b26-95e0-3b4ae352f2aa","res":{"statusCode":200},"responseTime":49.22966480255127,"msg":"request completed"}
+{"level":30,"time":1793662305464,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_8efaab12-7fae-4011-98d3-c423a6a31dd7","req":{"method":"POST","url":"/api/pipelines","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305495,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_8efaab12-7fae-4011-98d3-c423a6a31dd7","res":{"statusCode":201},"responseTime":30.637598991394043,"msg":"request completed"}
+{"level":30,"time":1793662305496,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_7f9613c9-3f32-4d7f-997c-6330d8daf933","req":{"method":"POST","url":"/api/pipelines/pipe_74aaf17e-5497-4b73-8318-a432275527f8/steps/pstep_362fd1df-1e34-4c18-af36-369d174f406b/approve","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1793662305499,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","reqId":"req_7f9613c9-3f32-4d7f-997c-6330d8daf933","res":{"statusCode":400},"responseTime":3.1905908584594727,"msg":"request completed"}
+{"level":50,"time":1793662305502,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","severity":"error","source":"heartbeat","code":"lock_release_failed","message":"Failed to release task locks during run cleanup","err":{"type":"DrizzleQueryError","message":"Failed query: select \"id\" from \"tasks\" where \"tasks\".\"execution_run_id\" = $1\nparams: run_761af138-9b0b-4aef-8d7a-db1d0177c13d: write CONNECTION_ENDED localhost:42209","stack":"Error: Failed query: select \"id\" from \"tasks\" where \"tasks\".\"execution_run_id\" = $1\nparams: run_761af138-9b0b-4aef-8d7a-db1d0177c13d\n    at PostgresJsPreparedQuery.queryWithCache (file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/drizzle-orm@0.45.2_pg@8.20.0_postgres@3.4.8/node_modules/src/pg-core/session.ts:73:11)\n    at file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/drizzle-orm@0.45.2_pg@8.20.0_postgres@3.4.8/node_modules/src/postgres-js/session.ts:58:17\n    at HeartbeatService.executeRun (/home/hermes/projects/orch8-approval-safety/packages/daemon/src/services/heartbeat.service.ts:976:29)\ncaused by: Error: write CONNECTION_ENDED localhost:42209\n    at Query.handler (file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/postgres@3.4.8/node_modules/postgres/src/index.js:331:34)\n    at Query.handle (file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/postgres@3.4.8/node_modules/postgres/src/query.js:140:65)","query":"select \"id\" from \"tasks\" where \"tasks\".\"execution_run_id\" = $1","params":["run_761af138-9b0b-4aef-8d7a-db1d0177c13d"]},"projectId":"proj_18225bf8-9fd2-451a-85a6-bd71fbd0cfb4","agentId":"route-agent-a","runId":"run_761af138-9b0b-4aef-8d7a-db1d0177c13d","msg":"Failed to release task locks during run cleanup"}
+{"level":50,"time":1793662305512,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","err":{"type":"DrizzleQueryError","message":"Failed query: select \"id\" from \"tasks\" where \"tasks\".\"execution_run_id\" = $1\nparams: run_761af138-9b0b-4aef-8d7a-db1d0177c13d: write CONNECTION_ENDED localhost:42209","stack":"Error: Failed query: select \"id\" from \"tasks\" where \"tasks\".\"execution_run_id\" = $1\nparams: run_761af138-9b0b-4aef-8d7a-db1d0177c13d\n    at PostgresJsPreparedQuery.queryWithCache (file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/drizzle-orm@0.45.2_pg@8.20.0_postgres@3.4.8/node_modules/src/pg-core/session.ts:73:11)\n    at file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/drizzle-orm@0.45.2_pg@8.20.0_postgres@3.4.8/node_modules/src/postgres-js/session.ts:58:17\n    at HeartbeatService.executeRun (/home/hermes/projects/orch8-approval-safety/packages/daemon/src/services/heartbeat.service.ts:976:29)\ncaused by: Error: write CONNECTION_ENDED localhost:42209\n    at Query.handler (file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/postgres@3.4.8/node_modules/postgres/src/index.js:331:34)\n    at Query.handle (file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/postgres@3.4.8/node_modules/postgres/src/query.js:140:65)","query":"select \"id\" from \"tasks\" where \"tasks\".\"execution_run_id\" = $1","params":["run_761af138-9b0b-4aef-8d7a-db1d0177c13d"]},"runId":"run_761af138-9b0b-4aef-8d7a-db1d0177c13d","msg":"Failed to release task locks during run cleanup"}
+{"level":50,"time":1793662305512,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","dbErr":{"query":"insert into \"error_log\" (\"id\", \"project_id\", \"agent_id\", \"task_id\", \"run_id\", \"chat_id\", \"request_id\", \"severity\", \"source\", \"code\", \"message\", \"stack\", \"cause\", \"metadata\", \"http_method\", \"http_path\", \"http_status\", \"actor_type\", \"actor_id\", \"fingerprint\", \"occurrences\", \"first_seen_at\", \"last_seen_at\", \"resolved_at\", \"resolved_by\", \"occurred_at\", \"created_at\") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, default, default, default, default, default, $21, default) on conflict (\"project_id\",\"fingerprint\") do update set \"message\" = $22, \"stack\" = $23, \"metadata\" = $24, \"occurrences\" = \"error_log\".\"occurrences\" + 1, \"last_seen_at\" = now(), \"resolved_at\" = $25, \"resolved_by\" = $26, \"occurred_at\" = $27 returning \"id\", \"occurrences\"","params":["err_f2c340dd-0b37-4420-af30-7a661b963566","proj_18225bf8-9fd2-451a-85a6-bd71fbd0cfb4","route-agent-a",null,"run_761af138-9b0b-4aef-8d7a-db1d0177c13d",null,null,"error","heartbeat","lock_release_failed","Failed to release task locks during run cleanup","Error: Failed query: select \"id\" from \"tasks\" where \"tasks\".\"execution_run_id\" = $1\nparams: run_761af138-9b0b-4aef-8d7a-db1d0177c13d\n    at PostgresJsPreparedQuery.queryWithCache (file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/drizzle-orm@0.45.2_pg@8.20.0_postgres@3.4.8/node_modules/src/pg-core/session.ts:73:11)\n    at file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/drizzle-orm@0.45.2_pg@8.20.0_postgres@3.4.8/node_modules/src/postgres-js/session.ts:58:17\n    at HeartbeatService.executeRun (/home/hermes/projects/orch8-approval-safety/packages/daemon/src/services/heartbeat.service.ts:976:29)","{\"name\":\"Error\",\"message\":\"Failed query: select \\\"id\\\" from \\\"tasks\\\" where \\\"tasks\\\".\\\"execution_run_id\\\" = $1\\nparams: run_761af138-9b0b-4aef-8d7a-db1d0177c13d\",\"cause\":{\"code\":\"CONNECTION_ENDED\",\"errno\":\"CONNECTION_ENDED\",\"address\":[\"localhost\"],\"port\":[42209]}}","{}",null,null,null,null,null,"2ea2fd49166db3f4cdbdd07b28933a4c922c2fb4","2026-11-02T23:31:45.511Z","Failed to release task locks during run cleanup","Error: Failed query: select \"id\" from \"tasks\" where \"tasks\".\"execution_run_id\" = $1\nparams: run_761af138-9b0b-4aef-8d7a-db1d0177c13d\n    at PostgresJsPreparedQuery.queryWithCache (file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/drizzle-orm@0.45.2_pg@8.20.0_postgres@3.4.8/node_modules/src/pg-core/session.ts:73:11)\n    at file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/drizzle-orm@0.45.2_pg@8.20.0_postgres@3.4.8/node_modules/src/postgres-js/session.ts:58:17\n    at HeartbeatService.executeRun (/home/hermes/projects/orch8-approval-safety/packages/daemon/src/services/heartbeat.service.ts:976:29)","{}",null,null,"2026-11-02T23:31:45.511Z"],"cause":{"code":"CONNECTION_ENDED","errno":"CONNECTION_ENDED","address":["localhost"],"port":[42209]}},"msg":"ErrorLoggerService DB write failed"}
+{"level":50,"time":1793662305512,"pid":3223185,"hostname":"ubuntu-4gb-fsn1-1","err":{"type":"DrizzleQueryError","message":"Failed query: select \"id\", \"project_id\", \"name\", \"role\", \"status\", \"icon\", \"color\", \"model\", \"effort\", \"max_turns\", \"allowed_tools\", \"heartbeat_enabled\", \"heartbeat_interval_sec\", \"session_compaction_enabled\", \"session_max_runs\", \"session_max_input_tokens\", \"session_max_age_hours\", \"wake_on_assignment\", \"wake_on_on_demand\", \"wake_on_automation\", \"max_concurrent_runs\", \"last_heartbeat\", \"can_assign_to\", \"can_create_tasks\", \"can_move_to\", \"mcp_tools\", \"skill_paths\", \"desired_skills\", \"work_log_dir\", \"lessons_file\", \"adapter_type\", \"adapter_config\", \"max_concurrent_tasks\", \"max_concurrent_subagents\", \"working_hours\", \"auto_pause_threshold\", \"budget_limit_usd\", \"budget_spent_usd\", \"budget_paused\", \"pause_reason\", \"env_vars\", \"agent_token_hash\", \"created_at\", \"updated_at\" from \"agents\" where (\"agents\".\"id\" = $1 and \"agents\".\"project_id\" = $2)\nparams: route-agent-a,proj_18225bf8-9fd2-451a-85a6-bd71fbd0cfb4: write CONNECTION_ENDED localhost:42209","stack":"Error: Failed query: select \"id\", \"project_id\", \"name\", \"role\", \"status\", \"icon\", \"color\", \"model\", \"effort\", \"max_turns\", \"allowed_tools\", \"heartbeat_enabled\", \"heartbeat_interval_sec\", \"session_compaction_enabled\", \"session_max_runs\", \"session_max_input_tokens\", \"session_max_age_hours\", \"wake_on_assignment\", \"wake_on_on_demand\", \"wake_on_automation\", \"max_concurrent_runs\", \"last_heartbeat\", \"can_assign_to\", \"can_create_tasks\", \"can_move_to\", \"mcp_tools\", \"skill_paths\", \"desired_skills\", \"work_log_dir\", \"lessons_file\", \"adapter_type\", \"adapter_config\", \"max_concurrent_tasks\", \"max_concurrent_subagents\", \"working_hours\", \"auto_pause_threshold\", \"budget_limit_usd\", \"budget_spent_usd\", \"budget_paused\", \"pause_reason\", \"env_vars\", \"agent_token_hash\", \"created_at\", \"updated_at\" from \"agents\" where (\"agents\".\"id\" = $1 and \"agents\".\"project_id\" = $2)\nparams: route-agent-a,proj_18225bf8-9fd2-451a-85a6-bd71fbd0cfb4\n    at PostgresJsPreparedQuery.queryWithCache (file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/drizzle-orm@0.45.2_pg@8.20.0_postgres@3.4.8/node_modules/src/pg-core/session.ts:73:11)\n    at file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/drizzle-orm@0.45.2_pg@8.20.0_postgres@3.4.8/node_modules/src/postgres-js/session.ts:58:17\n    at HeartbeatService.loadAgent (/home/hermes/projects/orch8-approval-safety/packages/daemon/src/services/heartbeat.service.ts:1214:21)\n    at /home/hermes/projects/orch8-approval-safety/packages/daemon/src/services/heartbeat.service.ts:1100:21\n    at HeartbeatService.withAgentLock (/home/hermes/projects/orch8-approval-safety/packages/daemon/src/services/heartbeat.service.ts:1180:14)\n    at HeartbeatService.executeRun (/home/hermes/projects/orch8-approval-safety/packages/daemon/src/services/heartbeat.service.ts:1001:7)\ncaused by: Error: write CONNECTION_ENDED localhost:42209\n    at Query.handler (file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/postgres@3.4.8/node_modules/postgres/src/index.js:331:34)\n    at Query.handle (file:///home/hermes/projects/orch8-approval-safety/node_modules/.pnpm/postgres@3.4.8/node_modules/postgres/src/query.js:140:65)","query":"select \"id\", \"project_id\", \"name\", \"role\", \"status\", \"icon\", \"color\", \"model\", \"effort\", \"max_turns\", \"allowed_tools\", \"heartbeat_enabled\", \"heartbeat_interval_sec\", \"session_compaction_enabled\", \"session_max_runs\", \"session_max_input_tokens\", \"session_max_age_hours\", \"wake_on_assignment\", \"wake_on_on_demand\", \"wake_on_automation\", \"max_concurrent_runs\", \"last_heartbeat\", \"can_assign_to\", \"can_create_tasks\", \"can_move_to\", \"mcp_tools\", \"skill_paths\", \"desired_skills\", \"work_log_dir\", \"lessons_file\", \"adapter_type\", \"adapter_config\", \"max_concurrent_tasks\", \"max_concurrent_subagents\", \"working_hours\", \"auto_pause_threshold\", \"budget_limit_usd\", \"budget_spent_usd\", \"budget_paused\", \"pause_reason\", \"env_vars\", \"agent_token_hash\", \"created_at\", \"updated_at\" from \"agents\" where (\"agents\".\"id\" = $1 and \"agents\".\"project_id\" = $2)","params":["route-agent-a","proj_18225bf8-9fd2-451a-85a6-bd71fbd0cfb4"]},"runId":"run_761af138-9b0b-4aef-8d7a-db1d0177c13d","agentId":"route-agent-a","projectId":"proj_18225bf8-9fd2-451a-85a6-bd71fbd0cfb4","msg":"Unhandled error in executeRun"}
+2026-11-02 23:31:45.531 UTC [3223139] LOG:  checkpoint starting: immediate force wait
+
+2026-11-02 23:31:45.542 UTC [3223139] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.005 s, sync=0.002 s, total=0.011 s; sync files=6, longest=0.001 s, average=0.001 s; distance=4973 kB, estimate=13743 kB; lsn=0/2A865A0, redo lsn=0/2A86548
+
+ ✓ src/__tests__/pipeline-routes.test.ts (8 tests) 917ms
+2026-11-02 23:31:46.731 UTC [3223139] LOG:  checkpoint starting: immediate force wait
+
+2026-11-02 23:31:46.746 UTC [3223139] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.004 s, sync=0.006 s, total=0.015 s; sync files=4, longest=0.002 s, average=0.002 s; distance=4934 kB, estimate=12862 kB; lsn=0/2F580C8, redo lsn=0/2F58070
+
+ ✓ src/__tests__/pipeline.test.ts (19 tests) 557ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > denies agent approve without writes or wakeups
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > denies agent reject without writes or wakeups
+AssertionError: expected 200 to be 403 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 403[39m
+[31m+ 200[39m
+
+ ❯ src/__tests__/pipeline-approval-safety.test.ts:77:35
+     75|         ...(decision === "reject" ? { payload: { targetStepId: steps[0…
+     76|       });
+     77|       expect(response.statusCode).toBe(403);
+       |                                   ^
+     78|       expect(await snapshot()).toEqual(before);
+     79|       expect(wake).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 50 passed (52)
+   Start at  23:31:38
+   Duration  8.29s (transform 719ms, setup 0ms, collect 2.70s, tests 3.31s, environment 0ms, prepare 241ms)
+
+2026-11-02 23:31:46.794 UTC [3223135] LOG:  received fast shutdown request
+
+2026-11-02 23:31:46.796 UTC [3223135] LOG:  aborting any active transactions
+
+2026-11-02 23:31:46.799 UTC [3223135] LOG:  background worker "logical replication launcher" (PID 3223144) exited with exit code 1
+
+2026-11-02 23:31:46.799 UTC [3223139] LOG:  shutting down
+
+2026-11-02 23:31:46.800 UTC [3223139] LOG:  checkpoint starting: shutdown immediate
+
+2026-11-02 23:31:46.805 UTC [3223139] LOG:  checkpoint complete: wrote 0 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.007 s; sync files=1, longest=0.001 s, average=0.001 s; distance=0 kB, estimate=11576 kB; lsn=0/2F581D0, redo lsn=0/2F581D0
+
+2026-11-02 23:31:46.822 UTC [3223135] LOG:  database system is shut down

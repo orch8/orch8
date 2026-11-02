@@ -136,6 +136,9 @@ export async function pipelineRoutes(app: FastifyInstance) {
   app.post(
     "/api/pipelines/:id/steps/:stepId/reject",
     async (request: FastifyRequest<{ Params: { id: string; stepId: string } }>, reply: FastifyReply) => {
+      if (!request.isAdmin) {
+        return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+      }
       const parsed = RejectPipelineStepSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
@@ -167,7 +170,7 @@ export async function pipelineRoutes(app: FastifyInstance) {
         if (message.includes("not found")) {
           return reply.code(404).send({ error: "not_found", message });
         }
-        if (message.includes("lower order")) {
+        if (message.includes("lower order") || message.includes("not active") || message.includes("not current") || message.includes("cannot be rejected")) {
           return reply.code(400).send({ error: "bad_request", message });
         }
         throw err;
@@ -179,6 +182,9 @@ export async function pipelineRoutes(app: FastifyInstance) {
   app.post(
     "/api/pipelines/:id/steps/:stepId/approve",
     async (request: FastifyRequest<{ Params: { id: string; stepId: string } }>, reply: FastifyReply) => {
+      if (!request.isAdmin) {
+        return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+      }
       try {
         const result = await app.pipelineService.approveStep(
           request.params.id,
@@ -204,7 +210,7 @@ export async function pipelineRoutes(app: FastifyInstance) {
         if (message.includes("not found")) {
           return reply.code(404).send({ error: "not_found", message });
         }
-        if (message.includes("not awaiting verification")) {
+        if (message.includes("not awaiting verification") || message.includes("not active") || message.includes("not current")) {
           return reply.code(400).send({ error: "bad_request", message });
         }
         throw err;

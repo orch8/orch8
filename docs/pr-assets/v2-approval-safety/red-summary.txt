@@ -1,0 +1,35 @@
+Verbatim selected lines from pre-fix red-expanded.log
+⎯⎯⎯⎯⎯⎯ Failed Tests 21 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > denies agent approve without writes or wakeups
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > denies agent reject without writes or wakeups
+AssertionError: expected 200 to be 403 // Object.is equality
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses approve on completed pipeline
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses approve on failed pipeline
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses approve on cancelled pipeline
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses reject on completed pipeline
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses reject on failed pipeline
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses reject on cancelled pipeline
+AssertionError: promise resolved "{ pipeline: { …(9) }, …(3) }" instead of rejecting
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses approve of a stale non-current gate
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses reject of a stale non-current gate
+AssertionError: promise resolved "{ pipeline: { …(9) }, …(3) }" instead of rejecting
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses rejection of a completed step
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses rejection of a failed step
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses rejection of a skipped step
+AssertionError: promise resolved "{ pipeline: { …(9) }, …(3) }" instead of rejecting
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > concurrent approve and reject accept only one decision
+AssertionError: expected [ { status: 'fulfilled', …(1) }, …(1) ] to have a length of 1 but got 2
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses foreign approval step without mutations
+AssertionError: promise resolved "{ pipeline: { …(9) }, …(3) }" instead of rejecting
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > refuses missing approval pipeline without mutations
+AssertionError: promise resolved "{ pipeline: undefined, …(3) }" instead of rejecting
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > concurrent approvals create exactly one successor and replay does not dispatch
+AssertionError: expected [ { raw: { …(2) }, …(10) }, …(2) ] to have a length of 1 but got 3
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > rolls back approval on failed pipeline update
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > rolls back approval on failed successor insert
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > rolls back approval on failed successor backlink
+AssertionError: expected { pipelines: [ { …(9) } ], …(2) } to deeply equal { pipelines: [ { …(9) } ], …(2) }
+ FAIL  src/__tests__/pipeline-approval-safety.test.ts > pipeline approval safety > rolls back last-step approval if final pipeline update fails
+AssertionError: expected { pipelines: [ { …(9) } ], …(2) } to deeply equal { pipelines: [ { …(9) } ], …(2) }
+ Test Files  1 failed (1)
+      Tests  21 failed | 4 passed (25)
