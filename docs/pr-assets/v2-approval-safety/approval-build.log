@@ -1,0 +1,57 @@
+> orch8@0.0.0 build /home/hermes/projects/orch8-approval-safety
+> turbo run build
+
+• turbo 2.8.21
+
+   • Packages in scope: @orch/cli, @orch/daemon, @orch/dashboard, @orch/shared
+   • Running build in 4 packages
+   • Remote caching disabled, using shared worktree cache
+
+@orch/cli:build: cache hit, replaying logs bd4768618c658686
+@orch/cli:build:
+@orch/cli:build: > @orch/cli@0.0.1 build /home/hermes/projects/orch8/packages/cli
+@orch/cli:build: > tsc
+@orch/cli:build:
+@orch/dashboard:build: cache hit, replaying logs 86bdf213ca2534c8
+@orch/dashboard:build:
+@orch/dashboard:build: > @orch/dashboard@0.0.0 build /home/hermes/projects/orch8/packages/dashboard
+@orch/dashboard:build: > tsr generate && tsc -b && vite build
+@orch/dashboard:build:
+@orch/dashboard:build: vite v6.4.2 building for production...
+@orch/dashboard:build: transforming...
+@orch/dashboard:build: ✓ 3386 modules transformed.
+@orch/dashboard:build: rendering chunks...
+@orch/dashboard:build: computing gzip size...
+@orch/dashboard:build: dist/index.html                                            1.07 kB │ gzip:   0.50 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-ext-400-normal-BtiwyxMk.woff2    7.36 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-ext-600-normal-4vooXBpG.woff2    7.42 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-ext-500-normal-BJfUCQsA.woff2    7.43 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-ext-700-normal-CJIcxD6K.woff2    7.45 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-ext-400-normal-BjWJ59Pq.woff     9.98 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-ext-700-normal-BLI3TTWz.woff    10.01 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-ext-600-normal-DRtaDpgU.woff    10.02 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-ext-500-normal-DR84L5F-.woff    10.07 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-600-normal-Aqo67rzb.woff2       14.14 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-400-normal-CW0RaeGs.woff2       14.20 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-500-normal-B9HHJjqV.woff2       14.30 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-700-normal-DvUfVpUG.woff2       14.35 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-600-normal-BmdmIIQ2.woff        18.32 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-400-normal-BwCSEQnW.woff        18.36 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-700-normal-CUSSCpQX.woff        18.50 kB
+@orch/dashboard:build: dist/assets/dm-sans-latin-500-normal-Dr3UlScf.woff        18.52 kB
+@orch/dashboard:build: dist/assets/index-RsBrfWZE.css                           186.36 kB │ gzip:  26.64 kB
+@orch/dashboard:build: dist/assets/dnd-C27C-4G6.js                               48.55 kB │ gzip:  16.10 kB
+@orch/dashboard:build: dist/assets/tanstack-CJoMLXZW.js                         144.18 kB │ gzip:  45.37 kB
+@orch/dashboard:build: dist/assets/markdown-Ccky1urm.js                         334.46 kB │ gzip: 101.42 kB
+@orch/dashboard:build: dist/assets/recharts-eO-3zduf.js                         373.17 kB │ gzip: 110.85 kB
+@orch/dashboard:build: dist/assets/index-nnH_TaVF.js                            712.25 kB │ gzip: 196.00 kB
+@orch/dashboard:build: ✓ built in 12.90s
+@orch/dashboard:build:
+@orch/dashboard:build: (!) Some chunks are larger than 550 kB after minification. Consider:
+@orch/dashboard:build: - Using dynamic import() to code-split the application
+@orch/dashboard:build: - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+@orch/dashboard:build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+ Tasks:    2 successful, 2 total
+Cached:    2 cached, 2 total
+  Time:    87ms >>> FULL TURBO

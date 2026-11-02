@@ -1,0 +1,33 @@
+> orch8@0.0.0 typecheck /home/hermes/projects/orch8-approval-safety
+> turbo run typecheck
+
+• turbo 2.8.21
+
+   • Packages in scope: @orch/cli, @orch/daemon, @orch/dashboard, @orch/shared
+   • Running typecheck in 4 packages
+   • Remote caching disabled, using shared worktree cache
+
+@orch/cli:typecheck: cache hit, replaying logs bcf32d6d8ee83f48
+@orch/shared:typecheck: cache hit, replaying logs 36047155b87bde4e
+@orch/cli:typecheck:
+@orch/cli:typecheck: > @orch/cli@0.0.1 typecheck /home/hermes/projects/orch8/packages/cli
+@orch/cli:typecheck: > tsc --noEmit
+@orch/cli:typecheck:
+@orch/shared:typecheck:
+@orch/shared:typecheck: > @orch/shared@0.0.0 typecheck /home/hermes/projects/orch8/packages/shared
+@orch/shared:typecheck: > tsc --noEmit
+@orch/shared:typecheck:
+@orch/daemon:typecheck: cache miss, executing 7b10052b33b9e568
+@orch/dashboard:typecheck: cache hit, replaying logs 73d3bc61467292be
+@orch/dashboard:typecheck:
+@orch/dashboard:typecheck: > @orch/dashboard@0.0.0 typecheck /home/hermes/projects/orch8/packages/dashboard
+@orch/dashboard:typecheck: > tsr generate && tsc --noEmit
+@orch/dashboard:typecheck:
+@orch/daemon:typecheck:
+@orch/daemon:typecheck: > @orch/daemon@0.0.0 typecheck /home/hermes/projects/orch8-approval-safety/packages/daemon
+@orch/daemon:typecheck: > tsc --noEmit
+@orch/daemon:typecheck:
+
+ Tasks:    4 successful, 4 total
+Cached:    3 cached, 4 total
+  Time:    9.842s

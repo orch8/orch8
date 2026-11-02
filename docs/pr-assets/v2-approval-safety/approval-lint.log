@@ -1,0 +1,362 @@
+> orch8@0.0.0 lint /home/hermes/projects/orch8-approval-safety
+> eslint .
+
+
+/home/hermes/projects/orch8-approval-safety/packages/daemon/src/api/routes/daemon.ts
+  85:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  85:72  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  85:94  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/daemon/src/api/routes/memory.ts
+  184:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  188:80  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  231:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  235:80  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/daemon/src/index.ts
+  24:5  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+/home/hermes/projects/orch8-approval-safety/packages/daemon/src/services/memory-extraction.service.ts
+  53:61  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-editor/AgentEditor.tsx
+  4:15  warning  'Agent' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-editor/AgentForm.tsx
+  21:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-editor/AgentForm.tsx:21:5
+  19 |
+  20 |   useEffect(() => {
+> 21 |     setModel(agent.model ?? "");
+     |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  22 |     setEffort(agent.effort ?? "");
+  23 |     setBudgetLimit(agent.budgetLimitUsd?.toString() ?? "");
+  24 |   }, [agent]);  react-hooks/set-state-in-effect
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-settings/BudgetTab.tsx
+  19:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-settings/BudgetTab.tsx:19:5
+  17 |
+  18 |   useEffect(() => {
+> 19 |     setBudgetLimit(agent.budgetLimitUsd?.toString() ?? "");
+     |     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  20 |     setAutoPauseThreshold(agent.autoPauseThreshold?.toString() ?? "");
+  21 |   }, [agent]);
+  22 |  react-hooks/set-state-in-effect
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-settings/ExecutionTab.tsx
+  13:34  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-explicit-any
+  13:39  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-explicit-any
+  13:44  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-explicit-any
+  13:49  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-explicit-any
+  57:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-settings/ExecutionTab.tsx:57:5
+  55 |   useEffect(() => {
+  56 |     const config = (agent.adapterConfig ?? {}) as Record<string, unknown>;
+> 57 |     setMaxTurns(agent.maxTurns.toString());
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  58 |     setMaxConcurrentRuns(agent.maxConcurrentRuns.toString());
+  59 |     setMaxConcurrentTasks((agent.maxConcurrentTasks ?? 1).toString());
+  60 |     setMaxConcurrentSubagents((agent.maxConcurrentSubagents ?? 3).toString());  react-hooks/set-state-in-effect
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-settings/GeneralTab.tsx
+  21:34  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-explicit-any
+  21:39  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-explicit-any
+  21:44  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-explicit-any
+  21:49  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-explicit-any
+  45:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-settings/GeneralTab.tsx:45:5
+  43 |
+  44 |   useEffect(() => {
+> 45 |     setName(agent.name);
+     |     ^^^^^^^ Avoid calling setState() directly within an effect
+  46 |     setIcon(agent.icon ?? "🤖");
+  47 |     setColor(agent.color ?? "#888780");
+  48 |     setModel(agent.model);  react-hooks/set-state-in-effect
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-settings/InstructionsTab.tsx
+  25:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-settings/InstructionsTab.tsx:25:5
+  23 |   useEffect(() => {
+  24 |     if (!data) return;
+> 25 |     setAgentsMd(data.agentsMd);
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  26 |     setInitialAgentsMd(data.agentsMd);
+  27 |     setHeartbeatMd(data.heartbeatMd);
+  28 |     setInitialHeartbeatMd(data.heartbeatMd);  react-hooks/set-state-in-effect
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-settings/PermissionsTab.tsx
+  10:34  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+  10:39  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+  10:44  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+  10:49  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+  20:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-settings/PermissionsTab.tsx:20:5
+  18 |
+  19 |   useEffect(() => {
+> 20 |     setCanCreateTasks(agent.canCreateTasks ?? false);
+     |     ^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  21 |     setCanMoveTo(agent.canMoveTo ?? []);
+  22 |     setCanAssignTo(agent.canAssignTo ?? []);
+  23 |   }, [agent]);  react-hooks/set-state-in-effect
+  42:31  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-settings/SkillsToolsTab.tsx
+   10:34  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+   10:39  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+   10:44  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+   10:49  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+   35:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/agent-settings/SkillsToolsTab.tsx:35:5
+  33 |
+  34 |   useEffect(() => {
+> 35 |     setDesiredSkills(agent.desiredSkills ?? []);
+     |     ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  36 |     setMcpTools(agent.mcpTools ?? []);
+  37 |     setAllowedTools(agent.allowedTools ?? []);
+  38 |   }, [agent]);  react-hooks/set-state-in-effect
+  162:71  warning  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react/no-unescaped-entities
+  162:86  warning  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react/no-unescaped-entities
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/chat/ChatThreadItem.tsx
+  1:27  warning  'useRouterState' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/chat/IdAutoLinker.tsx
+   9:51  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+   9:64  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  27:24  warning  'id' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/kanban/KanbanBoard.tsx
+  99:47  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/layout/Breadcrumbs.tsx
+  81:31  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/layout/ProjectSwitcher.tsx
+  32:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  87:65  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/onboarding/WelcomeWizard.tsx
+   90:27  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  110:34  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  110:52  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  297:14  warning  Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/pipeline/PipelineStepper.tsx
+  26:42  warning  'currentStep' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/pipeline/PipelineTemplateEditor.tsx
+  42:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/pipeline/PipelineTemplateEditor.tsx:42:7
+  40 |   useEffect(() => {
+  41 |     if (template) {
+> 42 |       setName(template.name);
+     |       ^^^^^^^ Avoid calling setState() directly within an effect
+  43 |       setDescription(template.description ?? "");
+  44 |       setIsDefault(template.isDefault ?? false);
+  45 |       const tplSteps = template.steps as StepDef[];  react-hooks/set-state-in-effect
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/runs/RunViewer.tsx
+  183:8  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/settings/SettingsPage.tsx
+  12:9   warning  'restartDaemon' is assigned a value but never used. Allowed unused vars must match /^_/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+  18:27  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/settings/SettingsPage.tsx:18:27
+  16 |
+  17 |   useEffect(() => {
+> 18 |     if (config && !draft) setDraft(config);
+     |                           ^^^^^^^^ Avoid calling setState() directly within an effect
+  19 |   }, [config, draft]);
+  20 |
+  21 |   if (isLoading || !draft) {  react-hooks/set-state-in-effect
+  30:56  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @typescript-eslint/no-explicit-any
+  35:34  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/shared/MarkdownEditor.tsx
+  40:9  warning  Error: Cannot access variable before it is declared
+
+`insertAround` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/shared/MarkdownEditor.tsx:40:9
+  38 |       if ((e.metaKey || e.ctrlKey) && e.key === "b") {
+  39 |         e.preventDefault();
+> 40 |         insertAround("**", "**", "bold text");
+     |         ^^^^^^^^^^^^ `insertAround` accessed before it is declared
+  41 |       }
+  42 |       if ((e.metaKey || e.ctrlKey) && e.key === "i") {
+  43 |         e.preventDefault();
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/shared/MarkdownEditor.tsx:54:3
+  52 |   );
+  53 |
+> 54 |   function insertAround(prefix: string, suffix: string, fallback: string) {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 55 |     const ta = textareaRef.current;
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 56 |     if (!ta) return;
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 66 |     });
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 67 |   }
+     | ^^^^ `insertAround` is declared here
+  68 |
+  69 |   return (
+  70 |     <div className={`rounded-md border border-zinc-800 bg-zinc-900 ${className ?? ""}`}>  react-hooks/immutability
+  51:5  warning  React Hook useCallback has a missing dependency: 'insertAround'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react-hooks/exhaustive-deps
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/task-detail/DependenciesSection.tsx
+  10:7   warning  'STATUS_DOTS' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  19:45  warning  'allTasks' is defined but never used. Allowed unused args must match /^_/u              @typescript-eslint/no-unused-vars
+  21:9   warning  'removeDep' is assigned a value but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/task-page/InlineEdit.tsx
+  52:26  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  67:24  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/components/task-page/TaskSidebar.tsx
+  29:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/hooks/useChatStream.ts
+  28:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/hooks/useChatStream.ts:28:5
+  26 |     bufferRef.current = "";
+  27 |     messageIdRef.current = null;
+> 28 |     setStreaming(null);
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  29 |
+  30 |     const offStarted = subscribe("chat_message_started", (event) => {
+  31 |       if (event.chatId !== chatId) return;  react-hooks/set-state-in-effect
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/hooks/useRunEvents.ts
+  35:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/hooks/useWebSocket.ts
+  66:42  warning  Error: Cannot access variable before it is declared
+
+`connect` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/hooks/useWebSocket.ts:66:42
+  64 |         );
+  65 |         control.attempts += 1;
+> 66 |         control.timer = setTimeout(() => connect(control), delay);
+     |                                          ^^^^^^^ `connect` accessed before it is declared
+  67 |       };
+  68 |
+  69 |       wsRef.current = ws;
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/hooks/useWebSocket.ts:28:3
+  26 |   const [status, setStatus] = useState<WebSocketStatus>("connecting");
+  27 |
+> 28 |   const connect = useCallback(
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 29 |     (
+     | ^^^^^
+> 30 |       control: {
+     …
+     | ^^^^^
+> 71 |     [url, reconnectInterval, maxReconnectDelay, maxReconnectAttempts],
+     | ^^^^^
+> 72 |   );
+     | ^^^^^ `connect` is declared here
+  73 |
+  74 |   useEffect(() => {
+  75 |     const control = {  react-hooks/immutability
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/routes/projects/$projectSlug/skills.$skillId.tsx
+  66:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/src/routes/projects/$projectSlug/skills.$skillId.tsx:66:5
+  64 |     if (!skill) return;
+  65 |     if (isEditing) return;
+> 66 |     setDraftName(skill.name);
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  67 |     setDraftDescription(skill.description ?? "");
+  68 |     setDraftMarkdown(stripFrontmatter(skill.markdown));
+  69 |     setDraftAgentIds(  react-hooks/set-state-in-effect
+
+/home/hermes/projects/orch8-approval-safety/packages/dashboard/vite.config.ts
+  31:5  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+/home/hermes/projects/orch8-approval-safety/packages/shared/src/schemas/chat-cards.ts
+  492:7  warning  'RESULT_KINDS' is assigned a value but only used as a type. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+✖ 69 problems (0 errors, 69 warnings)
+  0 errors and 2 warnings potentially fixable with the `--fix` option.
