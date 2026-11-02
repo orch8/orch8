@@ -1,0 +1,107 @@
+name: v2 verification
+
+on:
+  pull_request:
+    branches: [v2]
+  push:
+    branches: [v2]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Build, typecheck, lint, and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      CI: "true"
+      TURBO_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Check non-root Linux environment
+        run: |
+          export LOG_DIR="$RUNNER_TEMP/v2-verification-logs"
+          printf 'LOG_DIR=%s\n' "$LOG_DIR" >> "$GITHUB_ENV"
+          mkdir -p "$LOG_DIR"
+          {
+            id
+            node --version
+            pnpm --version
+            # Embedded Postgres runs initdb as the current user, never root.
+            test "$(id -u)" -ne 0
+            test "$(uname -s)" = Linux
+          } 2>&1 | tee "$LOG_DIR/environment.log"
+
+      - name: Install locked dependencies
+        id: install
+        run: pnpm install --frozen-lockfile 2>&1 | tee "$LOG_DIR/install.log"
+
+      - name: Build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm build 2>&1 | tee "$LOG_DIR/build.log"
+
+      - name: Typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm typecheck 2>&1 | tee "$LOG_DIR/typecheck.log"
+
+      - name: Lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm lint 2>&1 | tee "$LOG_DIR/lint.log"
+
+      - name: Test
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        # Force execution rather than replaying cached Turbo test output.
+        run: |
+          rm -f packages/{cli,shared,dashboard,daemon}/vitest-results.json
+          pnpm run test --force -- --reporter=default --reporter=json --outputFile=vitest-results.json 2>&1 | tee "$LOG_DIR/test.log"
+          # A local run returned zero despite failed Vitest assertions.
+          # Require successful, nonempty reports from every workspace as well.
+          node --input-type=module <<'NODE' 2>&1 | tee "$LOG_DIR/test-report-check.log"
+          import { readFileSync } from 'node:fs';
+          for (const workspace of ['cli', 'shared', 'dashboard', 'daemon']) {
+            const report = JSON.parse(readFileSync(`packages/${workspace}/vitest-results.json`, 'utf8'));
+            if (report.success !== true || report.numTotalTests < 1 ||
+                report.numFailedTests !== 0 || report.numFailedTestSuites !== 0 ||
+                report.numPassedTests !== report.numTotalTests) {
+              throw new Error(`${workspace}: failed, missing, or skipped test results`);
+            }
+            console.log(`${workspace}: ${report.numPassedTests} tests passed`);
+          }
+          NODE
+
+      - name: Upload verification logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: v2-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/v2-verification-logs/*.log
+            packages/*/vitest-results.json
+          if-no-files-found: warn
+          retention-days: 14
