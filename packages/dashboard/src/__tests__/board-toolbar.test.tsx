@@ -1,15 +1,26 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderWithProviders, screen } from "../test-utils.js";
 import userEvent from "@testing-library/user-event";
 import { BoardToolbar } from "../components/kanban/BoardToolbar.js";
 
 const navigateMock = vi.fn();
 
+// This suite tests navigation/filter controls, not agent HTTP fetching.
+vi.mock("../hooks/useAgents.js", () => ({
+  useAgents: () => ({ data: [] }),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigateMock,
 }));
 
 describe("BoardToolbar", () => {
+  let fetchSpy: import("vitest").MockInstance<typeof fetch>;
+  beforeEach(() => { fetchSpy = vi.spyOn(globalThis, "fetch"); });
+  afterEach(() => {
+    try { expect(fetchSpy).not.toHaveBeenCalled(); }
+    finally { fetchSpy.mockRestore(); }
+  });
   it("renders New Task button", () => {
     renderWithProviders(
       <BoardToolbar projectId="proj_1" onFilterChange={() => {}} />,

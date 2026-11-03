@@ -5,6 +5,10 @@ import { Writable, Readable } from "node:stream";
 import { projects, tasks, agents, taskDependencies, heartbeatRuns } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { buildServer } from "../server.js";
+import { buildStartupTestServer } from "./helpers/startup-server.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { globalConfigSchema } from "../config/schema.js";
 
 function createMockProcess() {
@@ -26,11 +30,19 @@ describe("Integration: Task Type Lifecycle", () => {
   let testDb: TestDb;
   let app: ReturnType<typeof buildServer>;
   let projectId: string;
+  let fixture: ReturnType<typeof buildStartupTestServer> | undefined;
+  let homeDir: string | undefined;
 
   beforeAll(async () => {
     testDb = await setupTestDb();
 
-    app = buildServer({
+    homeDir = mkdtempSync(join(tmpdir(), "orch-integration-"));
+    const [project] = await testDb.db.insert(projects).values({
+      name: "Integration", slug: "integration", homeDir,
+    }).returning();
+    projectId = project.id;
+
+    fixture = buildStartupTestServer({
       databaseUrl: testDb.connectionUri,
       spawnFn: vi.fn(() => createMockProcess()) as unknown as typeof import("node:child_process").spawn,
       // Enable the loopback-admin bypass so app.inject() requests — which
@@ -38,14 +50,10 @@ describe("Integration: Task Type Lifecycle", () => {
       // thread a bearer token through every test case.
       config: globalConfigSchema.parse({ auth: { allow_localhost_admin: true } }),
     });
-    await app.ready();
-
-    const [project] = await testDb.db.insert(projects).values({
-      name: "Integration",
-      slug: "integration",
-      homeDir: "/tmp/integ",
-    }).returning();
-    projectId = project.id;
+    app = fixture.app;
+    await fixture.ready();
+    const provisioned = await testDb.db.select().from(agents).where(eq(agents.projectId, projectId));
+    expect(provisioned.some((agent) => agent.id === "chat")).toBe(true);
 
     await testDb.db.insert(agents).values({
       id: "int-agent",
@@ -56,8 +64,11 @@ describe("Integration: Task Type Lifecycle", () => {
   }, 60_000);
 
   afterAll(async () => {
-    await app.close();
-    await teardownTestDb(testDb);
+    try { await fixture?.close(); }
+    finally {
+      try { if (testDb) await teardownTestDb(testDb); }
+      finally { if (homeDir) rmSync(homeDir, { recursive: true, force: true }); }
+    }
   });
 
   beforeEach(async () => {
