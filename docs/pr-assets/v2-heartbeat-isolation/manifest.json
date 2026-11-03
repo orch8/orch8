@@ -54,10 +54,10 @@
   },
   "files": [
     {
-      "path": "change.patch",
+      "path": "change.patch.gz",
       "original_bytes": 8652,
       "original_sha256": "81b6dc191ec9c0b167dac2ea072f9aabafba5a75152cd26f6d1fc28c9654c011",
-      "stored_sha256": "81b6dc191ec9c0b167dac2ea072f9aabafba5a75152cd26f6d1fc28c9654c011"
+      "stored_sha256": "30947a0cd4ff5124e78fdeebf8273913f92da043e6b8d2ddaab150d2b347cc0b"
     },
     {
       "path": "focused-1.json.gz",
