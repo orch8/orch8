@@ -38,6 +38,12 @@ During implementation, `pnpm test --force` was rejected by pnpm itself. The fina
 
 [Local logs and final JSON reports](evidence/v2-verification-local.tar.gz) include the initial false-green output, the passing report-enabled test output, final exact-shell-step logs, command statuses, and final per-workspace reports. Paths inside the archive distinguish earlier runs from the final run. These are actual local outputs, not a GitHub artifact.
 
+## Review correction and remote evidence
+
+The independent specification review found that missing or string-valued test counts could pass JavaScript comparisons. The guard now requires nonnegative safe integers for all four count fields, a positive total, all tests passed and zero failures. `python docs/ci/test-report-guard.py` executes the exact inline Node guard with 11 explicitly synthetic cases: valid, failed, empty, skipped, missing counts, numeric strings, negative counts, fractional counts, null counts, missing file and malformed JSON. All 11 produced the expected accept/reject exit. The Python harness requires PyYAML and Node; it is a local verifier, not an application-test result.
+
+The first remote run, https://github.com/orch8/orch8/actions/runs/41548331556, passed environment/install/build/typecheck/lint and successfully uploaded artifacts. The test guard failed on three daemon assertions. Downloaded reports show 762 daemon tests passed and 3 failed; other packages passed. This establishes remote event/action/artifact execution, not green CI. A separate branch is fixing the independently diagnosed asynchronous test synchronization defects; no test is skipped or weakened here.
+
 ## Action pins and remote limits
 
 The action SHAs in the workflow were retrieved with `git ls-remote` against the upstream repositories' `refs/tags/v4`:
@@ -47,4 +53,4 @@ The action SHAs in the workflow were retrieved with `git ls-remote` against the 
 - `actions/setup-node`: `49933ea5288caeca8642d1e84afbd3f7d6820020`
 - `actions/upload-artifact`: `ea165f8d65b6e75b540449e92b4886f43607fa02`
 
-The final YAML passes actionlint, and its shell steps were executed locally using Bash `-eo pipefail`. GitHub event dispatch, action execution, cache behavior, and artifact upload have not run remotely. After review, any PR must target `v2`; verify its real Actions result and download its logs before claiming CI passed.
+The initial YAML passed actionlint, and its shell steps were executed locally using Bash `-eo pipefail`. The first remote run subsequently verified GitHub event dispatch, action execution and artifact upload, but failed the test gate as detailed above. Any PR must target `v2`; inspect the latest actual Actions result and download its reports before claiming CI passed.

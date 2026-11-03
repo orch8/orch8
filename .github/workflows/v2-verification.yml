@@ -86,7 +86,10 @@ jobs:
           import { readFileSync } from 'node:fs';
           for (const workspace of ['cli', 'shared', 'dashboard', 'daemon']) {
             const report = JSON.parse(readFileSync(`packages/${workspace}/vitest-results.json`, 'utf8'));
-            if (report.success !== true || report.numTotalTests < 1 ||
+            const counts = ['numTotalTests', 'numPassedTests', 'numFailedTests', 'numFailedTestSuites'];
+            if (report.success !== true ||
+                !counts.every(key => Number.isSafeInteger(report[key]) && report[key] >= 0) ||
+                report.numTotalTests < 1 ||
                 report.numFailedTests !== 0 || report.numFailedTestSuites !== 0 ||
                 report.numPassedTests !== report.numTotalTests) {
               throw new Error(`${workspace}: failed, missing, or skipped test results`);
