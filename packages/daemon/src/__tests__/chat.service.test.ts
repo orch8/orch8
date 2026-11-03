@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { useAsyncWork, finishHeldChatTurn } from "./helpers/async-work.js";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import {
   projects,
@@ -15,9 +16,10 @@ import { eq } from "drizzle-orm";
 
 const TEST_API_URL = "http://localhost:3847";
 
-function makeMockAdapter(mockOutput: string) {
+function makeMockAdapter(mockOutput: string, hold?: () => Promise<void>) {
   return {
     runAgent: vi.fn(async (_cfg: unknown, ctx: any, _instructions: unknown) => {
+      await hold?.();
       // Simulate streaming chunks
       if (typeof ctx.onEvent === "function") {
         ctx.onEvent({
@@ -43,6 +45,7 @@ function makeMockAdapter(mockOutput: string) {
 }
 
 describe("ChatService", () => {
+  const work = useAsyncWork(ChatService.prototype, "runAssistantTurn");
   let testDb: TestDb;
   let projectId: string;
   let agentId: string;
@@ -147,7 +150,8 @@ describe("ChatService", () => {
   // ─── Ingestion ────────────────────────────────────
 
   it("sendUserMessage writes a user row and triggers adapter.runAgent", async () => {
-    const adapter = makeMockAdapter("Thanks for the message.");
+    const gate = work.gate();
+    const adapter = makeMockAdapter("Thanks for the message.", gate.hold);
     service = new ChatService(
       testDb.db,
       adapter as any,
@@ -162,10 +166,11 @@ describe("ChatService", () => {
     expect(userRow.role).toBe("user");
     expect(userRow.content).toBe("hello");
 
-    // Wait for the fire-and-forget assistant turn to finish.
+    await finishHeldChatTurn(work, gate, () => service.listMessages(chat.id), 1);
     const msgs = await vi.waitFor(async () => {
       const list = await service.listMessages(chat.id);
       expect(list.map((m) => m.role)).toEqual(["user", "assistant"]);
+      expect(list.filter((m) => m.role === "assistant").every((m) => m.status === "complete")).toBe(true);
       return list;
     });
     expect(adapter.runAgent).toHaveBeenCalledTimes(1);
@@ -311,9 +316,11 @@ describe("ChatService", () => {
     const chat = await service.createChat({ projectId, agentId });
     await service.sendUserMessage(chat.id, "create a qa agent");
 
+    await work.drain();
     const msgs = await vi.waitFor(async () => {
       const list = await service.listMessages(chat.id);
       expect(list.some((m) => m.role === "assistant")).toBe(true);
+      expect(list.filter((m) => m.role === "assistant").every((m) => m.status === "complete")).toBe(true);
       return list;
     });
     const assistant = msgs.find((m) => m.role === "assistant")!;
@@ -335,6 +342,7 @@ describe("ChatService", () => {
     const chat = await service.createChat({ projectId, agentId });
     await service.sendUserMessage(chat.id, "plan the migration please");
 
+    await work.drain();
     const refreshed = await vi.waitFor(async () => {
       const c = await service.getChat(chat.id);
       expect(c?.title).toBe("Plan the migration please");
@@ -362,9 +370,11 @@ describe("ChatService", () => {
     const chat = await service.createChat({ projectId, agentId });
     await service.sendUserMessage(chat.id, "hi");
 
+    await work.drain();
     const msgs = await vi.waitFor(async () => {
       const list = await service.listMessages(chat.id);
       expect(list.some((m) => m.role === "assistant")).toBe(true);
+      expect(list.filter((m) => m.role === "assistant").every((m) => m.status === "complete")).toBe(true);
       return list;
     });
     const assistant = msgs.find((m) => m.role === "assistant")!;
@@ -375,9 +385,11 @@ describe("ChatService", () => {
     // decideCard writes a system message synchronously and kicks off a
     // follow-up assistant turn asynchronously. Wait for the system row to
     // appear before asserting on the final shape.
+    await work.drain();
     const refreshedMsgs = await vi.waitFor(async () => {
       const list = await service.listMessages(chat.id);
       expect(list.some((m) => m.role === "system")).toBe(true);
+      expect(list.filter((m) => m.role === "assistant").every((m) => m.status === "complete")).toBe(true);
       return list;
     });
     const systemMsgs = refreshedMsgs.filter((m) => m.role === "system");
@@ -410,9 +422,11 @@ describe("ChatService", () => {
     const chat = await service.createChat({ projectId, agentId });
     await service.sendUserMessage(chat.id, "hi");
 
+    await work.drain();
     const msgs = await vi.waitFor(async () => {
       const list = await service.listMessages(chat.id);
       expect(list.some((m) => m.role === "assistant")).toBe(true);
+      expect(list.filter((m) => m.role === "assistant").every((m) => m.status === "complete")).toBe(true);
       return list;
     });
     const assistant = msgs.find((m) => m.role === "assistant")!;
@@ -474,9 +488,11 @@ describe("ChatService", () => {
     // Project A chat with a pending card.
     const chatA = await service.createChat({ projectId, agentId });
     await service.sendUserMessage(chatA.id, "make a task");
+    await work.drain();
     const msgsA = await vi.waitFor(async () => {
       const list = await service.listMessages(chatA.id);
       expect(list.some((m) => m.role === "assistant")).toBe(true);
+      expect(list.filter((m) => m.role === "assistant").every((m) => m.status === "complete")).toBe(true);
       return list;
     });
     const cardA = ((msgsA.find((m) => m.role === "assistant")!).cards as ExtractedCard[])[0];
@@ -484,9 +500,11 @@ describe("ChatService", () => {
     // Project B chat with its own pending card.
     const chatB = await service.createChat({ projectId: projectB.id, agentId: "chat" });
     await service.sendUserMessage(chatB.id, "make another task");
+    await work.drain();
     const msgsB = await vi.waitFor(async () => {
       const list = await service.listMessages(chatB.id);
       expect(list.some((m) => m.role === "assistant")).toBe(true);
+      expect(list.filter((m) => m.role === "assistant").every((m) => m.status === "complete")).toBe(true);
       return list;
     });
     const cardB = ((msgsB.find((m) => m.role === "assistant")!).cards as ExtractedCard[])[0];

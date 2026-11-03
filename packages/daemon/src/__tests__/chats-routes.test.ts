@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import Fastify from "fastify";
+import { useAsyncWork, finishHeldChatTurn } from "./helpers/async-work.js";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { projects, agents, chats, chatMessages, heartbeatRuns } from "@orch/shared/db";
 import { ChatService } from "../services/chat.service.js";
@@ -37,9 +38,13 @@ function makeMockAdapter() {
 }
 
 describe("Chat API Routes", () => {
+  const work = useAsyncWork(ChatService.prototype, "runAssistantTurn", async () => {
+    await Promise.all(apps.splice(0).map((instance) => instance.close()));
+  });
   let testDb: TestDb;
   let projectId: string;
   let app: ReturnType<typeof Fastify>;
+  const apps: ReturnType<typeof Fastify>[] = [];
 
   beforeAll(async () => {
     testDb = await setupTestDb();
@@ -85,7 +90,9 @@ describe("Chat API Routes", () => {
       "http://localhost:3847",
     );
 
+    chatService.setLogger(work.logger);
     app = Fastify();
+    apps.push(app);
     app.decorate("db", testDb.db);
     app.decorate("projectService", new ProjectService(testDb.db));
     app.decorate("chatService", chatService);
@@ -195,6 +202,7 @@ describe("Chat API Routes", () => {
     expect(body.content).toBe("hello");
 
     // Poll until the fire-and-forget assistant turn has written its row.
+    await work.drain();
     const msgs = await vi.waitFor(async () => {
       const msgsRes = await app.inject({
         method: "GET",
@@ -203,6 +211,7 @@ describe("Chat API Routes", () => {
       });
       const parsed = JSON.parse(msgsRes.body);
       expect(parsed.map((m: { role: string }) => m.role)).toEqual(["user", "assistant"]);
+      expect(parsed.filter((m: { role: string }) => m.role === "assistant").every((m: { status: string }) => m.status === "complete")).toBe(true);
       return parsed;
     });
     expect(msgs.map((m: { role: string }) => m.role)).toEqual(["user", "assistant"]);
@@ -230,11 +239,13 @@ describe("Chat API Routes", () => {
   // ─── Card Decisions ───────────────────────────
 
   it("POST /api/chats/:chatId/cards/:cardId/decision approves a card", async () => {
+    const gate = work.gate();
     // Stub the adapter to emit a fenced card
     const broadcast = new BroadcastService(new Set<any>());
     const sessionMgr = new SessionManager(testDb.db);
     const adapter = {
       runAgent: vi.fn(async (_cfg: unknown, ctx: any) => {
+        await gate.hold();
         const fenced = [
           "```orch8-card",
           '{"kind":"confirm_create_task","summary":"Create T","payload":{"title":"T"}}',
@@ -267,7 +278,9 @@ describe("Chat API Routes", () => {
       "http://localhost:3847",
     );
 
+    chatService.setLogger(work.logger);
     const localApp = Fastify();
+    apps.push(localApp);
     localApp.decorate("db", testDb.db);
     localApp.decorate("projectService", new ProjectService(testDb.db));
     localApp.decorate("chatService", chatService);
@@ -290,7 +303,7 @@ describe("Chat API Routes", () => {
       payload: { content: "create task" },
     });
 
-    // Poll until the assistant row has landed.
+    await finishHeldChatTurn(work, gate, () => chatService.listMessages(chat.id), 1);
     const msgs = await vi.waitFor(async () => {
       const msgsRes = await localApp.inject({
         method: "GET",
@@ -299,6 +312,7 @@ describe("Chat API Routes", () => {
       });
       const parsed = JSON.parse(msgsRes.body);
       expect(parsed.some((m: { role: string }) => m.role === "assistant")).toBe(true);
+      expect(parsed.filter((m: { role: string }) => m.role === "assistant").every((m: { status: string }) => m.status === "complete")).toBe(true);
       return parsed;
     });
     const assistant = msgs.find((m: { role: string }) => m.role === "assistant");
@@ -315,7 +329,13 @@ describe("Chat API Routes", () => {
     expect((updated.cards as ExtractedCard[])[0].status).toBe("approved");
     expect((updated.cards as ExtractedCard[])[0].decidedBy).toBe("integration-test");
 
-    await localApp.close();
+    await work.drain();
+    const finalMessages = await chatService.listMessages(chat.id);
+    expect(finalMessages.map((message) => message.role)).toEqual(["user", "assistant", "system", "assistant"]);
+    expect(finalMessages[3].status).toBe("complete");
+    expect(finalMessages[3].cards).toHaveLength(1);
+    expect(finalMessages[3].content).toBeTruthy();
+    expect(adapter.runAgent).toHaveBeenCalledTimes(2);
   });
 
   it("POST /api/projects/:projectId/chats with seedMessage inserts assistant message", async () => {

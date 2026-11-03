@@ -1,0 +1,277 @@
+{
+  "base": "26c83ab38f363a7c0a1a90f57684fb825731c2c1",
+  "sourceFiles": {
+    "packages/daemon/src/__tests__/chat-message-replay.test.ts": "e5119260dfae1170b93b99eaed552116bca48180e65e01e2862b31ccfe739dae",
+    "packages/daemon/src/__tests__/chat.service.test.ts": "c09293970490641516225e8600d98882bbbfb3f531179c72f49b5d72a91cdb0b",
+    "packages/daemon/src/__tests__/chats-routes.test.ts": "4b5661c1272d68c3cdfd865e7c8e035e16bbb3c8f52361266d8509e524cacfc3",
+    "packages/daemon/src/__tests__/heartbeat-integration.test.ts": "9465df0b518e5324037365323d8963eb191b898bd59e032c938914574705d143",
+    "packages/daemon/src/__tests__/async-work.test.ts": "d15030cd490acf0bcd187651514c9b2b0b9650059b76f127ed5f2fe3f39d7f7b",
+    "packages/daemon/src/__tests__/helpers/async-work.ts": "3ee3ce5377a14478a38779ca3ff78ec29f7f0f95b4e6528d7f53a7548f3ae746"
+  },
+  "artifacts": [
+    {
+      "artifact": "verification/build.log.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/build.log",
+      "uncompressedBytes": 3743,
+      "uncompressedSha256": "eadac5afc3b504edf6708c320a54511bbb819629c5d3c99501dfffaa1a7b7c3f"
+    },
+    {
+      "artifact": "verification/focused-normal-1.json.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/focused-normal-1.json",
+      "uncompressedBytes": 10525,
+      "uncompressedSha256": "ea2a1ec3b4333d5c89a539d9466547b86b99bf383d64b7abcd0905f7f4572743"
+    },
+    {
+      "artifact": "verification/focused-normal-1.log.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/focused-normal-1.log",
+      "uncompressedBytes": 4428,
+      "uncompressedSha256": "972553bcd25b3cd393bf9c8b8b442141641312fdc34c7726e9e79212eb9ab457"
+    },
+    {
+      "artifact": "verification/focused-normal-2.json.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/focused-normal-2.json",
+      "uncompressedBytes": 10524,
+      "uncompressedSha256": "bee1a62e2818427be3232960d66e5e39d9e6cf791f6beb88317e0ec7c65493c9"
+    },
+    {
+      "artifact": "verification/focused-normal-2.log.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/focused-normal-2.log",
+      "uncompressedBytes": 4431,
+      "uncompressedSha256": "eed5654e339908e6ef25226c1f8931184eb00b276481e751d32b252584d24c82"
+    },
+    {
+      "artifact": "verification/focused-normal-3.json.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/focused-normal-3.json",
+      "uncompressedBytes": 10505,
+      "uncompressedSha256": "1aac327a29659ea75958f1219e6adc7b35f2d03b532a212330f0b8a4b6732024"
+    },
+    {
+      "artifact": "verification/focused-normal-3.log.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/focused-normal-3.log",
+      "uncompressedBytes": 4426,
+      "uncompressedSha256": "89ae92479662c0787154fdf654f05618417b8f0871061d95423d6c9b56def7a0"
+    },
+    {
+      "artifact": "verification/focused-single-worker-1.json.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/focused-single-worker-1.json",
+      "uncompressedBytes": 10504,
+      "uncompressedSha256": "f5f3b052f20d45433dce2729ba4df9a91bf42fc6a68f9a517eee471c291a4844"
+    },
+    {
+      "artifact": "verification/focused-single-worker-1.log.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/focused-single-worker-1.log",
+      "uncompressedBytes": 4432,
+      "uncompressedSha256": "7a4e846e018f78446c9730e41d7569dc155e0cbae39e9d4594fac36c4476aa16"
+    },
+    {
+      "artifact": "verification/focused-single-worker-2.json.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/focused-single-worker-2.json",
+      "uncompressedBytes": 10510,
+      "uncompressedSha256": "91b2b28457ef57af189bfa9d1302dd870a70fa87d177f474bda414e8ac69f50e"
+    },
+    {
+      "artifact": "verification/focused-single-worker-2.log.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/focused-single-worker-2.log",
+      "uncompressedBytes": 4435,
+      "uncompressedSha256": "c8ce32ea1d5e03f0afd49fcaaf2e5b7d3298a1915c00655da91e5ddc7e1aea64"
+    },
+    {
+      "artifact": "verification/focused-single-worker-3.json.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/focused-single-worker-3.json",
+      "uncompressedBytes": 10507,
+      "uncompressedSha256": "aa9c7133b1419810fd43bcc511e6f968f6da8d3087a9624da0efb1940fbb3206"
+    },
+    {
+      "artifact": "verification/focused-single-worker-3.log.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/focused-single-worker-3.log",
+      "uncompressedBytes": 4438,
+      "uncompressedSha256": "8a037fe6336b2a74302f62d1eb1bbc3e5e562d3cecda9ccbb7d20cbd0bd2861e"
+    },
+    {
+      "artifact": "verification/full-validation.json",
+      "source": "/home/hermes/orch8-evidence/reliability-package/full-validation.json",
+      "uncompressedBytes": 1003,
+      "uncompressedSha256": "49fbe4a6924fdfc6dbb5369d578da2903a090e765f3155bd937a3bd3eb106a21"
+    },
+    {
+      "artifact": "verification/gates.json",
+      "source": "/home/hermes/orch8-evidence/reliability-package/gates.json",
+      "uncompressedBytes": 6292,
+      "uncompressedSha256": "ef2da1ec3ba529be7efe4ae16e4b3a659cbc9129c289eac5d4c65354c81b75e5"
+    },
+    {
+      "artifact": "verification/lint.log.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/lint.log",
+      "uncompressedBytes": 49747,
+      "uncompressedSha256": "66ef7d812b3d615b96b7cb4cb945d5c3704b73aeabc669044385613f11f83810"
+    },
+    {
+      "artifact": "verification/typecheck.log.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-package/typecheck.log",
+      "uncompressedBytes": 1411,
+      "uncompressedSha256": "b4334c73aeaf51a5dc83a59d30c4f89557facb3a98b68ddcc288a940401ac6fe"
+    },
+    {
+      "artifact": "full-suite/test.log.gz",
+      "source": "/home/hermes/orch8-evidence/reliability-full-reviewed.log",
+      "uncompressedBytes": 99031,
+      "uncompressedSha256": "f1f3083a6f729279adc4fa03e65d213d7393cb7bcc275d58d770b702f8b1080e"
+    },
+    {
+      "artifact": "full-suite/shared.json.gz",
+      "source": "/home/hermes/projects/orch8-test-investigation/packages/shared/vitest-review-final.json",
+      "uncompressedBytes": 50871,
+      "uncompressedSha256": "6ce8d70e84cda1e8779d4162ce4e6acc067851e138c56c486265ecf0f051a1df"
+    },
+    {
+      "artifact": "full-suite/daemon.json.gz",
+      "source": "/home/hermes/projects/orch8-test-investigation/packages/daemon/vitest-review-final.json",
+      "uncompressedBytes": 228372,
+      "uncompressedSha256": "86584be0b127823f3b5cc8faa04f1006876dd9deb60e62073a61afd03ea2262e"
+    },
+    {
+      "artifact": "full-suite/dashboard.json.gz",
+      "source": "/home/hermes/projects/orch8-test-investigation/packages/dashboard/vitest-review-final.json",
+      "uncompressedBytes": 79682,
+      "uncompressedSha256": "3793aa3527dd30cd28d96a22d04d3bd4e6d9690f59c0c8fc7a4f37eb27ebb763"
+    },
+    {
+      "artifact": "full-suite/cli.json.gz",
+      "source": "/home/hermes/projects/orch8-test-investigation/packages/cli/vitest-review-final.json",
+      "uncompressedBytes": 1651,
+      "uncompressedSha256": "6a9e2cd2a227f005848e60698c8dd7748ef9f514660ca6f17699ca88de1bd2a2"
+    },
+    {
+      "artifact": "reviews/reliability-final-review.md",
+      "source": "/home/hermes/orch8-evidence/reliability-final-review.md",
+      "uncompressedBytes": 8584,
+      "uncompressedSha256": "82f652805a932866d0e0914284494777686adb5d976e479fd00824e3703f320e"
+    },
+    {
+      "artifact": "reviews/reliability-review-fixes.md",
+      "source": "/home/hermes/orch8-evidence/reliability-review-fixes.md",
+      "uncompressedBytes": 7079,
+      "uncompressedSha256": "65d0ea7533e5727e710eb9d4015d6653a7b17352c69e806dbf760e77531ab1cf"
+    },
+    {
+      "artifact": "reviews/reliability-spec-review.md",
+      "source": "/home/hermes/orch8-evidence/reliability-spec-review.md",
+      "uncompressedBytes": 6478,
+      "uncompressedSha256": "268b5c1fd056c668077b6f355b4051e380f417d0b5dfa650b506bf23fc3953c5"
+    },
+    {
+      "artifact": "review-evidence/independent-final-1793665849779043472-validation.json.gz",
+      "source": "/home/hermes/orch8-evidence/independent-final-1793665849779043472-validation.json",
+      "uncompressedBytes": 1495,
+      "uncompressedSha256": "555f7641c653d9c19f6627f22ecc5460cbb3d53a15bdef3fbc0ddb8ed74a82ea"
+    },
+    {
+      "artifact": "review-evidence/independent-final-1793665849779043472.json.gz",
+      "source": "/home/hermes/orch8-evidence/independent-final-1793665849779043472.json",
+      "uncompressedBytes": 10513,
+      "uncompressedSha256": "45298732a40dff3410367f9b0bd1cfd3717793fd5ac8512dabd043fe51749e33"
+    },
+    {
+      "artifact": "review-evidence/independent-final-1793665849779043472.log.gz",
+      "source": "/home/hermes/orch8-evidence/independent-final-1793665849779043472.log",
+      "uncompressedBytes": 4427,
+      "uncompressedSha256": "620b80d88ec878abbe219ee6ba90335ac0656d2d3becfb424a11eef66bc622f5"
+    },
+    {
+      "artifact": "review-evidence/independent-final-typecheck.log.gz",
+      "source": "/home/hermes/orch8-evidence/independent-final-typecheck.log",
+      "uncompressedBytes": 0,
+      "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-final.json.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-final.json",
+      "uncompressedBytes": 10517,
+      "uncompressedSha256": "1a7b92efbe47be4e27265af176a8b6c6455ae922e65404e2295df1e6d48fc534"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-final.log.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-final.log",
+      "uncompressedBytes": 4408,
+      "uncompressedSha256": "d1fc0ba91f32cc33f3be679e85bbe6b0696ef362268036a756375a388f81bfde"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-green-1.json.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-green-1.json",
+      "uncompressedBytes": 10507,
+      "uncompressedSha256": "f7bf0465b31b41f7f34d6cd81f523b3befc3d2b3d7d04d06d46d2bcf4243074c"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-green-1.log.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-green-1.log",
+      "uncompressedBytes": 4410,
+      "uncompressedSha256": "e50caab4a5cc78b320154b3d2602a7b7c24e6e8d2b0802f9f4d3968876c94687"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-observer-red.json.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-observer-red.json",
+      "uncompressedBytes": 2921,
+      "uncompressedSha256": "b7679a71b59eee1987cd550d6ef7adeff9d7fa0833451588526ebbbd59062f6d"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-observer-red.log.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-observer-red.log",
+      "uncompressedBytes": 3198,
+      "uncompressedSha256": "841c303b5b58bec1a7f2020ef0ad8ebdc48e5d65e339355f8a01c0ea52bfa173"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-red.json.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-red.json",
+      "uncompressedBytes": 2554,
+      "uncompressedSha256": "acd0deb5813cb1f8a3dd33cd03b2ba07a525f3766c6768759806d8111d5a41e6"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-red.log.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-red.log",
+      "uncompressedBytes": 2785,
+      "uncompressedSha256": "e5ea98ef5227ae7e666ed7809c651b3b7a05ae7c17e8513adb9a7a36343c05cd"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-release-red.json.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-release-red.json",
+      "uncompressedBytes": 6912,
+      "uncompressedSha256": "b34a6158e800da9bf90bdaa47018c77e42636e82c21e89fc239d4605dfb29f42"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-release-red.log.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-release-red.log",
+      "uncompressedBytes": 2794,
+      "uncompressedSha256": "3e7adad64b189efc51d4f1473b99617b726b410581186afd6184b021b429e832"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-restore-red.json.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-restore-red.json",
+      "uncompressedBytes": 2203,
+      "uncompressedSha256": "0a0c5497d748ca6d23b223b5ba5d30d8d50bd8ebdc895332b77f7ad439747a10"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-restore-red.log.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-restore-red.log",
+      "uncompressedBytes": 2790,
+      "uncompressedSha256": "42a9fab27297f188b6a53be4e9bf50bbc900ae56cd8ab0ca8eeaf89da1cf6047"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-typecheck.log.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-typecheck.log",
+      "uncompressedBytes": 0,
+      "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "artifact": "review-evidence/review-fixes-validation.json.gz",
+      "source": "/home/hermes/orch8-evidence/review-fixes-validation.json",
+      "uncompressedBytes": 663,
+      "uncompressedSha256": "7eb7cbba55562e5df97656c5a7994374f8c1659d91307f4e46ed1b137cdb85df"
+    },
+    {
+      "artifact": "verification/package-reliability-gates.py",
+      "source": "/home/hermes/orch8-evidence/package-reliability-gates.py",
+      "uncompressedBytes": 2552,
+      "uncompressedSha256": "8f0ac883d23d18b0470b32c68133e58659b7a72a8a349a7655b825727eddc529"
+    }
+  ]
+}
