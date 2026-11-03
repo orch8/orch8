@@ -1,7 +1,9 @@
 import { eq, and, sql } from "drizzle-orm";
-import { projects, tasks, taskDependencies } from "@orch/shared/db";
+import { projects, tasks, taskDependencies, pipelineSteps } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { CreateTaskInput, UpdateTask, TaskFilter } from "@orch/shared";
+
+import { lockPipelineAttempt, requireActiveAttempt, PipelineConflict, type PipelineTx } from "./pipeline.service.js";
 
 type Task = typeof tasks.$inferSelect;
 
@@ -120,15 +122,35 @@ export class TaskService {
     return this.db.select().from(tasks).where(and(...conditions));
   }
 
-  async update(id: string, input: UpdateTask): Promise<Task> {
-    const [updated] = await this.db
-      .update(tasks)
-      .set({ ...input, updatedAt: new Date() })
-      .where(eq(tasks.id, id))
-      .returning();
+  private async withTaskLock<T>(taskId: string, operation: (tx: PipelineTx, task: Task) => Promise<T>): Promise<T> {
+    return this.db.transaction(async tx => {
+      const [hint] = await tx.select().from(tasks).where(eq(tasks.id, taskId));
+      if (!hint) throw new Error("Task not found");
+      if (hint.pipelineId || hint.pipelineStepId) {
+        const state = await lockPipelineAttempt(tx, hint.pipelineId ?? "", hint.pipelineStepId ?? "", taskId);
+        requireActiveAttempt(state.pipeline, state.step, state.task);
+        return operation(tx, state.task);
+      }
+      const [task] = await tx.select().from(tasks).where(eq(tasks.id, taskId)).for("update");
+      if (!task) throw new Error("Task not found");
+      return operation(tx, task);
+    });
+  }
 
-    if (!updated) throw new Error("Task not found");
-    return updated;
+  async update(id: string, input: UpdateTask): Promise<Task> {
+    return this.withTaskLock(id, async (tx, task) => {
+      if (task.pipelineId) {
+        if (input.column !== undefined) throw new PipelineConflict("Use pipeline lifecycle operations");
+        if (input.assignee !== undefined) {
+          if (task.executionRunId) throw new PipelineConflict("Cannot reassign an executing pipeline task");
+          await tx.update(pipelineSteps).set({ agentId: input.assignee, updatedAt: new Date() })
+            .where(eq(pipelineSteps.id, task.pipelineStepId!));
+        }
+      }
+      const [updated] = await tx.update(tasks).set({ ...input, updatedAt: new Date() })
+        .where(eq(tasks.id, id)).returning();
+      return updated;
+    });
   }
 
   async delete(id: string): Promise<void> {
@@ -137,7 +159,7 @@ export class TaskService {
   }
 
   async addDependency(taskId: string, dependsOnId: string): Promise<void> {
-    await this.addDependencyTx(this.db as TxOrDb, taskId, dependsOnId);
+    await this.withTaskLock(taskId, tx => this.addDependencyTx(tx, taskId, dependsOnId));
   }
 
   private async addDependencyTx(
@@ -168,14 +190,9 @@ export class TaskService {
   }
 
   async removeDependency(taskId: string, dependsOnId: string): Promise<void> {
-    await this.db
-      .delete(taskDependencies)
-      .where(
-        and(
-          eq(taskDependencies.taskId, taskId),
-          eq(taskDependencies.dependsOnId, dependsOnId),
-        ),
-      );
+    await this.withTaskLock(taskId, async tx => {
+      await tx.delete(taskDependencies).where(and(eq(taskDependencies.taskId, taskId), eq(taskDependencies.dependsOnId, dependsOnId)));
+    });
   }
 
   async convertBrainstorm(taskId: string, newType: "quick"): Promise<Task> {
@@ -211,6 +228,7 @@ export class TaskService {
         JOIN tasks blocked ON blocked.id = td.task_id
         WHERE blocked."column" = 'blocked'
           AND blocked.project_id = ${projectId}
+          AND blocked.pipeline_id IS NULL AND blocked.pipeline_step_id IS NULL
         GROUP BY td.task_id
         HAVING bool_and(blocker."column" = 'done')
       )
@@ -219,7 +237,29 @@ export class TaskService {
       WHERE id IN (SELECT task_id FROM newly_unblockable)
       RETURNING id, title, assignee
     `);
-    return result as unknown as Array<{ id: string; title: string; assignee: string | null }>;
+    const unblocked = result as unknown as Array<{ id: string; title: string; assignee: string | null }>;
+    const candidates = await this.db.select().from(tasks).where(and(eq(tasks.projectId, projectId), eq(tasks.column, "blocked")));
+    for (const candidate of candidates) {
+      if (!candidate.pipelineId && !candidate.pipelineStepId) continue;
+      try {
+        await this.withTaskLock(candidate.id, async (tx, task) => {
+          if (task.column !== "blocked") return;
+          const resolved = await tx.execute(sql`
+            SELECT td.task_id FROM task_dependencies td
+            JOIN tasks blocker ON blocker.id = td.depends_on_id
+            WHERE td.task_id = ${task.id}
+            GROUP BY td.task_id
+            HAVING bool_and(blocker."column" = 'done')
+          `);
+          if (!resolved.length) return;
+          await tx.update(tasks).set({ column: "backlog", updatedAt: new Date() }).where(eq(tasks.id, task.id));
+          unblocked.push({ id: task.id, title: task.title, assignee: task.assignee });
+        });
+      } catch (error) {
+        if (!(error instanceof PipelineConflict)) throw error;
+      }
+    }
+    return unblocked;
   }
 
   private async wouldCreateCycleTx(

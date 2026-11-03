@@ -267,7 +267,7 @@ export class SchedulerService {
 
         // Release task lock if applicable
         if (run.taskId) {
-          await this.heartbeatService.releaseTaskLock(run.taskId);
+          await this.heartbeatService.releaseTaskLock(run.taskId, run.id);
         }
       }
 

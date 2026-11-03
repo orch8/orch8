@@ -1,6 +1,7 @@
+import { PipelineConflict } from "../../services/pipeline.service.js";
 // packages/daemon/src/api/routes/tasks.ts
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { CreateTaskSchema, UpdateTaskSchema, CompletePipelineStepSchema, ConvertTaskSchema, TaskFilterSchema } from "@orch/shared";
+import { CreateTaskSchema, TaskColumnSchema, UpdateTaskSchema, CompletePipelineStepSchema, ConvertTaskSchema, TaskFilterSchema } from "@orch/shared";
 import { eq } from "drizzle-orm";
 import { agents } from "@orch/shared/db";
 import { requireProjectScope } from "../utils/project-scope.js";
@@ -178,6 +179,7 @@ export async function taskRoutes(app: FastifyInstance) {
         );
         return task;
       } catch (err) {
+        if (err instanceof PipelineConflict) throw err;
         const message = (err as Error).message;
         if (message.startsWith("Invalid transition")) {
           return reply.code(400).send({ error: "invalid_transition", message });
@@ -218,9 +220,12 @@ export async function taskRoutes(app: FastifyInstance) {
     },
     async (request, reply: FastifyReply) => {
       if (!await scopedTask(request, reply, request.params.id)) return reply;
-      const body = request.body as { column?: string; agentId?: string; runId?: string };
-      if (!body.column) {
+      const body = request.body as { column?: string; agentId?: string; runId?: string } | undefined;
+      if (!body?.column) {
         return reply.code(400).send({ error: "validation_error", message: "column is required" });
+      }
+      if (!TaskColumnSchema.safeParse(body.column).success) {
+        return reply.code(400).send({ error: "validation_error", message: "Invalid task column" });
       }
 
       try {
@@ -234,6 +239,7 @@ export async function taskRoutes(app: FastifyInstance) {
         );
         return task;
       } catch (err) {
+        if (err instanceof PipelineConflict) throw err;
         const message = (err as Error).message;
         if (message.startsWith("Invalid transition")) {
           return reply.code(400).send({ error: "invalid_transition", message });
@@ -265,20 +271,10 @@ export async function taskRoutes(app: FastifyInstance) {
         });
       }
 
-      const pipelineData = await app.pipelineService.findByTaskId(task.id);
-      if (!pipelineData) {
-        return reply.code(500).send({ error: "internal", message: "Pipeline data not found for task" });
-      }
-
-      const outputFilePath = pipelineData.step.outputFilePath
-        ?? `.orch8/pipelines/${pipelineData.pipeline.id}/${pipelineData.step.label}.md`;
-
       const result = await app.pipelineService.completeStep(
-        pipelineData.pipeline.id,
-        pipelineData.step.id,
-        parsed.data.output,
-        outputFilePath,
+        task.pipelineId, task.pipelineStepId, task.id, parsed.data.output,
       );
+      await taskService.unblockResolved(task.projectId);
 
       // Post step output as a system comment on the task
       try {
@@ -290,13 +286,6 @@ export async function taskRoutes(app: FastifyInstance) {
         });
       } catch {
         // Best-effort — don't block completion if comment fails
-      }
-
-      // Transition task to done
-      try {
-        await app.lifecycleService.transition(task.id, "done");
-      } catch {
-        // Best-effort: task may already be in done state
       }
 
       // Wake next step's agent if there is one
@@ -436,9 +425,11 @@ export async function taskRoutes(app: FastifyInstance) {
         const task = await app.lifecycleService.release(
           request.params.id,
           agentId,
+          request.runId,
         );
         return task;
       } catch (err) {
+        if (err instanceof PipelineConflict) throw err;
         const message = (err as Error).message;
         if (message === "Task not found") {
           return reply.code(404).send({ error: "not_found", message });

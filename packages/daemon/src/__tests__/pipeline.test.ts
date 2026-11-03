@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import { projects, tasks, agents, pipelineTemplates, pipelines, pipelineSteps } from "@orch/shared/db";
+import postgres from "postgres";
+import { projects, tasks, agents, pipelineTemplates, pipelines, pipelineSteps, heartbeatRuns } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { makeFailingTxDb } from "./helpers/failing-tx.js";
 import { PipelineService } from "../services/pipeline.service.js";
 import { PipelineTemplateService } from "../services/pipeline-template.service.js";
+import { HeartbeatService } from "../services/heartbeat.service.js";
+import { BroadcastService } from "../services/broadcast.service.js";
 
 describe("PipelineService", () => {
   let testDb: TestDb;
@@ -89,6 +92,53 @@ describe("PipelineService", () => {
   });
 
   describe("completeStep", () => {
+    it("does not let task-only heartbeat cleanup erase a pipeline execution owner", async () => {
+      const { firstTask } = await service.create({
+        projectId, name: "Cleanup ownership", steps: [{ label: "work", agentId: "agent-b" }],
+      });
+      const observer = postgres(testDb.connectionUri, { max: 1 });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        projectId, taskId: firstTask.id, agentId: "agent-b", status: "running",
+        invocationSource: "on_demand",
+      }).returning();
+      try {
+        // The cleanup API has no expected run identity. A caller retaining only
+        // the task ID cannot distinguish its old lock from this newer owner.
+        await observer`UPDATE tasks SET execution_run_id = ${run.id},
+          execution_agent_id = 'agent-b', execution_locked_at = now()
+          WHERE id = ${firstTask.id}`;
+        const before = await observer`SELECT * FROM tasks WHERE id = ${firstTask.id}`;
+        const heartbeat = new HeartbeatService(testDb.db, new BroadcastService(new Set()));
+        await heartbeat.releaseTaskLock(firstTask.id).catch(() => undefined);
+        expect(await observer`SELECT * FROM tasks WHERE id = ${firstTask.id}`).toEqual(before);
+      } finally {
+        await observer.end();
+      }
+    });
+    it("rolls back completion when successor insertion fails", async () => {
+      const { pipeline, steps } = await service.create({
+        projectId, name: "Rollback completion",
+        steps: [{ label: "first" }, { label: "second" }],
+      });
+      const observer = postgres(testDb.connectionUri, { max: 1 });
+      const snapshot = async () => ({
+        pipelines: await observer`SELECT * FROM pipelines ORDER BY id`,
+        steps: await observer`SELECT * FROM pipeline_steps ORDER BY id`,
+        tasks: await observer`SELECT * FROM tasks ORDER BY id`,
+        allocator: await observer`SELECT id, next_task_number FROM projects ORDER BY id`,
+      });
+      try {
+        const before = await snapshot();
+        const failing = new PipelineService(makeFailingTxDb(testDb.db, {
+          failInsertOnTable: tasks,
+        }), templateService);
+        await expect(failing.completeStep(pipeline.id, steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!, "done", "first.md"))
+          .rejects.toThrow("simulated db write failure");
+        expect(await snapshot()).toEqual(before);
+      } finally {
+        await observer.end();
+      }
+    });
     it("marks step completed and creates task for next step", async () => {
       const { pipeline, steps } = await service.create({
         projectId,
@@ -101,7 +151,7 @@ describe("PipelineService", () => {
 
       const result = await service.completeStep(
         pipeline.id,
-        steps[0].id,
+        steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!,
         "Research complete",
         ".orch8/pipelines/test/research.md",
       );
@@ -123,7 +173,7 @@ describe("PipelineService", () => {
 
       const result = await service.completeStep(
         pipeline.id,
-        steps[0].id,
+        steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!,
         "Done",
         ".orch8/pipelines/test/do-it.md",
       );
@@ -144,7 +194,7 @@ describe("PipelineService", () => {
 
       const first = await service.completeStep(
         pipeline.id,
-        steps[0].id,
+        steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!,
         "Research complete",
         ".orch8/pipelines/test/research.md",
       );
@@ -155,7 +205,7 @@ describe("PipelineService", () => {
       // Second call to completeStep for the same step
       const second = await service.completeStep(
         pipeline.id,
-        steps[0].id,
+        steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!,
         "Research complete (retry)",
         ".orch8/pipelines/test/research.md",
       );
@@ -187,7 +237,7 @@ describe("PipelineService", () => {
 
       const result = await service.completeStep(
         pipeline.id,
-        steps[0].id,
+        steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!,
         "Research done",
         ".orch8/pipelines/test/research.md",
       );
@@ -210,7 +260,7 @@ describe("PipelineService", () => {
 
       const result = await service.completeStep(
         pipeline.id,
-        steps[0].id,
+        steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!,
         "Plan output",
         ".orch8/pipelines/test/plan.md",
       );
@@ -235,7 +285,7 @@ describe("PipelineService", () => {
 
       await service.completeStep(
         pipeline.id,
-        steps[0].id,
+        steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!,
         "Plan output",
         ".orch8/pipelines/test/plan.md",
       );
@@ -262,7 +312,7 @@ describe("PipelineService", () => {
 
       await service.completeStep(
         pipeline.id,
-        steps[0].id,
+        steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!,
         "Review output",
         ".orch8/pipelines/test/review.md",
       );
@@ -302,7 +352,7 @@ describe("PipelineService", () => {
       // Complete step 1
       await service.completeStep(
         pipeline.id,
-        steps[0].id,
+        steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!,
         "Research done",
         ".orch8/pipelines/test/research.md",
       );
@@ -313,7 +363,7 @@ describe("PipelineService", () => {
 
       await service.completeStep(
         pipeline.id,
-        planStep.id,
+        planStep.id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === planStep.id)!.taskId!,
         "Plan output",
         ".orch8/pipelines/test/plan.md",
       );
@@ -344,7 +394,7 @@ describe("PipelineService", () => {
         ],
       });
 
-      const result = await service.failStep(pipeline.id, steps[0].id);
+      const result = await service.failStep(pipeline.id, steps[0].id, steps[0].taskId!);
 
       expect(result.step.status).toBe("failed");
       expect(result.pipeline.status).toBe("failed");
@@ -402,13 +452,13 @@ describe("PipelineService", () => {
       // Complete first two steps
       await service.completeStep(
         pipeline.id,
-        steps[0].id,
+        steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!,
         "Research done",
         ".orch8/pipelines/test/research.md",
       );
       const step2Result = await service.completeStep(
         pipeline.id,
-        steps[1].id,
+        steps[1].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[1].id)!.taskId!,
         "Impl done",
         ".orch8/pipelines/test/implement.md",
       );
@@ -454,7 +504,7 @@ describe("PipelineService", () => {
 
       await service.completeStep(
         pipeline.id,
-        steps[0].id,
+        steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!,
         "Done",
         ".orch8/pipelines/test/implement.md",
       );
@@ -537,8 +587,8 @@ describe("PipelineService", () => {
       });
 
       // Advance to review step so rejectStep has a real target.
-      await service.completeStep(pipeline.id, steps[0].id, "r", "/tmp/r.md");
-      const step2Result = await service.completeStep(pipeline.id, steps[1].id, "i", "/tmp/i.md");
+      await service.completeStep(pipeline.id, steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!, "r", "/tmp/r.md");
+      const step2Result = await service.completeStep(pipeline.id, steps[1].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[1].id)!.taskId!, "i", "/tmp/i.md");
       const reviewStep = step2Result.nextStep!;
 
       // Snapshot state before reject
