@@ -1,0 +1,205 @@
+[
+  {
+    "name": "build",
+    "command": [
+      "pnpm",
+      "exec",
+      "turbo",
+      "run",
+      "build",
+      "--force"
+    ],
+    "cwd": "/home/hermes/projects/orch8-test-investigation",
+    "exitCode": 0,
+    "started": 1793666088.045553,
+    "finished": 1793666114.0569892
+  },
+  {
+    "name": "typecheck",
+    "command": [
+      "pnpm",
+      "exec",
+      "turbo",
+      "run",
+      "typecheck",
+      "--force"
+    ],
+    "cwd": "/home/hermes/projects/orch8-test-investigation",
+    "exitCode": 0,
+    "started": 1793666114.0571902,
+    "finished": 1793666139.7615047
+  },
+  {
+    "name": "lint",
+    "command": [
+      "pnpm",
+      "lint"
+    ],
+    "cwd": "/home/hermes/projects/orch8-test-investigation",
+    "exitCode": 0,
+    "started": 1793666139.7621026,
+    "finished": 1793666158.7084234
+  },
+  {
+    "name": "focused-normal-1",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "src/__tests__/async-work.test.ts",
+      "src/__tests__/heartbeat-integration.test.ts",
+      "src/__tests__/chats-routes.test.ts",
+      "src/__tests__/chat-message-replay.test.ts",
+      "src/__tests__/chat.service.test.ts",
+      "--reporter=json",
+      "--outputFile=/home/hermes/orch8-evidence/reliability-package/focused-normal-1.json"
+    ],
+    "cwd": "/home/hermes/projects/orch8-test-investigation/packages/daemon",
+    "exitCode": 0,
+    "started": 1793666158.7087736,
+    "finished": 1793666167.0421138,
+    "validation": {
+      "report": "/home/hermes/orch8-evidence/reliability-package/focused-normal-1.json",
+      "tests": 33,
+      "files": 5,
+      "sha256": "ea2a1ec3b4333d5c89a539d9466547b86b99bf383d64b7abcd0905f7f4572743"
+    }
+  },
+  {
+    "name": "focused-normal-2",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "src/__tests__/async-work.test.ts",
+      "src/__tests__/heartbeat-integration.test.ts",
+      "src/__tests__/chats-routes.test.ts",
+      "src/__tests__/chat-message-replay.test.ts",
+      "src/__tests__/chat.service.test.ts",
+      "--reporter=json",
+      "--outputFile=/home/hermes/orch8-evidence/reliability-package/focused-normal-2.json"
+    ],
+    "cwd": "/home/hermes/projects/orch8-test-investigation/packages/daemon",
+    "exitCode": 0,
+    "started": 1793666167.0430338,
+    "finished": 1793666175.370455,
+    "validation": {
+      "report": "/home/hermes/orch8-evidence/reliability-package/focused-normal-2.json",
+      "tests": 33,
+      "files": 5,
+      "sha256": "bee1a62e2818427be3232960d66e5e39d9e6cf791f6beb88317e0ec7c65493c9"
+    }
+  },
+  {
+    "name": "focused-normal-3",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "src/__tests__/async-work.test.ts",
+      "src/__tests__/heartbeat-integration.test.ts",
+      "src/__tests__/chats-routes.test.ts",
+      "src/__tests__/chat-message-replay.test.ts",
+      "src/__tests__/chat.service.test.ts",
+      "--reporter=json",
+      "--outputFile=/home/hermes/orch8-evidence/reliability-package/focused-normal-3.json"
+    ],
+    "cwd": "/home/hermes/projects/orch8-test-investigation/packages/daemon",
+    "exitCode": 0,
+    "started": 1793666175.3716314,
+    "finished": 1793666183.6175795,
+    "validation": {
+      "report": "/home/hermes/orch8-evidence/reliability-package/focused-normal-3.json",
+      "tests": 33,
+      "files": 5,
+      "sha256": "1aac327a29659ea75958f1219e6adc7b35f2d03b532a212330f0b8a4b6732024"
+    }
+  },
+  {
+    "name": "focused-single-worker-1",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "src/__tests__/async-work.test.ts",
+      "src/__tests__/heartbeat-integration.test.ts",
+      "src/__tests__/chats-routes.test.ts",
+      "src/__tests__/chat-message-replay.test.ts",
+      "src/__tests__/chat.service.test.ts",
+      "--reporter=json",
+      "--outputFile=/home/hermes/orch8-evidence/reliability-package/focused-single-worker-1.json",
+      "--maxWorkers=1",
+      "--no-file-parallelism"
+    ],
+    "cwd": "/home/hermes/projects/orch8-test-investigation/packages/daemon",
+    "exitCode": 0,
+    "started": 1793666183.6186454,
+    "finished": 1793666191.8309336,
+    "validation": {
+      "report": "/home/hermes/orch8-evidence/reliability-package/focused-single-worker-1.json",
+      "tests": 33,
+      "files": 5,
+      "sha256": "f5f3b052f20d45433dce2729ba4df9a91bf42fc6a68f9a517eee471c291a4844"
+    }
+  },
+  {
+    "name": "focused-single-worker-2",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "src/__tests__/async-work.test.ts",
+      "src/__tests__/heartbeat-integration.test.ts",
+      "src/__tests__/chats-routes.test.ts",
+      "src/__tests__/chat-message-replay.test.ts",
+      "src/__tests__/chat.service.test.ts",
+      "--reporter=json",
+      "--outputFile=/home/hermes/orch8-evidence/reliability-package/focused-single-worker-2.json",
+      "--maxWorkers=1",
+      "--no-file-parallelism"
+    ],
+    "cwd": "/home/hermes/projects/orch8-test-investigation/packages/daemon",
+    "exitCode": 0,
+    "started": 1793666191.8321161,
+    "finished": 1793666200.234155,
+    "validation": {
+      "report": "/home/hermes/orch8-evidence/reliability-package/focused-single-worker-2.json",
+      "tests": 33,
+      "files": 5,
+      "sha256": "91b2b28457ef57af189bfa9d1302dd870a70fa87d177f474bda414e8ac69f50e"
+    }
+  },
+  {
+    "name": "focused-single-worker-3",
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "src/__tests__/async-work.test.ts",
+      "src/__tests__/heartbeat-integration.test.ts",
+      "src/__tests__/chats-routes.test.ts",
+      "src/__tests__/chat-message-replay.test.ts",
+      "src/__tests__/chat.service.test.ts",
+      "--reporter=json",
+      "--outputFile=/home/hermes/orch8-evidence/reliability-package/focused-single-worker-3.json",
+      "--maxWorkers=1",
+      "--no-file-parallelism"
+    ],
+    "cwd": "/home/hermes/projects/orch8-test-investigation/packages/daemon",
+    "exitCode": 0,
+    "started": 1793666200.2350435,
+    "finished": 1793666208.3779144,
+    "validation": {
+      "report": "/home/hermes/orch8-evidence/reliability-package/focused-single-worker-3.json",
+      "tests": 33,
+      "files": 5,
+      "sha256": "aa9c7133b1419810fd43bcc511e6f968f6da8d3087a9624da0efb1940fbb3206"
+    }
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "reports": [
+    {
+      "report": "/home/hermes/projects/orch8-test-investigation/packages/shared/vitest-review-final.json",
+      "tests": 180,
+      "files": 8,
+      "sha256": "6ce8d70e84cda1e8779d4162ce4e6acc067851e138c56c486265ecf0f051a1df"
+    },
+    {
+      "report": "/home/hermes/projects/orch8-test-investigation/packages/daemon/vitest-review-final.json",
+      "tests": 770,
+      "files": 96,
+      "sha256": "86584be0b127823f3b5cc8faa04f1006876dd9deb60e62073a61afd03ea2262e"
+    },
+    {
+      "report": "/home/hermes/projects/orch8-test-investigation/packages/dashboard/vitest-review-final.json",
+      "tests": 276,
+      "files": 62,
+      "sha256": "3793aa3527dd30cd28d96a22d04d3bd4e6d9690f59c0c8fc7a4f37eb27ebb763"
+    },
+    {
+      "report": "/home/hermes/projects/orch8-test-investigation/packages/cli/vitest-review-final.json",
+      "tests": 4,
+      "files": 1,
+      "sha256": "6a9e2cd2a227f005848e60698c8dd7748ef9f514660ca6f17699ca88de1bd2a2"
+    }
+  ],
+  "total": 1230
+}
