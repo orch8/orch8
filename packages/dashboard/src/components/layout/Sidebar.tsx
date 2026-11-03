@@ -1,7 +1,8 @@
 import { Link, useRouterState, useParams } from "@tanstack/react-router";
-import type { ComponentProps, ComponentType } from "react";
+import { useId, useState, type ComponentProps, type ComponentType } from "react";
 import {
   ActivityIcon,
+  MoreHorizontalIcon,
   AlertTriangleIcon,
   BotIcon,
   BriefcaseBusinessIcon,
@@ -74,7 +75,6 @@ function useProjectSections(): NavSection[] {
         { to: `${prefix}/runs`, label: "Runs", icon: RadioIcon },
         { to: `${prefix}/errors`, label: "Errors", icon: AlertTriangleIcon },
         { to: `${prefix}/cost`, label: "Cost", icon: CircleDollarSignIcon },
-        { to: `${prefix}/memory`, label: "Memory", icon: CpuIcon },
         { to: `${prefix}/activity`, label: "Activity", icon: ActivityIcon },
       ],
     },
@@ -93,6 +93,15 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
   const sections = useProjectSections();
   const { data: daemonStatus } = useDaemonStatus();
   const { state } = useSidebar();
+  const moreId = useId();
+  const [moreDisclosure, setMoreDisclosure] = useState<{ pathname: string; expanded: boolean } | null>(null);
+  const moreItems = params.projectSlug ? [
+    { to: `/projects/${params.projectSlug}/chat`, label: "Chat", icon: MessageSquareTextIcon },
+    { to: `/projects/${params.projectSlug}/briefing`, label: "Briefing", icon: BriefcaseBusinessIcon },
+    { to: `/projects/${params.projectSlug}/memory`, label: "Memory", icon: CpuIcon },
+  ] : [];
+  const moreActive = moreItems.some(({ to }) => pathname === to || pathname.startsWith(`${to}/`));
+  const moreOpen = moreDisclosure?.pathname === pathname ? moreDisclosure.expanded : moreActive;
 
   function isActive(to: string) {
     if (to === "/") return pathname === "/";
@@ -106,27 +115,6 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
       </div>
 
       <nav className="flex flex-1 flex-col overflow-y-auto px-2 py-3">
-        {params.projectSlug && (
-          <SidebarGroup>
-            <SidebarMenu>
-              <NavLink
-                active={pathname.startsWith(`/projects/${params.projectSlug}/chat`)}
-                icon={MessageSquareTextIcon}
-                label="Chat"
-                onClose={onClose}
-                to={`/projects/${params.projectSlug}/chat`}
-              />
-              <NavLink
-                active={pathname.startsWith(`/projects/${params.projectSlug}/briefing`)}
-                icon={BriefcaseBusinessIcon}
-                label="Briefing"
-                onClose={onClose}
-                to={`/projects/${params.projectSlug}/briefing`}
-              />
-            </SidebarMenu>
-          </SidebarGroup>
-        )}
-
         {sections.map((section) => (
           <SidebarGroup key={section.title} className="mt-2">
             <span className="px-2 type-label text-whisper group-data-[collapsible=icon]:sr-only">
@@ -147,6 +135,29 @@ export function Sidebar({ onClose }: SidebarProps = {}) {
             </SidebarMenu>
           </SidebarGroup>
         ))}
+        {params.projectSlug && (
+          <SidebarGroup className="mt-2">
+            <SidebarMenuButton
+              aria-label="More"
+              aria-expanded={moreOpen}
+              aria-controls={moreId}
+              isActive={moreActive}
+              tooltip="More"
+              onClick={() => setMoreDisclosure({ pathname, expanded: !moreOpen })}
+            >
+              <MoreHorizontalIcon />
+              <span>More</span>
+            </SidebarMenuButton>
+            {moreOpen && (
+              <SidebarMenu id={moreId} className="mt-1">
+                {moreItems.map((item) => (
+                  <NavLink key={item.to} active={isActive(item.to)} icon={item.icon}
+                    label={item.label} to={item.to as LinkTo} onClose={onClose} />
+                ))}
+              </SidebarMenu>
+            )}
+          </SidebarGroup>
+        )}
       </nav>
 
       <div className="border-t border-edge-soft p-2">
@@ -185,11 +196,18 @@ function NavLink({
   onClose?: () => void;
   to: LinkTo;
 }) {
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  function handleClick() {
+    if (isMobile) setOpenMobile(false);
+    onClose?.();
+  }
+
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
         isActive={active}
-        onClick={onClose}
+        onClick={handleClick}
         render={<Link to={to} />}
         tooltip={label}
       >

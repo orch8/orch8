@@ -9,12 +9,6 @@ function WelcomePage() {
         onComplete={(projectId) =>
           navigate({ to: "/projects/$projectSlug", params: { projectSlug: projectId } })
         }
-        onChatNavigate={(projectId, chatId) =>
-          navigate({
-            to: "/projects/$projectSlug/chat/$chatId",
-            params: { projectSlug: projectId, chatId },
-          })
-        }
       />
     </div>
   );

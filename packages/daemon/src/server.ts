@@ -255,7 +255,6 @@ export function buildServer(options: ServerOptions = {}) {
               project.id,
             );
             if (created) provisionedCount++;
-            await seedingService.ensureInitialChat(dbClient.db, project.id);
             await seedingService.reconcileAgentSkills(dbClient.db, project.id);
           } catch (err) {
             app.log.error(

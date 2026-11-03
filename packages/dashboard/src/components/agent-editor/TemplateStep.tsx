@@ -14,7 +14,9 @@ interface TemplateStepMultiProps {
   onToggle: (agentId: string) => void;
 }
 
-type TemplateStepProps = TemplateStepSingleProps | TemplateStepMultiProps;
+type TemplateStepProps = (TemplateStepSingleProps | TemplateStepMultiProps) & {
+  allowedIds?: readonly string[];
+};
 
 export function TemplateStep(props: TemplateStepProps) {
   const { data: bundledAgents, isLoading } = useBundledAgents();
@@ -54,7 +56,7 @@ export function TemplateStep(props: TemplateStepProps) {
 
   return (
     <div className="grid grid-cols-2 gap-[var(--gap-block)]">
-      {bundledAgents.map((agent) => (
+      {bundledAgents.filter((agent) => !props.allowedIds || props.allowedIds.includes(agent.id)).map((agent) => (
         <button
           key={agent.id}
           type="button"

@@ -1,0 +1,519 @@
+{
+  "baseline": "87267e7df8d9c28568c3ed880899221c850018b6",
+  "source_manifest_sha256": "169011e51f75ce35ef33ee4188e0e5f1d2fec8c28e400dc4a8398893d7117923",
+  "source_hashes_verified": true,
+  "reviewed_diff_sha256": "9093a6f0da0e2d798eb79ee37d0016f6109c6b16b49ae2a6362aa41e48e5fcc1",
+  "tests": [
+    {
+      "package": "shared",
+      "files": 8,
+      "passed": 180
+    },
+    {
+      "package": "cli",
+      "files": 1,
+      "passed": 4
+    },
+    {
+      "package": "daemon",
+      "files": 97,
+      "passed": 773
+    },
+    {
+      "package": "dashboard",
+      "files": 63,
+      "passed": 278
+    }
+  ],
+  "excluded_scratch": [
+    "packages/daemon/factory-browser-fixture.ts"
+  ],
+  "artifacts": [
+    {
+      "path": "gates/build.log.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/build.log",
+      "sha256": "755c019c98c2a45178998229f9e9c5e51c91bc5e7d873ff09eddf261a7e9e804",
+      "bytes": 1119,
+      "original_sha256": "4d7c7717743d404fc131610fdbdd834f606018dc5b6054f91bdaba5150a6d9e1",
+      "original_bytes": 3739,
+      "gzip": true
+    },
+    {
+      "path": "gates/cli.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/cli.json",
+      "sha256": "07e81ad93bba9b80961ee25ff229e3adb78b80a2d9bd44ff95c42d0640b759ac",
+      "bytes": 509,
+      "original_sha256": "f3185caf5d18d78306af57d8f4ad6b9187b6b298c5c085c68069dc4c67806307",
+      "original_bytes": 1649,
+      "gzip": true
+    },
+    {
+      "path": "gates/daemon-retry-gate.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/daemon-retry-gate.json",
+      "sha256": "144c40f80e6bf54b3e1f0e93a400cde29a7b605db045ca8c7023a10119b62b8f",
+      "bytes": 435,
+      "original_sha256": "6ce57968898053937b4f0e78c69f8813abd72588f178ec18618cacae01c2fb50",
+      "original_bytes": 709,
+      "gzip": true
+    },
+    {
+      "path": "gates/daemon-tmpfs.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/daemon-tmpfs.json",
+      "sha256": "565c4028d3977bf31cfe00912724920444a779fbdd0d10a3f6ea1b55b1d15205",
+      "bytes": 30270,
+      "original_sha256": "50c1d6c21014072251fd72dfbf0904cf53baba0773a7c796ff72fbb35a61511d",
+      "original_bytes": 229227,
+      "gzip": true
+    },
+    {
+      "path": "gates/daemon.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/daemon.json",
+      "sha256": "b9c6d88ef1283c7bdb15f041ad8ab4d11fb9420c924a0203e3b9cab8255e7f84",
+      "bytes": 30219,
+      "original_sha256": "e804468b2db94a4a5ea42940ca7b65ef121f634857fbe2938398e9de870ae64c",
+      "original_bytes": 228997,
+      "gzip": true
+    },
+    {
+      "path": "gates/dashboard.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/dashboard.json",
+      "sha256": "b3d8656ceb7a54801cef11b56403d31a0e55b0165f2fd1a281e18f7a48c86f95",
+      "bytes": 11642,
+      "original_sha256": "47b1adc58326fefaee548a501b9472567e8dc73644e40b93f904a2e959477c9a",
+      "original_bytes": 80317,
+      "gzip": true
+    },
+    {
+      "path": "gates/diff-after.patch.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/diff-after.patch",
+      "sha256": "2b4b270ecc935084a18fc1f162de2d7392f482f72e4be83b7188dbfe7dbf808f",
+      "bytes": 9813,
+      "original_sha256": "9093a6f0da0e2d798eb79ee37d0016f6109c6b16b49ae2a6362aa41e48e5fcc1",
+      "original_bytes": 43003,
+      "gzip": true
+    },
+    {
+      "path": "gates/diff-before.patch.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/diff-before.patch",
+      "sha256": "2b4b270ecc935084a18fc1f162de2d7392f482f72e4be83b7188dbfe7dbf808f",
+      "bytes": 9813,
+      "original_sha256": "9093a6f0da0e2d798eb79ee37d0016f6109c6b16b49ae2a6362aa41e48e5fcc1",
+      "original_bytes": 43003,
+      "gzip": true
+    },
+    {
+      "path": "gates/gates.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/gates.json",
+      "sha256": "eba6a1754c140ab2ca2eaf5fe7a43698c7f61bf6eaaf8bf332ee44ddfe3c4c71",
+      "bytes": 507,
+      "original_sha256": "612ecdf13538817d45a82d5b4ebe5a157251951a1cbeac69aaa6b34cc94dc596",
+      "original_bytes": 2921,
+      "gzip": true
+    },
+    {
+      "path": "gates/lint.log.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/lint.log",
+      "sha256": "807b9b9e92e2d405a8558b2a3b3a50fede65fb38d8a0ab6bf6eecc4f6f07f68e",
+      "bytes": 3779,
+      "original_sha256": "fdc4260bb717cf959bf5b0b09bf6c73c1ed638b7f8ae47966f4fc3eda41b78cb",
+      "original_bytes": 49244,
+      "gzip": true
+    },
+    {
+      "path": "gates/retry_daemon.py.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/retry_daemon.py",
+      "sha256": "e22d9aa7f0b97bebb784ce7b7d568a09684eda36a4b6ae8569f3bb129cfad22f",
+      "bytes": 670,
+      "original_sha256": "9edfa594900c8504ad05bf1f2e39ca8cd4630ed1548e78a9cfe5edc33704adaa",
+      "original_bytes": 1137,
+      "gzip": true
+    },
+    {
+      "path": "gates/run_gates.py.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/run_gates.py",
+      "sha256": "bba55a176f80f39d50221365cc431aceedbd6108137e4652e4674c02317e8616",
+      "bytes": 1058,
+      "original_sha256": "6e4def758062f739d1a9e818fb08adee64e3ba4634ad66eda3ef77b4680a9aaf",
+      "original_bytes": 2158,
+      "gzip": true
+    },
+    {
+      "path": "gates/shared.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/shared.json",
+      "sha256": "df1a30a5c0cb7d387d88954f852edb9c4c6d9b607bb2880f21b8a7ed841f17c0",
+      "bytes": 4499,
+      "original_sha256": "81d6d4f0b31e23265554fc0416fe22cd60a42e93befada2a6634a6f292edbdf2",
+      "original_bytes": 50867,
+      "gzip": true
+    },
+    {
+      "path": "gates/source-after.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/source-after.json",
+      "sha256": "708efa4fb12e341c0a7fe6c0e5a05977bb4ee9837c887731e4e64dc7a06f1992",
+      "bytes": 32552,
+      "original_sha256": "cf0db80675ef9cd2401ae299ca3946a4606c15ede13ebe875929cc44a03499f6",
+      "original_bytes": 85448,
+      "gzip": true
+    },
+    {
+      "path": "gates/source-before.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/source-before.json",
+      "sha256": "708efa4fb12e341c0a7fe6c0e5a05977bb4ee9837c887731e4e64dc7a06f1992",
+      "bytes": 32552,
+      "original_sha256": "cf0db80675ef9cd2401ae299ca3946a4606c15ede13ebe875929cc44a03499f6",
+      "original_bytes": 85448,
+      "gzip": true
+    },
+    {
+      "path": "gates/status-after.txt.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/status-after.txt",
+      "sha256": "215ebd72f1b32674ccf27b7855a780cabfc35284bea15813214ce71fcf8a704f",
+      "bytes": 260,
+      "original_sha256": "86c2fa7988f8f18c455ab8e789ab7a1c01de124643a10bca5fefd69ad56271f4",
+      "original_bytes": 823,
+      "gzip": true
+    },
+    {
+      "path": "gates/status-before.txt.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/status-before.txt",
+      "sha256": "215ebd72f1b32674ccf27b7855a780cabfc35284bea15813214ce71fcf8a704f",
+      "bytes": 260,
+      "original_sha256": "86c2fa7988f8f18c455ab8e789ab7a1c01de124643a10bca5fefd69ad56271f4",
+      "original_bytes": 823,
+      "gzip": true
+    },
+    {
+      "path": "gates/test-cli.log.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/test-cli.log",
+      "sha256": "209958637b3852de8d44d98ef0e23063ea285bbdee7273a7c1ede6d5fe402c4b",
+      "bytes": 286,
+      "original_sha256": "15abd9c18eadf35eaee20044c45583e8bba63d559d6697d3af51563d1f451e43",
+      "original_bytes": 383,
+      "gzip": true
+    },
+    {
+      "path": "gates/test-daemon-tmpfs.log.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/test-daemon-tmpfs.log",
+      "sha256": "22e08bdda23ef3305869c574fd41481fa13d4c00d9ddc59485d78fb16d1cd85f",
+      "bytes": 16184,
+      "original_sha256": "d6f6a0b43e77122105a5be22782518973ab774ffbfb4c78f1c67855516ee9d63",
+      "original_bytes": 117463,
+      "gzip": true
+    },
+    {
+      "path": "gates/test-daemon.log.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/test-daemon.log",
+      "sha256": "ac72697e68c4738b70b25814a88e9b372452340457d85232e9ea1bde29858a81",
+      "bytes": 13783,
+      "original_sha256": "33c13ee73084ec0a510ed5d88c0649b2f71e21c7a12d7414d6493c71a147e2a3",
+      "original_bytes": 99240,
+      "gzip": true
+    },
+    {
+      "path": "gates/test-dashboard.log.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/test-dashboard.log",
+      "sha256": "510010d80265e2fe9cb910ffccbc40ddeddeb6893383421f2a59a3af4d1155a8",
+      "bytes": 2429,
+      "original_sha256": "40e06d145e30f82806d872ce72731b1bd77878c8a00b2faee2f06018c2770a61",
+      "original_bytes": 21741,
+      "gzip": true
+    },
+    {
+      "path": "gates/test-shared.log.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/test-shared.log",
+      "sha256": "ccbea8613759aef8d37d6d0b221aa2da73fd92e82b0f15018360d48265b15b7f",
+      "bytes": 397,
+      "original_sha256": "4c6e86dfaf9957b63f6fce867139743709ba23c4769bc83d0cb5b865e4ef9f1a",
+      "original_bytes": 803,
+      "gzip": true
+    },
+    {
+      "path": "gates/typecheck.log.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/typecheck.log",
+      "sha256": "3a248f22e087bc33a6cbbacabab74ad453201008c133f22264782e7aed5f6992",
+      "bytes": 435,
+      "original_sha256": "149bfba80c9a8be4f1861736d515273e67fc6c82e80abcb060c204d0c5c4a405",
+      "original_bytes": 1403,
+      "gzip": true
+    },
+    {
+      "path": "gates/validate.py.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/validate.py",
+      "sha256": "46da414b277f9fa57573219ff40021bb6c4837647390662ce242ffa1afd97d52",
+      "bytes": 3061,
+      "original_sha256": "ab7bbd6f538e52fae07cbcb8fa111423f41230f0012a32895728aaee478cb6aa",
+      "original_bytes": 7028,
+      "gzip": true
+    },
+    {
+      "path": "gates/validation.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-reconciled/validation.json",
+      "sha256": "2052295b6a4793360fd6d09df8b3e2a227680b5e275f8fd19fd2e35171a23514",
+      "bytes": 1884,
+      "original_sha256": "b0ee3fbfcac45f03db6c5324514867f3c6d2f123b553e570a7e583f3e720ce15",
+      "original_bytes": 12782,
+      "gzip": true
+    },
+    {
+      "path": "spec-review.md",
+      "source": "/home/hermes/orch8-evidence/factory-defaults-spec-review.md",
+      "sha256": "96e8910b3115a15e35654e2290aa6f70394bcc156046e3af0bb5244441fd3ee4",
+      "bytes": 10581,
+      "original_sha256": "96e8910b3115a15e35654e2290aa6f70394bcc156046e3af0bb5244441fd3ee4",
+      "original_bytes": 10581,
+      "gzip": false
+    },
+    {
+      "path": "quality-review.md",
+      "source": "/home/hermes/orch8-evidence/factory-defaults-quality-review.md",
+      "sha256": "c52615601c8618b905aa1a8a1371f3434271b07b93ae676f6f981e41fd008016",
+      "bytes": 10025,
+      "original_sha256": "c52615601c8618b905aa1a8a1371f3434271b07b93ae676f6f981e41fd008016",
+      "original_bytes": 10025,
+      "gzip": false
+    },
+    {
+      "path": "final-gates.md",
+      "source": "/home/hermes/orch8-evidence/factory-defaults-final-gates.md",
+      "sha256": "29ddf33f5b3cf8fe946472e9372401daf2d8b9c914db67f6f3f858c5c192c499",
+      "bytes": 5503,
+      "original_sha256": "29ddf33f5b3cf8fe946472e9372401daf2d8b9c914db67f6f3f858c5c192c499",
+      "original_bytes": 5503,
+      "gzip": false
+    },
+    {
+      "path": "browser/browser-extra.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-quality/browser-extra.json",
+      "sha256": "a624bd5b39f9de8b99a334e6a6821bad1dbd7cd79adeba0310f44a2f41135c06",
+      "bytes": 1453,
+      "original_sha256": "7229d03a3409de0fffe1305a28ef845fa6eff197396b1905d313e675803662ef",
+      "original_bytes": 5546,
+      "gzip": true
+    },
+    {
+      "path": "browser/browser-extra.py.gz",
+      "source": "/home/hermes/orch8-evidence/factory-quality/browser-extra.py",
+      "sha256": "919e4073475d648f194c47056030ba6f5b0596c2895bf2038f568cba186f9261",
+      "bytes": 1065,
+      "original_sha256": "07dc7b332ca29b43b971ee9a7bdf5e6a329d5ae1c4aa48423053d75839fc90f7",
+      "original_bytes": 2329,
+      "gzip": true
+    },
+    {
+      "path": "browser/browser.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-quality/browser.json",
+      "sha256": "74fc530d38dae41afffb7dd18ca00b28c6994d107d6aa89519428a3128ccab5b",
+      "bytes": 721,
+      "original_sha256": "277f3986450448108c019a81273815bbd06c6d6abcbf6e089ce9fb199ca01080",
+      "original_bytes": 3413,
+      "gzip": true
+    },
+    {
+      "path": "browser/browser.py.gz",
+      "source": "/home/hermes/orch8-evidence/factory-quality/browser.py",
+      "sha256": "c1bf79dd612bda175ff48b8840f96882fa7a18649ed726fdeaa1ca4bf5c69f5d",
+      "bytes": 1417,
+      "original_sha256": "8b7e34fc4c27d692276f9571e88cf9e6ac2fc87a50a1704a3aa3d04446170c7d",
+      "original_bytes": 3912,
+      "gzip": true
+    },
+    {
+      "path": "browser/comments-readback.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-quality/comments-readback.json",
+      "sha256": "524a532e2ab24aad74b5b7583ad28ae45610d16cb5a257f21ec881ddb7d59de4",
+      "bytes": 304,
+      "original_sha256": "a82eaec4c8355bd747770b8f212c8116e4839c7c8f059f32f3fcdd190f2cd24f",
+      "original_bytes": 563,
+      "gzip": true
+    },
+    {
+      "path": "browser/fixture.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-quality/fixture.json",
+      "sha256": "2abbe043f51030c0909a98e85a8f0db10211d02ae33921951565c1b28a685032",
+      "bytes": 798,
+      "original_sha256": "54e1b32defe4bfcb5a888ea9668d8894310bca8e767c64ea07f50506da899d2e",
+      "original_bytes": 2176,
+      "gzip": true
+    },
+    {
+      "path": "browser/security-scan.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-quality/security-scan.json",
+      "sha256": "1eb7bcd124d95ad324e60e9b6b92443440e1e543cc31a5e6903bdb4f2cd9550d",
+      "bytes": 82,
+      "original_sha256": "457bad17cdb45e1b70bb3349c18a06fce4c573c94e9af4864921e22f2f876169",
+      "original_bytes": 82,
+      "gzip": true
+    },
+    {
+      "path": "browser/source-hashes.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-quality/source-hashes.json",
+      "sha256": "28a149f57e11f801491f0e2254ce7e97461a5367fe6978c7a05532081dbe3a13",
+      "bytes": 977,
+      "original_sha256": "e1dcabd43515ce45854dfe2f73dfc4401e0700e510cc2b428138931ad7c27146",
+      "original_bytes": 2060,
+      "gzip": true
+    },
+    {
+      "path": "browser/verification.json.gz",
+      "source": "/home/hermes/orch8-evidence/factory-quality/verification.json",
+      "sha256": "f60018ea475407a48cae6219e1d003b76f9fe94c6fc15c9f5e9e9a4208036225",
+      "bytes": 255,
+      "original_sha256": "5cd24bbb2765da9512d966495c196932b4d36f37d0f248d9a89551af313d3d32",
+      "original_bytes": 354,
+      "gzip": true
+    },
+    {
+      "path": "browser/verify.py.gz",
+      "source": "/home/hermes/orch8-evidence/factory-quality/verify.py",
+      "sha256": "d4d5b0605e877e145c4e3cf5ca9e44daf0814d8364ebcf0e9568c20a4824d898",
+      "bytes": 1079,
+      "original_sha256": "2838854050fb146961795a3f47e5d7e710ec7fb8560dc22b139a21f111694a66",
+      "original_bytes": 2865,
+      "gzip": true
+    },
+    {
+      "path": "desktop-board.png",
+      "source": "/home/hermes/orch8-evidence/factory-quality/desktop-board.png",
+      "sha256": "f1552f9b600f9996e217c59a8653d2464e722ed47155475a1ce339b7e03d5221",
+      "bytes": 362953,
+      "original_sha256": "f1552f9b600f9996e217c59a8653d2464e722ed47155475a1ce339b7e03d5221",
+      "original_bytes": 362953,
+      "gzip": false
+    },
+    {
+      "path": "desktop-more.png",
+      "source": "/home/hermes/orch8-evidence/factory-quality/desktop-more.png",
+      "sha256": "cc402270936bba5fe7a9739cc80ef6b9cad7ec2177aff1622f61039c515318fc",
+      "bytes": 372102,
+      "original_sha256": "cc402270936bba5fe7a9739cc80ef6b9cad7ec2177aff1622f61039c515318fc",
+      "original_bytes": 372102,
+      "gzip": false
+    },
+    {
+      "path": "desktop-collapsed-more.png",
+      "source": "/home/hermes/orch8-evidence/factory-quality/desktop-collapsed-more.png",
+      "sha256": "01d9c91821b0e924300ec64f819e0b3d33058435c0f41afbb1bb8e720a43b1bd",
+      "bytes": 344714,
+      "original_sha256": "01d9c91821b0e924300ec64f819e0b3d33058435c0f41afbb1bb8e720a43b1bd",
+      "original_bytes": 344714,
+      "gzip": false
+    },
+    {
+      "path": "collapsed-keyboard-memory.png",
+      "source": "/home/hermes/orch8-evidence/factory-quality/collapsed-keyboard-memory.png",
+      "sha256": "9ac9060c1df646f7a6a04339ea44a5b9eff765726aaa68b1c9c289b9762607fa",
+      "bytes": 346193,
+      "original_sha256": "9ac9060c1df646f7a6a04339ea44a5b9eff765726aaa68b1c9c289b9762607fa",
+      "original_bytes": 346193,
+      "gzip": false
+    },
+    {
+      "path": "mobile-more.png",
+      "source": "/home/hermes/orch8-evidence/factory-quality/mobile-more.png",
+      "sha256": "d152bd554ea753cc1ec170a6fd7f214aaa573f2f574ec4be6765712e7b4c32ac",
+      "bytes": 26699,
+      "original_sha256": "d152bd554ea753cc1ec170a6fd7f214aaa573f2f574ec4be6765712e7b4c32ac",
+      "original_bytes": 26699,
+      "gzip": false
+    },
+    {
+      "path": "mobile-memory-closed.png",
+      "source": "/home/hermes/orch8-evidence/factory-quality/mobile-memory-closed.png",
+      "sha256": "4d6aba42aecbb5297229b7589573485b11fe4a5ddfc20fdb3dc4eaaf09fba7e3",
+      "bytes": 264134,
+      "original_sha256": "4d6aba42aecbb5297229b7589573485b11fe4a5ddfc20fdb3dc4eaaf09fba7e3",
+      "original_bytes": 264134,
+      "gzip": false
+    },
+    {
+      "path": "onboarding-project.png",
+      "source": "/home/hermes/orch8-evidence/factory-quality/onboarding-project.png",
+      "sha256": "dae8070284aebc6a14c4a21a3618f766d4e395f280a5eb0ae352d920f208038b",
+      "bytes": 359758,
+      "original_sha256": "dae8070284aebc6a14c4a21a3618f766d4e395f280a5eb0ae352d920f208038b",
+      "original_bytes": 359758,
+      "gzip": false
+    },
+    {
+      "path": "onboarding-agents.png",
+      "source": "/home/hermes/orch8-evidence/factory-quality/onboarding-agents.png",
+      "sha256": "6226f73120fe92a593e27c8cb276bac5791dccb451d2b2567e67166651e12b91",
+      "bytes": 356245,
+      "original_sha256": "6226f73120fe92a593e27c8cb276bac5791dccb451d2b2567e67166651e12b91",
+      "original_bytes": 356245,
+      "gzip": false
+    },
+    {
+      "path": "legacy-chat.png",
+      "source": "/home/hermes/orch8-evidence/factory-quality/legacy-chat.png",
+      "sha256": "3f2fe3224813122172770f2047307669b23938316ea0817778c2d0c54158b503",
+      "bytes": 391822,
+      "original_sha256": "3f2fe3224813122172770f2047307669b23938316ea0817778c2d0c54158b503",
+      "original_bytes": 391822,
+      "gzip": false
+    },
+    {
+      "path": "normal-agent-catalog.png",
+      "source": "/home/hermes/orch8-evidence/factory-quality/normal-agent-catalog.png",
+      "sha256": "13b791f406b38a20cb59e2da7327333524d7b6643bf98662288a599ff6dfc404",
+      "bytes": 406066,
+      "original_sha256": "13b791f406b38a20cb59e2da7327333524d7b6643bf98662288a599ff6dfc404",
+      "original_bytes": 406066,
+      "gzip": false
+    },
+    {
+      "path": "task-comment-submitted.png",
+      "source": "/home/hermes/orch8-evidence/factory-quality/task-comment-submitted.png",
+      "sha256": "b9ff8c1a18af26ca16f34714255bd595063140b5a54de0742bf4ff672bd655d6",
+      "bytes": 427836,
+      "original_sha256": "b9ff8c1a18af26ca16f34714255bd595063140b5a54de0742bf4ff672bd655d6",
+      "original_bytes": 427836,
+      "gzip": false
+    },
+    {
+      "path": "welcome-before.png",
+      "source": "/home/hermes/projects/orch8-factory-defaults/docs/pr-assets/v2-factory-defaults/welcome-before.png",
+      "sha256": "821701ee982cb3cfc1e3d5ebfb5c3cf049dc7508486511be1852d9ed73b111ba",
+      "bytes": 372189,
+      "original_sha256": "821701ee982cb3cfc1e3d5ebfb5c3cf049dc7508486511be1852d9ed73b111ba",
+      "original_bytes": 372189,
+      "gzip": false
+    },
+    {
+      "path": "agents-before.png",
+      "source": "/home/hermes/projects/orch8-factory-defaults/docs/pr-assets/v2-factory-defaults/agents-before.png",
+      "sha256": "5f953da65e51df665a864f2a568d79719eca3d9802a69c4270af79e97e2993fd",
+      "bytes": 399508,
+      "original_sha256": "5f953da65e51df665a864f2a568d79719eca3d9802a69c4270af79e97e2993fd",
+      "original_bytes": 399508,
+      "gzip": false
+    },
+    {
+      "path": "project-entry-before.png",
+      "source": "/home/hermes/projects/orch8-factory-defaults/docs/pr-assets/v2-factory-defaults/project-entry-before.png",
+      "sha256": "ad910ab27bd37316ffcb9e80c7a952c2be20c09b1817eaa0e8a48d28a35065c5",
+      "bytes": 389789,
+      "original_sha256": "ad910ab27bd37316ffcb9e80c7a952c2be20c09b1817eaa0e8a48d28a35065c5",
+      "original_bytes": 389789,
+      "gzip": false
+    },
+    {
+      "path": "browser/baseline-browser-evidence.json.gz",
+      "source": "/home/hermes/projects/orch8-factory-defaults/docs/pr-assets/v2-factory-defaults/browser-evidence.json",
+      "sha256": "0bf7cda9e749801f191732c28db15b9b55e18f1218540b2336c4d8c217ec33bf",
+      "bytes": 997,
+      "original_sha256": "6ff24ebc099e81e26f2253c69947814c8be8143a3c3d1946ac35aae5c1d1d09d",
+      "original_bytes": 3623,
+      "gzip": true
+    },
+    {
+      "path": "browser/factory-browser-fixture.ts.gz",
+      "source": "/home/hermes/projects/orch8-factory-defaults/packages/daemon/factory-browser-fixture.ts",
+      "sha256": "7a23800437a8934fa19f676de060f5089ee2bdfc187cacd6b5a71461e7f442ed",
+      "bytes": 1257,
+      "original_sha256": "ac13f0a3fefb4f646740be13c59a449df3d9654939c16a9f871d074351408355",
+      "original_bytes": 2891,
+      "gzip": true
+    }
+  ]
+}
