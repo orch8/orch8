@@ -2,7 +2,7 @@
 
 This directory preserves the original implementation and independent-review evidence for the fail-closed resolver change. No source changes were made during packaging. All three source SHA-256 values matched both `source-manifest.json` and the independent review before packaging.
 
-`manifest.json` lists each original artifact, its uncompressed SHA-256 and its committed-byte SHA-256. Logs, test reports, and the implementation diff are gzip-compressed without altering their original bytes. Read with `gzip -dc <file.gz>`. Markdown reports, the probe script, source hashes, and the validated result summary remain directly readable.
+`manifest.json` lists each original artifact, its uncompressed SHA-256 and its committed-byte SHA-256. Logs, test reports, and the implementation diff are gzip-compressed without altering their original bytes. Read with `gzip -dc <file.gz>`. Markdown reports, source hashes, and the validated result summary remain directly readable. The original CommonJS probe is also gzip-compressed so repository-wide lint does not treat archived evidence as application source. Initial remote run 41561647595 failed lint on the uncompressed probe's four require imports; build, typecheck and all tests passed. Its downloaded logs and reports are retained in the external delivery evidence. Packaging was corrected without changing the probe bytes or reviewed source.
 
 ## Results and retained failures
 

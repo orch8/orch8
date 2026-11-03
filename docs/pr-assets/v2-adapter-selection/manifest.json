@@ -129,10 +129,10 @@
       "original_bytes": 3214
     },
     {
-      "path": "independent-probe.cjs",
+      "path": "independent-probe.cjs.gz",
       "original": "independent-probe.cjs",
       "sha256": "d18636b19a6f856c713a0ede893735de4031c31b7f1cf436b314cefca7cbc82c",
-      "stored_sha256": "d18636b19a6f856c713a0ede893735de4031c31b7f1cf436b314cefca7cbc82c",
+      "stored_sha256": "230ece3c5a20af26cf407fd898bbb44bfe57e5bf0ddab38f3a841eec7850a222",
       "original_bytes": 1728
     },
     {
