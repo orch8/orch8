@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { useAsyncWork, finishHeldChatTurn } from "./helpers/async-work.js";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { projects, agents } from "@orch/shared/db";
 import { ChatService } from "../services/chat.service.js";
@@ -7,6 +8,7 @@ import { SessionManager } from "../adapter/session-manager.js";
 import type { ExtractedCard } from "@orch/shared";
 
 describe("Chat message replay (end-to-end)", () => {
+  const work = useAsyncWork(ChatService.prototype, "runAssistantTurn");
   let testDb: TestDb;
   let projectId: string;
   let service: ChatService;
@@ -41,6 +43,7 @@ describe("Chat message replay (end-to-end)", () => {
   });
 
   it("replays user → confirm card → approve → result card in order", async () => {
+    const gates = [work.gate(), work.gate()];
     let callCount = 0;
 
     // First call: agent emits a confirm card. Second call (after approval):
@@ -48,6 +51,7 @@ describe("Chat message replay (end-to-end)", () => {
     const adapter = {
       runAgent: vi.fn(async (_cfg: unknown, ctx: any) => {
         callCount++;
+        await gates[callCount - 1].hold();
         const output = callCount === 1
           ? [
               "I'll create that task.",
@@ -96,9 +100,11 @@ describe("Chat message replay (end-to-end)", () => {
     // Turn 1: user message → assistant emits confirm card
     await service.sendUserMessage(chat.id, "create task T");
 
+    await finishHeldChatTurn(work, gates[0], () => service.listMessages(chat.id), 1);
     let msgs = await vi.waitFor(async () => {
       const list = await service.listMessages(chat.id);
       expect(list.map((m) => m.role)).toEqual(["user", "assistant"]);
+      expect(list.filter((m) => m.role === "assistant").every((m) => m.status === "complete")).toBe(true);
       return list;
     });
     const assistant1 = msgs[1];
@@ -110,10 +116,12 @@ describe("Chat message replay (end-to-end)", () => {
     // Turn 2: user approves the card
     await service.decideCard(chat.id, cards1[0].id, "approved", "tester", projectId);
 
+    await finishHeldChatTurn(work, gates[1], () => service.listMessages(chat.id), 3);
     msgs = await vi.waitFor(async () => {
       const list = await service.listMessages(chat.id);
       // Ordering: user, assistant(confirm), system(approval), assistant(result)
       expect(list.map((m) => m.role)).toEqual(["user", "assistant", "system", "assistant"]);
+      expect(list.filter((m) => m.role === "assistant").every((m) => m.status === "complete")).toBe(true);
       return list;
     });
     const roles = msgs.map((m) => m.role);

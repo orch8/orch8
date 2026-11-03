@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
+import { useAsyncWork } from "./helpers/async-work.js";
 import { eq } from "drizzle-orm";
 import {
   projects, agents, heartbeatRuns, wakeupRequests, tasks,
@@ -20,10 +21,12 @@ async function waitForRunComplete(db: TestDb["db"], runId: string, timeoutMs = 2
 }
 
 describe("Heartbeat Pipeline Integration", () => {
+  const work = useAsyncWork(HeartbeatService.prototype, "executeRun", () => service?.shutdown());
   let testDb: TestDb;
   let service: HeartbeatService;
   let projectId: string;
   let mockSocket: { readyState: number; send: ReturnType<typeof vi.fn> };
+
 
   beforeAll(async () => {
     testDb = await setupTestDb();
@@ -37,7 +40,6 @@ describe("Heartbeat Pipeline Integration", () => {
   }, 60_000);
 
   afterAll(async () => {
-    service?.shutdown();
     await teardownTestDb(testDb);
   });
 
@@ -56,6 +58,8 @@ describe("Heartbeat Pipeline Integration", () => {
     const sockets = new Set([mockSocket]) as unknown as Set<import("ws").WebSocket>;
     const broadcastService = new BroadcastService(sockets);
     service = new HeartbeatService(testDb.db, broadcastService);
+    service.setLogger(work.logger);
+    service.setErrorLogger(work.errorLogger as any);
   });
 
   it("full pipeline: enqueue → promote → claim → execute (with mock adapter)", async () => {
@@ -97,6 +101,8 @@ describe("Heartbeat Pipeline Integration", () => {
 
     // Wait for the fire-and-forget executeRun to complete
     await waitForRunComplete(testDb.db, wakeup.runId!);
+
+    await work.drain();
 
     // Check final run state
     const allRuns = await testDb.db
@@ -158,6 +164,8 @@ describe("Heartbeat Pipeline Integration", () => {
     await waitForRunComplete(testDb.db, wake1.runId!);
     await waitForRunComplete(testDb.db, wake2.runId!);
 
+    await work.drain();
+
     // Verify both agents succeeded
     const eng1Runs = await testDb.db
       .select()
@@ -174,6 +182,40 @@ describe("Heartbeat Pipeline Integration", () => {
     expect(eng2Runs[0].status).toBe("succeeded");
   });
 
+  it("detects swallowed late task-lock cleanup failure even when executeRun resolves", async () => {
+    await testDb.db.insert(agents).values({
+      id: "cleanup-probe", projectId, name: "Cleanup probe", role: "engineer",
+      adapterType: "claude_local", adapterConfig: {},
+    });
+    const gate = work.gate();
+    service.setAdapter({ runAgent: async () => {
+      await gate.hold();
+      return {
+        sessionId: null, model: null, result: "done", usage: null,
+        costUsd: null, billingType: "api", exitCode: 0, signal: null,
+        error: null, errorCode: null, events: [],
+      };
+    } } as any);
+    const wake = await service.enqueueWakeup("cleanup-probe", projectId, { source: "on_demand" });
+    await gate.entered;
+    const execution = vi.mocked((HeartbeatService.prototype as any).executeRun).mock.results[0].value;
+    const release = vi.spyOn(service, "releaseTaskLock").mockRejectedValue(new Error("deliberate late cleanup failure"));
+    try {
+      await testDb.db.insert(tasks).values({ projectId, title: "Locked", executionRunId: wake.runId });
+      gate.release();
+      // The real service catches the injected failure and still fulfills its promise.
+      await expect(execution).resolves.toBeUndefined();
+      const [run] = await testDb.db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, wake.runId!));
+      expect(run.status).toBe("succeeded");
+      expect(release).toHaveBeenCalledTimes(1);
+      await expect(work.drain()).rejects.toThrow(/Unexpected service errors:.*lock_release_failed.*Failed to release task locks/);
+      expect(work.pendingCount).toBe(0);
+    } finally {
+      gate.release();
+      try { await execution; } finally { release.mockRestore(); }
+    }
+  });
+
   it("concurrent wakeups: second wakeup coalesces", async () => {
     await testDb.db.insert(agents).values({
       id: "cto-1",
@@ -184,16 +226,51 @@ describe("Heartbeat Pipeline Integration", () => {
       maxConcurrentRuns: 1,
     });
 
+    const gate = work.gate();
+    const adapter = { runAgent: vi.fn(async () => {
+      await gate.hold();
+      return {
+        sessionId: null, model: null, result: "done", usage: null,
+        costUsd: null, billingType: "api", exitCode: 0, signal: null,
+        error: null, errorCode: null, events: [],
+      };
+    }) };
+    service.setAdapter(adapter as any);
+
     // First timer wakeup
     const wake1 = await service.enqueueWakeup("cto-1", projectId, {
       source: "timer",
     });
     expect(wake1.status).toBe("queued");
 
+    await gate.entered;
+    try {
     // Second timer wakeup while first is still queued/running
     const wake2 = await service.enqueueWakeup("cto-1", projectId, {
       source: "timer",
     });
     expect(wake2.status).toBe("coalesced");
+    // Coalesced wake receipts do not carry a runId; the existing run remains authoritative.
+    expect(wake2.runId).toBeNull();
+    const runs = await testDb.db.select().from(heartbeatRuns);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].id).toBe(wake1.runId);
+    expect(runs[0].status).toBe("running");
+    expect(adapter.runAgent).toHaveBeenCalledTimes(1);
+    } finally {
+      gate.release();
+      await work.drain();
+    }
+    expect(adapter.runAgent).toHaveBeenCalledTimes(1);
+    expect(work.pendingCount).toBe(0);
+    const [first] = await testDb.db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, wake1.runId!));
+    expect(first.status).toBe("succeeded");
+    const wake3 = await service.enqueueWakeup("cto-1", projectId, { source: "timer" });
+    expect(wake3.status).toBe("queued");
+    expect(wake3.runId).not.toBe(wake1.runId);
+    await work.drain();
+    expect(adapter.runAgent).toHaveBeenCalledTimes(2);
+    const [third] = await testDb.db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, wake3.runId!));
+    expect(third.status).toBe("succeeded");
   });
 });
