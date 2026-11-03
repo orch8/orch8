@@ -1,0 +1,38 @@
+{
+  "daemon": {
+    "success": true,
+    "numTotalTests": 808,
+    "numPassedTests": 808,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "numFailedTestSuites": 0,
+    "files": 99
+  },
+  "shared": {
+    "success": true,
+    "numTotalTests": 180,
+    "numPassedTests": 180,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "numFailedTestSuites": 0,
+    "files": 8
+  },
+  "dashboard": {
+    "success": true,
+    "numTotalTests": 278,
+    "numPassedTests": 278,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "numFailedTestSuites": 0,
+    "files": 63
+  },
+  "cli": {
+    "success": true,
+    "numTotalTests": 4,
+    "numPassedTests": 4,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "numFailedTestSuites": 0,
+    "files": 1
+  }
+}

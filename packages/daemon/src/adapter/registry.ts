@@ -8,13 +8,17 @@ export function resolveAdapter(
   adapters: AdapterMap,
   logger?: { warn: (obj: unknown, msg: string) => void },
 ): AgentAdapter {
-  if (type && type in adapters) {
-    return adapters[type as AdapterType];
+  // Only absent legacy values use the default. Empty or misspelled explicit
+  // values must not silently select a different execution provider.
+  if (type === null || type === undefined) {
+    return adapters.claude_local;
   }
 
-  if (type) {
-    logger?.warn({ type }, "Unknown adapterType, falling back to claude_local");
+  // Check supported names, not object membership (which includes prototypes).
+  if (type === "claude_local" || type === "codex_local") {
+    return adapters[type];
   }
 
-  return adapters.claude_local;
+  logger?.warn({ type }, "Unsupported adapter type");
+  throw new Error(`Unsupported adapter type: ${JSON.stringify(type)}`);
 }
