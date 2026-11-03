@@ -1,0 +1,9 @@
+{
+  "base": "17e254e3ea22e0c433e8f9ab2bcaec3ee4bda7d4",
+  "branch": "fix/v2-adapter-selection",
+  "sha256": {
+    "packages/daemon/src/adapter/registry.ts": "b658484171108980dfc0edead78fedde7f311dedd38bf3f0b61dfacb22abb5e0",
+    "packages/daemon/src/__tests__/adapter/registry.test.ts": "c79bca5164f25e72090d4807e4f15eded17d08360a75f153ffb38125e0f7b278",
+    "packages/daemon/src/__tests__/adapter-selection.test.ts": "3bb042a622f3db6085a2aeb6cee847b519bb743fd7e99b17eb64c89aac3eca5f"
+  }
+}
