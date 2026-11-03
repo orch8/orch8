@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { AgentWizard } from "../components/agent-editor/AgentWizard.js";
 
 const mockBundledAgents = [
+  ...["cto", "qa"].map(id => ({ id, name: id.toUpperCase(), role: id, model: "claude-opus-4-7", maxTurns: 100, skills: [], heartbeatEnabled: true })),
   {
     id: "implementer",
     name: "Implementer",
@@ -46,6 +47,8 @@ describe("AgentWizard", () => {
       expect(screen.getByText("Implementer")).toBeInTheDocument();
     });
     expect(screen.getByText("Reviewer")).toBeInTheDocument();
+    expect(screen.getByText("CTO")).toBeInTheDocument();
+    expect(screen.getByText("QA")).toBeInTheDocument();
     expect(screen.getByText("Blank Agent")).toBeInTheDocument();
   });
 

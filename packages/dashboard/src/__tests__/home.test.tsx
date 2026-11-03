@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderWithProviders } from "../test-utils.js";
 
-// Mock Navigate so we can assert it was asked to redirect to /chat without
+// Mock Navigate so we can assert it was asked to redirect to /board without
 // actually triggering router navigation during the unit test.
 const navigateSpy = vi.fn();
 
@@ -22,11 +22,11 @@ import { Route as HomeRoute } from "../routes/projects/$projectSlug/index.js";
 const ProjectIndexRedirect = (HomeRoute as any).component;
 
 describe("ProjectIndexRedirect", () => {
-  it("redirects to the project chat route", () => {
+  it("redirects to the project board route", () => {
     renderWithProviders(<ProjectIndexRedirect />);
     expect(navigateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        to: "/projects/$projectSlug/chat",
+        to: "/projects/$projectSlug/board",
         params: { projectSlug: "proj_1" },
         replace: true,
       }),

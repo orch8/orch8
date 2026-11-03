@@ -40,7 +40,6 @@ export class ProjectService {
       const { SeedingService } = await import("./seeding.service.js");
       const seeding = new SeedingService();
       await seeding.provisionChatAgent(this.db, project.id);
-      await seeding.ensureInitialChat(this.db, project.id);
     } catch {
       // swallow — startup backfill will retry
     }
