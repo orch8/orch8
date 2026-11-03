@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
+import { createAsyncWork } from "./helpers/async-work.js";
+import { eq } from "drizzle-orm";
 import { EventEmitter } from "node:events";
 import { Writable, Readable } from "node:stream";
-import { projects, agents, pipelineTemplates, pipelines, pipelineSteps, tasks } from "@orch/shared/db";
+import { projects, agents, pipelineTemplates, pipelines, pipelineSteps, tasks, heartbeatRuns } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { buildServer } from "../server.js";
 import { globalConfigSchema } from "../config/schema.js";
@@ -26,14 +28,6 @@ describe("Pipeline API routes", () => {
 
   beforeAll(async () => {
     testDb = await setupTestDb();
-    app = buildServer({
-      databaseUrl: testDb.connectionUri,
-      spawnFn: vi.fn(() => createMockProcess()) as unknown as typeof import("node:child_process").spawn,
-      // Enable the loopback-admin bypass so test requests (source IP
-      // 127.0.0.1 under app.inject) pass auth without Bearer tokens.
-      config: globalConfigSchema.parse({ auth: { allow_localhost_admin: true } }),
-    });
-    await app.ready();
 
     const [project] = await testDb.db.insert(projects).values({
       name: "Route Test",
@@ -50,16 +44,136 @@ describe("Pipeline API routes", () => {
     });
   }, 60_000);
 
+  let work: ReturnType<typeof createAsyncWork> | undefined;
+
+  async function cleanupFixture() {
+    if (!work) return;
+    const owned = work;
+    work = undefined;
+    // Release held work and join final queue promotion before app.close ends SQL.
+    app.schedulerService.stop();
+    await owned.cleanup();
+  }
+
+  afterEach(cleanupFixture);
   afterAll(async () => {
-    await app.close();
-    await teardownTestDb(testDb);
+    try { await cleanupFixture(); } finally { await teardownTestDb(testDb); }
   });
 
   beforeEach(async () => {
+    await cleanupFixture();
+    app = buildServer({
+      databaseUrl: testDb.connectionUri,
+      spawnFn: vi.fn(() => createMockProcess()) as unknown as typeof import("node:child_process").spawn,
+      // Enable the loopback-admin bypass so test requests (source IP
+      // 127.0.0.1 under app.inject) pass auth without Bearer tokens.
+      config: globalConfigSchema.parse({ auth: { allow_localhost_admin: true } }),
+    });
+    const owner = app;
+    work = createAsyncWork(owner.heartbeatService, "executeRun", () => owner.close());
+    owner.heartbeatService.setLogger(work.logger);
+    owner.heartbeatService.setErrorLogger(work.errorLogger as Parameters<typeof owner.heartbeatService.setErrorLogger>[0]);
+    await app.ready();
+    await app.initPromise;
     await testDb.db.delete(tasks);
     await testDb.db.delete(pipelineSteps);
     await testDb.db.delete(pipelines);
     await testDb.db.delete(pipelineTemplates);
+  });
+
+  it.each(["success", "assertion", "rejection", "logger", "errorLogger"] as const)(
+    "joins final queue cleanup before closing connections: %s", async (failure) => {
+      const owner = app;
+      const owned = work!;
+      const gate = owned.gate();
+      const service = owner.heartbeatService;
+      const execute = service.executeRun;
+      const promote = service.startNextQueuedRunForAgent.bind(service);
+      let finished = false;
+      let promotions = 0;
+      const queue = vi.spyOn(service, "startNextQueuedRunForAgent").mockImplementation(async (...args) => {
+        if (promotions++ === 0) return promote(...args);
+        await gate.hold();
+        const result = await promote(...args);
+        finished = true;
+        if (failure === "rejection") throw new Error("injected queue cleanup rejection");
+        if (failure === "logger") owned.logger.error("injected cleanup logger error");
+        if (failure === "errorLogger") await owned.errorLogger.record({ code: "injected_cleanup_error" });
+        return result;
+      });
+      const closeStates: { pending: number; finished: boolean; intercepted: boolean }[] = [];
+      const close = owner.close.bind(owner);
+      const closing = vi.spyOn(owner, "close").mockImplementation((async () => {
+        closeStates.push({ pending: owned.pendingCount, finished, intercepted: service.executeRun === execute });
+        await close();
+      }) as typeof owner.close);
+      try {
+        const response = await owner.inject({
+          method: "POST", url: "/api/pipelines",
+          payload: { projectId, name: "Cleanup boundary", steps: [{ label: "work", agentId: "route-agent-a" }] },
+        });
+        expect(response.statusCode).toBe(201);
+        await gate.entered;
+        expect(owned.pendingCount).toBe(1);
+        const scenario = async () => {
+          try {
+            if (failure === "assertion") expect("actual").toBe("expected");
+          } finally {
+            await cleanupFixture();
+          }
+        };
+        if (failure === "success") await scenario();
+        else await expect(scenario()).rejects.toThrow({
+          assertion: "expected", rejection: "injected queue cleanup rejection",
+          logger: "Unexpected service errors", errorLogger: "Unexpected service errors",
+        }[failure]);
+        if (failure === "rejection") {
+          // The queue launcher also logs the rejection; require that exact diagnostic.
+          await expect(owned.drain()).rejects.toThrow("Unhandled error in executeRun");
+        }
+        expect(closeStates).toEqual([{ pending: 0, finished: true, intercepted: false }]);
+        expect(owned.pendingCount).toBe(0);
+        expect(closing).toHaveBeenCalledOnce();
+        await expect(owner.inject({ method: "GET", url: "/health" })).rejects.toThrow();
+        await expect(owner.db.select().from(agents)).rejects.toThrow();
+      } finally {
+        gate.release();
+        try {
+          if (owned.pendingCount > 0 || work === owned) await owned.cleanup();
+        } finally { queue.mockRestore(); closing.mockRestore(); }
+      }
+    }, 10_000,
+  );
+
+  it("rejects swallowed lock-cleanup errors even when executeRun fulfills", async () => {
+    const owner = app;
+    const owned = work!;
+    const service = owner.heartbeatService;
+    const [run] = await testDb.db.insert(heartbeatRuns).values({
+      projectId, agentId: "route-agent-a", invocationSource: "on_demand", status: "queued",
+    }).returning();
+    await testDb.db.insert(tasks).values({
+      projectId, title: "Held lock", executionRunId: run.id,
+    });
+    service.setAdapter({ runAgent: async () => ({
+      sessionId: null, model: null, result: "ok", usage: null, costUsd: null,
+      billingType: "api", exitCode: 0, signal: null,
+      error: null, errorCode: null, events: [],
+    }) } as unknown as Parameters<typeof service.setAdapter>[0]);
+    const release = vi.spyOn(service, "releaseTaskLock").mockRejectedValue(new Error("injected lock cleanup failure"));
+    try {
+      await expect(service.executeRun(run.id)).resolves.toBeUndefined();
+      expect(release).toHaveBeenCalledOnce();
+      const [finished] = await testDb.db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, run.id));
+      expect(finished.status).toBe("succeeded");
+      expect(finished.finishedAt).not.toBeNull();
+      await expect(cleanupFixture()).rejects.toThrow("lock_release_failed");
+      expect(owned.pendingCount).toBe(0);
+      await expect(owner.db.select().from(agents)).rejects.toThrow();
+      await expect(owner.inject({ method: "GET", url: "/health" })).rejects.toThrow();
+    } finally {
+      try { await cleanupFixture(); } finally { release.mockRestore(); }
+    }
   });
 
   describe("Pipeline Templates", () => {
