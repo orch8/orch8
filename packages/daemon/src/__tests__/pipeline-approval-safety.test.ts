@@ -49,8 +49,8 @@ describe("pipeline approval safety", () => {
     const result = await service.create({ projectId, name: "Gate", steps: [
       { label: "work" }, { label: "review", requiresVerification: true }, { label: "ship" },
     ] });
-    await service.completeStep(result.pipeline.id, result.steps[0].id, "work", "work.md");
-    await service.completeStep(result.pipeline.id, result.steps[1].id, "review", "review.md");
+    await service.completeStep(result.pipeline.id, result.steps[0].id, (await service.getWithSteps(result.pipeline.id))!.steps.find(s => s.id === result.steps[0].id)!.taskId!, "work", "work.md");
+    await service.completeStep(result.pipeline.id, result.steps[1].id, (await service.getWithSteps(result.pipeline.id))!.steps.find(s => s.id === result.steps[1].id)!.taskId!, "review", "review.md");
     return result;
   }
 
@@ -100,7 +100,7 @@ describe("pipeline approval safety", () => {
           method: "POST", url: `/api/pipelines/${pipeline.id}/steps/${steps[1].id}/${decision}`,
           ...(decision === "reject" ? { payload: { targetStepId: steps[0].id, feedback: "revise" } } : {}),
         });
-        expect(response.statusCode).toBe(400);
+        expect(response.statusCode).toBe(409);
         expect(await snapshot()).toEqual(before);
       });
     }
@@ -126,6 +126,11 @@ describe("pipeline approval safety", () => {
       const before = await snapshot();
       await expect(service.rejectStep(pipeline.id, steps[1].id, steps[0].id, "revise"))
         .rejects.toThrow("Step cannot be rejected");
+      const response = await app.inject({
+        method: "POST", url: `/api/pipelines/${pipeline.id}/steps/${steps[1].id}/reject`,
+        payload: { targetStepId: steps[0].id, feedback: "revise" },
+      });
+      expect(response.statusCode).toBe(409);
       expect(await snapshot()).toEqual(before);
     });
   }
@@ -180,12 +185,12 @@ describe("pipeline approval safety", () => {
     const decide = () => app.inject({ method: "POST", url: `/api/pipelines/${pipeline.id}/steps/${steps[1].id}/approve` });
     const responses = await Promise.all(Array.from({ length: 8 }, decide));
     expect(responses.filter(r => r.statusCode === 200)).toHaveLength(1);
-    expect(responses.filter(r => r.statusCode === 400)).toHaveLength(7);
+    expect(responses.filter(r => r.statusCode === 409)).toHaveLength(7);
     const successorTasks = await testDb.db.select().from(tasks).where(eq(tasks.pipelineStepId, steps[2].id));
     expect(successorTasks).toHaveLength(1);
     const state = await service.getWithSteps(pipeline.id);
     expect(state!.steps[2].taskId).toBe(successorTasks[0].id);
-    expect((await decide()).statusCode).toBe(400);
+    expect((await decide()).statusCode).toBe(409);
     expect(wake).toHaveBeenCalledTimes(1);
   });
 
@@ -207,7 +212,7 @@ describe("pipeline approval safety", () => {
 
   it("rolls back last-step approval if final pipeline update fails", async () => {
     const { pipeline, steps } = await service.create({ projectId, name: "Last", steps: [{ label: "review", requiresVerification: true }] });
-    await service.completeStep(pipeline.id, steps[0].id, "done", "review.md");
+    await service.completeStep(pipeline.id, steps[0].id, (await service.getWithSteps(pipeline.id))!.steps.find(s => s.id === steps[0].id)!.taskId!, "done", "review.md");
     const before = await snapshot();
     const failing = new PipelineService(makeFailingTxDb(testDb.db, { failUpdateOnTable: pipelines }), new PipelineTemplateService(testDb.db));
     await expect(failing.approveStep(pipeline.id, steps[0].id)).rejects.toThrow("simulated db write failure");

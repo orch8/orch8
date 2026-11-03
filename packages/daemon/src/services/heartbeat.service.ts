@@ -1,4 +1,5 @@
 import { eq, and, sql } from "drizzle-orm";
+import { lockPipelineAttempt, PipelineConflict } from "./pipeline.service.js";
 import {
   agents, heartbeatRuns, wakeupRequests, tasks, projects, runEvents,
 } from "@orch/shared/db";
@@ -369,17 +370,29 @@ export class HeartbeatService {
     return wakeup;
   }
 
-  async releaseTaskLock(taskId: string): Promise<void> {
-    // Clear execution lock fields
-    await this.db
-      .update(tasks)
-      .set({
-        executionRunId: null,
-        executionAgentId: null,
-        executionLockedAt: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(tasks.id, taskId));
+  async releaseTaskLock(taskId: string, expectedRunId?: string): Promise<void> {
+    const released = await this.db.transaction(async tx => {
+      const [hint] = await tx.select().from(tasks).where(eq(tasks.id, taskId));
+      if (!hint) return false;
+      let task = hint;
+      if (hint.pipelineId || hint.pipelineStepId) {
+        if (!expectedRunId) return false;
+        try {
+          task = (await lockPipelineAttempt(tx, hint.pipelineId ?? "", hint.pipelineStepId ?? "", taskId)).task;
+        } catch (error) {
+          if (error instanceof PipelineConflict) return false;
+          throw error;
+        }
+      } else {
+        [task] = await tx.select().from(tasks).where(eq(tasks.id, taskId)).for("update");
+      }
+      if (!task || !task.executionRunId || (expectedRunId && task.executionRunId !== expectedRunId)) return false;
+      await tx.update(tasks).set({ executionRunId: null, executionAgentId: null,
+        executionLockedAt: null, updatedAt: new Date() })
+        .where(and(eq(tasks.id, taskId), eq(tasks.executionRunId, task.executionRunId)));
+      return true;
+    });
+    if (!released) return;
 
     // Promote oldest deferred wakeup for this task
     const [deferred] = await this.db
@@ -978,7 +991,7 @@ export class HeartbeatService {
           .from(tasks)
           .where(eq(tasks.executionRunId, runId));
         for (const t of lockedTasks) {
-          await this.releaseTaskLock(t.id);
+          await this.releaseTaskLock(t.id, run.id);
         }
       } catch (lockErr) {
         void this.errorLogger?.record({

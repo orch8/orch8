@@ -1,5 +1,6 @@
 import { eq, and, asc } from "drizzle-orm";
-import { pipelines, pipelineSteps, tasks } from "@orch/shared/db";
+import { pipelines, pipelineSteps, tasks, projects } from "@orch/shared/db";
+import type { BroadcastService } from "./broadcast.service.js";
 import type { SchemaDb } from "../db/client.js";
 import type { PipelineTemplateService } from "./pipeline-template.service.js";
 import type { CreatePipeline, PipelineFilter, UpdatePipelineStep } from "@orch/shared";
@@ -41,10 +42,48 @@ interface ApproveStepResult {
   nextTask: Task | null;
 }
 
+
+export type PipelineTx = Parameters<Parameters<SchemaDb["transaction"]>[0]>[0];
+export class PipelineConflict extends Error {
+  readonly statusCode = 409;
+}
+
+export async function lockPipeline(tx: PipelineTx, pipelineId: string) {
+  const [hint] = await tx.select().from(pipelines).where(eq(pipelines.id, pipelineId));
+  if (!hint) return undefined;
+  // Match ordinary task creation: allocator before pipeline, steps and task.
+  // NO KEY UPDATE serializes allocation without blocking foreign-key readers.
+  await tx.select().from(projects).where(eq(projects.id, hint.projectId)).for("no key update");
+  const [pipeline] = await tx.select().from(pipelines).where(eq(pipelines.id, pipelineId)).for("update");
+  return pipeline;
+}
+
+export async function lockPipelineAttempt(tx: PipelineTx, pipelineId: string, stepId: string, taskId: string) {
+  const pipeline = await lockPipeline(tx, pipelineId);
+  if (!pipeline) throw new PipelineConflict("Pipeline not found for task");
+  const steps = await tx.select().from(pipelineSteps).where(eq(pipelineSteps.pipelineId, pipelineId))
+    .orderBy(asc(pipelineSteps.order)).for("update");
+  const step = steps.find(s => s.id === stepId);
+  const [task] = await tx.select().from(tasks).where(eq(tasks.id, taskId)).for("update");
+  if (!step || !task || task.projectId !== pipeline.projectId || task.pipelineId !== pipelineId ||
+      task.pipelineStepId !== stepId || step.taskId !== taskId) {
+    throw new PipelineConflict("Stale or inconsistent pipeline task attempt");
+  }
+  return { pipeline, steps, step, task };
+}
+
+export function requireActiveAttempt(pipeline: Pipeline, step: PipelineStep, task: Task) {
+  if (!["pending", "running"].includes(pipeline.status) || pipeline.currentStep !== step.order ||
+      !["pending", "running"].includes(step.status) || task.column === "done") {
+    throw new PipelineConflict("Pipeline task attempt is not active");
+  }
+}
+
 export class PipelineService {
   constructor(
     private db: SchemaDb,
     private templateService: PipelineTemplateService,
+    private broadcastService?: BroadcastService,
   ) {}
 
   async create(input: CreatePipeline): Promise<CreateResult> {
@@ -147,110 +186,49 @@ export class PipelineService {
   }
 
   async completeStep(
-    pipelineId: string,
-    stepId: string,
-    summary: string,
-    outputFilePath: string,
+    pipelineId: string, stepId: string, taskId: string,
+    summary: string, outputFilePath?: string,
   ): Promise<CompleteStepResult> {
-    // Idempotency guard: if step is already completed or awaiting_verification, return existing state
-    const [existingStep] = await this.db.select().from(pipelineSteps)
-      .where(eq(pipelineSteps.id, stepId));
-    if (existingStep?.status === "completed" || existingStep?.status === "awaiting_verification") {
-      const pipeline = await this.getById(pipelineId);
-      if (!pipeline) throw new Error("Pipeline not found");
-      return { pipeline, completedStep: existingStep, nextStep: null, nextTask: null };
-    }
-
-    // If step requires verification, pause here
-    if (existingStep?.requiresVerification) {
-      const [pausedStep] = await this.db
-        .update(pipelineSteps)
-        .set({
-          status: "awaiting_verification",
-          outputSummary: summary,
-          outputFilePath,
-          updatedAt: new Date(),
-        })
-        .where(eq(pipelineSteps.id, stepId))
-        .returning();
-
-      // Ensure pipeline is marked running (may still be "pending" if this is step 1)
-      const [updatedPipeline] = await this.db
-        .update(pipelines)
-        .set({ status: "running", updatedAt: new Date() })
-        .where(eq(pipelines.id, pipelineId))
-        .returning();
-
-      return { pipeline: updatedPipeline, completedStep: pausedStep, nextStep: null, nextTask: null };
-    }
-
-    const [completedStep] = await this.db
-      .update(pipelineSteps)
-      .set({
-        status: "completed",
+    let transition: { taskId: string; from: string; to: string } | undefined;
+    const result = await this.db.transaction(async (tx) => {
+      const { pipeline, steps, step, task } = await lockPipelineAttempt(tx, pipelineId, stepId, taskId);
+      if (pipeline.status === "cancelled") throw new PipelineConflict("Pipeline is not active");
+      if (step.status === "completed" || step.status === "awaiting_verification") {
+        return { pipeline, completedStep: step, nextStep: null, nextTask: null };
+      }
+      requireActiveAttempt(pipeline, step, task);
+      transition = { taskId, from: task.column, to: "done" };
+      await tx.update(tasks).set({ column: "done", executionRunId: null,
+        executionAgentId: null, executionLockedAt: null, updatedAt: new Date() })
+        .where(eq(tasks.id, taskId));
+      const [completedStep] = await tx.update(pipelineSteps).set({
+        status: step.requiresVerification ? "awaiting_verification" : "completed",
         outputSummary: summary,
-        outputFilePath,
+        outputFilePath: outputFilePath ?? step.outputFilePath ?? `.orch8/pipelines/${pipelineId}/${step.label}.md`,
         updatedAt: new Date(),
-      })
-      .where(eq(pipelineSteps.id, stepId))
-      .returning();
-
-    const allSteps = await this.db.select().from(pipelineSteps)
-      .where(eq(pipelineSteps.pipelineId, pipelineId))
-      .orderBy(asc(pipelineSteps.order));
-
-    const nextStep = allSteps.find(
-      s => s.order > completedStep.order && s.status !== "skipped",
-    );
-
-    if (!nextStep) {
-      const [updatedPipeline] = await this.db
-        .update(pipelines)
-        .set({ status: "completed", updatedAt: new Date() })
-        .where(eq(pipelines.id, pipelineId))
-        .returning();
-
-      return { pipeline: updatedPipeline, completedStep, nextStep: null, nextTask: null };
-    }
-
-    const [updatedPipeline] = await this.db
-      .update(pipelines)
-      .set({
-        status: "running",
-        currentStep: nextStep.order,
-        updatedAt: new Date(),
-      })
-      .where(eq(pipelines.id, pipelineId))
-      .returning();
-
-    const nextTask = await this.createTaskForStep(
-      updatedPipeline.projectId,
-      updatedPipeline,
-      nextStep,
-    );
-
-    const [updatedNextStep] = await this.db
-      .update(pipelineSteps)
-      .set({ taskId: nextTask.id, updatedAt: new Date() })
-      .where(eq(pipelineSteps.id, nextStep.id))
-      .returning();
-
-    return {
-      pipeline: updatedPipeline,
-      completedStep,
-      nextStep: updatedNextStep,
-      nextTask,
-    };
+      }).where(eq(pipelineSteps.id, stepId)).returning();
+      const nextStep = step.requiresVerification ? undefined : steps.find(s => s.order > step.order && s.status !== "skipped");
+      const [updatedPipeline] = await tx.update(pipelines).set({
+        status: step.requiresVerification || nextStep ? "running" : "completed",
+        currentStep: nextStep?.order ?? pipeline.currentStep, updatedAt: new Date(),
+      }).where(eq(pipelines.id, pipelineId)).returning();
+      if (!nextStep) return { pipeline: updatedPipeline, completedStep, nextStep: null, nextTask: null };
+      const nextTask = await this.createTaskForStep(pipeline.projectId, updatedPipeline, nextStep, tx);
+      const [updatedNextStep] = await tx.update(pipelineSteps).set({ taskId: nextTask.id, updatedAt: new Date() })
+        .where(eq(pipelineSteps.id, nextStep.id)).returning();
+      return { pipeline: updatedPipeline, completedStep, nextStep: updatedNextStep, nextTask };
+    });
+    if (transition) this.broadcastService?.taskTransitioned(result.pipeline.projectId, transition);
+    return result;
   }
 
   async approveStep(pipelineId: string, stepId: string): Promise<ApproveStepResult> {
     return this.db.transaction(async (tx) => {
       // Serialize decisions before reading state, including competing rejection.
-      const [pipeline] = await tx.select().from(pipelines)
-        .where(eq(pipelines.id, pipelineId)).for("update");
+      const pipeline = await lockPipeline(tx, pipelineId);
       if (!pipeline) throw new Error("Pipeline not found");
       if (pipeline.status !== "pending" && pipeline.status !== "running") {
-        throw new Error("Pipeline is not active");
+        throw new PipelineConflict("Pipeline is not active");
       }
 
       const [step] = await tx.select().from(pipelineSteps)
@@ -258,10 +236,11 @@ export class PipelineService {
         .for("update");
       if (!step) throw new Error("Pipeline step not found");
       if (step.status !== "awaiting_verification") {
-        throw new Error("Step is not awaiting verification");
+        throw new PipelineConflict("Step is not awaiting verification");
       }
 
-      if (step.order !== pipeline.currentStep) throw new Error("Step is not current");
+      if (step.order !== pipeline.currentStep) throw new PipelineConflict("Step is not current");
+      await lockPipelineAttempt(tx, pipelineId, stepId, step.taskId ?? "");
 
       const [approvedStep] = await tx
         .update(pipelineSteps)
@@ -319,69 +298,48 @@ export class PipelineService {
     });
   }
 
-  async failStep(pipelineId: string, stepId: string): Promise<FailStepResult> {
-    const [step] = await this.db
-      .update(pipelineSteps)
-      .set({ status: "failed", updatedAt: new Date() })
-      .where(eq(pipelineSteps.id, stepId))
-      .returning();
-
-    const [pipeline] = await this.db
-      .update(pipelines)
-      .set({ status: "failed", updatedAt: new Date() })
-      .where(eq(pipelines.id, pipelineId))
-      .returning();
-
-    return { pipeline, step };
+  async failStep(pipelineId: string, stepId: string, taskId: string): Promise<FailStepResult> {
+    return this.db.transaction(async tx => {
+      const state = await lockPipelineAttempt(tx, pipelineId, stepId, taskId);
+      requireActiveAttempt(state.pipeline, state.step, state.task);
+      const [step] = await tx.update(pipelineSteps).set({ status: "failed", updatedAt: new Date() })
+        .where(eq(pipelineSteps.id, stepId)).returning();
+      const [pipeline] = await tx.update(pipelines).set({ status: "failed", updatedAt: new Date() })
+        .where(eq(pipelines.id, pipelineId)).returning();
+      return { pipeline, step };
+    });
   }
 
   async cancel(pipelineId: string): Promise<Pipeline> {
-    const [updated] = await this.db
-      .update(pipelines)
-      .set({ status: "cancelled", updatedAt: new Date() })
-      .where(eq(pipelines.id, pipelineId))
-      .returning();
-    if (!updated) throw new Error("Pipeline not found");
-    return updated;
+    return this.db.transaction(async tx => {
+      const pipeline = await lockPipeline(tx, pipelineId);
+      if (!pipeline) throw new Error("Pipeline not found");
+      const [updated] = await tx.update(pipelines).set({ status: "cancelled", updatedAt: new Date() })
+        .where(eq(pipelines.id, pipelineId)).returning();
+      return updated;
+    });
   }
 
   async retry(pipelineId: string): Promise<CompleteStepResult> {
-    const data = await this.getWithSteps(pipelineId);
-    if (!data) throw new Error("Pipeline not found");
-
-    const failedStep = data.steps.find(s => s.status === "failed");
-    if (!failedStep) throw new Error("No failed step to retry");
-
-    const [resetStep] = await this.db
-      .update(pipelineSteps)
-      .set({ status: "pending", taskId: null, updatedAt: new Date() })
-      .where(eq(pipelineSteps.id, failedStep.id))
-      .returning();
-
-    const newTask = await this.createTaskForStep(
-      data.pipeline.projectId,
-      data.pipeline,
-      resetStep,
-    );
-
-    const [updatedStep] = await this.db
-      .update(pipelineSteps)
-      .set({ taskId: newTask.id, updatedAt: new Date() })
-      .where(eq(pipelineSteps.id, failedStep.id))
-      .returning();
-
-    const [updatedPipeline] = await this.db
-      .update(pipelines)
-      .set({ status: "running", currentStep: failedStep.order, updatedAt: new Date() })
-      .where(eq(pipelines.id, pipelineId))
-      .returning();
-
-    return {
-      pipeline: updatedPipeline,
-      completedStep: updatedStep,
-      nextStep: updatedStep,
-      nextTask: newTask,
-    };
+    return this.db.transaction(async tx => {
+      const pipeline = await lockPipeline(tx, pipelineId);
+      if (!pipeline) throw new Error("Pipeline not found");
+      if (pipeline.status !== "failed") throw new PipelineConflict("Pipeline is not failed");
+      const steps = await tx.select().from(pipelineSteps).where(eq(pipelineSteps.pipelineId, pipelineId))
+        .orderBy(asc(pipelineSteps.order)).for("update");
+      const failedStep = steps.find(s => s.status === "failed" && s.order === pipeline.currentStep);
+      if (!failedStep) throw new PipelineConflict("No failed step to retry");
+      await lockPipelineAttempt(tx, pipelineId, failedStep.id, failedStep.taskId ?? "");
+      const [resetStep] = await tx.update(pipelineSteps).set({ status: "pending", taskId: null,
+        outputSummary: null, outputFilePath: null, updatedAt: new Date() })
+        .where(eq(pipelineSteps.id, failedStep.id)).returning();
+      const newTask = await this.createTaskForStep(pipeline.projectId, pipeline, resetStep, tx);
+      const [updatedStep] = await tx.update(pipelineSteps).set({ taskId: newTask.id, updatedAt: new Date() })
+        .where(eq(pipelineSteps.id, failedStep.id)).returning();
+      const [updatedPipeline] = await tx.update(pipelines).set({ status: "running", updatedAt: new Date() })
+        .where(eq(pipelines.id, pipelineId)).returning();
+      return { pipeline: updatedPipeline, completedStep: updatedStep, nextStep: updatedStep, nextTask: newTask };
+    });
   }
 
   async rejectStep(
@@ -392,11 +350,10 @@ export class PipelineService {
   ): Promise<RejectStepResult> {
     return this.db.transaction(async (tx) => {
       // Use the same pipeline-first lock order as approval.
-      const [pipeline] = await tx.select().from(pipelines)
-        .where(eq(pipelines.id, pipelineId)).for("update");
+      const pipeline = await lockPipeline(tx, pipelineId);
       if (!pipeline) throw new Error("Pipeline not found");
       if (pipeline.status !== "pending" && pipeline.status !== "running") {
-        throw new Error("Pipeline is not active");
+        throw new PipelineConflict("Pipeline is not active");
       }
       const steps = await tx.select().from(pipelineSteps)
         .where(eq(pipelineSteps.pipelineId, pipelineId))
@@ -409,9 +366,10 @@ export class PipelineService {
         throw new Error("Target step must have a lower order than the rejecting step");
       }
       if (!["pending", "running", "awaiting_verification"].includes(rejectingStep.status)) {
-        throw new Error("Step cannot be rejected");
+        throw new PipelineConflict("Step cannot be rejected");
       }
-      if (rejectingStep.order !== pipeline.currentStep) throw new Error("Step is not current");
+      if (rejectingStep.order !== pipeline.currentStep) throw new PipelineConflict("Step is not current");
+      await lockPipelineAttempt(tx, pipelineId, rejectingStepId, rejectingStep.taskId ?? "");
 
       // 1. Mark rejecting step as failed with rejection feedback
       const [updatedRejectingStep] = await tx
@@ -429,7 +387,7 @@ export class PipelineService {
         if (step.order >= targetStep.order && step.order < rejectingStep.order) {
           await tx
             .update(pipelineSteps)
-            .set({ status: "pending", taskId: null, updatedAt: new Date() })
+            .set({ status: "pending", taskId: null, outputSummary: null, outputFilePath: null, updatedAt: new Date() })
             .where(eq(pipelineSteps.id, step.id));
         }
       }
@@ -478,18 +436,25 @@ export class PipelineService {
   }
 
   async updateStep(pipelineId: string, stepId: string, input: UpdatePipelineStep): Promise<PipelineStep> {
-    const [step] = await this.db.select().from(pipelineSteps)
-      .where(and(eq(pipelineSteps.id, stepId), eq(pipelineSteps.pipelineId, pipelineId)));
-    if (!step) throw new Error("Pipeline step not found");
-    if (step.status === "completed") throw new Error("Cannot modify completed step");
-
-    const [updated] = await this.db
-      .update(pipelineSteps)
-      .set({ ...input, updatedAt: new Date() })
-      .where(eq(pipelineSteps.id, stepId))
-      .returning();
-
-    return updated;
+    return this.db.transaction(async tx => {
+      const pipeline = await lockPipeline(tx, pipelineId);
+      if (!pipeline) throw new Error("Pipeline not found");
+      if (!["pending", "running"].includes(pipeline.status)) throw new PipelineConflict("Pipeline is not active");
+      const [step] = await tx.select().from(pipelineSteps)
+        .where(and(eq(pipelineSteps.id, stepId), eq(pipelineSteps.pipelineId, pipelineId))).for("update");
+      if (!step) throw new Error("Pipeline step not found");
+      if (!["pending", "running"].includes(step.status)) throw new PipelineConflict("Cannot modify completed step");
+      if (step.taskId) {
+        const state = await lockPipelineAttempt(tx, pipelineId, stepId, step.taskId);
+        requireActiveAttempt(pipeline, step, state.task);
+        if (state.task.executionRunId) throw new PipelineConflict("Cannot modify an executing pipeline step");
+        if (input.agentId !== undefined) await tx.update(tasks).set({ assignee: input.agentId, updatedAt: new Date() })
+          .where(eq(tasks.id, step.taskId));
+      }
+      const [updated] = await tx.update(pipelineSteps).set({ ...input, updatedAt: new Date() })
+        .where(eq(pipelineSteps.id, stepId)).returning();
+      return updated;
+    });
   }
 
   async findByTaskId(taskId: string): Promise<{ pipeline: Pipeline; step: PipelineStep } | null> {
@@ -539,7 +504,7 @@ export class PipelineService {
     projectId: string,
     pipeline: Pipeline,
     step: PipelineStep,
-    db: SchemaDb | Parameters<Parameters<SchemaDb["transaction"]>[0]>[0] = this.db,
+    db: PipelineTx,
   ): Promise<Task> {
     const [task] = await db.insert(tasks).values({
       id: await allocateTaskId(db, projectId),

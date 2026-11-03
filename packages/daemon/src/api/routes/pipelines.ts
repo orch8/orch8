@@ -1,3 +1,4 @@
+import { PipelineConflict } from "../../services/pipeline.service.js";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import {
   CreatePipelineSchema,
@@ -32,6 +33,7 @@ export async function pipelineRoutes(app: FastifyInstance) {
 
       return reply.code(201).send(result);
     } catch (err) {
+      if (err instanceof PipelineConflict) throw err;
       const message = (err as Error).message;
       if (message.includes("template not found")) {
         return reply.code(404).send({ error: "not_found", message });
@@ -66,6 +68,7 @@ export async function pipelineRoutes(app: FastifyInstance) {
       const pipeline = await app.pipelineService.cancel(request.params.id);
       return pipeline;
     } catch (err) {
+      if (err instanceof PipelineConflict) throw err;
       if ((err as Error).message.includes("not found")) {
         return reply.code(404).send({ error: "not_found", message: "Pipeline not found" });
       }
@@ -93,6 +96,7 @@ export async function pipelineRoutes(app: FastifyInstance) {
 
       return result;
     } catch (err) {
+      if (err instanceof PipelineConflict) throw err;
       const message = (err as Error).message;
       if (message.includes("not found")) {
         return reply.code(404).send({ error: "not_found", message });
@@ -120,6 +124,7 @@ export async function pipelineRoutes(app: FastifyInstance) {
         );
         return step;
       } catch (err) {
+        if (err instanceof PipelineConflict) throw err;
         const message = (err as Error).message;
         if (message.includes("not found")) {
           return reply.code(404).send({ error: "not_found", message });
@@ -166,6 +171,7 @@ export async function pipelineRoutes(app: FastifyInstance) {
 
         return result;
       } catch (err) {
+        if (err instanceof PipelineConflict) throw err;
         const message = (err as Error).message;
         if (message.includes("not found")) {
           return reply.code(404).send({ error: "not_found", message });
@@ -206,6 +212,7 @@ export async function pipelineRoutes(app: FastifyInstance) {
 
         return result;
       } catch (err) {
+        if (err instanceof PipelineConflict) throw err;
         const message = (err as Error).message;
         if (message.includes("not found")) {
           return reply.code(404).send({ error: "not_found", message });

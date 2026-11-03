@@ -81,6 +81,17 @@ describe("Pipeline API routes", () => {
     await testDb.db.delete(pipelineTemplates);
   });
 
+  it("returns 409 for stale completion and generic pipeline done", async () => {
+    const { pipeline, steps, firstTask } = await app.pipelineService.create({ projectId, name: "stale", steps: [{ label: "work" }] });
+    await app.pipelineService.failStep(pipeline.id, steps[0].id, firstTask.id);
+    const replacement = await app.pipelineService.retry(pipeline.id);
+    const stale = await app.inject({ method: "POST", url: `/api/tasks/${firstTask.id}/complete`, payload: { output: "late" } });
+    expect(stale.statusCode).toBe(409);
+    const bypass = await app.inject({ method: "PATCH", url: `/api/tasks/${replacement.nextTask!.id}`, payload: { column: "done" } });
+    expect(bypass.statusCode).toBe(409);
+    expect((await app.pipelineService.getWithSteps(pipeline.id))!.steps[0].status).toBe("pending");
+  });
+
   it.each(["success", "assertion", "rejection", "logger", "errorLogger"] as const)(
     "joins final queue cleanup before closing connections: %s", async (failure) => {
       const owner = app;
@@ -174,6 +185,18 @@ describe("Pipeline API routes", () => {
     } finally {
       try { await cleanupFixture(); } finally { release.mockRestore(); }
     }
+  });
+
+  it("broadcasts one committed done transition across duplicate completion requests", async () => {
+    const { firstTask } = await app.pipelineService.create({projectId,name:"completion event",steps:[{label:"work"}]});
+    const spy = vi.spyOn(app.broadcastService,"taskTransitioned");
+    try {
+      const complete = () => app.inject({method:"POST",url:`/api/tasks/${firstTask.id}/complete`,payload:{output:"done"}});
+      const responses = await Promise.all([complete(),complete()]);
+      expect(responses.map(r => r.statusCode)).toEqual([200,200]);
+      expect(spy).toHaveBeenCalledExactlyOnceWith(projectId,{taskId:firstTask.id,from:"backlog",to:"done"});
+      expect((await app.taskService.getById(firstTask.id))!.column).toBe("done");
+    } finally { spy.mockRestore(); }
   });
 
   describe("Pipeline Templates", () => {
@@ -318,7 +341,7 @@ describe("Pipeline API routes", () => {
       // We need to complete via the task route, but for simplicity we'll use the service directly
       await app.pipelineService.completeStep(
         created.pipeline.id,
-        planStep.id,
+        planStep.id, (await app.pipelineService.getWithSteps(created.pipeline.id))!.steps.find(s => s.id === planStep.id)!.taskId!,
         "Plan output",
         ".orch8/pipelines/test/plan.md",
       );
@@ -336,7 +359,7 @@ describe("Pipeline API routes", () => {
       expect(body.pipeline.currentStep).toBe(2);
     });
 
-    it("POST /api/pipelines/:id/steps/:stepId/approve returns 400 for non-verification step", async () => {
+    it("POST /api/pipelines/:id/steps/:stepId/approve returns 409 for non-verification step", async () => {
       const createRes = await app.inject({
         method: "POST",
         url: "/api/pipelines",
@@ -353,7 +376,7 @@ describe("Pipeline API routes", () => {
         url: `/api/pipelines/${created.pipeline.id}/steps/${created.steps[0].id}/approve`,
       });
 
-      expect(res.statusCode).toBe(400);
+      expect(res.statusCode).toBe(409);
     });
   });
 });

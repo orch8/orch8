@@ -123,7 +123,7 @@ export function buildServer(options: ServerOptions = {}) {
     // Pipeline services
     const pipelineTemplateService = new PipelineTemplateService(dbClient.db);
     app.decorate("pipelineTemplateService", pipelineTemplateService);
-    const pipelineService = new PipelineService(dbClient.db, pipelineTemplateService);
+    const pipelineService = new PipelineService(dbClient.db, pipelineTemplateService, broadcastService);
     app.decorate("pipelineService", pipelineService);
 
     // Agent service
