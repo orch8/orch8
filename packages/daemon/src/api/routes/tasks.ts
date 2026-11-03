@@ -1,6 +1,9 @@
 // packages/daemon/src/api/routes/tasks.ts
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { CreateTaskSchema, UpdateTaskSchema, CompletePipelineStepSchema, ConvertTaskSchema, TaskFilterSchema } from "@orch/shared";
+import { eq } from "drizzle-orm";
+import { agents } from "@orch/shared/db";
+import { requireProjectScope } from "../utils/project-scope.js";
 import { TaskService } from "../../services/task.service.js";
 import { CommentService } from "../../services/comment.service.js";
 import type { TaskColumn } from "../../services/task-transitions.js";
@@ -10,6 +13,27 @@ import { resolveProjectParam, resolveProjectValue } from "../utils/project-resol
 export async function taskRoutes(app: FastifyInstance) {
   const taskService = new TaskService(app.db);
   const commentService = new CommentService(app.db);
+
+  // Services remain trusted entrypoints; authorize persisted ownership at the API.
+  async function scopedTask(request: FastifyRequest, reply: FastifyReply, id: string) {
+    const task = await taskService.getById(id);
+    if (!task) {
+      reply.code(404).send({ error: "not_found", message: "Task not found" });
+      return null;
+    }
+    return requireProjectScope(request, reply, task.projectId) ? task : null;
+  }
+
+  async function scopedAssignee(request: FastifyRequest, reply: FastifyReply, id?: string | null) {
+    // Preserve admin association semantics and assignment removal.
+    if (request.isAdmin || !id) return true;
+    const [agent] = await app.db.select().from(agents).where(eq(agents.id, id));
+    if (!agent) {
+      reply.code(404).send({ error: "not_found", message: "Agent not found" });
+      return false;
+    }
+    return requireProjectScope(request, reply, agent.projectId);
+  }
 
   // POST /api/tasks — Create task
   app.post("/api/tasks", {
@@ -25,6 +49,13 @@ export async function taskRoutes(app: FastifyInstance) {
 
     const projectId = await resolveProjectParam(app, parsed.data.projectId, reply);
     if (!projectId) return reply;
+    if (!requireProjectScope(request, reply, projectId)) return reply;
+    if (!await scopedAssignee(request, reply, parsed.data.assignee)) return reply;
+    if (!request.isAdmin) {
+      for (const id of parsed.data.dependsOn ?? []) {
+        if (!await scopedTask(request, reply, id)) return reply;
+      }
+    }
     const { dependsOn, ...taskData } = { ...parsed.data, projectId };
 
     // Insert the task row and attach its initial dependencies in a single
@@ -57,10 +88,19 @@ export async function taskRoutes(app: FastifyInstance) {
   });
 
   // GET /api/tasks — List tasks
-  app.get("/api/tasks", async (request: FastifyRequest) => {
+  app.get("/api/tasks", async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = TaskFilterSchema.safeParse(request.query);
     const filter = parsed.success ? parsed.data : {};
-    if (filter.projectId) {
+    if (!request.isAdmin) {
+      if (!requireProjectScope(request, reply, request.agent?.projectId ?? "")) return reply;
+      // Check an explicit project even when another filter field fails parsing.
+      const explicitProject = (request.query as { projectId?: unknown }).projectId;
+      if (typeof explicitProject === "string" && explicitProject) {
+        const projectId = await resolveProjectParam(app, explicitProject, reply);
+        if (!projectId || !requireProjectScope(request, reply, projectId)) return reply;
+      }
+      filter.projectId = request.agent!.projectId;
+    } else if (filter.projectId) {
       filter.projectId = await resolveProjectValue(app, filter.projectId);
     }
     return taskService.list(filter);
@@ -68,10 +108,8 @@ export async function taskRoutes(app: FastifyInstance) {
 
   // GET /api/tasks/:id — Get task
   app.get("/api/tasks/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const task = await taskService.getById(request.params.id);
-    if (!task) {
-      return reply.code(404).send({ error: "not_found", message: "Task not found" });
-    }
+    const task = await scopedTask(request, reply, request.params.id);
+    if (!task) return reply;
     return task;
   });
 
@@ -85,10 +123,8 @@ export async function taskRoutes(app: FastifyInstance) {
       preHandler: requirePermission("create_task"),
     },
     async (request, reply: FastifyReply) => {
-      const task = await taskService.getById(request.params.id);
-      if (!task) {
-        return reply.code(404).send({ error: "not_found", message: "Task not found" });
-      }
+      const task = await scopedTask(request, reply, request.params.id);
+      if (!task) return reply;
 
       // Refuse to delete a task that's actively executing. The executing
       // agent still owns the worktree and run; yanking the task out from
@@ -125,6 +161,9 @@ export async function taskRoutes(app: FastifyInstance) {
         details: parsed.error.issues,
       });
     }
+
+    if (!await scopedTask(request, reply, request.params.id)) return reply;
+    if (!await scopedAssignee(request, reply, parsed.data.assignee)) return reply;
 
     // If column is being changed, redirect to lifecycle transition
     if (parsed.data.column) {
@@ -178,6 +217,7 @@ export async function taskRoutes(app: FastifyInstance) {
       preHandler: requirePermission("move_task"),
     },
     async (request, reply: FastifyReply) => {
+      if (!await scopedTask(request, reply, request.params.id)) return reply;
       const body = request.body as { column?: string; agentId?: string; runId?: string };
       if (!body.column) {
         return reply.code(400).send({ error: "validation_error", message: "column is required" });
@@ -211,10 +251,8 @@ export async function taskRoutes(app: FastifyInstance) {
 
   // POST /api/tasks/:id/complete — Signal task or phase completion
   app.post("/api/tasks/:id/complete", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const task = await taskService.getById(request.params.id);
-    if (!task) {
-      return reply.code(404).send({ error: "not_found", message: "Task not found" });
-    }
+    const task = await scopedTask(request, reply, request.params.id);
+    if (!task) return reply;
 
     // Pipeline step completion
     if (task.pipelineId && task.pipelineStepId) {
@@ -292,12 +330,14 @@ export async function taskRoutes(app: FastifyInstance) {
 
   // POST /api/tasks/:id/dependencies — Add dependency
   app.post("/api/tasks/:id/dependencies", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    if (!await scopedTask(request, reply, request.params.id)) return reply;
     const body = request.body as { dependsOnId?: string };
     if (!body.dependsOnId) {
       return reply.code(400).send({ error: "validation_error", message: "dependsOnId is required" });
     }
 
     try {
+      if (!request.isAdmin && !await scopedTask(request, reply, body.dependsOnId)) return reply;
       await taskService.addDependency(request.params.id, body.dependsOnId);
       return reply.code(201).send({ ok: true });
     } catch (err) {
@@ -310,13 +350,16 @@ export async function taskRoutes(app: FastifyInstance) {
   });
 
   // DELETE /api/tasks/:id/dependencies/:depId — Remove dependency
-  app.delete("/api/tasks/:id/dependencies/:depId", async (request: FastifyRequest<{ Params: { id: string; depId: string } }>) => {
+  app.delete("/api/tasks/:id/dependencies/:depId", async (request: FastifyRequest<{ Params: { id: string; depId: string } }>, reply: FastifyReply) => {
+    if (!await scopedTask(request, reply, request.params.id)) return reply;
+    if (!request.isAdmin && !await scopedTask(request, reply, request.params.depId)) return reply;
     await taskService.removeDependency(request.params.id, request.params.depId);
     return { ok: true };
   });
 
   // POST /api/tasks/:id/convert — Convert brainstorm to work task
   app.post("/api/tasks/:id/convert", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    if (!await scopedTask(request, reply, request.params.id)) return reply;
     const parsed = ConvertTaskSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({
@@ -351,6 +394,7 @@ export async function taskRoutes(app: FastifyInstance) {
         });
       }
 
+      if (!await scopedTask(request, reply, request.params.id)) return reply;
       try {
         const task = await app.lifecycleService.checkout(
           request.params.id,
@@ -387,6 +431,7 @@ export async function taskRoutes(app: FastifyInstance) {
         });
       }
 
+      if (!await scopedTask(request, reply, request.params.id)) return reply;
       try {
         const task = await app.lifecycleService.release(
           request.params.id,
