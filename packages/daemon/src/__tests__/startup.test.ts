@@ -1,11 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { loadGlobalConfig } from "../config/loader.js";
-import { buildServer } from "../server.js";
-import { startEmbeddedPostgres, stopEmbeddedPostgres } from "../db/embedded.js";
+import { buildStartupTestServer } from "./helpers/startup-server.js";
+import { setupTestDb, teardownTestDb } from "./helpers/test-db.js";
+import { SchedulerService } from "../services/scheduler.service.js";
 import { globalConfigSchema } from "../config/schema.js";
 
 describe("startup config integration", () => {
@@ -54,21 +55,29 @@ orphan_detection:
 
 describe("full startup integration", () => {
   it("builds server with config and starts scheduler", async () => {
-    const dataDir = join(tmpdir(), `orch-startup-integ-${randomUUID()}`);
-    const databaseUrl = await startEmbeddedPostgres({ databaseDir: dataDir, port: 0, persistent: false });
+    const testDb = await setupTestDb();
+    const start = vi.spyOn(SchedulerService.prototype, "start");
     const config = globalConfigSchema.parse({
       orchestrator: { tick_interval_ms: 60000 },
     });
 
-    const server = buildServer({ databaseUrl, config });
+    let fixture: ReturnType<typeof buildStartupTestServer> | undefined;
+    try {
+      fixture = buildStartupTestServer({ databaseUrl: testDb.connectionUri, config });
+      const server = fixture.app;
+      await fixture.ready();
+      expect(start).toHaveBeenCalledOnce();
+      expect(server.schedulerService.intervalMs).toBe(60000);
 
-    // Server should have all decorated services
-    expect(server.heartbeatService).toBeDefined();
-    expect(server.schedulerService).toBeDefined();
-    expect(server.agentService).toBeDefined();
-    expect(server.projectService).toBeDefined();
+      // Server should have all decorated services
+      expect(server.heartbeatService).toBeDefined();
+      expect(server.schedulerService).toBeDefined();
+      expect(server.agentService).toBeDefined();
+      expect(server.projectService).toBeDefined();
 
-    await server.close();
-    await stopEmbeddedPostgres();
+    } finally {
+      try { await fixture?.close(); }
+      finally { start.mockRestore(); await teardownTestDb(testDb); }
+    }
   }, 60_000);
 });
