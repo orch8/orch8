@@ -84,7 +84,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     <h2 className="text-lg font-semibold text-zinc-100">Build a feature</h2>
     <p className="mt-1 text-sm text-zinc-400">The implementation step waits for plan approval. Planning agents can write to the repository; planning-only behavior is a prompt instruction, not a read-only sandbox.</p>
     <p className="mt-1 text-xs text-zinc-500">Uses the configured repository and agent permissions, not a new isolated worktree. Keep the sandbox settings of selected agents unchanged during this workflow. Automatic PR creation is not included.</p>
-    <p className="mt-1 text-xs text-zinc-500">Check the selected agents before starting. On Linux this tests a shell command in Codex's configured sandbox; other hosts are not supported yet. A text-only response is not proof that planning can inspect the repository.</p>
+    <p className="mt-1 text-xs text-zinc-500">Check the selected agents before starting. On Linux this tests a shell command in the configured Codex sandbox; other hosts are not supported yet. A text-only response is not proof that planning can inspect the repository.</p>
     <p className="mt-3 text-xs text-zinc-500">Repository: {project?.homeDir ?? "Loading repository..."}</p>
     <form onSubmit={submit} className="mt-4 space-y-3">
       <label className="block text-sm text-zinc-300" htmlFor="feature-request">What should change?</label>
