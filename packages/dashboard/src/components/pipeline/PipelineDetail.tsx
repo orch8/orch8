@@ -119,6 +119,17 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
         {diffError && <p role="alert" className="text-xs text-amber-300">Could not load repository diff. Try refreshing.</p>}
         {repositoryDiff && !repositoryDiff.available && <p className="text-xs text-amber-300">{repositoryDiff.reason ?? "Repository diff unavailable."}</p>}
         {repositoryDiff?.available && <div className="space-y-4">
+          <div className="rounded border border-zinc-700 bg-zinc-950 p-3 text-xs text-zinc-300 space-y-1">
+            <p>Checked-out branch: <span className="font-mono">{repositoryDiff.branch ?? "detached HEAD"}</span></p>
+            {repositoryDiff.pullRequest ? <p>
+              GitHub PR for this exact branch commit: <a className="text-blue-300 underline" href={repositoryDiff.pullRequest.url} target="_blank" rel="noopener noreferrer">
+                #{repositoryDiff.pullRequest.number} {repositoryDiff.pullRequest.title}
+              </a> ({repositoryDiff.pullRequest.state.toLowerCase()})
+            </p> : repositoryDiff.prLookup === "none" ? <p>No GitHub PR found for this branch commit and configured base. Uncommitted changes are not part of a PR.</p>
+              : repositoryDiff.prLookup === "unavailable" ? <p>PR lookup unavailable. Check GitHub authentication and the repository origin.</p>
+                : <p>PR lookup applies to named branches other than the configured base.</p>}
+            <p className="text-zinc-500">This is a repository-wide snapshot, not proof that the pipeline created the PR. Refresh to check again.</p>
+          </div>
           <div>
             <h5 className="text-xs font-medium text-zinc-300 mb-2">Committed changes since {repositoryDiff.baseBranch}</h5>
             <GitDiffViewer diff={repositoryDiff.committedDiff ?? ""} />

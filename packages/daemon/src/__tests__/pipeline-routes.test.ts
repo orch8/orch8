@@ -294,7 +294,8 @@ describe("Pipeline API routes", () => {
         const response = await app.inject({ method: "GET", url: `/api/pipelines/${pipeline.id}/diff` });
         expect(response.statusCode).toBe(200);
         expect(response.json()).toMatchObject({
-          available: true, baseBranch: "stable", untrackedFiles: ["untracked.txt"], untrackedMore: false,
+          available: true, baseBranch: "stable", branch: "feature", prLookup: "unavailable",
+          pullRequest: null, untrackedFiles: ["untracked.txt"], untrackedMore: false,
         });
         expect(response.json().committedDiff).toContain("+committed branch work");
         expect(response.json().committedDiff).not.toContain("staged.txt");
