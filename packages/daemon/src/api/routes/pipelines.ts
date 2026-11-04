@@ -1,5 +1,6 @@
 import { PipelineConflict } from "../../services/pipeline.service.js";
 import { publishPipelinePr } from "../../services/pipeline-pr.service.js";
+import { featureBranchReadiness, prepareFeatureBranch } from "../../services/feature-branch.service.js";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import {
   CreatePipelineSchema,
@@ -151,6 +152,26 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
 }
 
 export async function pipelineRoutes(app: FastifyInstance) {
+  const preparing = new Set<string>();
+  app.get("/api/projects/:projectId/feature-branch", async (request: FastifyRequest<{ Params: { projectId: string } }>, reply: FastifyReply) => {
+    if (!requireProjectScope(request, reply, request.params.projectId)) return reply;
+    const project = await app.projectService.getById(request.params.projectId);
+    if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    return featureBranchReadiness(project.homeDir, project.defaultBranch);
+  });
+  app.post("/api/projects/:projectId/feature-branch", async (request: FastifyRequest<{ Params: { projectId: string }; Body: { name?: unknown } }>, reply: FastifyReply) => {
+    if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+    if (!requireProjectScope(request, reply, request.params.projectId)) return reply;
+    const project = await app.projectService.getById(request.params.projectId);
+    if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    if (typeof request.body?.name !== "string") return reply.code(400).send({ error: "validation_error", message: "Enter a feature branch name." });
+    const key = await realpath(project.homeDir).catch(() => project.homeDir);
+    if (preparing.has(key)) return reply.code(409).send({ error: "conflict", message: "Branch preparation is already running for this repository." });
+    preparing.add(key);
+    try { return reply.code(201).send(await prepareFeatureBranch(project.homeDir, project.defaultBranch, request.body.name)); }
+    catch (error) { return reply.code(409).send({ error: "conflict", message: (error as Error).message }); }
+    finally { preparing.delete(key); }
+  });
   const publishing = new Set<string>();
   // Explicit admin action only. No implicit commit, checkout, or publication.
   app.post("/api/pipelines/:id/pull-request", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {

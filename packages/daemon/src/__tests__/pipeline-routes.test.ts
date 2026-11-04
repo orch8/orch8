@@ -328,6 +328,32 @@ describe("Pipeline API routes", () => {
     });
   });
 
+  it("prepares a branch for an authorized admin and refuses agent writes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orch-prepare-route-"));
+    try {
+      const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" } }).trim();
+      git("init", "-q", "-b", "main");
+      git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "base");
+      await testDb.db.update(projects).set({ homeDir: root, defaultBranch: "main" }).where(eq(projects.id, projectId));
+      const url = `/api/projects/${projectId}/feature-branch`;
+      const token = "branch-preparation-agent-token";
+      await testDb.db.update(agents).set({ agentTokenHash: hashAgentToken(token) }).where(eq(agents.id, "route-agent-a"));
+      expect((await app.inject({ method: "POST", url, headers: { authorization: `Bearer ${token}` }, payload: { name: "feat/test" } })).statusCode).toBe(403);
+      const [other] = await testDb.db.insert(projects).values({ name: "Other branch project", slug: `other-branch-${Date.now()}`, homeDir: "/tmp/private-branch" }).returning();
+      expect((await app.inject({ method: "GET", url: `/api/projects/${other.id}/feature-branch`, headers: { authorization: `Bearer ${token}` } })).statusCode).toBe(403);
+      expect((await app.inject({ method: "GET", url })).json()).toMatchObject({ ready: true, branch: "main", baseBranch: "main" });
+      const created = await app.inject({ method: "POST", url, payload: { name: "feat/test" } });
+      expect(created.statusCode).toBe(201);
+      expect(created.json()).toMatchObject({ branch: "feat/test", baseBranch: "main" });
+      expect(git("branch", "--show-current")).toBe("feat/test");
+      expect((await app.inject({ method: "POST", url, payload: { name: "feat/second" } })).statusCode).toBe(409);
+      expect((await app.inject({ method: "POST", url, payload: { name: "feat/test" } })).statusCode).toBe(409);
+    } finally {
+      await testDb.db.update(projects).set({ homeDir: "/tmp/route", defaultBranch: "main" }).where(eq(projects.id, projectId));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   describe("Pipelines", () => {
     it("refuses publication before a completed independent review", async () => {
       const created = await app.pipelineService.create({ projectId, name: "Review gate", steps: [
