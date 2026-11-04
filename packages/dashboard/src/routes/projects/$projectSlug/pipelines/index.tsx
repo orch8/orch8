@@ -1,7 +1,9 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { usePipelines } from "../../../../hooks/usePipelines.js";
 import { PipelineList } from "../../../../components/pipeline/PipelineList.js";
+import { FeatureIntake } from "../../../../components/pipeline/FeatureIntake.js";
+import { PipelineDetail } from "../../../../components/pipeline/PipelineDetail.js";
 
 // Pipelines tabs are built from runtime paths like
 // `/projects/${projectId}/pipelines/history`, which TanStack Router's Link
@@ -15,6 +17,8 @@ function PipelinesActivePage() {
   const { projectSlug: projectId } = Route.useParams();
   const { data: allPipelines, isLoading } = usePipelines(projectId);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [created, setCreated] = useState<{ id: string; projectId: string } | null>(null);
+  const createdId = created?.projectId === projectId ? created.id : null;
 
   const activePipelines = allPipelines?.filter(
     (p) => p.status === "pending" || p.status === "running" || p.status === "failed",
@@ -33,6 +37,11 @@ function PipelinesActivePage() {
   return (
     <div className="flex flex-col gap-4 p-[var(--gap-section)]">
       <h1 className="type-section font-semibold text-zinc-100">Pipelines</h1>
+      <FeatureIntake key={projectId} projectId={projectId} onCreated={id => setCreated({ id, projectId })} />
+      {createdId && <div className="rounded border border-blue-800 bg-blue-950/20 p-4">
+        <p className="mb-3 text-sm text-blue-200">Planning requested. A completed plan appears here for approval before the implementation step starts. A finished agent run alone does not mean the plan is complete.</p>
+        <PipelineDetail pipelineId={createdId} projectId={projectId} />
+      </div>}
 
       <div className="flex gap-1 border-b border-zinc-800">
         {tabs.map((tab) => (

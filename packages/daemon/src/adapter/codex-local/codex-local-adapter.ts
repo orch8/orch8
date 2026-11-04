@@ -21,7 +21,7 @@ import { ensureCodexHome, seedCodexAuth } from "./codex-home.js";
 import { syncCodexSkills } from "./skills.js";
 import { buildCodexExecArgs } from "./args-builder.js";
 import { buildCodexEnv } from "./env-builder.js";
-import { buildCodexPrompt } from "./prompt-builder.js";
+import { buildCodexPrompt, appendTaskContext } from "./prompt-builder.js";
 import { runCodexProcess } from "./process-runner.js";
 import { resolveCodexPath } from "./resolve-codex-path.js";
 import {
@@ -64,7 +64,7 @@ export class CodexLocalAdapter implements AgentAdapter {
       throw new Error(`Missing AGENTS.md for agent "${instructions.slug}" at ${systemPromptPath}`);
     }
 
-    const prompt = await buildCodexPrompt(systemPromptPath, instructions);
+    const prompt = appendTaskContext(await buildCodexPrompt(systemPromptPath, instructions), ctx);
     const command = codexConfig.command ?? resolveCodexPath();
     const env = buildCodexEnv(codexConfig, { ...ctx, cwd }, codexHome, process.env as Record<string, string | undefined>);
 

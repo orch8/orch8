@@ -7,13 +7,32 @@ import {
   useApprovePipelineStep,
 } from "../../hooks/usePipelines.js";
 import { PipelineStepper } from "./PipelineStepper.js";
+import { useRuns } from "../../hooks/useRuns.js";
+import { RunViewer } from "../runs/RunViewer.js";
+import { useEffect } from "react";
+
+function StepEvidence({ taskId, projectId, stepStatus }: { taskId: string; projectId: string; stepStatus: string }) {
+  const { data: runs } = useRuns(projectId, { taskId, limit: 20 });
+  const [selectedRun, setSelectedRun] = useState<string | null>(null);
+  return <div className="mt-2 space-y-1 text-xs">
+    <a href={`/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`} className="text-blue-300 underline">Open task {taskId}</a>
+    {runs?.map(run => <div key={run.id}>
+      <button type="button" onClick={() => setSelectedRun(run.id)} className="text-blue-300 underline">{run.agentId} run: {run.status} (log and events)</button>
+      {run.status === "failed" && run.error && <p role="alert" className="text-red-300">{run.error}</p>}
+    </div>)}
+    {stepStatus === "pending" && runs?.[0]?.status === "succeeded" &&
+      <p role="status" className="text-amber-300">Agent run ended without completing this step. Inspect its log before retrying.</p>}
+    {selectedRun && <RunViewer runId={selectedRun} projectId={projectId} onClose={() => setSelectedRun(null)} />}
+  </div>;
+}
 
 interface PipelineDetailProps {
   pipelineId: string;
+  projectId?: string;
 }
 
-export function PipelineDetail({ pipelineId }: PipelineDetailProps) {
-  const { data, isLoading } = usePipeline(pipelineId);
+export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
+  const { data, isLoading, refetch } = usePipeline(pipelineId);
   const cancelMutation = useCancelPipeline();
   const retryMutation = useRetryPipeline();
   const rejectMutation = useRejectPipelineStep();
@@ -21,6 +40,11 @@ export function PipelineDetail({ pipelineId }: PipelineDetailProps) {
   const [rejectingStepId, setRejectingStepId] = useState<string | null>(null);
   const [targetStepId, setTargetStepId] = useState("");
   const [feedback, setFeedback] = useState("");
+  useEffect(() => {
+    if (data?.pipeline.status === "completed" || data?.pipeline.status === "cancelled") return;
+    const timer = setInterval(() => { void refetch(); }, 5000);
+    return () => clearInterval(timer);
+  }, [data?.pipeline.status, pipelineId, refetch]);
 
   if (isLoading || !data) {
     return <p className="text-sm text-zinc-600">Loading pipeline...</p>;
@@ -66,7 +90,11 @@ export function PipelineDetail({ pipelineId }: PipelineDetailProps) {
       {/* Step details */}
       <div className="flex flex-col gap-[var(--gap-inline)]">
         {steps.map((step) => (
-          <div key={step.id}>
+          <div key={step.id} className="rounded border border-zinc-800 p-3">
+            <p className="text-sm font-medium text-zinc-200">{step.label} <span className="text-xs text-zinc-500">{step.status}</span></p>
+            {step.taskId && <StepEvidence taskId={step.taskId} projectId={projectId ?? pipeline.projectId} stepStatus={step.status} />}
+            {step.status === "awaiting_verification" && !step.outputSummary &&
+              <p role="alert" className="mt-2 text-xs text-amber-300">No plan or review summary is available. Inspect the task and run log before approving.</p>}
             {step.outputSummary && (
               <details className="mt-1">
                 <summary className="cursor-pointer text-xs text-zinc-500 hover:text-zinc-300">

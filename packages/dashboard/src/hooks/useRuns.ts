@@ -15,6 +15,7 @@ export function useRuns(
   return useQuery<Run[]>({
     queryKey: ["runs", projectId, filters],
     queryFn: () => api.get("/runs", { projectId, ...filters }),
+    refetchInterval: filters?.taskId ? 5000 : false,
   });
 }
 

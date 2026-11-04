@@ -25,10 +25,10 @@ export function useCreatePipeline() {
       projectId: string;
       name: string;
       templateId?: string;
-      steps?: Array<{ label: string; agentId?: string; promptOverride?: string }>;
+      steps?: Array<{ label: string; agentId?: string; promptOverride?: string; requiresVerification?: boolean }>;
     }) => api.post<{ pipeline: Pipeline; steps: unknown[] }>("/pipelines", input),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["pipelines", data.pipeline.projectId] });
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pipelines"] });
     },
   });
 }
@@ -39,7 +39,7 @@ export function useCancelPipeline() {
     mutationFn: (pipelineId: string) =>
       api.post<Pipeline>(`/pipelines/${pipelineId}/cancel`, {}),
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["pipelines", data.projectId] });
+      qc.invalidateQueries({ queryKey: ["pipelines"] });
       qc.invalidateQueries({ queryKey: ["pipeline", data.id] });
     },
   });
@@ -51,7 +51,7 @@ export function useRetryPipeline() {
     mutationFn: (pipelineId: string) =>
       api.post<{ pipeline: Pipeline }>(`/pipelines/${pipelineId}/retry`, {}),
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["pipelines", data.pipeline.projectId] });
+      qc.invalidateQueries({ queryKey: ["pipelines"] });
       qc.invalidateQueries({ queryKey: ["pipeline", data.pipeline.id] });
     },
   });
@@ -81,7 +81,7 @@ export function useRejectPipelineStep() {
         feedback,
       }),
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["pipelines", data.pipeline.projectId] });
+      qc.invalidateQueries({ queryKey: ["pipelines"] });
       qc.invalidateQueries({ queryKey: ["pipeline", data.pipeline.id] });
     },
   });
@@ -104,7 +104,7 @@ export function useApprovePipelineStep() {
         nextTask: unknown;
       }>(`/pipelines/${pipelineId}/steps/${stepId}/approve`, {}),
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["pipelines", data.pipeline.projectId] });
+      qc.invalidateQueries({ queryKey: ["pipelines"] });
       qc.invalidateQueries({ queryKey: ["pipeline", data.pipeline.id] });
     },
   });
