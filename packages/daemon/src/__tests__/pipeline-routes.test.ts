@@ -241,11 +241,100 @@ describe("Pipeline API routes", () => {
   });
 
   describe("Pipelines", () => {
-    it("shows only the authorized project's tracked working-tree changes, not untracked files or prior commits", async () => {
+    it("shows committed branch, staged and unstaged changes separately and lists untracked paths", async () => {
+      const root = await mkdtemp(join(tmpdir(), "orch-pipeline-branch-"));
+      try {
+        const git = (...args: string[]) => execFileSync("git", args, { cwd: root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" } });
+        git("init", "-q");
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "base");
+        git("branch", "stable");
+        git("switch", "-qc", "feature");
+        await writeFile(join(root, "committed.txt"), "committed branch work\n");
+        git("add", "committed.txt");
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "feature");
+        await writeFile(join(root, "staged.txt"), "staged work\n");
+        git("add", "staged.txt");
+        await writeFile(join(root, "committed.txt"), "committed branch work\nunstaged work\n");
+        await writeFile(join(root, "untracked.txt"), "untracked secret content\n");
+        await testDb.db.update(projects).set({ homeDir: root, defaultBranch: "stable" }).where(eq(projects.id, projectId));
+        const { pipeline } = await app.pipelineService.create({ projectId, name: "branch diff", steps: [{ label: "work" }] });
+        const response = await app.inject({ method: "GET", url: `/api/pipelines/${pipeline.id}/diff` });
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toMatchObject({
+          available: true, baseBranch: "stable", untrackedFiles: ["untracked.txt"], untrackedMore: false,
+        });
+        expect(response.json().committedDiff).toContain("+committed branch work");
+        expect(response.json().committedDiff).not.toContain("staged.txt");
+        expect(response.json().workingDiff).toContain("+staged work");
+        expect(response.json().workingDiff).toContain("+unstaged work");
+        expect(response.json().diff).not.toContain("untracked secret content");
+      } finally {
+        await testDb.db.update(projects).set({ homeDir: "/tmp/route", defaultBranch: "main" }).where(eq(projects.id, projectId));
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+
+    it("reports a missing configured base instead of showing an incomplete working-tree-only diff", async () => {
+      const root = await mkdtemp(join(tmpdir(), "orch-pipeline-no-base-"));
+      try {
+        const git = (...args: string[]) => execFileSync("git", args, { cwd: root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" } });
+        git("init", "-q");
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "base");
+        await testDb.db.update(projects).set({ homeDir: root, defaultBranch: "missing" }).where(eq(projects.id, projectId));
+        const { pipeline } = await app.pipelineService.create({ projectId, name: "no base", steps: [{ label: "work" }] });
+        const response = await app.inject({ method: "GET", url: `/api/pipelines/${pipeline.id}/diff` });
+        expect(response.json()).toMatchObject({ available: false, diff: "", reason: expect.stringContaining("missing") });
+      } finally {
+        await testDb.db.update(projects).set({ homeDir: "/tmp/route", defaultBranch: "main" }).where(eq(projects.id, projectId));
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+
+    it("uses the local origin tracking ref when the default branch has no local branch", async () => {
+      const root = await mkdtemp(join(tmpdir(), "orch-pipeline-remote-base-"));
+      try {
+        const git = (...args: string[]) => execFileSync("git", args, { cwd: root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" } });
+        git("init", "-q", "-b", "feature");
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "base");
+        git("update-ref", "refs/remotes/origin/stable", "HEAD");
+        await writeFile(join(root, "feature.txt"), "feature\n");
+        git("add", "feature.txt");
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "feature");
+        await testDb.db.update(projects).set({ homeDir: root, defaultBranch: "stable" }).where(eq(projects.id, projectId));
+        const { pipeline } = await app.pipelineService.create({ projectId, name: "tracking base", steps: [{ label: "work" }] });
+        const response = await app.inject({ method: "GET", url: `/api/pipelines/${pipeline.id}/diff` });
+        expect(response.json()).toMatchObject({ available: true, baseBranch: "stable", workingDiff: "" });
+        expect(response.json().committedDiff).toContain("+feature");
+      } finally {
+        await testDb.db.update(projects).set({ homeDir: "/tmp/route", defaultBranch: "main" }).where(eq(projects.id, projectId));
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+
+    it("caps untracked previews without implying that the list is complete", async () => {
+      const root = await mkdtemp(join(tmpdir(), "orch-pipeline-untracked-cap-"));
+      try {
+        const git = (...args: string[]) => execFileSync("git", args, { cwd: root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" } });
+        git("init", "-q", "-b", "main");
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "base");
+        await Promise.all(Array.from({ length: 21 }, (_, i) => writeFile(join(root, `new-${i}.txt`), "private content\n")));
+        await testDb.db.update(projects).set({ homeDir: root }).where(eq(projects.id, projectId));
+        const { pipeline } = await app.pipelineService.create({ projectId, name: "untracked cap", steps: [{ label: "work" }] });
+        const response = await app.inject({ method: "GET", url: `/api/pipelines/${pipeline.id}/diff` });
+        expect(response.json()).toMatchObject({ available: true, untrackedMore: true, diff: "" });
+        expect(response.json().untrackedFiles).toHaveLength(20);
+        expect(response.body).not.toContain("private content");
+      } finally {
+        await testDb.db.update(projects).set({ homeDir: "/tmp/route" }).where(eq(projects.id, projectId));
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+
+    it("shows only the authorized project's tracked working-tree changes, not untracked file contents", async () => {
       const root = await mkdtemp(join(tmpdir(), "orch-pipeline-diff-"));
       try {
         const git = (...args: string[]) => execFileSync("git", args, { cwd: root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1" } });
-        git("init", "-q");
+        git("init", "-q", "-b", "main");
         await writeFile(join(root, "tracked.txt"), "committed\n");
         git("add", "tracked.txt");
         git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "baseline");

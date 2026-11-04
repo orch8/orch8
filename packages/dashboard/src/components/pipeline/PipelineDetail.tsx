@@ -96,12 +96,28 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
           <button type="button" onClick={() => { void refreshDiff(); }} className="text-xs text-blue-300 underline">Refresh diff</button>
         </div>
         <p className="text-xs text-zinc-400">
-          Live tracked changes against HEAD, including staged and unstaged edits. Untracked files and changes already committed to HEAD are not shown. This is not a per-step diff. Test results are available only in run logs, not verified by this view.
+          Live snapshot of committed branch changes and staged/unstaged edits. Untracked file names are listed, but their contents are not shown; submodule changes are excluded. This is not a per-step diff. Test results are available only in run logs, not verified by this view.
         </p>
         {diffLoading && <p className="text-xs text-zinc-500">Loading repository diff...</p>}
         {diffError && <p role="alert" className="text-xs text-amber-300">Could not load repository diff. Try refreshing.</p>}
         {repositoryDiff && !repositoryDiff.available && <p className="text-xs text-amber-300">{repositoryDiff.reason ?? "Repository diff unavailable."}</p>}
-        {repositoryDiff?.available && <GitDiffViewer diff={repositoryDiff.diff} />}
+        {repositoryDiff?.available && <div className="space-y-4">
+          <div>
+            <h5 className="text-xs font-medium text-zinc-300 mb-2">Committed changes since {repositoryDiff.baseBranch}</h5>
+            <GitDiffViewer diff={repositoryDiff.committedDiff ?? ""} />
+          </div>
+          <div>
+            <h5 className="text-xs font-medium text-zinc-300 mb-2">Staged and unstaged changes</h5>
+            <GitDiffViewer diff={repositoryDiff.workingDiff ?? ""} />
+          </div>
+          <div>
+            <h5 className="text-xs font-medium text-zinc-300 mb-1">Untracked files (names only)</h5>
+            {repositoryDiff.untrackedFiles?.length ? <ul className="text-xs text-zinc-400 font-mono space-y-1">
+              {repositoryDiff.untrackedFiles.map(path => <li key={path} className="break-all">{path}</li>)}
+            </ul> : <p className="text-xs text-zinc-500">None found</p>}
+            {repositoryDiff.untrackedMore && <p className="text-xs text-amber-300">More untracked files exist; only the first 20 names are shown.</p>}
+          </div>
+        </div>}
       </section>
 
       {/* Step details */}

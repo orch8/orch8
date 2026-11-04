@@ -14,14 +14,19 @@ import { realpath } from "node:fs/promises";
 
 const runGit = promisify(execFile);
 const DIFF_MAX_BYTES = 1024 * 1024;
+const UNTRACKED_PREVIEW_LIMIT = 20;
 
-async function repositoryDiff(homeDir: string): Promise<{ available: boolean; diff: string; reason?: string }> {
+async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
+  available: boolean; diff: string; reason?: string; baseBranch?: string;
+  committedDiff?: string; workingDiff?: string; untrackedFiles?: string[]; untrackedMore?: boolean;
+}> {
   // Ignore inherited Git environment overrides and global configuration. No hooks,
   // pagers, external diff programs or textconv commands should run for this read.
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
   env.GIT_CONFIG_NOSYSTEM = "1";
   env.GIT_CONFIG_GLOBAL = "/dev/null";
-  const git = (args: string[]) => runGit("git", ["-c", "core.fsmonitor=false", ...args], {
+  env.GIT_NO_LAZY_FETCH = "1";
+  const git = (args: string[]) => runGit("git", ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", ...args], {
     cwd: homeDir, env, timeout: 10_000, maxBuffer: DIFF_MAX_BYTES, encoding: "utf8",
   });
   try {
@@ -31,8 +36,41 @@ async function repositoryDiff(homeDir: string): Promise<{ available: boolean; di
     if (await realpath(topLevel.trim()) !== root) {
       return { available: false, diff: "", reason: "Project directory is not a Git repository root." };
     }
-    const { stdout } = await git(["diff", "--no-ext-diff", "--no-textconv", "--no-color", "HEAD", "--"]);
-    return { available: true, diff: stdout };
+    if (!baseBranch || baseBranch.length > 200 || !/^[a-zA-Z0-9_./-]+$/.test(baseBranch) || baseBranch.startsWith("-") || baseBranch.includes("..") || baseBranch.includes("//")) {
+      return { available: false, diff: "", reason: "Configured default branch is invalid." };
+    }
+    // Prefer the local default branch; an origin tracking ref works in worktrees
+    // where the branch is only checked out elsewhere. Never fetch implicitly.
+    let baseRef = `refs/heads/${baseBranch}`;
+    try {
+      await git(["show-ref", "--verify", "--quiet", baseRef]);
+    } catch {
+      baseRef = `refs/remotes/origin/${baseBranch}`;
+      try {
+        await git(["show-ref", "--verify", "--quiet", baseRef]);
+      } catch {
+        return { available: false, diff: "", reason: `Configured default branch '${baseBranch}' is not available locally.` };
+      }
+    }
+    let mergeBase: string;
+    try {
+      mergeBase = (await git(["merge-base", "HEAD", baseRef])).stdout.trim();
+    } catch {
+      return { available: false, diff: "", reason: "No common ancestor with the configured default branch." };
+    }
+    const diffArgs = ["diff", "--no-ext-diff", "--no-textconv", "--no-color", "--ignore-submodules=all"];
+    const committedDiff = (await git([...diffArgs, mergeBase, "HEAD", "--"])).stdout;
+    const workingDiff = (await git([...diffArgs, "HEAD", "--"])).stdout;
+    const diff = committedDiff + workingDiff;
+    if (Buffer.byteLength(diff) > DIFF_MAX_BYTES) {
+      return { available: false, diff: "", reason: "Diff exceeds the 1 MiB viewing limit." };
+    }
+    const untracked = (await git(["ls-files", "--others", "--exclude-standard", "-z"])).stdout;
+    const paths = untracked ? untracked.split("\0").filter(Boolean) : [];
+    return {
+      available: true, diff, baseBranch, committedDiff, workingDiff,
+      untrackedFiles: paths.slice(0, UNTRACKED_PREVIEW_LIMIT), untrackedMore: paths.length > UNTRACKED_PREVIEW_LIMIT,
+    };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
       return { available: false, diff: "", reason: "Diff exceeds the 1 MiB viewing limit." };
@@ -95,14 +133,14 @@ export async function pipelineRoutes(app: FastifyInstance) {
     return result;
   });
 
-  // The diff is a live snapshot of tracked changes against HEAD, not step output.
+  // Live branch and worktree snapshot, not a per-step artifact.
   app.get("/api/pipelines/:id/diff", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const pipeline = await app.pipelineService.getById(request.params.id);
     if (!pipeline) return reply.code(404).send({ error: "not_found", message: "Pipeline not found" });
     if (!requireProjectScope(request, reply, pipeline.projectId)) return reply;
     const project = await app.projectService.getById(pipeline.projectId);
     if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
-    return repositoryDiff(project.homeDir);
+    return repositoryDiff(project.homeDir, project.defaultBranch);
   });
 
   // POST /api/pipelines/:id/cancel — Cancel pipeline

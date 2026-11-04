@@ -21,6 +21,11 @@ export function usePipeline(pipelineId: string | null) {
 export interface PipelineRepositoryDiff {
   available: boolean;
   diff: string;
+  baseBranch?: string;
+  committedDiff?: string;
+  workingDiff?: string;
+  untrackedFiles?: string[];
+  untrackedMore?: boolean;
   reason?: string;
 }
 

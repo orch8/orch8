@@ -1,0 +1,7 @@
+# Repository change view evidence
+
+The screenshot `real-repo-change-view.png` was captured from the actual dashboard and the changed daemon API, using an isolated demo Git repository at `/tmp/orch8-branch-visibility-demo/repository`. Its branch has a committed README edit, a further uncommitted README edit, and an untracked text file. Those edits were made manually for this demonstration, **not by a coding agent**. The browser routed API calls to the isolated daemon on port 3858; it did not use mock API responses.
+
+The view lists committed changes since the local configured default branch separately from staged/unstaged changes, and lists untracked filenames without their contents. It excludes submodule changes and is a live repository snapshot, not a per-step artifact. Test results still require run-log inspection. This screenshot does not demonstrate a successful agent plan, implementation, review, or PR publication. The previous real Codex attempt on this host failed to run shell commands because the workspace-write sandbox encountered `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.
+
+Independent read-only review found no security or data-loss blocker. It flagged submodule omission (disclosed in the UI), duplicated diff text in the API response near the viewing limit, and an oversized untracked filename list that can make the whole view unavailable. These last two are size/availability limitations, not proof of agent execution.
