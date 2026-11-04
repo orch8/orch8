@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   usePipeline,
+  usePipelineDiff,
   useCancelPipeline,
   useRetryPipeline,
   useRejectPipelineStep,
@@ -9,6 +10,7 @@ import {
 import { PipelineStepper } from "./PipelineStepper.js";
 import { useRuns } from "../../hooks/useRuns.js";
 import { RunViewer } from "../runs/RunViewer.js";
+import { GitDiffViewer } from "../diff/GitDiffViewer.js";
 import { useEffect } from "react";
 
 function StepEvidence({ taskId, projectId, stepStatus }: { taskId: string; projectId: string; stepStatus: string }) {
@@ -33,6 +35,7 @@ interface PipelineDetailProps {
 
 export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
   const { data, isLoading, refetch } = usePipeline(pipelineId);
+  const { data: repositoryDiff, isLoading: diffLoading, isError: diffError, refetch: refreshDiff } = usePipelineDiff(pipelineId);
   const cancelMutation = useCancelPipeline();
   const retryMutation = useRetryPipeline();
   const rejectMutation = useRejectPipelineStep();
@@ -86,6 +89,20 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
       </div>
 
       <PipelineStepper steps={steps} currentStep={pipeline.currentStep} />
+
+      <section aria-label="Repository changes" className="rounded border border-zinc-800 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <h4 className="text-sm font-medium text-zinc-200">Current repository changes</h4>
+          <button type="button" onClick={() => { void refreshDiff(); }} className="text-xs text-blue-300 underline">Refresh diff</button>
+        </div>
+        <p className="text-xs text-zinc-400">
+          Live tracked changes against HEAD, including staged and unstaged edits. Untracked files and changes already committed to HEAD are not shown. This is not a per-step diff. Test results are available only in run logs, not verified by this view.
+        </p>
+        {diffLoading && <p className="text-xs text-zinc-500">Loading repository diff...</p>}
+        {diffError && <p role="alert" className="text-xs text-amber-300">Could not load repository diff. Try refreshing.</p>}
+        {repositoryDiff && !repositoryDiff.available && <p className="text-xs text-amber-300">{repositoryDiff.reason ?? "Repository diff unavailable."}</p>}
+        {repositoryDiff?.available && <GitDiffViewer diff={repositoryDiff.diff} />}
+      </section>
 
       {/* Step details */}
       <div className="flex flex-col gap-[var(--gap-inline)]">

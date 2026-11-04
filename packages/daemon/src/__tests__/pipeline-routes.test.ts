@@ -7,6 +7,11 @@ import { projects, agents, pipelineTemplates, pipelines, pipelineSteps, tasks, h
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { buildServer } from "../server.js";
 import { globalConfigSchema } from "../config/schema.js";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { hashAgentToken } from "../api/middleware/agent-token.js";
 
 function createMockProcess() {
   const stdin = new Writable({
@@ -236,6 +241,58 @@ describe("Pipeline API routes", () => {
   });
 
   describe("Pipelines", () => {
+    it("shows only the authorized project's tracked working-tree changes, not untracked files or prior commits", async () => {
+      const root = await mkdtemp(join(tmpdir(), "orch-pipeline-diff-"));
+      try {
+        const git = (...args: string[]) => execFileSync("git", args, { cwd: root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1" } });
+        git("init", "-q");
+        await writeFile(join(root, "tracked.txt"), "committed\n");
+        git("add", "tracked.txt");
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "baseline");
+        await writeFile(join(root, "tracked.txt"), "changed\n");
+        await writeFile(join(root, "untracked.txt"), "secret\n");
+        await testDb.db.update(projects).set({ homeDir: root }).where(eq(projects.id, projectId));
+        const { pipeline } = await app.pipelineService.create({ projectId, name: "diff", steps: [{ label: "work" }] });
+        const res = await app.inject({ method: "GET", url: `/api/pipelines/${pipeline.id}/diff` });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({ available: true, diff: expect.stringContaining("+changed") });
+        expect(res.json().diff).not.toContain("untracked.txt");
+        expect(res.json().diff).not.toContain("secret");
+        const missing = await app.inject({ method: "GET", url: "/api/pipelines/pipe_missing/diff" });
+        expect(missing.statusCode).toBe(404);
+        await writeFile(join(root, "tracked.txt"), "committed\n");
+        const empty = await app.inject({ method: "GET", url: `/api/pipelines/${pipeline.id}/diff` });
+        expect(empty.json()).toMatchObject({ available: true, diff: "" });
+      } finally {
+        await testDb.db.update(projects).set({ homeDir: "/tmp/route" }).where(eq(projects.id, projectId));
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+
+    it("does not disclose a different project's diff to an agent", async () => {
+      const token = "pipeline-diff-scoped-token";
+      await testDb.db.update(agents).set({ agentTokenHash: hashAgentToken(token) }).where(eq(agents.id, "route-agent-a"));
+      const [other] = await testDb.db.insert(projects).values({ name: "Other", slug: `other-${Date.now()}`, homeDir: "/tmp/private" }).returning();
+      const { pipeline } = await app.pipelineService.create({ projectId: other.id, name: "private", steps: [{ label: "work" }] });
+      const res = await app.inject({ method: "GET", url: `/api/pipelines/${pipeline.id}/diff`, headers: { authorization: `Bearer ${token}` } });
+      expect(res.statusCode).toBe(403);
+      expect(res.body).not.toContain("/tmp/private");
+    });
+
+    it("reports a non-git project without leaking its configured path", async () => {
+      const root = await mkdtemp(join(tmpdir(), "orch-pipeline-no-git-"));
+      try {
+        await testDb.db.update(projects).set({ homeDir: root }).where(eq(projects.id, projectId));
+        const { pipeline } = await app.pipelineService.create({ projectId, name: "no git", steps: [{ label: "work" }] });
+        const res = await app.inject({ method: "GET", url: `/api/pipelines/${pipeline.id}/diff` });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({ available: false, diff: "" });
+        expect(res.body).not.toContain(root);
+      } finally {
+        await testDb.db.update(projects).set({ homeDir: "/tmp/route" }).where(eq(projects.id, projectId));
+        await rm(root, { recursive: true, force: true });
+      }
+    });
     it("POST /api/pipelines creates pipeline with steps", async () => {
       const res = await app.inject({
         method: "POST",
