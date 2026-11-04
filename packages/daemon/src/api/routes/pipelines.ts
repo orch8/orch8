@@ -80,13 +80,13 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
     if (!baseBranch || baseBranch.length > 200 || !/^[a-zA-Z0-9_./-]+$/.test(baseBranch) || baseBranch.startsWith("-") || baseBranch.includes("..") || baseBranch.includes("//")) {
       return { available: false, diff: "", reason: "Configured default branch is invalid." };
     }
-    // Prefer the local default branch; an origin tracking ref works in worktrees
-    // where the branch is only checked out elsewhere. Never fetch implicitly.
-    let baseRef = `refs/heads/${baseBranch}`;
+    // Prefer the fetched origin ref: the local base can lag while another
+    // worktree advances the default branch. Never fetch implicitly.
+    let baseRef = `refs/remotes/origin/${baseBranch}`;
     try {
       await git(["show-ref", "--verify", "--quiet", baseRef]);
     } catch {
-      baseRef = `refs/remotes/origin/${baseBranch}`;
+      baseRef = `refs/heads/${baseBranch}`;
       try {
         await git(["show-ref", "--verify", "--quiet", baseRef]);
       } catch {
