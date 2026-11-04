@@ -7,7 +7,7 @@ import { projects, agents, pipelineTemplates, pipelines, pipelineSteps, tasks, h
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { buildServer } from "../server.js";
 import { globalConfigSchema } from "../config/schema.js";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, symlink, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -84,6 +84,39 @@ describe("Pipeline API routes", () => {
     await testDb.db.delete(pipelineSteps);
     await testDb.db.delete(pipelines);
     await testDb.db.delete(pipelineTemplates);
+  });
+
+  it("shows the recorded plan file but refuses symlinks and paths outside the pipeline", async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), "orch8-plan-view-"));
+    try {
+      await testDb.db.update(projects).set({ homeDir }).where(eq(projects.id, projectId));
+      const { pipeline, steps, firstTask } = await app.pipelineService.create({
+        projectId, name: "Inspect plan", steps: [{ label: "Plan", requiresVerification: true }],
+      });
+      const dir = join(homeDir, ".orch8", "pipelines", pipeline.id);
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "Plan.md"), "# Actual plan\nBuild a user-facing view.\n");
+      await app.pipelineService.completeStep(pipeline.id, steps[0].id, firstTask.id, "Plan ready");
+      const url = `/api/pipelines/${pipeline.id}/steps/${steps[0].id}/output`;
+      const result = await app.inject({ method: "GET", url });
+      expect(result.statusCode).toBe(200);
+      expect(result.json()).toMatchObject({ content: "# Actual plan\nBuild a user-facing view.\n" });
+      await rm(join(dir, "Plan.md"));
+      await writeFile(join(homeDir, "private.txt"), "PRIVATE");
+      await symlink(join(homeDir, "private.txt"), join(dir, "Plan.md"));
+      expect((await app.inject({ method: "GET", url })).statusCode).toBe(404);
+      await rm(dir, { recursive: true });
+      const otherDir = join(homeDir, "unrelated");
+      await mkdir(otherDir);
+      await writeFile(join(otherDir, "Plan.md"), "NOT PIPELINE OUTPUT");
+      await symlink(otherDir, dir);
+      expect((await app.inject({ method: "GET", url })).statusCode).toBe(404);
+      await testDb.db.update(pipelineSteps).set({ outputFilePath: "../../private.txt" }).where(eq(pipelineSteps.id, steps[0].id));
+      expect((await app.inject({ method: "GET", url })).statusCode).toBe(404);
+    } finally {
+      await testDb.db.update(projects).set({ homeDir: "/tmp/route" }).where(eq(projects.id, projectId));
+      await rm(homeDir, { recursive: true, force: true });
+    }
   });
 
   it("returns 409 for stale completion and generic pipeline done", async () => {

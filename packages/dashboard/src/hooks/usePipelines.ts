@@ -36,6 +36,15 @@ export function usePipelineDiff(pipelineId: string) {
   });
 }
 
+export function usePipelineStepOutput(pipelineId: string, stepId: string, revision: string, enabled: boolean) {
+  return useQuery<{ path: string; content: string }>({
+    queryKey: ["pipeline-output", pipelineId, stepId, revision],
+    queryFn: () => api.get(`/pipelines/${encodeURIComponent(pipelineId)}/steps/${encodeURIComponent(stepId)}/output`),
+    enabled,
+    retry: false,
+  });
+}
+
 export function useCreatePipeline() {
   const qc = useQueryClient();
   return useMutation({
