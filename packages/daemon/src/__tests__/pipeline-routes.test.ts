@@ -294,13 +294,18 @@ describe("Pipeline API routes", () => {
         const response = await app.inject({ method: "GET", url: `/api/pipelines/${pipeline.id}/diff` });
         expect(response.statusCode).toBe(200);
         expect(response.json()).toMatchObject({
-          available: true, baseBranch: "stable", untrackedFiles: ["untracked.txt"], untrackedMore: false,
+          available: true, baseBranch: "stable", branch: "feature", prLookup: "unavailable",
+          pullRequest: null, untrackedFiles: ["untracked.txt"], untrackedMore: false,
         });
         expect(response.json().committedDiff).toContain("+committed branch work");
         expect(response.json().committedDiff).not.toContain("staged.txt");
         expect(response.json().workingDiff).toContain("+staged work");
         expect(response.json().workingDiff).toContain("+unstaged work");
         expect(response.json().diff).not.toContain("untracked secret content");
+        // A stale local base must not override a newer fetched origin base.
+        git("update-ref", "refs/remotes/origin/stable", "HEAD");
+        const refreshed = await app.inject({ method: "GET", url: `/api/pipelines/${pipeline.id}/diff` });
+        expect(refreshed.json().committedDiff).toBe("");
       } finally {
         await testDb.db.update(projects).set({ homeDir: "/tmp/route", defaultBranch: "main" }).where(eq(projects.id, projectId));
         await rm(root, { recursive: true, force: true });

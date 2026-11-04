@@ -58,6 +58,8 @@ async function stepArtifact(homeDir: string, pipelineId: string, outputFilePath:
 async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
   available: boolean; diff: string; reason?: string; baseBranch?: string;
   committedDiff?: string; workingDiff?: string; untrackedFiles?: string[]; untrackedMore?: boolean;
+  branch?: string; pullRequest?: { number: number; url: string; title: string; state: string } | null;
+  prLookup?: "found" | "none" | "unavailable" | "not_applicable";
 }> {
   // Ignore inherited Git environment overrides and global configuration. No hooks,
   // pagers, external diff programs or textconv commands should run for this read.
@@ -78,13 +80,13 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
     if (!baseBranch || baseBranch.length > 200 || !/^[a-zA-Z0-9_./-]+$/.test(baseBranch) || baseBranch.startsWith("-") || baseBranch.includes("..") || baseBranch.includes("//")) {
       return { available: false, diff: "", reason: "Configured default branch is invalid." };
     }
-    // Prefer the local default branch; an origin tracking ref works in worktrees
-    // where the branch is only checked out elsewhere. Never fetch implicitly.
-    let baseRef = `refs/heads/${baseBranch}`;
+    // Prefer the fetched origin ref: the local base can lag while another
+    // worktree advances the default branch. Never fetch implicitly.
+    let baseRef = `refs/remotes/origin/${baseBranch}`;
     try {
       await git(["show-ref", "--verify", "--quiet", baseRef]);
     } catch {
-      baseRef = `refs/remotes/origin/${baseBranch}`;
+      baseRef = `refs/heads/${baseBranch}`;
       try {
         await git(["show-ref", "--verify", "--quiet", baseRef]);
       } catch {
@@ -106,9 +108,38 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
     }
     const untracked = (await git(["ls-files", "--others", "--exclude-standard", "-z"])).stdout;
     const paths = untracked ? untracked.split("\0").filter(Boolean) : [];
+    const branch = (await git(["symbolic-ref", "--quiet", "--short", "HEAD"]).catch(() => ({ stdout: "" }))).stdout.trim();
+    let pullRequest: { number: number; url: string; title: string; state: string } | null = null;
+    let prLookup: "found" | "none" | "unavailable" | "not_applicable" = "not_applicable";
+    if (branch && branch !== baseBranch) {
+      try {
+        const origin = (await git(["remote", "get-url", "origin"])).stdout.trim();
+        const match = /^(?:https:\/\/github\.com\/|git@github\.com:)([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(origin);
+        if (match) {
+          const head = (await git(["rev-parse", "HEAD"])).stdout.trim();
+          const repo = `${match[1]}/${match[2]}`;
+          const { stdout } = await runGit("gh", ["pr", "list", "--repo", repo, "--head", branch, "--base", baseBranch,
+            "--state", "all", "--json", "number,url,title,state,headRefOid", "--limit", "20"],
+          { cwd: homeDir, env, timeout: 10_000, maxBuffer: 64 * 1024, encoding: "utf8" });
+          const items: unknown = JSON.parse(stdout);
+          if (!Array.isArray(items)) throw new Error("Invalid GitHub response");
+          const found = items.find(item => item && typeof item === "object" && item.headRefOid === head &&
+            typeof item.number === "number" && typeof item.title === "string" &&
+            typeof item.url === "string" && item.url.startsWith(`https://github.com/${repo}/pull/`) &&
+            ["OPEN", "CLOSED", "MERGED"].includes(item.state));
+          if (found) {
+            pullRequest = { number: found.number, url: found.url, title: found.title, state: found.state };
+            prLookup = "found";
+          } else prLookup = items.length < 20 ? "none" : "unavailable";
+        } else prLookup = "unavailable";
+      } catch {
+        prLookup = "unavailable";
+      }
+    }
     return {
       available: true, diff, baseBranch, committedDiff, workingDiff,
       untrackedFiles: paths.slice(0, UNTRACKED_PREVIEW_LIMIT), untrackedMore: paths.length > UNTRACKED_PREVIEW_LIMIT,
+      branch: branch || undefined, pullRequest, prLookup,
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {

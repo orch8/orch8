@@ -26,6 +26,9 @@ export interface PipelineRepositoryDiff {
   workingDiff?: string;
   untrackedFiles?: string[];
   untrackedMore?: boolean;
+  branch?: string;
+  pullRequest?: { number: number; url: string; title: string; state: string } | null;
+  prLookup?: "found" | "none" | "unavailable" | "not_applicable";
   reason?: string;
 }
 
