@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useAgents } from "../../hooks/useAgents.js";
 import { useProject } from "../../hooks/useProjects.js";
 import { useCreatePipeline } from "../../hooks/usePipelines.js";
+import { api } from "../../api/client.js";
 
 /** An opinionated entry point to the existing pipeline runner, not a second executor. */
 export function FeatureIntake({ projectId, onCreated }: { projectId: string; onCreated: (id: string) => void }) {
@@ -13,6 +14,9 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const [implementer, setImplementer] = useState("");
   const [reviewer, setReviewer] = useState("");
   const [error, setError] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [checkedKey, setCheckedKey] = useState("");
+  const [checkMessage, setCheckMessage] = useState("");
   // Codex defaults to bypassing its sandbox; never start this workflow with
   // that default. Claude's current adapter unconditionally skips permissions.
   const available = (agents ?? []).filter(a => {
@@ -25,7 +29,31 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       config.sandbox === "workspace-write" &&
       !config.extraArgs?.length && !Object.keys(config.configOverrides ?? {}).length && !config.profile;
   });
-  const ready = feature.trim().length > 0 && [planner, implementer, reviewer].every(id => available.some(a => a.id === id)) && reviewer !== implementer && !create.isPending;
+  const selected = [planner, implementer, reviewer].map(id => available.find(a => a.id === id));
+  const selectionKey = JSON.stringify(selected.map(a => [a?.id, a?.adapterConfig]));
+  const validSelection = selected.every(Boolean) && reviewer !== implementer;
+  const ready = feature.trim().length > 0 && validSelection && checkedKey === selectionKey && !checking && !create.isPending;
+
+  async function checkRuntime() {
+    if (!validSelection) return;
+    setChecking(true);
+    setCheckedKey("");
+    setCheckMessage("");
+    try {
+      for (const agent of selected) {
+        const result = await api.post<{ ok: boolean; message?: string }>(
+          "/adapter/codex_local/test-environment", { config: agent!.adapterConfig },
+        );
+        if (!result.ok) throw new Error(`${agent!.name}: ${result.message ?? "Runtime test failed"}`);
+      }
+      setCheckedKey(selectionKey);
+      setCheckMessage("Selected agents passed the runtime check. This does not guarantee a feature run will succeed.");
+    } catch (err) {
+      setCheckMessage(err instanceof Error ? err.message : "Runtime test failed");
+    } finally {
+      setChecking(false);
+    }
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -56,6 +84,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     <h2 className="text-lg font-semibold text-zinc-100">Build a feature</h2>
     <p className="mt-1 text-sm text-zinc-400">The implementation step waits for plan approval. Planning agents can write to the repository; planning-only behavior is a prompt instruction, not a read-only sandbox.</p>
     <p className="mt-1 text-xs text-zinc-500">Uses the configured repository and agent permissions, not a new isolated worktree. Keep the sandbox settings of selected agents unchanged during this workflow. Automatic PR creation is not included.</p>
+    <p className="mt-1 text-xs text-zinc-500">Check the selected agents before starting. On Linux this tests a shell command in the configured Codex sandbox; other hosts are not supported yet. A text-only response is not proof that planning can inspect the repository.</p>
     <p className="mt-3 text-xs text-zinc-500">Repository: {project?.homeDir ?? "Loading repository..."}</p>
     <form onSubmit={submit} className="mt-4 space-y-3">
       <label className="block text-sm text-zinc-300" htmlFor="feature-request">What should change?</label>
@@ -71,6 +100,9 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       </div>
       {!isLoading && !available.length && <p role="status" className="text-sm text-amber-300">No eligible Codex agents. Configure active Codex agents with sandbox enabled and approval bypass disabled in Agents before starting.</p>}
       {reviewer && implementer && reviewer === implementer && <p role="alert" className="text-sm text-amber-300">Choose a different agent for independent review.</p>}
+      <button type="button" onClick={() => { void checkRuntime(); }} disabled={!validSelection || checking} className="rounded border border-zinc-600 px-4 py-2 text-sm text-zinc-200 disabled:opacity-40">{checking ? "Checking agents..." : "Check agent runtime"}</button>
+      {checkMessage && <p role="status" className={checkedKey === selectionKey ? "text-sm text-emerald-300" : "text-sm text-amber-300"}>{checkMessage}</p>}
+      {validSelection && checkedKey !== selectionKey && <p className="text-xs text-amber-300">Runtime check required for this agent selection.</p>}
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       <button type="submit" disabled={!ready} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Start with a plan</button>
     </form>
