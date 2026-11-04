@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import { usePipelines } from "../../../../hooks/usePipelines.js";
 import { PipelineList } from "../../../../components/pipeline/PipelineList.js";
 import { FeatureIntake } from "../../../../components/pipeline/FeatureIntake.js";
+import { useProject } from "../../../../hooks/useProjects.js";
 
 // Pipelines tabs are built from runtime paths like
 // `/projects/${projectId}/pipelines/history`, which TanStack Router's Link
@@ -15,6 +16,7 @@ type Tab = "active" | "history" | "templates";
 function PipelinesActivePage() {
   const { projectSlug: projectId } = Route.useParams();
   const { data: allPipelines, isLoading } = usePipelines(projectId);
+  const { data: project } = useProject(projectId);
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -34,7 +36,13 @@ function PipelinesActivePage() {
 
   return (
     <div className="flex flex-col gap-4 p-[var(--gap-section)]">
-      <h1 className="type-section font-semibold text-zinc-100">Pipelines</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="type-section font-semibold text-zinc-100">Build in {project?.name ?? "repository"}</h1>
+          <p className="mt-1 break-all text-xs text-zinc-400">{project?.homeDir ?? "Loading repository..."} {project?.defaultBranch ? `· base ${project.defaultBranch}` : ""}</p>
+        </div>
+        <Link to="/projects/$projectSlug/board" params={{ projectSlug: projectId }} className="rounded border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:text-white">Open task board</Link>
+      </div>
       <FeatureIntake key={projectId} projectId={projectId} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />
 
       <div className="flex gap-1 border-b border-zinc-800">
