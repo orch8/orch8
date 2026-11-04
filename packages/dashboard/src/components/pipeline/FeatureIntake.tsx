@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useAgents } from "../../hooks/useAgents.js";
 import { useProject } from "../../hooks/useProjects.js";
 import { useCreatePipeline } from "../../hooks/usePipelines.js";
@@ -17,6 +17,33 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const [checking, setChecking] = useState(false);
   const [checkedKey, setCheckedKey] = useState("");
   const [checkMessage, setCheckMessage] = useState("");
+  const [branchName, setBranchName] = useState("");
+  const [branchState, setBranchState] = useState<{ ready: boolean; branch: string; baseBranch: string; reason?: string } | null>(null);
+  const [branchError, setBranchError] = useState("");
+  const [preparing, setPreparing] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setBranchState(null);
+    setBranchError("");
+    if (project?.id) {
+      api.get<{ ready: boolean; branch: string; baseBranch: string; reason?: string }>(`/projects/${encodeURIComponent(project.id)}/feature-branch`)
+        .then(result => { if (active) setBranchState(result); })
+        .catch(() => { if (active) setBranchError("Could not check repository branch readiness. Refresh to retry."); });
+    }
+    return () => { active = false; };
+  }, [project?.id]);
+  async function prepareBranch() {
+    if (!project?.id || !branchState?.ready || !branchName.trim() || preparing) return;
+    setPreparing(true); setBranchError("");
+    try {
+      const result = await api.post<{ branch: string; baseBranch: string }>(`/projects/${encodeURIComponent(project.id)}/feature-branch`, { name: branchName.trim() });
+      setBranchState({ ready: false, ...result, reason: "Feature branch prepared. You can now start with a plan." });
+      setBranchName("");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Branch preparation failed";
+      try { setBranchError(JSON.parse(message).message ?? message); } catch { setBranchError(message); }
+    } finally { setPreparing(false); }
+  }
   // Codex defaults to bypassing its sandbox; never start this workflow with
   // that default. Claude's current adapter unconditionally skips permissions.
   const available = (agents ?? []).filter(a => {
@@ -84,6 +111,18 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     <h2 className="text-lg font-semibold text-zinc-100">Build a feature</h2>
     <p className="mt-1 text-sm text-zinc-400">Describe a change, review the agent's plan, then run implementation and independent review. If the work is committed on a separate branch, you can publish it as a draft PR.</p>
     <p className="mt-3 text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
+    <div className="mt-3 space-y-2 rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Prepare feature branch">
+      <h3 className="font-medium">Prepare a feature branch (optional)</h3>
+      <p>Current branch: {branchState?.branch || "Checking..."} · Configured base: {branchState?.baseBranch ?? project?.defaultBranch ?? "Checking..."}</p>
+      <p className="text-xs text-zinc-400">Creates and checks out a new local branch in this repository. Does not commit, push, or start agents.</p>
+      <label className="block" htmlFor="feature-branch-name">New feature branch name</label>
+      <div className="flex flex-wrap gap-2">
+        <input id="feature-branch-name" value={branchName} onChange={e => setBranchName(e.target.value)} placeholder="feat/my-feature" className="min-w-48 flex-1 rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
+        <button type="button" onClick={() => { void prepareBranch(); }} disabled={!branchState?.ready || !branchName.trim() || preparing} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">{preparing ? "Preparing..." : "Prepare feature branch"}</button>
+      </div>
+      {branchState?.reason && <p role="status" className="text-amber-300">{branchState.reason}</p>}
+      {branchError && <p role="alert" className="text-red-300">{branchError}</p>}
+    </div>
     <details className="mt-2 text-xs text-zinc-500">
       <summary className="cursor-pointer">Current runtime limits</summary>
       <div className="mt-2 space-y-1 pl-3">
