@@ -119,6 +119,61 @@ describe("Pipeline API routes", () => {
     }
   });
 
+  it("offers retry when an agent exits without completing its plan task", async () => {
+    app.heartbeatService.setAdapter({ runAgent: async () => ({
+      sessionId: null, model: null, result: "I could not run commands", usage: null,
+      costUsd: null, billingType: "api", exitCode: 0, signal: null,
+      error: null, errorCode: null, events: [],
+    }) } as unknown as Parameters<typeof app.heartbeatService.setAdapter>[0]);
+    const { pipeline, steps, firstTask } = await app.pipelineService.create({
+      projectId, name: "Blocked plan", steps: [{ label: "Plan", agentId: "route-agent-a", requiresVerification: true }],
+    });
+    await app.heartbeatService.enqueueWakeup("route-agent-a", projectId, {
+      source: "automation", taskId: firstTask.id, reason: "pipeline_step_ready",
+    });
+    await work!.drain();
+    const stalled = await app.inject({ method: "GET", url: `/api/pipelines/${pipeline.id}` });
+    expect(stalled.json().pipeline.status).toBe("failed");
+    expect(stalled.json().steps[0].status).toBe("failed");
+    expect(stalled.json().steps[0].taskId).toBe(firstTask.id);
+    const retry = await app.inject({ method: "POST", url: `/api/pipelines/${pipeline.id}/retry` });
+    expect(retry.statusCode).toBe(200);
+    expect(retry.json().nextTask.id).not.toBe(firstTask.id);
+    expect(retry.json().nextStep.id).toBe(steps[0].id);
+  });
+
+  it("offers retry when the assigned agent process throws", async () => {
+    const failingAdapter = { runAgent: async () => { throw new Error("runtime unavailable"); } };
+    app.heartbeatService.setAdapter(failingAdapter as unknown as Parameters<typeof app.heartbeatService.setAdapter>[0]);
+    const { pipeline, firstTask } = await app.pipelineService.create({
+      projectId, name: "Runtime failure", steps: [{ label: "Plan", agentId: "route-agent-a" }],
+    });
+    await app.heartbeatService.enqueueWakeup("route-agent-a", projectId, {
+      source: "automation", taskId: firstTask.id,
+    });
+    await work!.drain();
+    const result = await app.pipelineService.getWithSteps(pipeline.id);
+    expect(result!.pipeline.status).toBe("failed");
+    expect(result!.steps[0].status).toBe("failed");
+  });
+
+  it("does not fail an assigned step when another agent wakes its task", async () => {
+    await testDb.db.insert(agents).values({ id: "route-agent-b", projectId, name: "Agent B", role: "engineer" });
+    app.heartbeatService.setAdapter({ runAgent: async () => ({
+      sessionId: null, model: null, result: "no change", usage: null,
+      costUsd: null, billingType: "api", exitCode: 0, signal: null,
+      error: null, errorCode: null, events: [],
+    }) } as unknown as Parameters<typeof app.heartbeatService.setAdapter>[0]);
+    const { pipeline, firstTask } = await app.pipelineService.create({
+      projectId, name: "Assigned only", steps: [{ label: "Plan", agentId: "route-agent-a" }],
+    });
+    await app.heartbeatService.enqueueWakeup("route-agent-b", projectId, {
+      source: "on_demand", taskId: firstTask.id,
+    });
+    await work!.drain();
+    expect((await app.pipelineService.getWithSteps(pipeline.id))!.pipeline.status).toBe("pending");
+  });
+
   it("returns 409 for stale completion and generic pipeline done", async () => {
     const { pipeline, steps, firstTask } = await app.pipelineService.create({ projectId, name: "stale", steps: [{ label: "work" }] });
     await app.pipelineService.failStep(pipeline.id, steps[0].id, firstTask.id);
