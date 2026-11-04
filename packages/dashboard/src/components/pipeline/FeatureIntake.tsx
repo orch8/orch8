@@ -82,10 +82,16 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
 
   return <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-5" aria-label="New feature">
     <h2 className="text-lg font-semibold text-zinc-100">Build a feature</h2>
-    <p className="mt-1 text-sm text-zinc-400">The implementation step waits for plan approval. Planning agents can write to the repository; planning-only behavior is a prompt instruction, not a read-only sandbox.</p>
-    <p className="mt-1 text-xs text-zinc-500">Uses the configured repository and agent permissions, not a new isolated worktree. Keep the sandbox settings of selected agents unchanged during this workflow. Automatic PR creation is not included.</p>
-    <p className="mt-1 text-xs text-zinc-500">Check the selected agents before starting. On Linux this tests a shell command in the configured Codex sandbox; other hosts are not supported yet. A text-only response is not proof that planning can inspect the repository.</p>
-    <p className="mt-3 text-xs text-zinc-500">Repository: {project?.homeDir ?? "Loading repository..."}</p>
+    <p className="mt-1 text-sm text-zinc-400">Describe a change, review the agent's plan, then run implementation and independent review. If the work is committed on a separate branch, you can publish it as a draft PR.</p>
+    <p className="mt-3 text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
+    <details className="mt-2 text-xs text-zinc-500">
+      <summary className="cursor-pointer">Current runtime limits</summary>
+      <div className="mt-2 space-y-1 pl-3">
+        <p>Planning agents can write to the repository. Planning-only behavior is a prompt instruction, not a read-only sandbox.</p>
+        <p>Uses the configured repository and agent permissions, not a new isolated worktree. Keep selected agents' sandbox settings unchanged during the workflow. PR creation is an explicit action after review.</p>
+        <p>Check the selected agents before starting. On Linux this tests a shell command in the configured Codex sandbox; other hosts are not supported yet. A text-only response is not proof that planning can inspect the repository.</p>
+      </div>
+    </details>
     <form onSubmit={submit} className="mt-4 space-y-3">
       <label className="block text-sm text-zinc-300" htmlFor="feature-request">What should change?</label>
       <textarea id="feature-request" rows={4} maxLength={2000} value={feature} onChange={e => setFeature(e.target.value)} placeholder="Describe the behavior users should gain and how to verify it" className="w-full rounded border border-zinc-700 bg-zinc-950 p-3 text-sm text-zinc-100" />

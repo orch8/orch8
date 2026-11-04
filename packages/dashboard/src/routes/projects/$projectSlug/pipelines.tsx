@@ -5,8 +5,8 @@ function PipelinesLayout() {
   return (
     <div>
       <PageHeader
-        title="Pipelines"
-        subtitle="Templates that drive task execution"
+        title="Feature workflows"
+        subtitle="Plan, approve, build and review changes in this repository"
       />
       <Outlet />
     </div>
