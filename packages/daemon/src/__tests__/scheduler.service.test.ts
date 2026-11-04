@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { projects, agents, heartbeatRuns, wakeupRequests, tasks } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
@@ -113,6 +113,9 @@ describe("SchedulerService", () => {
     });
 
     it("retries once before failing permanently", async () => {
+      // This test checks retry scheduling, not the adapter's asynchronous run.
+      // Starting a real run can race this assertion and fail on missing agent setup.
+      const startRetry = vi.spyOn(heartbeatService, "startNextQueuedRunForAgent").mockResolvedValue([]);
       await testDb.db.insert(agents).values({
         id: "eng-1", projectId, name: "Eng", role: "engineer",
       });
@@ -146,8 +149,9 @@ describe("SchedulerService", () => {
         (r) => r.retryOfRunId === run.id,
       );
       expect(retryRun).toBeTruthy();
-      // startNextQueuedRunForAgent promotes the retry run to "running"
-      expect(["queued", "running"]).toContain(retryRun!.status);
+      expect(retryRun!.status).toBe("queued");
+      expect(startRetry).toHaveBeenCalledWith("eng-1", projectId);
+      startRetry.mockRestore();
     });
 
     it("does not retry when processLossRetryCount >= 1", async () => {
