@@ -39,6 +39,16 @@ export function usePipelineDiff(pipelineId: string) {
   });
 }
 
+export function usePublishPipelinePr() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pipelineId: string) => api.post<{ url: string }>(`/pipelines/${encodeURIComponent(pipelineId)}/pull-request`, {}),
+    onSuccess: (_data, pipelineId) => {
+      void qc.invalidateQueries({ queryKey: ["pipeline-diff", pipelineId] });
+    },
+  });
+}
+
 export function usePipelineStepOutput(pipelineId: string, stepId: string, revision: string, enabled: boolean) {
   return useQuery<{ path: string; content: string }>({
     queryKey: ["pipeline-output", pipelineId, stepId, revision],

@@ -1,4 +1,5 @@
 import { PipelineConflict } from "../../services/pipeline.service.js";
+import { publishPipelinePr } from "../../services/pipeline-pr.service.js";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import {
   CreatePipelineSchema,
@@ -150,6 +151,42 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
 }
 
 export async function pipelineRoutes(app: FastifyInstance) {
+  const publishing = new Set<string>();
+  // Explicit admin action only. No implicit commit, checkout, or publication.
+  app.post("/api/pipelines/:id/pull-request", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+    const result = await app.pipelineService.getWithSteps(request.params.id);
+    if (!result) return reply.code(404).send({ error: "not_found", message: "Pipeline not found" });
+    if (!requireProjectScope(request, reply, result.pipeline.projectId)) return reply;
+    const { pipeline, steps } = result;
+    if (pipeline.status !== "completed" || steps.length < 2 || steps.some(step => step.status !== "completed")) {
+      return reply.code(409).send({ error: "conflict", message: "Complete every pipeline step and approval before publishing." });
+    }
+    const implement = steps.find(step => step.label.toLowerCase() === "implement");
+    const review = steps.find(step => ["review", "independent review"].includes(step.label.toLowerCase()));
+    if (!implement?.agentId || !review?.agentId || !review.requiresVerification || implement.agentId === review.agentId ||
+        !review.outputSummary?.trim() || review.outputSummary.startsWith("[REJECTED]") ||
+        review.order <= implement.order || review.order !== steps.length) {
+      return reply.code(409).send({ error: "conflict", message: "A completed independent review after implementation is required." });
+    }
+    const project = await app.projectService.getById(pipeline.projectId);
+    if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    const key = project.homeDir;
+    if (publishing.has(key)) return reply.code(409).send({ error: "conflict", message: "PR publication is already running for this repository." });
+    publishing.add(key);
+    try {
+      const published = await publishPipelinePr(project, pipeline.name, steps.map(step => step.outputFilePath).filter((path): path is string => !!path));
+      return reply.code(201).send(published);
+    } catch (error) {
+      // Expected preflight failures are actionable; never expose raw git/gh stderr or credentials.
+      const message = (error as Error).message;
+      const safe = /^(Configure a GitHub|Configured default branch|Project directory must|Check out a feature|Commit or remove|Git origin|No committed branch|PR lookup incomplete|A PR already exists|The repository changed)/.test(message);
+      return reply.code(safe ? 409 : 502).send({ error: safe ? "conflict" : "publication_failed",
+        message: safe ? message : "PR publication or verification failed. Inspect GitHub and the branch before retrying; no merge was attempted." });
+    } finally {
+      publishing.delete(key);
+    }
+  });
   // POST /api/pipelines — Create pipeline
   app.post("/api/pipelines", async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = CreatePipelineSchema.safeParse(request.body);

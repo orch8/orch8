@@ -17,6 +17,7 @@ vi.mock("../hooks/usePipelines.js", () => ({
   useRetryPipeline: () => ({ isPending: false }),
   useRejectPipelineStep: () => ({ isPending: false }),
   useApprovePipelineStep: () => ({ isPending: false, mutate: state.approve }),
+  usePublishPipelinePr: () => ({ isPending: false, isError: false }),
 }));
 
 describe("pipeline plan decision", () => {

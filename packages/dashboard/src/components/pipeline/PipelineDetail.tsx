@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   usePipeline,
   usePipelineDiff,
+  usePublishPipelinePr,
   useCancelPipeline,
   useRetryPipeline,
   useRejectPipelineStep,
@@ -79,6 +80,8 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
   const retryMutation = useRetryPipeline();
   const rejectMutation = useRejectPipelineStep();
   const approveMutation = useApprovePipelineStep();
+  const publishMutation = usePublishPipelinePr();
+  const [confirmPublish, setConfirmPublish] = useState(false);
   const [rejectingStepId, setRejectingStepId] = useState<string | null>(null);
   const [targetStepId, setTargetStepId] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -93,6 +96,16 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
   }
 
   const { pipeline, steps } = data;
+  const implement = steps.find(step => step.label.toLowerCase() === "implement");
+  const review = steps.find(step => ["review", "independent review"].includes(step.label.toLowerCase()));
+  const outputPaths = new Set(steps.map(step => step.outputFilePath).filter(Boolean));
+  const canPublish = pipeline.status === "completed" && steps.every(step => step.status === "completed") &&
+    !!implement?.agentId && !!review?.agentId && !!review.requiresVerification && implement.agentId !== review.agentId &&
+    review.order > implement.order && review.order === steps.length &&
+    !!review.outputSummary?.trim() && !review.outputSummary.startsWith("[REJECTED]") &&
+    repositoryDiff?.available && repositoryDiff.branch && repositoryDiff.branch !== repositoryDiff.baseBranch &&
+    repositoryDiff.prLookup === "none" && !!repositoryDiff.committedDiff &&
+    !repositoryDiff.workingDiff && !repositoryDiff.untrackedFiles?.some(path => !outputPaths.has(path)) && !repositoryDiff.untrackedMore;
 
   function handleRejectSubmit(stepId: string) {
     if (!targetStepId || !feedback.trim()) return;
@@ -152,6 +165,16 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
                 : <p>PR lookup applies to named branches other than the configured base.</p>}
             <p className="text-zinc-500">This is a repository-wide snapshot, not proof that the pipeline created the PR. Refresh to check again.</p>
           </div>
+          {canPublish && <div className="rounded border border-blue-800/60 bg-blue-950/20 p-3 space-y-2 text-xs">
+            <p className="text-zinc-300">Independent review completed. Create a draft PR from the current committed branch to {repositoryDiff.baseBranch}. Review the exact diff and tests on GitHub: this branch commit is not cryptographically tied to the pipeline review. This does not commit files, run checks, or merge.</p>
+            {!confirmPublish ? <button type="button" onClick={() => setConfirmPublish(true)} className="rounded bg-blue-800 px-3 py-1 text-blue-100">Create pull request</button> : <div className="space-y-2">
+              <p>Confirm: this publishes the committed branch {repositoryDiff.branch} to {repositoryDiff.baseBranch} on GitHub. Verify the review and diff first.</p>
+              <button type="button" disabled={publishMutation.isPending} onClick={() => publishMutation.mutate(pipeline.id, { onSuccess: () => { setConfirmPublish(false); void refreshDiff(); } })} className="rounded bg-blue-800 px-3 py-1 text-blue-100 disabled:opacity-50">{publishMutation.isPending ? "Publishing..." : "Confirm create pull request"}</button>{" "}
+              <button type="button" disabled={publishMutation.isPending} onClick={() => setConfirmPublish(false)} className="text-zinc-400 underline">Cancel</button>
+            </div>}
+          </div>}
+          {publishMutation.isError && <p role="alert" className="text-amber-300 text-xs">{publishMutation.error instanceof Error ? publishMutation.error.message : "PR publication failed. Inspect GitHub before retrying."}</p>}
+          {publishMutation.data && <p role="status" className="text-xs text-emerald-300">Pull request created: <a href={publishMutation.data.url} target="_blank" rel="noopener noreferrer" className="underline">{publishMutation.data.url}</a></p>}
           <div>
             <h5 className="text-xs font-medium text-zinc-300 mb-2">Committed changes since {repositoryDiff.baseBranch}</h5>
             <GitDiffViewer diff={repositoryDiff.committedDiff ?? ""} />
