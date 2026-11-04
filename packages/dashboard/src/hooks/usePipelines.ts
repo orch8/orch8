@@ -18,6 +18,19 @@ export function usePipeline(pipelineId: string | null) {
   });
 }
 
+export interface PipelineRepositoryDiff {
+  available: boolean;
+  diff: string;
+  reason?: string;
+}
+
+export function usePipelineDiff(pipelineId: string) {
+  return useQuery<PipelineRepositoryDiff>({
+    queryKey: ["pipeline-diff", pipelineId],
+    queryFn: () => api.get(`/pipelines/${encodeURIComponent(pipelineId)}/diff`),
+  });
+}
+
 export function useCreatePipeline() {
   const qc = useQueryClient();
   return useMutation({

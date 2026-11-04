@@ -7,6 +7,39 @@ import {
   RejectPipelineStepSchema,
 } from "@orch/shared";
 import { resolveProjectParam, resolveProjectValue } from "../utils/project-resolver.js";
+import { requireProjectScope } from "../utils/project-scope.js";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { realpath } from "node:fs/promises";
+
+const runGit = promisify(execFile);
+const DIFF_MAX_BYTES = 1024 * 1024;
+
+async function repositoryDiff(homeDir: string): Promise<{ available: boolean; diff: string; reason?: string }> {
+  // Ignore inherited Git environment overrides and global configuration. No hooks,
+  // pagers, external diff programs or textconv commands should run for this read.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  env.GIT_CONFIG_NOSYSTEM = "1";
+  env.GIT_CONFIG_GLOBAL = "/dev/null";
+  const git = (args: string[]) => runGit("git", ["-c", "core.fsmonitor=false", ...args], {
+    cwd: homeDir, env, timeout: 10_000, maxBuffer: DIFF_MAX_BYTES, encoding: "utf8",
+  });
+  try {
+    const root = await realpath(homeDir);
+    const { stdout: topLevel } = await git(["rev-parse", "--show-toplevel"]);
+    // A subdirectory within some other repository is not itself this project's repo.
+    if (await realpath(topLevel.trim()) !== root) {
+      return { available: false, diff: "", reason: "Project directory is not a Git repository root." };
+    }
+    const { stdout } = await git(["diff", "--no-ext-diff", "--no-textconv", "--no-color", "HEAD", "--"]);
+    return { available: true, diff: stdout };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
+      return { available: false, diff: "", reason: "Diff exceeds the 1 MiB viewing limit." };
+    }
+    return { available: false, diff: "", reason: "Repository diff is unavailable (not a Git repository or no HEAD commit)." };
+  }
+}
 
 export async function pipelineRoutes(app: FastifyInstance) {
   // POST /api/pipelines — Create pipeline
@@ -60,6 +93,16 @@ export async function pipelineRoutes(app: FastifyInstance) {
     const result = await app.pipelineService.getWithSteps(request.params.id);
     if (!result) return reply.code(404).send({ error: "not_found", message: "Pipeline not found" });
     return result;
+  });
+
+  // The diff is a live snapshot of tracked changes against HEAD, not step output.
+  app.get("/api/pipelines/:id/diff", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const pipeline = await app.pipelineService.getById(request.params.id);
+    if (!pipeline) return reply.code(404).send({ error: "not_found", message: "Pipeline not found" });
+    if (!requireProjectScope(request, reply, pipeline.projectId)) return reply;
+    const project = await app.projectService.getById(pipeline.projectId);
+    if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    return repositoryDiff(project.homeDir);
   });
 
   // POST /api/pipelines/:id/cancel — Cancel pipeline
