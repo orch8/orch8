@@ -10,11 +10,50 @@ import { resolveProjectParam, resolveProjectValue } from "../utils/project-resol
 import { requireProjectScope } from "../utils/project-scope.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { realpath } from "node:fs/promises";
+import { open, realpath } from "node:fs/promises";
+import { constants } from "node:fs";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 
 const runGit = promisify(execFile);
 const DIFF_MAX_BYTES = 1024 * 1024;
 const UNTRACKED_PREVIEW_LIMIT = 20;
+const ARTIFACT_MAX_BYTES = 256 * 1024;
+
+// Read only recorded step output within this pipeline's artifact directory.
+async function stepArtifact(homeDir: string, pipelineId: string, outputFilePath: string) {
+  const expectedDir = resolve(homeDir, ".orch8", "pipelines", pipelineId);
+  if (isAbsolute(outputFilePath)) return null;
+  const candidate = resolve(homeDir, outputFilePath);
+  const within = relative(expectedDir, candidate);
+  if (!within || within === ".." || within.startsWith(`..${sep}`) || isAbsolute(within)) return null;
+  try {
+    const projectRoot = await realpath(homeDir);
+    const root = await realpath(expectedDir);
+    // A symlink in .orch8/pipelines/<id> must not turn another project file
+    // into the recorded pipeline output, even when it remains inside the project.
+    if (root !== resolve(projectRoot, ".orch8", "pipelines", pipelineId)) return null;
+    const rootWithin = relative(projectRoot, root);
+    if (!rootWithin || rootWithin === ".." || rootWithin.startsWith(`..${sep}`) || isAbsolute(rootWithin)) return null;
+    // Open the candidate itself, then check the open descriptor rather than a
+    // pathname that a workspace process could swap after validation.
+    const handle = await open(candidate, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      const file = await realpath(`/proc/self/fd/${handle.fd}`);
+      const actual = relative(root, file);
+      if (!actual || actual === ".." || actual.startsWith(`..${sep}`) || isAbsolute(actual)) return null;
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size > ARTIFACT_MAX_BYTES) return null;
+      const buffer = Buffer.alloc(stat.size);
+      const { bytesRead } = await handle.read(buffer, 0, stat.size, 0);
+      if (bytesRead !== stat.size) return null;
+      return buffer.toString("utf8");
+    } finally {
+      await handle.close();
+    }
+  } catch {
+    return null;
+  }
+}
 
 async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
   available: boolean; diff: string; reason?: string; baseBranch?: string;
@@ -141,6 +180,22 @@ export async function pipelineRoutes(app: FastifyInstance) {
     const project = await app.projectService.getById(pipeline.projectId);
     if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
     return repositoryDiff(project.homeDir, project.defaultBranch);
+  });
+
+  // Read the recorded plan/review file; the request never supplies a filesystem path.
+  app.get("/api/pipelines/:id/steps/:stepId/output", async (request: FastifyRequest<{ Params: { id: string; stepId: string } }>, reply: FastifyReply) => {
+    const result = await app.pipelineService.getWithSteps(request.params.id);
+    if (!result) return reply.code(404).send({ error: "not_found", message: "Pipeline not found" });
+    if (!requireProjectScope(request, reply, result.pipeline.projectId)) return reply;
+    const step = result.steps.find(s => s.id === request.params.stepId);
+    if (!step || !step.outputFilePath || !["completed", "awaiting_verification"].includes(step.status)) {
+      return reply.code(404).send({ error: "not_found", message: "Step output not available" });
+    }
+    const project = await app.projectService.getById(result.pipeline.projectId);
+    if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    const content = await stepArtifact(project.homeDir, result.pipeline.id, step.outputFilePath);
+    if (content === null) return reply.code(404).send({ error: "not_found", message: "Step output missing, invalid, or over the viewing limit" });
+    return { path: step.outputFilePath, content };
   });
 
   // POST /api/pipelines/:id/cancel — Cancel pipeline

@@ -6,6 +6,7 @@ import {
   useRetryPipeline,
   useRejectPipelineStep,
   useApprovePipelineStep,
+  usePipelineStepOutput,
 } from "../../hooks/usePipelines.js";
 import { PipelineStepper } from "./PipelineStepper.js";
 import { useRuns } from "../../hooks/useRuns.js";
@@ -25,6 +26,22 @@ function StepEvidence({ taskId, projectId, stepStatus }: { taskId: string; proje
     {stepStatus === "pending" && runs?.[0]?.status === "succeeded" &&
       <p role="status" className="text-amber-300">Agent run ended without completing this step. Inspect its log before retrying.</p>}
     {selectedRun && <RunViewer runId={selectedRun} projectId={projectId} onClose={() => setSelectedRun(null)} />}
+  </div>;
+}
+
+function StepOutput({ pipelineId, stepId, label, revision }: { pipelineId: string; stepId: string; label: string; revision: string }) {
+  const [open, setOpen] = useState(false);
+  const { data, isLoading, isError, refetch } = usePipelineStepOutput(pipelineId, stepId, revision, open);
+  return <div className="mt-2">
+    <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-xs text-blue-300 underline">
+      {open ? "Hide" : "Inspect"} full {label.toLowerCase()} file
+    </button>
+    {open && <div className="mt-2 rounded border border-zinc-700 bg-zinc-950 p-3">
+      {isLoading && <p className="text-xs text-zinc-400">Loading file...</p>}
+      {isError && <p role="alert" className="text-xs text-amber-300">File unavailable or too large. Check the run log or repository. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>}
+      {data && <><p className="mb-2 break-all font-mono text-xs text-zinc-500">{data.path}</p>
+        <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words text-xs text-zinc-200">{data.content || "(Empty file)"}</pre></>}
+    </div>}
   </div>;
 }
 
@@ -126,6 +143,8 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
           <div key={step.id} className="rounded border border-zinc-800 p-3">
             <p className="text-sm font-medium text-zinc-200">{step.label} <span className="text-xs text-zinc-500">{step.status}</span></p>
             {step.taskId && <StepEvidence taskId={step.taskId} projectId={projectId ?? pipeline.projectId} stepStatus={step.status} />}
+            {step.outputFilePath && (step.status === "completed" || step.status === "awaiting_verification") &&
+              <StepOutput pipelineId={pipeline.id} stepId={step.id} label={step.label} revision={String(step.updatedAt ?? step.outputSummary ?? "")} />}
             {step.status === "awaiting_verification" && !step.outputSummary &&
               <p role="alert" className="mt-2 text-xs text-amber-300">No plan or review summary is available. Inspect the task and run log before approving.</p>}
             {step.outputSummary && (
