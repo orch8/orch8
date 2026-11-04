@@ -27,7 +27,7 @@ export function RunViewer({ runId, projectId, onClose }: RunViewerProps) {
   const [activeTab, setActiveTab] = useState<Tab>("events");
   const { data: run } = useRun(runId, projectId);
   const { data: events } = useRunEvents(runId, projectId);
-  const { data: logData } = useRunLog(runId, projectId);
+  const { data: logData, refetch: refetchLog } = useRunLog(runId, projectId);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +39,11 @@ export function RunViewer({ runId, projectId, onClose }: RunViewerProps) {
   useModalA11y(dialogRef, !!run, onClose);
 
   const isLive = run?.status === "running" || run?.status === "queued";
+
+  // The log endpoint can be empty until the runner closes its log stream.
+  useEffect(() => {
+    if (run?.status && !isLive) void refetchLog();
+  }, [run?.status, runId, projectId, isLive, refetchLog]);
 
   // Auto-scroll to bottom for live runs
   useEffect(() => {
