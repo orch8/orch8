@@ -1,4 +1,6 @@
 import { spawn as nodeSpawn } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -133,6 +135,31 @@ export class CodexLocalAdapter implements AgentAdapter {
 
     try {
       await seedCodexAuth(codexHome);
+      // A text-only reply can succeed even when Codex cannot run a single
+      // sandboxed shell command. Check the actual execution boundary first.
+      if (codexConfig.sandbox && codexConfig.sandbox !== "danger-full-access" &&
+          codexConfig.dangerouslyBypassApprovalsAndSandbox === false) {
+        if (process.platform !== "linux") {
+          return { ok: false, errorCode: "process_error",
+            message: "Sandbox shell preflight is currently supported on Linux only. No agent work was started." };
+        }
+        try {
+          await promisify(execFile)(codexConfig.command ?? resolveCodexPath(), [
+            "-c", `sandbox_mode=${JSON.stringify(codexConfig.sandbox)}`,
+            "sandbox", "linux", "--", "/bin/true",
+          ], { cwd, timeout: 10000, env: buildCodexEnv(codexConfig, {
+            agentId: "probe", agentName: "Probe", projectId: "probe", runId: "probe",
+            wakeReason: "on_demand", apiUrl: "http://localhost:3847", cwd,
+          }, codexHome, process.env as Record<string, string | undefined>) });
+        } catch (err) {
+          const failure = err as Error & { stderr?: string };
+          const detail = failure.stderr?.includes("Failed RTM_NEWADDR")
+            ? "bubblewrap could not initialize its network namespace (Failed RTM_NEWADDR: Operation not permitted)"
+            : (failure.stderr || failure.message).trim().slice(0, 400);
+          return { ok: false, errorCode: "process_error",
+            message: `Codex sandbox cannot run commands: ${detail}. Keep approvals and sandbox enabled; repair the host sandbox before starting a feature.` };
+        }
+      }
       const result = await runCodexProcess(
         {
           command: codexConfig.command ?? resolveCodexPath(),
