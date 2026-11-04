@@ -68,6 +68,51 @@ function PlanDecision({ pipelineId, stepId, revision, outputFilePath }: { pipeli
   </section>;
 }
 
+function ReviewDecision({ pipelineId, stepId, revision, outputFilePath, prEligibleLabel }: { pipelineId: string; stepId: string; revision: string; outputFilePath: string | null; prEligibleLabel: boolean }) {
+  const [reviewedContent, setReviewedContent] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [changed, setChanged] = useState(false);
+  const { data, isLoading, isError, isFetching, refetch } = usePipelineStepOutput(pipelineId, stepId, revision, !!outputFilePath);
+  const approve = useApprovePipelineStep();
+  const hasReport = !isError && !isLoading && !isFetching && !!data?.content.trim();
+  async function accept() {
+    if (!hasReport || reviewedContent !== data?.content || checking) return;
+    setChecking(true);
+    try {
+      const current = await refetch();
+      if (current.isError || !current.data?.content.trim() || current.data.content !== reviewedContent) {
+        setReviewedContent(null);
+        setChanged(true);
+        return;
+      }
+      approve.mutate({ pipelineId, stepId });
+    } catch {
+      setReviewedContent(null);
+      setChanged(true);
+    } finally {
+      setChecking(false);
+    }
+  }
+  return <section aria-label="Independent review decision" className="mt-3 space-y-3 rounded border border-amber-700/60 bg-amber-950/20 p-3">
+    <h4 className="text-sm font-semibold text-amber-200">Decide whether the independent review passes</h4>
+    <p className="text-xs text-zinc-400">Read the review findings and inspect the repository diff and run logs before accepting. Approval records your decision; it does not verify the tests or publish a PR.</p>
+    {!prEligibleLabel && <p className="text-xs text-amber-300">The built-in draft PR action requires a final step named Review or Independent review. This custom verification step can finish the workflow, but cannot use that PR action.</p>}
+    {!outputFilePath && <p role="alert" className="text-xs text-amber-300">No review file was recorded. Inspect the run log and reject this step.</p>}
+    {isLoading && <p className="text-xs text-zinc-400">Loading the recorded review...</p>}
+    {isError && <p role="alert" className="text-xs text-amber-300">Review file unavailable or too large. Check the run log or repository. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>}
+    {data && <><p className="break-all font-mono text-xs text-zinc-500">{data.path}</p>
+      <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-950 p-3 text-xs text-zinc-200">{data.content || "(Empty file)"}</pre></>}
+    {data && !data.content.trim() && <p role="alert" className="text-xs text-amber-300">The review file is empty. Reject this step.</p>}
+    {changed && <p role="alert" className="text-xs text-amber-300">The review changed or could not be refreshed. Read the current report and confirm again.</p>}
+    <label className="flex items-start gap-2 text-xs text-zinc-200">
+      <input type="checkbox" checked={hasReport && reviewedContent === data?.content} disabled={!hasReport} onChange={event => { setReviewedContent(event.target.checked ? data?.content ?? null : null); setChanged(false); }} />
+      I read the full independent review and found no blocking findings.
+    </label>
+    <button type="button" onClick={() => { void accept(); }} disabled={!hasReport || reviewedContent !== data?.content || checking || approve.isPending}
+      className="rounded bg-emerald-800 px-3 py-1 text-xs text-emerald-200 disabled:opacity-50">{checking ? "Checking review..." : approve.isPending ? "Approving..." : "Accept review"}</button>
+  </section>;
+}
+
 interface PipelineDetailProps {
   pipelineId: string;
   projectId?: string;
@@ -96,6 +141,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
   }
 
   const { pipeline, steps } = data;
+  const isReviewDecision = (step: typeof steps[number]) => /\b(review|verification)\b/i.test(step.label);
   const implement = steps.find(step => step.label.toLowerCase() === "implement");
   const review = steps.find(step => ["review", "independent review"].includes(step.label.toLowerCase()));
   const outputPaths = new Set(steps.map(step => step.outputFilePath).filter(Boolean));
@@ -201,8 +247,10 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
             {step.taskId && <StepEvidence taskId={step.taskId} projectId={projectId ?? pipeline.projectId} stepStatus={step.status} />}
             {step.order === 1 && step.label.toLowerCase() === "plan" && step.status === "awaiting_verification" ?
               <PlanDecision key={`${step.id}:${step.updatedAt ?? ""}`} pipelineId={pipeline.id} stepId={step.id} revision={String(step.updatedAt ?? step.outputSummary ?? "")} outputFilePath={step.outputFilePath ?? null} /> :
-              step.outputFilePath && (step.status === "completed" || step.status === "awaiting_verification") &&
-              <StepOutput pipelineId={pipeline.id} stepId={step.id} label={step.label} revision={String(step.updatedAt ?? step.outputSummary ?? "")} />}
+              isReviewDecision(step) && step.status === "awaiting_verification" ?
+                <ReviewDecision key={`${step.id}:${step.updatedAt ?? ""}`} pipelineId={pipeline.id} stepId={step.id} revision={String(step.updatedAt ?? step.outputSummary ?? "")} outputFilePath={step.outputFilePath ?? null} prEligibleLabel={["review", "independent review"].includes(step.label.toLowerCase())} /> :
+                step.outputFilePath && (step.status === "completed" || step.status === "awaiting_verification") &&
+                <StepOutput pipelineId={pipeline.id} stepId={step.id} label={step.label} revision={String(step.updatedAt ?? step.outputSummary ?? "")} />}
             {step.status === "awaiting_verification" && !step.outputSummary &&
               <p role="alert" className="mt-2 text-xs text-amber-300">No plan or review summary is available. Inspect the task and run log before approving.</p>}
             {step.outputSummary && (
@@ -287,7 +335,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
             {step.status === "awaiting_verification" && !(step.order === 1 && step.label.toLowerCase() === "plan") && (
               <div className="mt-2 space-y-2">
                 <div className="flex gap-2">
-                  <button
+                  {!isReviewDecision(step) && <button
                     onClick={() =>
                       approveMutation.mutate({ pipelineId: pipeline.id, stepId: step.id })
                     }
@@ -295,7 +343,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
                     className="rounded bg-emerald-800 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-700 disabled:opacity-50"
                   >
                     {approveMutation.isPending ? "Approving..." : "Approve"}
-                  </button>
+                  </button>}
                   {step.order > 1 && (
                     <button
                       onClick={() => setRejectingStepId(step.id)}
