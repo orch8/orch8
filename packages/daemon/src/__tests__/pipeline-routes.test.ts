@@ -329,6 +329,40 @@ describe("Pipeline API routes", () => {
   });
 
   describe("Pipelines", () => {
+    it("refuses publication before a completed independent review", async () => {
+      const created = await app.pipelineService.create({ projectId, name: "Review gate", steps: [
+        { label: "implement", agentId: "route-agent-a" },
+        { label: "review", agentId: "route-agent-a" },
+      ] });
+      const url = `/api/pipelines/${created.pipeline.id}/pull-request`;
+      expect((await app.inject({ method: "POST", url })).statusCode).toBe(409);
+      const next = await app.pipelineService.completeStep(created.pipeline.id, created.steps[0].id, created.firstTask.id, "implemented");
+      await app.pipelineService.completeStep(created.pipeline.id, created.steps[1].id, next.nextTask!.id, "reviewed");
+      const response = await app.inject({ method: "POST", url });
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toMatch(/independent/i);
+    });
+    it("accepts the feature intake's independent review after its approval gate", async () => {
+      await testDb.db.insert(agents).values({ id: "route-reviewer", projectId, name: "Reviewer", role: "reviewer" });
+      const created = await app.pipelineService.create({ projectId, name: "Actual intake", steps: [
+        { label: "Plan", agentId: "route-agent-a", requiresVerification: true },
+        { label: "Implement", agentId: "route-agent-a" },
+        { label: "Independent review", agentId: "route-reviewer", requiresVerification: true },
+      ] });
+      const plan = await app.pipelineService.completeStep(created.pipeline.id, created.steps[0].id, created.firstTask.id, "Plan ready");
+      expect(plan.completedStep.status).toBe("awaiting_verification");
+      const approved = await app.pipelineService.approveStep(created.pipeline.id, created.steps[0].id);
+      const implemented = await app.pipelineService.completeStep(created.pipeline.id, created.steps[1].id, approved.nextTask!.id, "Implemented");
+      const reviewed = await app.pipelineService.completeStep(created.pipeline.id, created.steps[2].id, implemented.nextTask!.id, "Independent review passed");
+      expect(reviewed.completedStep.status).toBe("awaiting_verification");
+      expect((await app.inject({ method: "POST", url: `/api/pipelines/${created.pipeline.id}/pull-request` })).statusCode).toBe(409);
+      await app.pipelineService.approveStep(created.pipeline.id, created.steps[2].id);
+      const response = await app.inject({ method: "POST", url: `/api/pipelines/${created.pipeline.id}/pull-request` });
+      // The review guard passed; the fixture deliberately has no GitHub repo configured.
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toMatch(/Configure a GitHub repository URL/);
+    });
+
     it("shows committed branch, staged and unstaged changes separately and lists untracked paths", async () => {
       const root = await mkdtemp(join(tmpdir(), "orch-pipeline-branch-"));
       try {

@@ -3949,6 +3949,48 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/pipelines/{id}/pull-request:
+    post:
+      tags: [Pipelines]
+      summary: Explicitly publish a reviewed pipeline branch as a pull request
+      description: >-
+        Admin only. Requires every step completed, a final review by an agent
+        distinct from the implementer with an approved verification gate, a configured GitHub project repo URL,
+        a committed feature branch without unrelated uncommitted changes, ahead of the locally
+        fetched project default branch, matching origin and all push URLs, and
+        no prior PR for this branch. Untracked output files recorded by this pipeline
+        are allowed but not committed. Pushes the branch and creates a draft PR;
+        the branch commit is not bound to the pipeline review, so inspect the exact
+        diff and test results on GitHub. It never
+        commits, switches branches, runs checks, or merges. GitHub CLI auth
+        must be available on the daemon host.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: PR created and read back from GitHub
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        "403":
+          description: Admin access required or project scope denied
+        "404":
+          description: Pipeline or project not found
+        "409":
+          description: Review, repository, or duplicate PR preflight failed
+        "502":
+          description: Git or GitHub operation failed; inspect GitHub before retrying
+
   /api/pipelines/{id}/cancel:
     post:
       tags: [Pipelines]
