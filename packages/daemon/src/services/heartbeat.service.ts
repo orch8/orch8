@@ -984,6 +984,30 @@ export class HeartbeatService {
           // Best-effort cleanup — don't let log finalization crash the run cleanup
         }
       }
+      // A terminal run is not a completed pipeline step. Only the assigned
+      // agent may fail its current attempt, and not while another assigned
+      // run is executing. A queued run does not prove anyone can do the work.
+      if (claimedRun.taskId && this.pipelineService) {
+        try {
+          const attempt = await this.pipelineService.findByTaskId(claimedRun.taskId);
+          if (attempt?.step.agentId === claimedRun.agentId &&
+              attempt.pipeline.projectId === claimedRun.projectId) {
+            const [otherRun] = await this.db.select({ id: heartbeatRuns.id }).from(heartbeatRuns)
+              .where(and(eq(heartbeatRuns.taskId, claimedRun.taskId),
+                eq(heartbeatRuns.agentId, claimedRun.agentId),
+                sql`${heartbeatRuns.id} <> ${runId}`,
+                sql`${heartbeatRuns.status} = 'running'`)).limit(1);
+            if (!otherRun) {
+              await this.pipelineService.failStep(attempt.pipeline.id, attempt.step.id, claimedRun.taskId);
+            }
+          }
+        } catch (err) {
+          if (!(err instanceof PipelineConflict)) {
+            this.logger?.error({ err, runId }, "Could not mark incomplete pipeline step failed");
+          }
+          // A concurrent completion, cancellation or retry wins the attempt.
+        }
+      }
       // 11. Crash recovery — release any tasks locked by this run
       try {
         const lockedTasks = await this.db
