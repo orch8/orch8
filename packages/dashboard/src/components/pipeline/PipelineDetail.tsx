@@ -10,24 +10,52 @@ import {
   usePipelineStepOutput,
 } from "../../hooks/usePipelines.js";
 import { PipelineStepper } from "./PipelineStepper.js";
-import { useRuns } from "../../hooks/useRuns.js";
+import { useRuns, useRunLog } from "../../hooks/useRuns.js";
+import type { Run } from "../../types.js";
+import { ApiError } from "../../api/client.js";
 import { RunViewer } from "../runs/RunViewer.js";
 import { GitDiffViewer } from "../diff/GitDiffViewer.js";
 import { useEffect } from "react";
 
-function StepEvidence({ taskId, projectId, stepStatus }: { taskId: string; projectId: string; stepStatus: string }) {
-  const { data: runs } = useRuns(projectId, { taskId, limit: 20 });
+function RunEvidence({ run, projectId, onOpen }: { run: Run; projectId: string; onOpen: () => void }) {
+  const [open, setOpen] = useState(false);
+  const { data: log, isLoading, isError, error, refetch } = useRunLog(open ? run.id : null, projectId);
+  return <div className="rounded border border-zinc-700 bg-zinc-950/60 p-2 space-y-2">
+    <div className="flex flex-wrap items-center gap-2 text-zinc-300">
+      <span className="font-mono">{run.id}</span>
+      <span>{run.agentId} · Run status: {run.status}</span>
+      <button type="button" onClick={onOpen} className="text-blue-300 underline" aria-label={`Open run viewer ${run.id}`}>Open run viewer (events and details)</button>
+    </div>
+    {run.error && <p role="alert" className="whitespace-pre-wrap break-words text-red-300">{run.error}</p>}
+    <details open={open} onToggle={event => setOpen(event.currentTarget.open)}>
+      <summary className="cursor-pointer text-blue-300">Raw log</summary>
+      {open && <div className="mt-2">
+        {isLoading && <p role="status" className="text-zinc-400">Loading run log...</p>}
+        {isError && (error instanceof ApiError && error.status === 404
+          ? <p className="text-zinc-400">No stored log found for this run. It may not have been written or may be missing. <button type="button" onClick={() => void refetch()} className="text-blue-300 underline">Retry</button></p>
+          : <p role="alert" className="text-amber-300">Could not load run log. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>)}
+        {!isLoading && !isError && log && (log.content
+          ? <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-900 p-3 font-mono text-xs text-zinc-200">{log.content}</pre>
+          : <p className="text-zinc-400">Log is empty. <button type="button" onClick={() => void refetch()} className="text-blue-300 underline">Refresh log</button></p>)}
+      </div>}
+    </details>
+  </div>;
+}
+
+function StepEvidence({ taskId, projectId, stepStatus, label }: { taskId: string; projectId: string; stepStatus: string; label: string }) {
+  const { data: runs, isLoading, isError, refetch } = useRuns(projectId, { taskId, limit: 20 });
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
-  return <div className="mt-2 space-y-1 text-xs">
+  return <section aria-label={`${label} run evidence`} className="mt-2 space-y-2 text-xs">
     <a href={`/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`} className="text-blue-300 underline">Open task {taskId}</a>
-    {runs?.map(run => <div key={run.id}>
-      <button type="button" onClick={() => setSelectedRun(run.id)} className="text-blue-300 underline">{run.agentId} run: {run.status} (log and events)</button>
-      {run.status === "failed" && run.error && <p role="alert" className="text-red-300">{run.error}</p>}
-    </div>)}
+    <p className="text-zinc-500">Run status is not a test result. Inspect the raw log for actual test output.</p>
+    {isLoading && <p role="status" className="text-zinc-400">Loading runs...</p>}
+    {isError && <p role="alert" className="text-amber-300">Could not load runs. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>}
+    {!isLoading && !isError && runs?.length === 0 && <p className="text-zinc-400">No run recorded yet for this step.</p>}
+    {runs?.map(run => <RunEvidence key={run.id} run={run} projectId={projectId} onOpen={() => setSelectedRun(run.id)} />)}
     {stepStatus === "pending" && runs?.[0]?.status === "succeeded" &&
       <p role="status" className="text-amber-300">Agent run ended without completing this step. Inspect its log before retrying.</p>}
     {selectedRun && <RunViewer runId={selectedRun} projectId={projectId} onClose={() => setSelectedRun(null)} />}
-  </div>;
+  </section>;
 }
 
 function StepOutput({ pipelineId, stepId, label, revision }: { pipelineId: string; stepId: string; label: string; revision: string }) {
@@ -244,7 +272,8 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
         {steps.map((step) => (
           <div key={step.id} className="rounded border border-zinc-800 p-3">
             <p className="text-sm font-medium text-zinc-200">{step.label} <span className="text-xs text-zinc-500">{step.status}</span></p>
-            {step.taskId && <StepEvidence taskId={step.taskId} projectId={projectId ?? pipeline.projectId} stepStatus={step.status} />}
+            {step.taskId ? <StepEvidence taskId={step.taskId} projectId={projectId ?? pipeline.projectId} stepStatus={step.status} label={step.label} /> :
+              <p className="mt-2 text-xs text-zinc-400">No task or run recorded yet for this step.</p>}
             {step.order === 1 && step.label.toLowerCase() === "plan" && step.status === "awaiting_verification" ?
               <PlanDecision key={`${step.id}:${step.updatedAt ?? ""}`} pipelineId={pipeline.id} stepId={step.id} revision={String(step.updatedAt ?? step.outputSummary ?? "")} outputFilePath={step.outputFilePath ?? null} /> :
               isReviewDecision(step) && step.status === "awaiting_verification" ?
