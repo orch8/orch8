@@ -1,0 +1,5 @@
+# Plan review visual QA
+
+`plan-approval-fixture.png` is a screenshot from the running Orch8 dashboard on this branch, connected to a disposable Fastify/Postgres instance. A test-created pipeline was advanced to `awaiting_verification` with a recorded file in its disposable repository. No provider or coding agent was launched; the fixture expressly disabled spawning. Browser inspection confirmed the recorded plan is visible without opening a disclosure, approval starts disabled, and checking the review box enables it. The screenshot shows the disabled state. This is visual and UI-path evidence only, not an end-to-end execution claim.
+
+The earlier real Codex run `run_1326ac4e-5d30-4ae5-8e70-6f64071f86a2` could not inspect the repository because its workspace-write sandbox shell failed with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`. No real plan, implementation, independent review, test output or feature PR has been generated through this workflow on this host. The new checkbox is a dashboard affordance, not a server-side authorization policy or guarantee that an artifact is unchanged after reading.

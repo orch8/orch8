@@ -45,6 +45,28 @@ function StepOutput({ pipelineId, stepId, label, revision }: { pipelineId: strin
   </div>;
 }
 
+function PlanDecision({ pipelineId, stepId, revision, outputFilePath }: { pipelineId: string; stepId: string; revision: string; outputFilePath: string | null }) {
+  const [reviewedContent, setReviewedContent] = useState<string | null>(null);
+  const { data, isLoading, isError, isFetching, refetch } = usePipelineStepOutput(pipelineId, stepId, revision, !!outputFilePath);
+  const approve = useApprovePipelineStep();
+  const hasPlan = !isError && !isLoading && !isFetching && !!data?.content.trim();
+  return <section aria-label="Plan approval" className="mt-3 space-y-3 rounded border border-amber-700/60 bg-amber-950/20 p-3">
+    <h4 className="text-sm font-semibold text-amber-200">Review the plan before implementation</h4>
+    {!outputFilePath && <p role="alert" className="text-xs text-amber-300">No plan file was recorded. Do not approve this step.</p>}
+    {isLoading && <p className="text-xs text-zinc-400">Loading the recorded plan...</p>}
+    {isError && <p role="alert" className="text-xs text-amber-300">File unavailable or too large. Check the run log or repository. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>}
+    {data && <><p className="break-all font-mono text-xs text-zinc-500">{data.path}</p>
+      <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-950 p-3 text-xs text-zinc-200">{data.content || "(Empty file)"}</pre></>}
+    {data && !data.content.trim() && <p role="alert" className="text-xs text-amber-300">The plan file is empty. Do not approve this step.</p>}
+    <label className="flex items-start gap-2 text-xs text-zinc-200">
+      <input type="checkbox" checked={hasPlan && reviewedContent === data?.content} disabled={!hasPlan} onChange={event => setReviewedContent(event.target.checked ? data?.content ?? null : null)} />
+      I have reviewed the full plan and want implementation to start.
+    </label>
+    <button type="button" onClick={() => approve.mutate({ pipelineId, stepId })} disabled={!hasPlan || reviewedContent !== data?.content || approve.isPending}
+      className="rounded bg-emerald-800 px-3 py-1 text-xs text-emerald-200 disabled:opacity-50">{approve.isPending ? "Approving..." : "Approve plan"}</button>
+  </section>;
+}
+
 interface PipelineDetailProps {
   pipelineId: string;
   projectId?: string;
@@ -154,7 +176,9 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
           <div key={step.id} className="rounded border border-zinc-800 p-3">
             <p className="text-sm font-medium text-zinc-200">{step.label} <span className="text-xs text-zinc-500">{step.status}</span></p>
             {step.taskId && <StepEvidence taskId={step.taskId} projectId={projectId ?? pipeline.projectId} stepStatus={step.status} />}
-            {step.outputFilePath && (step.status === "completed" || step.status === "awaiting_verification") &&
+            {step.order === 1 && step.label.toLowerCase() === "plan" && step.status === "awaiting_verification" ?
+              <PlanDecision key={`${step.id}:${step.updatedAt ?? ""}`} pipelineId={pipeline.id} stepId={step.id} revision={String(step.updatedAt ?? step.outputSummary ?? "")} outputFilePath={step.outputFilePath ?? null} /> :
+              step.outputFilePath && (step.status === "completed" || step.status === "awaiting_verification") &&
               <StepOutput pipelineId={pipeline.id} stepId={step.id} label={step.label} revision={String(step.updatedAt ?? step.outputSummary ?? "")} />}
             {step.status === "awaiting_verification" && !step.outputSummary &&
               <p role="alert" className="mt-2 text-xs text-amber-300">No plan or review summary is available. Inspect the task and run log before approving.</p>}
@@ -237,7 +261,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
               )}
 
             {/* Approve / Reject for steps awaiting verification */}
-            {step.status === "awaiting_verification" && (
+            {step.status === "awaiting_verification" && !(step.order === 1 && step.label.toLowerCase() === "plan") && (
               <div className="mt-2 space-y-2">
                 <div className="flex gap-2">
                   <button
