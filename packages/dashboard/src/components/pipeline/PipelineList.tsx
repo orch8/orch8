@@ -48,6 +48,9 @@ export function PipelineList({ pipelines: items, showActions = false }: Pipeline
               {new Date(pipeline.createdAt).toLocaleDateString()}
             </span>
           </button>
+          <div className="border-t border-zinc-800 px-4 py-2">
+            <a href={`/projects/${encodeURIComponent(pipeline.projectId)}/pipelines/${encodeURIComponent(pipeline.id)}`} className="text-xs text-blue-300 underline">Open workflow and copy link</a>
+          </div>
 
           {expandedId === pipeline.id && (
             <div className="border-t border-zinc-800 px-4 py-3">
