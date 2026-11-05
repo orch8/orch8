@@ -315,7 +315,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
                 step.outputFilePath && (step.status === "completed" || step.status === "awaiting_verification") &&
                 <StepOutput pipelineId={pipeline.id} stepId={step.id} label={step.label} revision={String(step.updatedAt ?? step.outputSummary ?? "")} />}
             {step.order === 1 && step.label.toLowerCase() === "plan" &&
-              <PlanHistory pipelineId={pipeline.id} projectId={projectId ?? pipeline.projectId} poll={step.status === "pending" || step.status === "running"} />}
+              <PlanHistory pipelineId={pipeline.id} projectId={projectId ?? pipeline.projectId} poll={["pending", "running", "awaiting_verification"].includes(step.status)} />}
             {step.status === "awaiting_verification" && !step.outputSummary &&
               <p role="alert" className="mt-2 text-xs text-amber-300">No plan or review summary is available. Inspect the task and run log before approving.</p>}
             {step.outputSummary && (
