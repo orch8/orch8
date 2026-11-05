@@ -58,18 +58,18 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
     <div className="grid gap-3 sm:grid-cols-2">
       <p>Current stage: <span className="text-zinc-100">{pipeline.status === "completed" ? "Workflow completed" : pipeline.status === "cancelled" ? "Workflow cancelled" : active ? `${active.label} · ${active.status === "awaiting_verification" ? "awaiting approval" : active.status}` : pipeline.status}</span></p>
       <p>Next action: <span className="text-zinc-100">{nextAction}</span></p>
-      <div>Implementation test evidence: {implement?.taskId ? <ImplementationEvidence run={latestRun} isLoading={runsLoading} isError={runsError} /> : <span>No implementation run recorded yet.</span>}</div>
+      <div>Implementation test evidence: {implement?.taskId ? <ImplementationEvidence run={latestRun} projectId={pipeline.projectId} isLoading={runsLoading} isError={runsError} /> : <span>No implementation run recorded yet.</span>}</div>
       <p>Review decision: <span className="text-zinc-100">{!review ? "No review step recorded" : review.outputSummary?.startsWith("[REJECTED]") ? "Rejected; changes requested" : review.status === "completed" ? review.requiresVerification ? "Accepted (test results still require inspection)" : "Completed; no human decision recorded" : review.status === "awaiting_verification" ? "Awaiting your decision" : review.status === "failed" ? "Review failed" : "Not decided"}</span></p>
       <p className="sm:col-span-2">Draft PR: {diffLoading ? "Checking repository..." : diffError || !diff?.available || diff.prLookup === "unavailable" ? "PR lookup unavailable; check GitHub." : diff.prLookup === "found" && diff.pullRequest ? <a href={diff.pullRequest.url} target="_blank" rel="noopener noreferrer" className="text-blue-300 underline">{diff.pullRequest.isDraft === true ? "Draft PR" : diff.pullRequest.isDraft === false ? "PR (not draft)" : "PR (draft status unknown)"} #{diff.pullRequest.number} · {diff.pullRequest.state.toLowerCase()}</a> : diff.prLookup === "none" ? "No PR found for this branch commit." : "Not verified for this branch commit."}</p>
     </div>
   </section>;
 }
 
-function ImplementationEvidence({ run, isLoading, isError }: { run?: Run; isLoading: boolean; isError: boolean }) {
+function ImplementationEvidence({ run, projectId, isLoading, isError }: { run?: Run; projectId: string; isLoading: boolean; isError: boolean }) {
   if (isLoading) return <span>Loading implementation runs...</span>;
   if (isError) return <span>Could not load implementation runs; test results unverified.</span>;
 
-  if (!run) return <span>No run recorded for the current implementation task; test results unverified. Earlier attempts may have separate task runs.</span>;
+  if (!run) return <span>No run recorded for the current implementation task; test results unverified. <a href={`/projects/${encodeURIComponent(projectId)}/runs`} className="text-blue-300 underline">Inspect project runs for earlier attempts</a>.</span>;
   return <span>Run status: {run.status}; test results unverified. <a href={`#implementation-run-${encodeURIComponent(run.id)}`} className="text-blue-300 underline">Open run {run.id} and raw log</a>.</span>;
 }
 

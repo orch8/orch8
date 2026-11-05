@@ -139,6 +139,7 @@ describe("feature progress summary", () => {
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(within(progress()).getByText(/Implement.*pending/i)).toBeInTheDocument();
     expect(within(progress()).getByText(/Rejected; changes requested/i)).toBeInTheDocument();
+    expect(within(progress()).getByRole("link", { name: /Inspect project runs for earlier attempts/i })).toHaveAttribute("href", "/projects/proj_1/runs");
     expect(within(progress()).queryByText(/Independent review.*failed/i)).not.toBeInTheDocument();
   });
 });
