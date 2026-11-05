@@ -11,6 +11,7 @@ import {
   useApprovePipelineStep,
   usePipelineStepOutput,
 } from "../../hooks/usePipelines.js";
+import { DownloadEvidence } from "./DownloadEvidence.js";
 import { PipelineStepper } from "./PipelineStepper.js";
 import { useRuns, useRunLog } from "../../hooks/useRuns.js";
 import type { Run } from "../../types.js";
@@ -338,6 +339,8 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
 
       {steps[0]?.label.toLowerCase() === "plan" && implement && review &&
         <FeatureProgress pipeline={pipeline} steps={steps} diff={repositoryDiff} diffLoading={diffLoading} diffError={diffError} canPublish={!!canPublish} />}
+      {steps[0]?.label.toLowerCase() === "plan" && implement && review &&
+        <DownloadEvidence key={pipeline.id} pipelineId={pipeline.id} />}
       <PipelineStepper steps={steps} currentStep={pipeline.currentStep} />
 
       <section aria-label="Repository changes" className="rounded border border-zinc-800 p-3 space-y-2">
