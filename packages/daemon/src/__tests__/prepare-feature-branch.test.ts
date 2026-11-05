@@ -15,6 +15,34 @@ async function fixture() {
   return { root, git };
 }
 describe("feature branch preparation", () => {
+  it("allows only Orch8's generated ignore change to follow a newly provisioned project onto the feature branch", async () => {
+    const { root, git } = await fixture();
+    await writeFile(join(root, ".gitignore"), "# orch8 orchestrator data\n.orch8/\n");
+    expect(await featureBranchReadiness(root, "main")).toMatchObject({ ready: true });
+    await prepareFeatureBranch(root, "main", "feat/generated-ignore");
+    expect(git("branch", "--show-current")).toBe("feat/generated-ignore");
+    expect(git("status", "--short")).toBe("?? .gitignore");
+  });
+  it("allows a generated ignore append but rejects other edits to that file", async () => {
+    const { root, git } = await fixture();
+    await writeFile(join(root, ".gitignore"), "node_modules/\n");
+    git("add", ".gitignore");
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "base ignore");
+    await writeFile(join(root, ".gitignore"), "node_modules/\n# user edits\n");
+    await expect(featureBranchReadiness(root, "main")).resolves.toMatchObject({ ready: false });
+    await writeFile(join(root, ".gitignore"), "node_modules/\n\n# orch8 orchestrator data\n.orch8/\n");
+    expect(await featureBranchReadiness(root, "main")).toMatchObject({ ready: true });
+    await prepareFeatureBranch(root, "main", "feat/appended-ignore");
+    expect(git("status", "--short")).toBe("M .gitignore");
+  });
+  it("does not mistake invalid UTF-8 edits for the generated ignore append", async () => {
+    const { root, git } = await fixture();
+    await writeFile(join(root, ".gitignore"), Buffer.from([0x80, 0x0a]));
+    git("add", ".gitignore");
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "ignore bytes");
+    await writeFile(join(root, ".gitignore"), Buffer.concat([Buffer.from([0x81, 0x0a]), Buffer.from("\n# orch8 orchestrator data\n.orch8/\n")]));
+    expect(await featureBranchReadiness(root, "main")).toMatchObject({ ready: false });
+  });
   it("creates and checks out only a new named branch from a clean configured default branch", async () => {
     const { root, git } = await fixture();
     expect(await featureBranchReadiness(root, "main")).toMatchObject({ ready: true, branch: "main", baseBranch: "main" });

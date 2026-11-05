@@ -17,6 +17,13 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("explains that generated ignore changes follow the feature branch without a commit", async () => {
+  state.readiness.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main", note: "Orch8's generated .gitignore will remain uncommitted on the feature branch." });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(await screen.findByText(/generated .gitignore will remain uncommitted/)).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("New feature branch name"), { target: { value: "feat/usage" } });
+  expect(screen.getByRole("button", { name: "Prepare feature branch" })).toBeEnabled();
+ });
  it("shows branch readiness and explicitly prepares a named branch before starting", async () => {
   state.probe.mockImplementation(async path => path.includes("feature-branch") ? { branch: "feat/usage", baseBranch: "main" } : { ok: true });
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);

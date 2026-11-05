@@ -1,12 +1,27 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { realpath } from "node:fs/promises";
+import { lstat, readFile, realpath } from "node:fs/promises";
 
 const exec = promisify(execFile);
 const env = () => ({ ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"))),
   GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_NO_LAZY_FETCH: "1", GIT_TERMINAL_PROMPT: "0" });
-const git = async (cwd: string, args: string[]) => (await exec("git", ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", ...args],
-  { cwd, env: env(), timeout: 10_000, maxBuffer: 1024 * 1024, encoding: "utf8" })).stdout.trim();
+const gitRaw = async (cwd: string, args: string[]) => (await exec("git", ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", ...args],
+  { cwd, env: env(), timeout: 10_000, maxBuffer: 1024 * 1024, encoding: "utf8" })).stdout;
+const gitBytes = async (cwd: string, args: string[]) => (await exec("git", ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", ...args],
+  { cwd, env: env(), timeout: 10_000, maxBuffer: 1024 * 1024, encoding: "buffer" })).stdout;
+const git = async (cwd: string, args: string[]) => (await gitRaw(cwd, args)).trim();
+
+async function onlyGeneratedIgnoreChange(homeDir: string, status: string) {
+  if (status !== "?? .gitignore" && status !== " M .gitignore") return false;
+  const ignore = `${homeDir}/.gitignore`;
+  const stat = await lstat(ignore);
+  if (!stat.isFile() || stat.size > 1024 * 1024) return false;
+  const content = await readFile(ignore);
+  if (status === "?? .gitignore") return content.equals(Buffer.from("# orch8 orchestrator data\n.orch8/\n"));
+  const original = await gitBytes(homeDir, ["show", "HEAD:.gitignore"]);
+  const suffix = original.length && original.at(-1) !== 10 ? "\n" : "";
+  return content.equals(Buffer.concat([original, Buffer.from(`${suffix}\n# orch8 orchestrator data\n.orch8/\n`)]));
+}
 
 export async function featureBranchReadiness(homeDir: string, baseBranch: string) {
   let branch = "";
@@ -20,10 +35,11 @@ export async function featureBranchReadiness(homeDir: string, baseBranch: string
     }
     branch = await git(homeDir, ["symbolic-ref", "--quiet", "--short", "HEAD"]).catch(() => "");
     if (branch !== baseBranch) throw new Error(`Check out the configured default branch '${baseBranch}' before preparing a feature branch.`);
-    if (await git(homeDir, ["status", "--porcelain=v1", "--untracked-files=all"])) {
+    const status = (await gitRaw(homeDir, ["status", "--porcelain=v1", "--untracked-files=all"])).trimEnd();
+    if (status && !(await onlyGeneratedIgnoreChange(homeDir, status))) {
       throw new Error("The repository must be clean (tracked and untracked files) before preparing a feature branch.");
     }
-    return { ready: true, branch, baseBranch };
+    return { ready: true, branch, baseBranch, note: status ? "Orch8's generated .gitignore will remain uncommitted on the feature branch." : undefined };
   } catch (error) {
     return { ready: false, branch, baseBranch, reason: (error as Error).message.startsWith("Command failed") || (error as Error).message.startsWith("ENOENT")
       ? "Repository is unavailable or has no checked-out HEAD." : (error as Error).message };

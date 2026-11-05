@@ -18,7 +18,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const [checkedKey, setCheckedKey] = useState("");
   const [checkMessage, setCheckMessage] = useState("");
   const [branchName, setBranchName] = useState("");
-  const [branchState, setBranchState] = useState<{ ready: boolean; branch: string; baseBranch: string; reason?: string } | null>(null);
+  const [branchState, setBranchState] = useState<{ ready: boolean; branch: string; baseBranch: string; reason?: string; note?: string } | null>(null);
   const [branchError, setBranchError] = useState("");
   const [preparing, setPreparing] = useState(false);
   useEffect(() => {
@@ -26,7 +26,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     setBranchState(null);
     setBranchError("");
     if (project?.id) {
-      api.get<{ ready: boolean; branch: string; baseBranch: string; reason?: string }>(`/projects/${encodeURIComponent(project.id)}/feature-branch`)
+      api.get<{ ready: boolean; branch: string; baseBranch: string; reason?: string; note?: string }>(`/projects/${encodeURIComponent(project.id)}/feature-branch`)
         .then(result => { if (active) setBranchState(result); })
         .catch(() => { if (active) setBranchError("Could not check repository branch readiness. Refresh to retry."); });
     }
@@ -121,6 +121,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
         <button type="button" onClick={() => { void prepareBranch(); }} disabled={!branchState?.ready || !branchName.trim() || preparing} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">{preparing ? "Preparing..." : "Prepare feature branch"}</button>
       </div>
       {branchState?.reason && <p role="status" className="text-amber-300">{branchState.reason}</p>}
+      {branchState?.note && <p role="status" className="text-amber-300">{branchState.note} Include it in the feature commit if you want the ignore rule in the PR.</p>}
       {branchError && <p role="alert" className="text-red-300">{branchError}</p>}
     </div>
     <details className="mt-2 text-xs text-zinc-500">
