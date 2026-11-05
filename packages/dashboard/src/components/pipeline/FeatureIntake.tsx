@@ -59,7 +59,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     return () => { active = false; };
   }, [project?.id]);
   async function prepareBranch() {
-    if (!project?.id || !branchState?.ready || !branchName.trim() || preparing) return;
+    if (!project?.id || !branchState?.ready || !branchName.trim() || preparing || checkedKey !== selectionKey) return;
     setPreparing(true); setBranchError("");
     try {
       const result = await api.post<{ branch: string; baseBranch: string }>(`/projects/${encodeURIComponent(project.id)}/feature-branch`, { name: branchName.trim() });
@@ -178,25 +178,13 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       <span>Feature request and agent choices are saved in this browser for this project until you start a plan or clear them. Runtime approval is never saved.</span>
       {(feature || branchName || planner || implementer || reviewer) && <button type="button" onClick={clearDraft} className="shrink-0 text-blue-300 underline">Clear draft</button>}
     </div>
-    <div className="mt-3 space-y-2 rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Prepare feature branch">
-      <h3 className="font-medium">Prepare a feature branch (required)</h3>
-      <p>Current branch: {branchState?.branch || "Checking..."} · Configured base: {branchState?.baseBranch ?? project?.defaultBranch ?? "Checking..."}</p>
-      <p className="text-xs text-zinc-400">Creates and checks out a new local branch in this repository. Does not commit, push, or start agents.</p>
-      <label className="block" htmlFor="feature-branch-name">New feature branch name</label>
-      <div className="flex flex-wrap gap-2">
-        <input id="feature-branch-name" value={branchName} onChange={e => setBranchName(e.target.value)} placeholder="feat/my-feature" className="min-w-48 flex-1 rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
-        <button type="button" onClick={() => { void prepareBranch(); }} disabled={!branchState?.ready || !branchName.trim() || preparing} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">{preparing ? "Preparing..." : "Prepare feature branch"}</button>
-      </div>
-      {branchState?.reason && <p role="status" className="text-amber-300">{branchState.reason}</p>}
-      {branchState?.note && <p role="status" className="text-amber-300">{branchState.note} Include it in the feature commit if you want the ignore rule in the PR.</p>}
-      {branchError && <p role="alert" className="text-red-300">{branchError}</p>}
-    </div>
+
     <details className="mt-2 text-xs text-zinc-500">
       <summary className="cursor-pointer">Current runtime limits</summary>
       <div className="mt-2 space-y-1 pl-3">
         <p>Planning agents can write to the repository. Planning-only behavior is a prompt instruction, not a read-only sandbox.</p>
         <p>Uses the configured repository and agent permissions, not a new isolated worktree. Keep selected agents' sandbox settings unchanged during the workflow. PR creation is an explicit action after review.</p>
-        <p>Check the selected agents before starting. On Linux this tests a shell command in the configured Codex sandbox; other hosts are not supported yet. A text-only response is not proof that planning can inspect the repository.</p>
+        <p>Check the selected agents before preparing a branch. On Linux this tests a shell command in the configured Codex sandbox; other hosts are not supported yet. A text-only response is not proof that planning can inspect the repository.</p>
       </div>
     </details>
     <form onSubmit={submit} className="mt-4 space-y-3">
@@ -225,6 +213,19 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       <button type="button" onClick={() => { void checkRuntime(); }} disabled={!validSelection || checking} className="rounded border border-zinc-600 px-4 py-2 text-sm text-zinc-200 disabled:opacity-40">{checking ? "Checking agents..." : "Check agent runtime"}</button>
       {checkMessage && <p role="status" className={checkedKey === selectionKey ? "text-sm text-emerald-300" : "text-sm text-amber-300"}>{checkMessage}</p>}
       {validSelection && checkedKey !== selectionKey && <p className="text-xs text-amber-300">Runtime check required for this agent selection.</p>}
+      <div className="space-y-2 rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Prepare feature branch">
+        <h3 className="font-medium">Prepare a feature branch (required)</h3>
+        <p>Current branch: {branchState?.branch || "Checking..."} · Configured base: {branchState?.baseBranch ?? project?.defaultBranch ?? "Checking..."}</p>
+        <p className="text-xs text-zinc-400">Check the agent runtime first, so an unavailable sandbox does not leave an unused branch behind. This creates and checks out a new local branch; it does not commit, push, or start agents.</p>
+        <label className="block" htmlFor="feature-branch-name">New feature branch name</label>
+        <div className="flex flex-wrap gap-2">
+          <input id="feature-branch-name" value={branchName} onChange={e => setBranchName(e.target.value)} placeholder="feat/my-feature" className="min-w-48 flex-1 rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
+          <button type="button" onClick={() => { void prepareBranch(); }} disabled={!branchState?.ready || !branchName.trim() || preparing || checkedKey !== selectionKey} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">{preparing ? "Preparing..." : "Prepare feature branch"}</button>
+        </div>
+        {branchState?.reason && <p role="status" className="text-amber-300">{branchState.reason}</p>}
+        {branchState?.note && <p role="status" className="text-amber-300">{branchState.note} Include it in the feature commit if you want the ignore rule in the PR.</p>}
+        {branchError && <p role="alert" className="text-red-300">{branchError}</p>}
+      </div>
       {branchState && !onFeatureBranch && <p role="status" className="text-xs text-amber-300">Start is unavailable on the base branch. Prepare a feature branch above, then check the agents.</p>}
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       <button type="submit" disabled={!ready} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Start with a plan</button>

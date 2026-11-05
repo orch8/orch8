@@ -53,6 +53,8 @@ describe("feature intake", () => {
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   expect(await screen.findByText(/generated .gitignore will remain uncommitted/)).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("New feature branch name"), { target: { value: "feat/usage" } });
+  expect(screen.getByRole("button", { name: "Prepare feature branch" })).toBeDisabled();
+  select(); await check();
   expect(screen.getByRole("button", { name: "Prepare feature branch" })).toBeEnabled();
  });
  it("shows branch readiness and explicitly prepares a named branch before starting", async () => {
@@ -63,6 +65,8 @@ describe("feature intake", () => {
   const button = screen.getByRole("button", { name: "Prepare feature branch" });
   expect(button).toBeDisabled();
   fireEvent.change(screen.getByLabelText("New feature branch name"), { target: { value: "feat/usage" } });
+  expect(button).toBeDisabled();
+  select(); await check();
   expect(button).toBeEnabled();
   await act(async () => { fireEvent.click(button); });
   expect(state.readiness).toHaveBeenCalledWith("/projects/canonical-id/feature-branch");
@@ -130,10 +134,16 @@ describe("feature intake", () => {
  });
  it("shows a failed sandbox probe and does not start a pipeline", async () => {
   state.probe.mockResolvedValue({ ok: false, message: "bwrap: loopback: Failed RTM_NEWADDR" });
-  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />); select(); await check();
-  expect(screen.getByRole("status").textContent).toContain("bwrap: loopback");
+  state.readiness.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />); select();
+  await screen.findByText(/Current branch: main/);
+  fireEvent.change(screen.getByLabelText("New feature branch name"), { target: { value: "feat/usage" } });
+  await check();
+  expect(screen.getByText(/planner: bwrap: loopback/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Prepare feature branch" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
   expect(state.create).not.toHaveBeenCalled();
+  expect(state.probe).not.toHaveBeenCalledWith("/projects/canonical-id/feature-branch", expect.anything());
  });
  it("restores a blocked feature draft after reload without restoring runtime clearance", async () => {
   state.probe.mockResolvedValue({ ok: false, message: "bwrap: Failed RTM_NEWADDR" });
