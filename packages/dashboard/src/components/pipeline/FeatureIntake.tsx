@@ -156,9 +156,9 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
           { label: "Plan", agentId: planner, requiresVerification: true,
             promptOverride: `Feature request: ${request}\nInspect the repository and write a concrete, scoped implementation plan to {{pipeline.outputFilePath}}. Do not edit product code. State the test command and expected result. Complete the assigned task with a concise summary of the plan so the operator can approve it.` },
           { label: "Implement", agentId: implementer, requiresVerification: false,
-            promptOverride: `Feature request: ${request}\nFollow the approved plan in {{pipeline.context}}. Work in the configured repository. Run relevant tests. Do not bypass approval, permissions, or budget limits. Report changed files, test results, and any PR URL. Write a summary to {{pipeline.outputFilePath}}.` },
+            promptOverride: `Feature request: ${request}\nFollow the approved plan in {{pipeline.context}}. Work only on the prepared feature branch in the configured repository. Run relevant tests and record commands, exit codes and bounded output excerpts in {{pipeline.outputFilePath}}; the run log holds full output. Never copy secrets from test output into the artifact. If the implementation is complete and the tests pass, commit only the intended feature files on this branch; inspect the staged diff before committing. If branch preparation left Orch8's generated .gitignore change, inspect it and include it only if it solely adds the .orch8/ ignore rule. Do not stage unrelated work or pipeline output files. Do not push, publish a PR, merge, or change approval, permission or budget settings. If tests fail or the branch/worktree is not safe to commit, leave changes uncommitted and report the blocker instead. Report the commit hash (if any), changed files, and test results in the summary.` },
           { label: "Independent review", agentId: reviewer, requiresVerification: true,
-            promptOverride: `Independently review the implementation of: ${request}\nUse {{pipeline.context}} and inspect the actual repository diff and test output. Do not assume the implementer's report is proof. Report concrete blocking findings or approval, and PR URL if one exists. Write findings to {{pipeline.outputFilePath}}.` },
+            promptOverride: `Independently review the implementation of: ${request}\nUse {{pipeline.context}} and inspect the actual committed branch diff, any uncommitted changes, and the implementation run's real test output. Do not assume the implementer's report is proof. Do not edit or commit product files, push, publish a PR, merge, or change approval, permission or budget settings. Report concrete blocking findings or approval, including the reviewed commit hash and whether the reported tests are supported by the run log. Write findings to {{pipeline.outputFilePath}}.` },
         ],
       });
       setFeature("");
@@ -172,7 +172,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
 
   return <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-5" aria-label="New feature">
     <h2 className="text-lg font-semibold text-zinc-100">Build a feature</h2>
-    <p className="mt-1 text-sm text-zinc-400">Describe a change on a feature branch, review the agent's plan, then run implementation and independent review. Once changes are committed, you can publish a draft PR.</p>
+    <p className="mt-1 text-sm text-zinc-400">Describe a change on a feature branch, approve the plan, then inspect implementation and independent review. If tests pass, the implementer commits its feature files locally. After accepting the review, inspect the diff and publish a draft PR explicitly.</p>
     <p className="mt-3 text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
     <div className="mt-2 flex items-center gap-3 text-xs text-zinc-400">
       <span>Feature request and agent choices are saved in this browser for this project until you start a plan or clear them. Runtime approval is never saved.</span>
