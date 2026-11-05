@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useCreateProject } from "../../hooks/useProjects.js";
+import { api } from "../../api/client.js";
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -20,12 +21,21 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
   const [budget, setBudget] = useState("");
   const [noLimit, setNoLimit] = useState(false);
   const [error, setError] = useState("");
+  const [checking, setChecking] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (create.isPending) return;
+    if (create.isPending || checking) return;
     setError("");
+    setChecking(true);
     try {
+      const readiness = await api.post<{ ready: boolean; reason?: string }>("/projects/repository-readiness", {
+        homeDir: path.trim(), defaultBranch: branch.trim(),
+      });
+      if (!readiness.ready) {
+        setError(`Repository is not ready: ${readiness.reason ?? "Check the path, base branch and working tree."}`);
+        return;
+      }
       const project = await create.mutateAsync({
         name: name.trim(),
         slug: slugify(name.trim()),
@@ -40,6 +50,8 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
       onComplete(project.slug);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not open repository");
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -69,9 +81,9 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
         <input required={!noLimit} disabled={noLimit} type="number" min="0.01" step="any" value={budget} onChange={event => setBudget(event.target.value)} placeholder="10.00" className={`mt-1 ${inputClass} disabled:opacity-40`} />
       </label>
       <label className="flex items-center gap-2 text-sm text-zinc-300"><input type="checkbox" checked={noLimit} onChange={event => setNoLimit(event.target.checked)} /> No project spending limit (I understand agents can incur costs)</label>
-      <p className="text-xs text-zinc-400">Choose an existing git checkout. Orch8 checks its branch on the next page; this form does not validate the path. The project starts with no automatic merge or PR strategy. Feature work requires a separate branch, and draft PR publication is an explicit action.</p>
+      <p className="text-xs text-zinc-400">Choose a clean git checkout at its repository root, on the base branch. Orch8 checks the checkout before creating the project. The project starts with no automatic merge or PR strategy. Feature work requires a separate branch, and draft PR publication is an explicit action.</p>
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-      <button type="submit" disabled={create.isPending || !name.trim() || !/^[A-Z][A-Z0-9]{1,4}$/.test(key.trim()) || !path.trim() || !branch.trim() || (!noLimit && !(Number(budget) > 0))} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{create.isPending ? "Opening..." : "Open and describe feature"}</button>
+      <button type="submit" disabled={checking || create.isPending || !name.trim() || !/^[A-Z][A-Z0-9]{1,4}$/.test(key.trim()) || !path.trim() || !branch.trim() || (!noLimit && !(Number(budget) > 0))} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{checking ? "Checking repository..." : create.isPending ? "Opening..." : "Open and describe feature"}</button>
     </form>
   </section>;
 }
