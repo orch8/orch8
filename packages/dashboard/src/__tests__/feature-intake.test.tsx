@@ -7,6 +7,7 @@ vi.mock("../hooks/useAgents.js", () => ({ useAgents: (id: string) => { state.req
 vi.mock("../hooks/useProjects.js", () => ({ useProject: () => ({ data: { id: "canonical-id", homeDir: "/repo" } }) }));
 vi.mock("../hooks/usePipelines.js", () => ({ useCreatePipeline: () => ({ mutateAsync: state.create, isPending: false }) }));
 beforeEach(() => {
+ localStorage.clear();
  state.requestedAgents.mockReset(); state.create.mockReset(); state.createAgent.mockReset(); state.createAgent.mockResolvedValue({ id: "created" }); state.probe.mockReset(); state.probe.mockResolvedValue({ ok: true });
  state.readiness.mockReset(); state.readiness.mockResolvedValue({ ready: false, branch: "feat/usage", baseBranch: "main" });
  state.agents = ["planner", "implementer", "reviewer"].map(id => ({ id, name: id, status: "active", adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
@@ -101,6 +102,7 @@ describe("feature intake", () => {
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Start with a plan" })); });
   expect(state.readiness).toHaveBeenLastCalledWith("/projects/canonical-id/feature-branch");
   expect(state.create).toHaveBeenCalledWith(expect.objectContaining({ projectId: "one", steps: [expect.objectContaining({ label: "Plan", requiresVerification: true }), expect.objectContaining({ label: "Implement", requiresVerification: false }), expect.objectContaining({ label: "Independent review", requiresVerification: true })] }));
+  expect(localStorage.getItem("orch8:feature-draft:one")).toBeNull();
  });
  it("requires a feature branch and refuses a changed branch at submission", async () => {
   state.readiness.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
@@ -127,5 +129,39 @@ describe("feature intake", () => {
   expect(screen.getByRole("status").textContent).toContain("bwrap: loopback");
   expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
   expect(state.create).not.toHaveBeenCalled();
+ });
+ it("restores a blocked feature draft after reload without restoring runtime clearance", async () => {
+  state.probe.mockResolvedValue({ ok: false, message: "bwrap: Failed RTM_NEWADDR" });
+  const first = render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  select();
+  await check();
+  await screen.findByText(/Current branch: feat\/usage/);
+  first.unmount();
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.getByLabelText("What should change?")).toHaveValue("Add usage");
+  expect(screen.getByLabelText("Review agent")).toHaveValue("reviewer");
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+  expect(screen.getByText(/Runtime check required for this agent selection/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Clear draft" }));
+  expect(screen.getByLabelText("What should change?")).toHaveValue("");
+  expect(localStorage.getItem("orch8:feature-draft:one")).toBeNull();
+ });
+ it("keeps drafts separate between repositories", async () => {
+  const first = render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  await screen.findByText(/Current branch: feat\/usage/);
+  fireEvent.change(screen.getByLabelText("What should change?"), { target: { value: "First repository" } });
+  first.unmount();
+  render(<FeatureIntake projectId="two" onCreated={vi.fn()} />);
+  expect(screen.getByLabelText("What should change?")).toHaveValue("");
+  expect(localStorage.getItem("orch8:feature-draft:one")).toContain("First repository");
+ });
+ it("preserves agent choices even before a feature request is entered", async () => {
+  const first = render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  await screen.findByText(/Current branch: feat\/usage/);
+  fireEvent.change(screen.getByLabelText("Plan agent"), { target: { value: "planner" } });
+  first.unmount();
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.getByLabelText("Plan agent")).toHaveValue("planner");
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
  });
 });

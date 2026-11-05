@@ -4,8 +4,20 @@ import { useProject } from "../../hooks/useProjects.js";
 import { useCreatePipeline } from "../../hooks/usePipelines.js";
 import { api } from "../../api/client.js";
 
+type FeatureDraft = { feature: string; branchName: string; planner: string; implementer: string; reviewer: string };
+const draftKey = (projectId: string) => `orch8:feature-draft:${projectId}`;
+function readDraft(projectId: string): FeatureDraft {
+  const empty = { feature: "", branchName: "", planner: "", implementer: "", reviewer: "" };
+  try {
+    const value = JSON.parse(localStorage.getItem(draftKey(projectId)) ?? "null");
+    if (!value || typeof value !== "object") return empty;
+    return Object.fromEntries(Object.keys(empty).map(key => [key, typeof value[key] === "string" ? value[key] : ""])) as FeatureDraft;
+  } catch { return empty; }
+}
+
 /** An opinionated entry point to the existing pipeline runner, not a second executor. */
 export function FeatureIntake({ projectId, onCreated }: { projectId: string; onCreated: (id: string) => void }) {
+  const [draft] = useState(() => readDraft(projectId));
   const { data: project } = useProject(projectId);
   const { data: agents, isLoading } = useAgents(project?.id ?? projectId);
   const createAgent = useCreateAgent();
@@ -13,18 +25,28 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const [settingUpAgents, setSettingUpAgents] = useState(false);
   const [setupError, setSetupError] = useState("");
   const [codexModel, setCodexModel] = useState("");
-  const [feature, setFeature] = useState("");
-  const [planner, setPlanner] = useState("");
-  const [implementer, setImplementer] = useState("");
-  const [reviewer, setReviewer] = useState("");
+  const [feature, setFeature] = useState(draft.feature);
+  const [planner, setPlanner] = useState(draft.planner);
+  const [implementer, setImplementer] = useState(draft.implementer);
+  const [reviewer, setReviewer] = useState(draft.reviewer);
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
   const [checkedKey, setCheckedKey] = useState("");
   const [checkMessage, setCheckMessage] = useState("");
-  const [branchName, setBranchName] = useState("");
+  const [branchName, setBranchName] = useState(draft.branchName);
   const [branchState, setBranchState] = useState<{ ready: boolean; branch: string; baseBranch: string; reason?: string; note?: string } | null>(null);
   const [branchError, setBranchError] = useState("");
   const [preparing, setPreparing] = useState(false);
+  useEffect(() => {
+    try {
+      if (feature || branchName || planner || implementer || reviewer) localStorage.setItem(draftKey(projectId), JSON.stringify({ feature, branchName, planner, implementer, reviewer }));
+      else localStorage.removeItem(draftKey(projectId));
+    } catch { /* Private mode or disabled storage: intake remains usable. */ }
+  }, [projectId, feature, branchName, planner, implementer, reviewer]);
+  function clearDraft() {
+    setFeature(""); setBranchName(""); setPlanner(""); setImplementer(""); setReviewer("");
+    setCheckedKey(""); setCheckMessage("");
+  }
   useEffect(() => {
     let active = true;
     setBranchState(null);
@@ -140,6 +162,8 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
         ],
       });
       setFeature("");
+      setBranchName("");
+      setPlanner(""); setImplementer(""); setReviewer("");
       onCreated(result.pipeline.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start feature");
@@ -150,6 +174,10 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     <h2 className="text-lg font-semibold text-zinc-100">Build a feature</h2>
     <p className="mt-1 text-sm text-zinc-400">Describe a change on a feature branch, review the agent's plan, then run implementation and independent review. Once changes are committed, you can publish a draft PR.</p>
     <p className="mt-3 text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
+    <div className="mt-2 flex items-center gap-3 text-xs text-zinc-400">
+      <span>Feature request and agent choices are saved in this browser for this project until you start a plan or clear them. Runtime approval is never saved.</span>
+      {(feature || branchName || planner || implementer || reviewer) && <button type="button" onClick={clearDraft} className="shrink-0 text-blue-300 underline">Clear draft</button>}
+    </div>
     <div className="mt-3 space-y-2 rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Prepare feature branch">
       <h3 className="font-medium">Prepare a feature branch (required)</h3>
       <p>Current branch: {branchState?.branch || "Checking..."} · Configured base: {branchState?.baseBranch ?? project?.defaultBranch ?? "Checking..."}</p>
