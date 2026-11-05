@@ -69,7 +69,7 @@ function ImplementationEvidence({ run, isLoading, isError }: { run?: Run; isLoad
   if (isLoading) return <span>Loading implementation runs...</span>;
   if (isError) return <span>Could not load implementation runs; test results unverified.</span>;
 
-  if (!run) return <span>No implementation run recorded yet; test results unverified.</span>;
+  if (!run) return <span>No run recorded for the current implementation task; test results unverified. Earlier attempts may have separate task runs.</span>;
   return <span>Run status: {run.status}; test results unverified. <a href={`#implementation-run-${encodeURIComponent(run.id)}`} className="text-blue-300 underline">Open run {run.id} and raw log</a>.</span>;
 }
 

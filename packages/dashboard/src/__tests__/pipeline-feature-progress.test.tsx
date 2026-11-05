@@ -55,7 +55,7 @@ describe("feature progress summary", () => {
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(within(progress()).getByText(/Plan.*awaiting approval/i)).toBeInTheDocument();
     expect(within(progress()).getByText(/Read the plan and approve it or request changes/i)).toBeInTheDocument();
-    expect(within(progress()).getByText(/No implementation run recorded yet/i)).toBeInTheDocument();
+    expect(within(progress()).getByText(/No run recorded for the current implementation task/i)).toBeInTheDocument();
   });
 
   it("links to the recorded implementation run without claiming its tests passed", () => {
