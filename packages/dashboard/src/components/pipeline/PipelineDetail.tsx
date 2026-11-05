@@ -18,11 +18,59 @@ import { ApiError } from "../../api/client.js";
 import { RunViewer } from "../runs/RunViewer.js";
 import { GitDiffViewer } from "../diff/GitDiffViewer.js";
 import { useEffect } from "react";
+import type { Pipeline, PipelineStep } from "../../types.js";
+import type { PipelineRepositoryDiff } from "../../hooks/usePipelines.js";
 
-function RunEvidence({ run, projectId, onOpen }: { run: Run; projectId: string; onOpen: () => void }) {
+function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPublish }: {
+  pipeline: Pipeline; steps: PipelineStep[]; diff?: PipelineRepositoryDiff;
+  diffLoading: boolean; diffError: boolean; canPublish: boolean;
+}) {
+  const active = steps.find(step => ["awaiting_verification", "running", "failed"].includes(step.status))
+    ?? steps.find(step => step.status === "pending");
+  const implement = steps.find(step => step.label.toLowerCase() === "implement");
+  const review = steps.find(step => /\b(review|verification)\b/i.test(step.label));
+  const { data: implementationRuns, isLoading: runsLoading, isError: runsError } = useRuns(
+    pipeline.projectId, { taskId: implement?.taskId ?? "", limit: 20 }, !!implement?.taskId,
+  );
+  const latestRun = implementationRuns?.[0];
+  const stalledImplementation = active?.id === implement?.id && active?.status === "pending" && latestRun?.status === "succeeded";
+  let nextAction: string;
+  if (pipeline.status === "failed") nextAction = "Inspect the failed step and its run log, then retry.";
+  else if (pipeline.status === "cancelled") nextAction = "No action; workflow cancelled.";
+  else if (stalledImplementation) nextAction = "Run ended without completing implementation. Inspect its log before retrying.";
+  else if (active?.status === "awaiting_verification") {
+    nextAction = active.label.toLowerCase() === "plan" ? "Read the plan and approve it or request changes."
+      : /\b(review|verification)\b/i.test(active.label) ? "Read the independent review and accept or reject it."
+        : `Review ${active.label} and approve or reject it.`;
+  } else if (canPublish) nextAction = "Inspect the diff and run logs, then create a draft PR.";
+  else if (pipeline.status === "completed" && diff?.prLookup === "found") nextAction = "Inspect the repository PR and checks.";
+  else if (pipeline.status === "completed" && diff?.prLookup === "none") nextAction = "Publication not ready. Check the review and repository prerequisites below.";
+  else if (pipeline.status === "completed") nextAction = "PR status unavailable. Check GitHub and repository prerequisites below.";
+  else nextAction = "No decision needed yet; wait for the current step.";
+  return <section aria-label="Feature progress" className="rounded border border-zinc-700 bg-zinc-900/60 p-4 text-sm text-zinc-300 space-y-3">
+    <h4 className="font-semibold text-zinc-100">Feature progress</h4>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <p>Current stage: <span className="text-zinc-100">{pipeline.status === "completed" ? "Workflow completed" : pipeline.status === "cancelled" ? "Workflow cancelled" : active ? `${active.label} · ${active.status === "awaiting_verification" ? "awaiting approval" : active.status}` : pipeline.status}</span></p>
+      <p>Next action: <span className="text-zinc-100">{nextAction}</span></p>
+      <div>Implementation test evidence: {implement?.taskId ? <ImplementationEvidence run={latestRun} isLoading={runsLoading} isError={runsError} /> : <span>No implementation run recorded yet.</span>}</div>
+      <p>Review decision: <span className="text-zinc-100">{!review ? "No review step recorded" : review.outputSummary?.startsWith("[REJECTED]") ? "Rejected; changes requested" : review.status === "completed" ? review.requiresVerification ? "Accepted (test results still require inspection)" : "Completed; no human decision recorded" : review.status === "awaiting_verification" ? "Awaiting your decision" : review.status === "failed" ? "Review failed" : "Not decided"}</span></p>
+      <p className="sm:col-span-2">Draft PR: {diffLoading ? "Checking repository..." : diffError || !diff?.available || diff.prLookup === "unavailable" ? "PR lookup unavailable; check GitHub." : diff.prLookup === "found" && diff.pullRequest ? <a href={diff.pullRequest.url} target="_blank" rel="noopener noreferrer" className="text-blue-300 underline">{diff.pullRequest.isDraft === true ? "Draft PR" : diff.pullRequest.isDraft === false ? "PR (not draft)" : "PR (draft status unknown)"} #{diff.pullRequest.number} · {diff.pullRequest.state.toLowerCase()}</a> : diff.prLookup === "none" ? "No PR found for this branch commit." : "Not verified for this branch commit."}</p>
+    </div>
+  </section>;
+}
+
+function ImplementationEvidence({ run, isLoading, isError }: { run?: Run; isLoading: boolean; isError: boolean }) {
+  if (isLoading) return <span>Loading implementation runs...</span>;
+  if (isError) return <span>Could not load implementation runs; test results unverified.</span>;
+
+  if (!run) return <span>No implementation run recorded yet; test results unverified.</span>;
+  return <span>Run status: {run.status}; test results unverified. <a href={`#implementation-run-${encodeURIComponent(run.id)}`} className="text-blue-300 underline">Open run {run.id} and raw log</a>.</span>;
+}
+
+function RunEvidence({ run, projectId, onOpen, implementation }: { run: Run; projectId: string; onOpen: () => void; implementation: boolean }) {
   const [open, setOpen] = useState(false);
   const { data: log, isLoading, isError, error, refetch } = useRunLog(open ? run.id : null, projectId);
-  return <div className="rounded border border-zinc-700 bg-zinc-950/60 p-2 space-y-2">
+  return <div id={implementation ? `implementation-run-${run.id}` : undefined} className="rounded border border-zinc-700 bg-zinc-950/60 p-2 space-y-2">
     <div className="flex flex-wrap items-center gap-2 text-zinc-300">
       <span className="font-mono">{run.id}</span>
       <span>{run.agentId} · Run status: {run.status}</span>
@@ -47,13 +95,13 @@ function RunEvidence({ run, projectId, onOpen }: { run: Run; projectId: string; 
 function StepEvidence({ taskId, projectId, stepStatus, label }: { taskId: string; projectId: string; stepStatus: string; label: string }) {
   const { data: runs, isLoading, isError, refetch } = useRuns(projectId, { taskId, limit: 20 });
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
-  return <section aria-label={`${label} run evidence`} className="mt-2 space-y-2 text-xs">
+  return <section id={label.toLowerCase() === "implement" ? "implementation-run-evidence" : undefined} aria-label={`${label} run evidence`} className="mt-2 space-y-2 text-xs">
     <a href={`/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`} className="text-blue-300 underline">Open task {taskId}</a>
     <p className="text-zinc-500">Run status is not a test result. Inspect the raw log for actual test output.</p>
     {isLoading && <p role="status" className="text-zinc-400">Loading runs...</p>}
     {isError && <p role="alert" className="text-amber-300">Could not load runs. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>}
     {!isLoading && !isError && runs?.length === 0 && <p className="text-zinc-400">No run recorded yet for this step.</p>}
-    {runs?.map(run => <RunEvidence key={run.id} run={run} projectId={projectId} onOpen={() => setSelectedRun(run.id)} />)}
+    {runs?.map(run => <RunEvidence key={run.id} run={run} projectId={projectId} implementation={label.toLowerCase() === "implement"} onOpen={() => setSelectedRun(run.id)} />)}
     {stepStatus === "pending" && runs?.[0]?.status === "succeeded" &&
       <p role="status" className="text-amber-300">Agent run ended without completing this step. Inspect its log before retrying.</p>}
     {selectedRun && <RunViewer runId={selectedRun} projectId={projectId} onClose={() => setSelectedRun(null)} />}
@@ -244,6 +292,8 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
         </span>
       </div>
 
+      {steps[0]?.label.toLowerCase() === "plan" && implement && review &&
+        <FeatureProgress pipeline={pipeline} steps={steps} diff={repositoryDiff} diffLoading={diffLoading} diffError={diffError} canPublish={!!canPublish} />}
       <PipelineStepper steps={steps} currentStep={pipeline.currentStep} />
 
       <section aria-label="Repository changes" className="rounded border border-zinc-800 p-3 space-y-2">

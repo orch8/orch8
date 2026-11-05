@@ -113,7 +113,7 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
     const untracked = (await git(["ls-files", "--others", "--exclude-standard", "-z"])).stdout;
     const paths = untracked ? untracked.split("\0").filter(Boolean) : [];
     const branch = (await git(["symbolic-ref", "--quiet", "--short", "HEAD"]).catch(() => ({ stdout: "" }))).stdout.trim();
-    let pullRequest: { number: number; url: string; title: string; state: string; checks: PrCheck[] } | null = null;
+    let pullRequest: { number: number; url: string; title: string; state: string; isDraft?: boolean; checks: PrCheck[] } | null = null;
     let prLookup: "found" | "none" | "unavailable" | "not_applicable" = "not_applicable";
     if (branch && branch !== baseBranch) {
       try {
@@ -123,7 +123,7 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
           const head = (await git(["rev-parse", "HEAD"])).stdout.trim();
           const repo = `${match[1]}/${match[2]}`;
           const { stdout } = await runGit("gh", ["pr", "list", "--repo", repo, "--head", branch, "--base", baseBranch,
-            "--state", "all", "--json", "number,url,title,state,headRefOid,statusCheckRollup", "--limit", "20"],
+            "--state", "all", "--json", "number,url,title,state,isDraft,headRefOid,statusCheckRollup", "--limit", "20"],
           { cwd: homeDir, env, timeout: 10_000, maxBuffer: 1024 * 1024, encoding: "utf8" });
           const items: unknown = JSON.parse(stdout);
           if (!Array.isArray(items)) throw new Error("Invalid GitHub response");
@@ -132,7 +132,8 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
             typeof item.url === "string" && item.url.startsWith(`https://github.com/${repo}/pull/`) &&
             ["OPEN", "CLOSED", "MERGED"].includes(item.state));
           if (found) {
-            pullRequest = { number: found.number, url: found.url, title: found.title, state: found.state, checks: readPrChecks(found.statusCheckRollup) };
+            pullRequest = { number: found.number, url: found.url, title: found.title, state: found.state,
+              ...(typeof found.isDraft === "boolean" ? { isDraft: found.isDraft } : {}), checks: readPrChecks(found.statusCheckRollup) };
             prLookup = "found";
           } else prLookup = items.length < 20 ? "none" : "unavailable";
         } else prLookup = "unavailable";
