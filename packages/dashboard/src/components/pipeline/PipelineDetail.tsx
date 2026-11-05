@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   usePipeline,
   useRequestPlanChanges,
+  usePlanAttempts,
   usePipelineDiff,
   usePublishPipelinePr,
   useCancelPipeline,
@@ -73,6 +74,23 @@ function StepOutput({ pipelineId, stepId, label, revision }: { pipelineId: strin
         <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words text-xs text-zinc-200">{data.content || "(Empty file)"}</pre></>}
     </div>}
   </div>;
+}
+
+function PlanHistory({ pipelineId, projectId }: { pipelineId: string; projectId: string }) {
+  const { data: attempts, isLoading, isError, refetch } = usePlanAttempts(pipelineId, true);
+  if (isLoading) return <p className="mt-2 text-xs text-zinc-400">Loading plan history...</p>;
+  if (isError) return <p role="alert" className="mt-2 text-xs text-amber-300">Plan history unavailable. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>;
+  if (!attempts || attempts.length < 2) return null;
+  return <section aria-label="Plan history" className="mt-3 space-y-2 text-xs">
+    <h4 className="font-medium text-zinc-200">Plan attempts</h4>
+    {attempts.map((attempt, index) => <details key={attempt.taskId} className="rounded border border-zinc-700 p-2">
+      <summary className="cursor-pointer text-blue-300">Attempt {index + 1}: {attempt.taskId}</summary>
+      <a href={`/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(attempt.taskId)}`} className="underline text-blue-300">Open planning task and run</a>
+      <p className="break-all font-mono text-zinc-500">{attempt.path}</p>
+      {attempt.content === null ? <p className="text-amber-300">Plan file unavailable. Inspect the task run.</p>
+        : <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words bg-zinc-950 p-3 text-zinc-200">{attempt.content || "(Empty file)"}</pre>}
+    </details>)}
+  </section>;
 }
 
 function PlanDecision({ pipelineId, stepId, revision, outputFilePath }: { pipelineId: string; stepId: string; revision: string; outputFilePath: string | null }) {
@@ -296,6 +314,8 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
                 <ReviewDecision key={`${step.id}:${step.updatedAt ?? ""}`} pipelineId={pipeline.id} stepId={step.id} revision={String(step.updatedAt ?? step.outputSummary ?? "")} outputFilePath={step.outputFilePath ?? null} prEligibleLabel={["review", "independent review"].includes(step.label.toLowerCase())} /> :
                 step.outputFilePath && (step.status === "completed" || step.status === "awaiting_verification") &&
                 <StepOutput pipelineId={pipeline.id} stepId={step.id} label={step.label} revision={String(step.updatedAt ?? step.outputSummary ?? "")} />}
+            {step.order === 1 && step.label.toLowerCase() === "plan" &&
+              <PlanHistory pipelineId={pipeline.id} projectId={projectId ?? pipeline.projectId} />}
             {step.status === "awaiting_verification" && !step.outputSummary &&
               <p role="alert" className="mt-2 text-xs text-amber-300">No plan or review summary is available. Inspect the task and run log before approving.</p>}
             {step.outputSummary && (

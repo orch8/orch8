@@ -81,9 +81,15 @@ describe("pipeline approval safety", () => {
     expect(paths).toEqual(expect.arrayContaining([
       p.steps[0].outputFilePath, first.step.outputFilePath, second.step.outputFilePath,
     ]));
+    expect(paths).not.toContain(`.orch8/pipelines/${p.pipeline.id}/Plan-${p.firstTask.id}.md`);
     expect(paths).not.toContain(other.steps[0].outputFilePath);
     expect(paths).not.toContain(`.orch8/pipelines/${p.pipeline.id}/Plan-${other.firstTask.id}.md`);
     expect(paths).not.toContain(`.orch8/pipelines/${p.pipeline.id}/unrelated.md`);
+    expect(await service.getPlanAttempts(p.pipeline.id)).toEqual([
+      { taskId: p.firstTask.id, path: p.steps[0].outputFilePath },
+      { taskId: first.newTask.id, path: first.step.outputFilePath },
+      { taskId: second.newTask.id, path: second.step.outputFilePath },
+    ]);
     const response = await app.inject({ method: "GET", url: `/api/pipelines/${p.pipeline.id}/diff` });
     expect(response.json().publicationOutputPaths).toEqual(paths);
   });

@@ -342,24 +342,29 @@ export class PipelineService {
     });
   }
 
-  // Derive exact historical filenames from database links, never task descriptions or directory contents.
+  // A plan revision has its own task and filename; the first attempt writes Plan.md.
+  async getPlanAttempts(pipelineId: string): Promise<Array<{ taskId: string; path: string }>> {
+    const result = await this.getWithSteps(pipelineId);
+    if (!result || !/^[\w-]+$/.test(pipelineId)) return [];
+    const plan = result.steps.find(step => step.order === 1 && step.label.toLowerCase() === "plan");
+    if (!plan) return [];
+    const attempts = await this.db.select({ id: tasks.id }).from(tasks).where(and(
+      eq(tasks.projectId, result.pipeline.projectId), eq(tasks.pipelineId, pipelineId), eq(tasks.pipelineStepId, plan.id),
+    )).orderBy(asc(tasks.createdAt), asc(tasks.id));
+    return attempts.filter(task => /^[\w-]+$/.test(task.id)).map((task, index) => ({
+      taskId: task.id,
+      path: index === 0 ? `.orch8/pipelines/${pipelineId}/${plan.label}.md`
+        : `.orch8/pipelines/${pipelineId}/Plan-${task.id}.md`,
+    }));
+  }
+
   async getPublicationOutputPaths(pipelineId: string): Promise<string[]> {
     const result = await this.getWithSteps(pipelineId);
     if (!result) return [];
-    const paths = new Set(result.steps.flatMap(step => step.outputFilePath ? [step.outputFilePath] : []));
-    const plan = result.steps.find(step => step.order === 1 && step.label.toLowerCase() === "plan");
-    if (plan && /^[\w-]+$/.test(pipelineId)) {
-      const attempts = await this.db.select({ id: tasks.id }).from(tasks).where(and(
-        eq(tasks.projectId, result.pipeline.projectId), eq(tasks.pipelineId, pipelineId), eq(tasks.pipelineStepId, plan.id),
-      ));
-      if (attempts.length) paths.add(`.orch8/pipelines/${pipelineId}/${plan.label}.md`);
-      for (const task of attempts) {
-        if (/^[\w-]+$/.test(task.id) && task.id !== plan.taskId) {
-          paths.add(`.orch8/pipelines/${pipelineId}/Plan-${task.id}.md`);
-        }
-      }
-    }
-    return [...paths];
+    return [...new Set([
+      ...result.steps.flatMap(step => step.outputFilePath ? [step.outputFilePath] : []),
+      ...(await this.getPlanAttempts(pipelineId)).map(attempt => attempt.path),
+    ])];
   }
 
   async requestPlanChanges(pipelineId: string, stepId: string, feedback: string) {

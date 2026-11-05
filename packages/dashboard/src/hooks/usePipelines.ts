@@ -35,6 +35,14 @@ export interface PipelineRepositoryDiff {
   reason?: string;
 }
 
+export function usePlanAttempts(pipelineId: string, enabled: boolean) {
+  return useQuery<Array<{ taskId: string; path: string; content: string | null }>>({
+    queryKey: ["plan-attempts", pipelineId],
+    queryFn: () => api.get(`/pipelines/${encodeURIComponent(pipelineId)}/plan-attempts`),
+    enabled,
+  });
+}
+
 export function usePipelineDiff(pipelineId: string) {
   return useQuery<PipelineRepositoryDiff>({
     queryKey: ["pipeline-diff", pipelineId],
@@ -161,6 +169,7 @@ export function useRequestPlanChanges() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["pipelines"] });
       qc.invalidateQueries({ queryKey: ["pipeline", data.pipeline.id] });
+      qc.invalidateQueries({ queryKey: ["plan-attempts", data.pipeline.id] });
     },
   });
 }

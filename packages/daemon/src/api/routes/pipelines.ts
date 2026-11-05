@@ -273,6 +273,19 @@ export async function pipelineRoutes(app: FastifyInstance) {
       publicationOutputPaths: await app.pipelineService.getPublicationOutputPaths(pipeline.id) };
   });
 
+  // Prior plans remain inspectable after a revision replaces the active step's task.
+  app.get("/api/pipelines/:id/plan-attempts", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const pipeline = await app.pipelineService.getById(request.params.id);
+    if (!pipeline) return reply.code(404).send({ error: "not_found", message: "Pipeline not found" });
+    if (!requireProjectScope(request, reply, pipeline.projectId)) return reply;
+    const project = await app.projectService.getById(pipeline.projectId);
+    if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    const attempts = await app.pipelineService.getPlanAttempts(pipeline.id);
+    return Promise.all(attempts.map(async attempt => ({ ...attempt,
+      content: await stepArtifact(project.homeDir, pipeline.id, attempt.path),
+    })));
+  });
+
   // Read the recorded plan/review file; the request never supplies a filesystem path.
   app.get("/api/pipelines/:id/steps/:stepId/output", async (request: FastifyRequest<{ Params: { id: string; stepId: string } }>, reply: FastifyReply) => {
     const result = await app.pipelineService.getWithSteps(request.params.id);

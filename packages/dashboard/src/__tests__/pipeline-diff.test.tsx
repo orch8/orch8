@@ -6,6 +6,7 @@ import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
 const state = vi.hoisted(() => ({ publish: vi.fn(), steps: [] as Array<{ id: string; label: string; order: number; agentId: string; status: string; outputSummary: string; outputFilePath?: string; requiresVerification?: boolean }>, diff: { available: true, diff: "", committedDiff: "", workingDiff: "", baseBranch: "main", untrackedFiles: [] as string[], untrackedMore: false } as { available: boolean; diff: string; committedDiff?: string; workingDiff?: string; baseBranch?: string; untrackedFiles?: string[]; publicationOutputPaths?: string[]; untrackedMore?: boolean; reason?: string; branch?: string; prLookup?: string; pullRequest?: { number: number; title: string; state: string; url: string } | null } }));
 vi.mock("../hooks/usePipelines.js", () => ({
   usePipeline: () => ({ data: { pipeline: { id: "pipe_1", name: "Build", projectId: "proj_1", status: "completed", currentStep: 1 }, steps: state.steps }, isLoading: false, refetch: vi.fn() }),
+  usePlanAttempts: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
   usePipelineDiff: () => ({ data: state.diff, isLoading: false, isError: false, refetch: vi.fn() }),
   useCancelPipeline: () => ({ isPending: false }),
   useRetryPipeline: () => ({ isPending: false }),
