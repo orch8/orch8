@@ -25,19 +25,25 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
   pipeline: Pipeline; steps: PipelineStep[]; diff?: PipelineRepositoryDiff;
   diffLoading: boolean; diffError: boolean; canPublish: boolean;
 }) {
-  const active = steps.find(step => ["awaiting_verification", "running", "failed"].includes(step.status))
+  const active = steps.find(step => step.order === pipeline.currentStep && step.status !== "completed")
+    ?? steps.find(step => ["awaiting_verification", "running", "failed"].includes(step.status))
     ?? steps.find(step => step.status === "pending");
   const implement = steps.find(step => step.label.toLowerCase() === "implement");
   const review = steps.find(step => /\b(review|verification)\b/i.test(step.label));
   const { data: implementationRuns, isLoading: runsLoading, isError: runsError } = useRuns(
     pipeline.projectId, { taskId: implement?.taskId ?? "", limit: 20 }, !!implement?.taskId,
   );
+  const { data: activeRuns } = useRuns(
+    pipeline.projectId, { taskId: active?.taskId ?? "", limit: 20 },
+    active?.status === "pending" && !!active.taskId && active.taskId !== implement?.taskId,
+  );
   const latestRun = implementationRuns?.[0];
-  const stalledImplementation = active?.id === implement?.id && active?.status === "pending" && latestRun?.status === "succeeded";
+  const activeRun = active?.taskId === implement?.taskId ? latestRun : activeRuns?.[0];
+  const stalledStep = active?.status === "pending" && activeRun?.status === "succeeded";
   let nextAction: string;
   if (pipeline.status === "failed") nextAction = "Inspect the failed step and its run log, then retry.";
   else if (pipeline.status === "cancelled") nextAction = "No action; workflow cancelled.";
-  else if (stalledImplementation) nextAction = "Run ended without completing implementation. Inspect its log before retrying.";
+  else if (stalledStep) nextAction = `Run ended without completing ${active.label.toLowerCase() === "implement" ? "implementation" : active.label.toLowerCase()}. Inspect its log before retrying.`;
   else if (active?.status === "awaiting_verification") {
     nextAction = active.label.toLowerCase() === "plan" ? "Read the plan and approve it or request changes."
       : /\b(review|verification)\b/i.test(active.label) ? "Read the independent review and accept or reject it."

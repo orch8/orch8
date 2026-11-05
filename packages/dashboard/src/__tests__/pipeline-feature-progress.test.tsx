@@ -4,6 +4,7 @@ import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
 
 const state = vi.hoisted(() => ({
   status: "running",
+  currentStep: 1,
   steps: [] as Array<Record<string, unknown>>,
   runs: [] as Array<Record<string, unknown>>,
   runsLoading: false,
@@ -11,7 +12,7 @@ const state = vi.hoisted(() => ({
   diff: { available: false, reason: "No repository" } as Record<string, unknown>,
 }));
 vi.mock("../hooks/usePipelines.js", () => ({
-  usePipeline: () => ({ data: { pipeline: { id: "pipe_1", name: "Feature", projectId: "proj_1", status: state.status, currentStep: 1 }, steps: state.steps }, isLoading: false, refetch: vi.fn() }),
+  usePipeline: () => ({ data: { pipeline: { id: "pipe_1", name: "Feature", projectId: "proj_1", status: state.status, currentStep: state.currentStep }, steps: state.steps }, isLoading: false, refetch: vi.fn() }),
   usePlanAttempts: () => ({ data: [], isLoading: false, isError: false }),
   usePipelineDiff: () => ({ data: state.diff, isLoading: false, isError: false, refetch: vi.fn() }),
   usePipelineStepOutput: () => ({ data: null, isLoading: false, isError: false, refetch: vi.fn() }),
@@ -23,7 +24,7 @@ vi.mock("../hooks/usePipelines.js", () => ({
   usePublishPipelinePr: () => ({ isPending: false, isError: false }),
 }));
 vi.mock("../hooks/useRuns.js", () => ({
-  useRuns: () => ({ data: state.runs, isLoading: state.runsLoading, isError: state.runsError, refetch: vi.fn() }),
+  useRuns: (_projectId: string, filters?: { taskId?: string }) => ({ data: state.runs.filter(run => run.taskId === filters?.taskId), isLoading: state.runsLoading, isError: state.runsError, refetch: vi.fn() }),
   useRunLog: () => ({ data: null, isLoading: false, isError: false, refetch: vi.fn() }),
 }));
 
@@ -34,6 +35,7 @@ const progress = () => screen.getByRole("region", { name: "Feature progress" });
 
 beforeEach(() => {
   state.status = "running";
+  state.currentStep = 1;
   state.steps = [step("Plan", 1, "running"), step("Implement", 2, "pending"), step("Independent review", 3, "pending")];
   state.runs = [];
   state.runsLoading = false;
@@ -121,5 +123,22 @@ describe("feature progress summary", () => {
     state.runs = [{ id: "run_stalled", status: "succeeded", taskId: "task_2", agentId: "builder" }];
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(within(progress()).getByText(/Run ended without completing implementation.*Inspect its log before retrying/i)).toBeInTheDocument();
+  });
+
+  it("does not tell the operator to wait after a planning run ends without a plan", () => {
+    state.steps = [step("Plan", 1, "pending"), step("Implement", 2, "pending"), step("Independent review", 3, "pending")];
+    state.runs = [{ id: "run_stalled_plan", status: "succeeded", taskId: "task_1", agentId: "planner" }];
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(within(progress()).getByText(/Run ended without completing plan.*Inspect its log before retrying/i)).toBeInTheDocument();
+    expect(within(progress()).queryByText(/wait for the current step/i)).not.toBeInTheDocument();
+  });
+
+  it("shows implementation rework rather than a previously rejected review", () => {
+    state.currentStep = 2;
+    state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "pending"), step("Independent review", 3, "failed", { outputSummary: "[REJECTED] Fix the issue" })];
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(within(progress()).getByText(/Implement.*pending/i)).toBeInTheDocument();
+    expect(within(progress()).getByText(/Rejected; changes requested/i)).toBeInTheDocument();
+    expect(within(progress()).queryByText(/Independent review.*failed/i)).not.toBeInTheDocument();
   });
 });
