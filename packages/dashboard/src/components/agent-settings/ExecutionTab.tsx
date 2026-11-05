@@ -3,7 +3,6 @@ import { FormField } from "../shared/FormField.js";
 import type { Agent } from "../../types.js";
 import type { UseMutationResult } from "@tanstack/react-query";
 
-const CODEX_MODELS = ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex"];
 const CODEX_EFFORTS = ["minimal", "low", "medium", "high", "xhigh"];
 const CODEX_SANDBOXES = ["read-only", "workspace-write", "danger-full-access"];
 
@@ -68,7 +67,7 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
     setSessionMaxRuns(agent.sessionMaxRuns?.toString() ?? "");
     setSessionMaxInputTokens(agent.sessionMaxInputTokens?.toString() ?? "");
     setSessionMaxAgeHours(agent.sessionMaxAgeHours?.toString() ?? "");
-    setCodexModel(asString(config.model) || "gpt-5.5");
+    setCodexModel(asString(config.model) || agent.model || "");
     setCodexReasoningEffort(asString(config.modelReasoningEffort));
     setCodexSandbox(asString(config.sandbox));
     setCodexBypass(config.dangerouslyBypassApprovalsAndSandbox !== false);
@@ -100,9 +99,10 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
     };
 
     if (agent.adapterType === "codex_local") {
+      patch.model = codexModel.trim();
       patch.adapterConfig = {
         ...((agent.adapterConfig ?? {}) as Record<string, unknown>),
-        model: codexModel || undefined,
+        model: codexModel.trim(),
         modelReasoningEffort: codexReasoningEffort || undefined,
         sandbox: codexSandbox || undefined,
         dangerouslyBypassApprovalsAndSandbox: codexBypass,
@@ -211,12 +211,8 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
         <div className="flex flex-col gap-4 rounded-lg border border-zinc-800 p-3">
           <p className="text-sm font-medium text-zinc-300">Codex Runtime</p>
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Model">
-              <select value={codexModel} onChange={(e) => setCodexModel(e.target.value)} className={inputClass}>
-                {CODEX_MODELS.map((model) => (
-                  <option key={model} value={model}>{model}</option>
-                ))}
-              </select>
+            <FormField label="Model" description="Enter a model supported by your Codex account. Saving changes the adapter model used for the next run.">
+              <input aria-label="Codex runtime model" value={codexModel} onChange={(e) => setCodexModel(e.target.value)} className={inputClass} />
             </FormField>
 
             <FormField label="Reasoning Effort">
@@ -290,7 +286,7 @@ export function ExecutionTab({ agent, projectId, updateAgent }: ExecutionTabProp
 
       <button
         onClick={handleSave}
-        disabled={updateAgent.isPending}
+        disabled={updateAgent.isPending || (agent.adapterType === "codex_local" && !codexModel.trim())}
         className="self-start rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
       >
         {updateAgent.isPending ? "Saving..." : "Save Changes"}
