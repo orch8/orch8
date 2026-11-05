@@ -21,17 +21,27 @@ describe("feature intake", () => {
   state.agents = [];
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   expect(state.requestedAgents).toHaveBeenCalledWith("canonical-id");
+  fireEvent.change(screen.getByLabelText("Codex model for new agents"), { target: { value: "  gpt-6.1-sol  " } });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Set up feature agents" })); });
   expect(state.createAgent).toHaveBeenCalledTimes(3);
   for (const role of ["planner", "implementer", "reviewer"]) {
-   expect(state.createAgent).toHaveBeenCalledWith(expect.objectContaining({ id: `feature-${role}`, projectId: "canonical-id", role, adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
+   expect(state.createAgent).toHaveBeenCalledWith(expect.objectContaining({ id: `feature-${role}`, projectId: "canonical-id", role, adapterType: "codex_local", model: "gpt-6.1-sol", adapterConfig: { model: "gpt-6.1-sol", sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
   }
   expect(state.create).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
  });
+ it("requires a model before creating feature agents", async () => {
+  state.agents = [];
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  await screen.findByText(/Current branch: feat\/usage/);
+  act(() => { fireEvent.change(screen.getByLabelText("Codex model for new agents"), { target: { value: "  " } }); });
+  expect(screen.getByRole("button", { name: "Set up feature agents" })).toBeDisabled();
+  expect(state.createAgent).not.toHaveBeenCalled();
+ });
  it("does not overwrite an existing feature agent", async () => {
   state.agents = [{ id: "feature-planner", status: "paused", adapterType: "claude_local", adapterConfig: {} }];
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("Codex model for new agents"), { target: { value: "gpt-6.1-sol" } });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Set up feature agents" })); });
   expect(state.createAgent).not.toHaveBeenCalled();
   expect(screen.getByRole("alert").textContent).toContain("feature-planner already exists but is not eligible");

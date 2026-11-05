@@ -157,7 +157,11 @@ export function GeneralTab({ agent, projectId, updateAgent }: GeneralTabProps) {
           </div>
         </FormField>
 
-        <FormField label="Model">
+        {agent.adapterType === "codex_local" ? (
+          <FormField label="Model" description="Change the Codex model in the Execution tab. The adapter model takes precedence over this general setting.">
+            <p className="py-2 text-sm text-zinc-300">{String((agent.adapterConfig as Record<string, unknown> | null)?.model ?? agent.model)}</p>
+          </FormField>
+        ) : <FormField label="Model">
           <select
             aria-label="Model"
             value={model}
@@ -168,7 +172,7 @@ export function GeneralTab({ agent, projectId, updateAgent }: GeneralTabProps) {
               <option key={m} value={m}>{m}</option>
             ))}
           </select>
-        </FormField>
+        </FormField>}
 
         <FormField label="Effort">
           <select

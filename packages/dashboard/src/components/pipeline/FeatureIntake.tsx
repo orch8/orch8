@@ -12,6 +12,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const create = useCreatePipeline();
   const [settingUpAgents, setSettingUpAgents] = useState(false);
   const [setupError, setSetupError] = useState("");
+  const [codexModel, setCodexModel] = useState("");
   const [feature, setFeature] = useState("");
   const [planner, setPlanner] = useState("");
   const [implementer, setImplementer] = useState("");
@@ -61,7 +62,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   });
   const selected = [planner, implementer, reviewer].map(id => available.find(a => a.id === id));
   async function setupAgents() {
-    if (settingUpAgents || isLoading || !project?.id) return;
+    if (settingUpAgents || isLoading || !project?.id || !codexModel.trim()) return;
     setSettingUpAgents(true);
     setSetupError("");
     try {
@@ -74,8 +75,8 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
         if ((agents ?? []).some(agent => agent.id === id)) continue;
         await createAgent.mutateAsync({
           id, projectId: project.id, name: `Feature ${role}`, role,
-          adapterType: "codex_local", model: "gpt-5.5",
-          adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false },
+          adapterType: "codex_local", model: codexModel.trim(),
+          adapterConfig: { model: codexModel.trim(), sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false },
           heartbeatEnabled: false, wakeOnAssignment: true, maxConcurrentRuns: 1,
         });
       }
@@ -185,7 +186,10 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       {!isLoading && available.length < 3 && <div className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
         <p>Feature workflows need three Codex agents, with a separate reviewer. Set them up here instead of configuring each agent by hand.</p>
         <p className="mt-1 text-xs text-zinc-400">Creates missing Feature planner, implementer and reviewer agents for this project with workspace-write sandbox and approval bypass off. It does not run agents or change existing agent settings. You still need to check the runtime and approve the plan.</p>
-        <button type="button" onClick={() => { void setupAgents(); }} disabled={settingUpAgents || !project?.id} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:opacity-40">{settingUpAgents ? "Setting up agents..." : "Set up feature agents"}</button>
+        <label className="mt-2 block text-xs text-zinc-300" htmlFor="feature-codex-model">Codex model for new agents</label>
+        <input id="feature-codex-model" value={codexModel} onChange={event => setCodexModel(event.target.value)} placeholder="Model available to your Codex account" className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
+        <p className="mt-1 text-xs text-zinc-400">Use a model supported by your Codex account. Existing agents keep their model; change it in Agents if needed. The runtime check may report a host sandbox failure before it can check model access.</p>
+        <button type="button" onClick={() => { void setupAgents(); }} disabled={settingUpAgents || !project?.id || !codexModel.trim()} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:opacity-40">{settingUpAgents ? "Setting up agents..." : "Set up feature agents"}</button>
         {setupError && <p role="alert" className="mt-2 text-red-300">{setupError}</p>}
       </div>}
       {!isLoading && !available.length && <p role="status" className="text-sm text-amber-300">No eligible Codex agents yet. Set up feature agents above or configure active Codex agents in Agents.</p>}
