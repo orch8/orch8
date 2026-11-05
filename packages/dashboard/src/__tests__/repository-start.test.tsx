@@ -6,8 +6,10 @@ import { RepositoryStart } from "../components/onboarding/RepositoryStart.js";
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 beforeEach(() => mockFetch.mockReset());
+const ready = { ok: true, json: async () => ({ ready: true, branch: "main", baseBranch: "main" }) };
 
 it("opens a repository for feature intake without starting agents or changing budgets", async () => {
+  mockFetch.mockResolvedValueOnce(ready);
   mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: "repo-id", slug: "my-app" }) });
   const onComplete = vi.fn();
   renderWithProviders(<RepositoryStart onComplete={onComplete} />);
@@ -21,8 +23,9 @@ it("opens a repository for feature intake without starting agents or changing bu
   expect(Array.from(form.elements).filter(el => el instanceof HTMLInputElement && !el.checkValidity()).map(el => (el as HTMLInputElement).outerHTML)).toEqual([]);
   await user.click(screen.getByRole("button", { name: "Open and describe feature" }));
   await waitFor(() => expect(onComplete).toHaveBeenCalledWith("my-app"));
-  expect(mockFetch).toHaveBeenCalledTimes(1);
-  const [url, options] = mockFetch.mock.calls[0];
+  expect(mockFetch).toHaveBeenCalledTimes(2);
+  expect(mockFetch.mock.calls[0][0]).toContain("/api/projects/repository-readiness");
+  const [url, options] = mockFetch.mock.calls[1];
   expect(url).toContain("/api/projects");
   expect(JSON.parse(options.body)).toMatchObject({
     name: "My App", slug: "my-app", key: "MYA", homeDir: "/tmp/my-app", repoUrl: "https://github.com/owner/my-app.git", defaultBranch: "main", finishStrategy: "none", budgetLimitUsd: 10,
@@ -30,6 +33,7 @@ it("opens a repository for feature intake without starting agents or changing bu
 });
 
 it("keeps the form and shows the API error when repository creation fails", async () => {
+  mockFetch.mockResolvedValueOnce(ready);
   mockFetch.mockRejectedValueOnce(new Error("Repository not found"));
   renderWithProviders(<RepositoryStart onComplete={vi.fn()} />);
   const user = userEvent.setup();
@@ -42,6 +46,7 @@ it("keeps the form and shows the API error when repository creation fails", asyn
 });
 
 it("can start without a GitHub URL while clearly disclosing the later PR requirement", async () => {
+  mockFetch.mockResolvedValueOnce(ready);
   mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: "repo-id", slug: "local-only" }) });
   renderWithProviders(<RepositoryStart onComplete={vi.fn()} />);
   const user = userEvent.setup();
@@ -50,8 +55,22 @@ it("can start without a GitHub URL while clearly disclosing the later PR require
   await user.type(screen.getByLabelText("Local repository path"), "/tmp/local-only");
   await user.click(screen.getByLabelText(/No project spending limit/));
   await user.click(screen.getByRole("button", { name: "Open and describe feature" }));
-  await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
-  expect(JSON.parse(mockFetch.mock.calls[0][1].body)).not.toHaveProperty("repoUrl");
+  await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+  expect(JSON.parse(mockFetch.mock.calls[1][1].body)).not.toHaveProperty("repoUrl");
+});
+
+it("does not create a project for a missing or dirty checkout, and keeps the inputs", async () => {
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ready: false, reason: "The repository must be clean before preparing a feature branch." }) });
+  renderWithProviders(<RepositoryStart onComplete={vi.fn()} />);
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText("Repository name"), "My App");
+  await user.type(screen.getByLabelText("Local repository path"), "/tmp/my-app");
+  await user.click(screen.getByLabelText(/No project spending limit/));
+  await user.click(screen.getByRole("button", { name: "Open and describe feature" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("repository must be clean");
+  expect(screen.getByLabelText("Local repository path")).toHaveValue("/tmp/my-app");
+  expect(mockFetch).toHaveBeenCalledTimes(1);
+  expect(mockFetch.mock.calls[0][0]).toContain("/api/projects/repository-readiness");
 });
 
 it("allows a different key when two names share a prefix, and requires an explicit budget choice", async () => {
