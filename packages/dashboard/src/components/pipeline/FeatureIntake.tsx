@@ -226,7 +226,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
         {branchState?.note && <p role="status" className="text-amber-300">{branchState.note} Include it in the feature commit if you want the ignore rule in the PR.</p>}
         {branchError && <p role="alert" className="text-red-300">{branchError}</p>}
       </div>
-      {branchState && !onFeatureBranch && <p role="status" className="text-xs text-amber-300">Start is unavailable on the base branch. Prepare a feature branch above, then check the agents.</p>}
+      {branchState && !onFeatureBranch && <p role="status" className="text-xs text-amber-300">Start is unavailable on the base branch. Check the agents above, then prepare a feature branch.</p>}
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       <button type="submit" disabled={!ready} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Start with a plan</button>
     </form>
