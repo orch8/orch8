@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useAgents } from "../../hooks/useAgents.js";
+import { useAgents, useCreateAgent } from "../../hooks/useAgents.js";
 import { useProject } from "../../hooks/useProjects.js";
 import { useCreatePipeline } from "../../hooks/usePipelines.js";
 import { api } from "../../api/client.js";
@@ -7,8 +7,11 @@ import { api } from "../../api/client.js";
 /** An opinionated entry point to the existing pipeline runner, not a second executor. */
 export function FeatureIntake({ projectId, onCreated }: { projectId: string; onCreated: (id: string) => void }) {
   const { data: project } = useProject(projectId);
-  const { data: agents, isLoading } = useAgents(projectId);
+  const { data: agents, isLoading } = useAgents(project?.id ?? projectId);
+  const createAgent = useCreateAgent();
   const create = useCreatePipeline();
+  const [settingUpAgents, setSettingUpAgents] = useState(false);
+  const [setupError, setSetupError] = useState("");
   const [feature, setFeature] = useState("");
   const [planner, setPlanner] = useState("");
   const [implementer, setImplementer] = useState("");
@@ -57,6 +60,35 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       !config.extraArgs?.length && !Object.keys(config.configOverrides ?? {}).length && !config.profile;
   });
   const selected = [planner, implementer, reviewer].map(id => available.find(a => a.id === id));
+  async function setupAgents() {
+    if (settingUpAgents || isLoading || !project?.id) return;
+    setSettingUpAgents(true);
+    setSetupError("");
+    try {
+      const roles = ["planner", "implementer", "reviewer"] as const;
+      const incompatible = roles.map(role => `feature-${role}`).filter(id =>
+        (agents ?? []).some(agent => agent.id === id && !available.some(candidate => candidate.id === id)));
+      if (incompatible.length) throw new Error(`${incompatible.join(", ")} already exists but is not eligible. Fix its Codex sandbox and status in Agents; existing settings will not be changed.`);
+      for (const role of roles) {
+        const id = `feature-${role}`;
+        if ((agents ?? []).some(agent => agent.id === id)) continue;
+        await createAgent.mutateAsync({
+          id, projectId: project.id, name: `Feature ${role}`, role,
+          adapterType: "codex_local", model: "gpt-5.5",
+          adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false },
+          heartbeatEnabled: false, wakeOnAssignment: true, maxConcurrentRuns: 1,
+        });
+      }
+      setPlanner("feature-planner");
+      setImplementer("feature-implementer");
+      setReviewer("feature-reviewer");
+      setCheckedKey("");
+    } catch (err) {
+      setSetupError(`Could not finish agent setup. Check Agents before retrying. ${err instanceof Error ? err.message : ""}`);
+    } finally {
+      setSettingUpAgents(false);
+    }
+  }
   const selectionKey = JSON.stringify(selected.map(a => [a?.id, a?.adapterConfig]));
   const validSelection = selected.every(Boolean) && reviewer !== implementer;
   const onFeatureBranch = !!branchState?.branch && branchState.branch !== branchState.baseBranch;
@@ -150,7 +182,13 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
             </select>
           </label>) }
       </div>
-      {!isLoading && !available.length && <p role="status" className="text-sm text-amber-300">No eligible Codex agents. Configure active Codex agents with sandbox enabled and approval bypass disabled in Agents before starting.</p>}
+      {!isLoading && available.length < 3 && <div className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
+        <p>Feature workflows need three Codex agents, with a separate reviewer. Set them up here instead of configuring each agent by hand.</p>
+        <p className="mt-1 text-xs text-zinc-400">Creates missing Feature planner, implementer and reviewer agents for this project with workspace-write sandbox and approval bypass off. It does not run agents or change existing agent settings. You still need to check the runtime and approve the plan.</p>
+        <button type="button" onClick={() => { void setupAgents(); }} disabled={settingUpAgents || !project?.id} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:opacity-40">{settingUpAgents ? "Setting up agents..." : "Set up feature agents"}</button>
+        {setupError && <p role="alert" className="mt-2 text-red-300">{setupError}</p>}
+      </div>}
+      {!isLoading && !available.length && <p role="status" className="text-sm text-amber-300">No eligible Codex agents yet. Set up feature agents above or configure active Codex agents in Agents.</p>}
       {reviewer && implementer && reviewer === implementer && <p role="alert" className="text-sm text-amber-300">Choose a different agent for independent review.</p>}
       <button type="button" onClick={() => { void checkRuntime(); }} disabled={!validSelection || checking} className="rounded border border-zinc-600 px-4 py-2 text-sm text-zinc-200 disabled:opacity-40">{checking ? "Checking agents..." : "Check agent runtime"}</button>
       {checkMessage && <p role="status" className={checkedKey === selectionKey ? "text-sm text-emerald-300" : "text-sm text-amber-300"}>{checkMessage}</p>}

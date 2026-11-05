@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { FeatureIntake } from "../components/pipeline/FeatureIntake.js";
-const state = vi.hoisted(() => ({ agents: [] as any[], create: vi.fn(), probe: vi.fn(), readiness: vi.fn() }));
+const state = vi.hoisted(() => ({ agents: [] as any[], requestedAgents: vi.fn(), create: vi.fn(), createAgent: vi.fn(), probe: vi.fn(), readiness: vi.fn() }));
 vi.mock("../api/client.js", () => ({ api: { post: state.probe, get: state.readiness } }));
-vi.mock("../hooks/useAgents.js", () => ({ useAgents: () => ({ data: state.agents, isLoading: false }) }));
+vi.mock("../hooks/useAgents.js", () => ({ useAgents: (id: string) => { state.requestedAgents(id); return { data: state.agents, isLoading: false }; }, useCreateAgent: () => ({ mutateAsync: state.createAgent }) }));
 vi.mock("../hooks/useProjects.js", () => ({ useProject: () => ({ data: { id: "canonical-id", homeDir: "/repo" } }) }));
 vi.mock("../hooks/usePipelines.js", () => ({ useCreatePipeline: () => ({ mutateAsync: state.create, isPending: false }) }));
 beforeEach(() => {
- state.create.mockReset(); state.probe.mockReset(); state.probe.mockResolvedValue({ ok: true });
+ state.requestedAgents.mockReset(); state.create.mockReset(); state.createAgent.mockReset(); state.createAgent.mockResolvedValue({ id: "created" }); state.probe.mockReset(); state.probe.mockResolvedValue({ ok: true });
  state.readiness.mockReset(); state.readiness.mockResolvedValue({ ready: false, branch: "feat/usage", baseBranch: "main" });
  state.agents = ["planner", "implementer", "reviewer"].map(id => ({ id, name: id, status: "active", adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
 });
@@ -17,6 +17,26 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("sets up three sandboxed agents explicitly without starting a feature", async () => {
+  state.agents = [];
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(state.requestedAgents).toHaveBeenCalledWith("canonical-id");
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Set up feature agents" })); });
+  expect(state.createAgent).toHaveBeenCalledTimes(3);
+  for (const role of ["planner", "implementer", "reviewer"]) {
+   expect(state.createAgent).toHaveBeenCalledWith(expect.objectContaining({ id: `feature-${role}`, projectId: "canonical-id", role, adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
+  }
+  expect(state.create).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+ });
+ it("does not overwrite an existing feature agent", async () => {
+  state.agents = [{ id: "feature-planner", status: "paused", adapterType: "claude_local", adapterConfig: {} }];
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Set up feature agents" })); });
+  expect(state.createAgent).not.toHaveBeenCalled();
+  expect(screen.getByRole("alert").textContent).toContain("feature-planner already exists but is not eligible");
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+ });
  it("explains that generated ignore changes follow the feature branch without a commit", async () => {
   state.readiness.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main", note: "Orch8's generated .gitignore will remain uncommitted on the feature branch." });
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
