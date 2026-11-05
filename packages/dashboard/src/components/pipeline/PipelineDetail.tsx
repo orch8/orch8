@@ -14,7 +14,7 @@ import {
 import { PipelineStepper } from "./PipelineStepper.js";
 import { useRuns, useRunLog } from "../../hooks/useRuns.js";
 import type { Run } from "../../types.js";
-import { ApiError } from "../../api/client.js";
+import { api, ApiError } from "../../api/client.js";
 import { RunViewer } from "../runs/RunViewer.js";
 import { GitDiffViewer } from "../diff/GitDiffViewer.js";
 import { useEffect } from "react";
@@ -40,6 +40,31 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
   const latestRun = implementationRuns?.[0];
   const activeRun = active?.taskId === implement?.taskId ? latestRun : activeRuns?.[0];
   const stalledStep = active?.status === "pending" && activeRun?.status === "succeeded";
+  const [retrying, setRetrying] = useState(false);
+  const [retryMessage, setRetryMessage] = useState("");
+  async function checkIncompleteStepRuntime() {
+    if (!stalledStep || !active?.agentId || !active.taskId || retrying) return;
+    setRetrying(true);
+    setRetryMessage("");
+    try {
+      const agent = await api.get<{ adapterType: string; adapterConfig: Record<string, unknown> }>(
+        `/agents/${encodeURIComponent(active.agentId)}`, { projectId: pipeline.projectId },
+      );
+      if (agent.adapterType !== "codex_local" || agent.adapterConfig?.sandbox !== "workspace-write" ||
+        agent.adapterConfig?.dangerouslyBypassApprovalsAndSandbox !== false) {
+        throw new Error("This agent does not have the supported sandbox configuration. Check its settings before retrying.");
+      }
+      const check = await api.post<{ ok: boolean; message?: string }>(
+        "/adapter/codex_local/test-environment", { config: agent.adapterConfig },
+      );
+      if (!check.ok) throw new Error(check.message ?? "Codex runtime check failed. No new run was started.");
+      setRetryMessage("Codex sandbox can run commands. No run was queued by this check. Inspect the task and its previous run before resuming.");
+    } catch (error) {
+      setRetryMessage(`Runtime unavailable: ${error instanceof Error ? error.message : "Could not check the runtime."} No run was queued.`);
+    } finally {
+      setRetrying(false);
+    }
+  }
   let nextAction: string;
   if (pipeline.status === "failed") nextAction = "Inspect the failed step and its run log, then retry.";
   else if (pipeline.status === "cancelled") nextAction = "No action; workflow cancelled.";
@@ -62,6 +87,14 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
       <p>Review decision: <span className="text-zinc-100">{!review ? "No review step recorded" : review.outputSummary?.startsWith("[REJECTED]") ? "Rejected; changes requested" : review.status === "completed" ? review.requiresVerification ? "Accepted (test results still require inspection)" : "Completed; no human decision recorded" : review.status === "awaiting_verification" ? "Awaiting your decision" : review.status === "failed" ? "Review failed" : "Not decided"}</span></p>
       <p className="sm:col-span-2">Draft PR: {diffLoading ? "Checking repository..." : diffError || !diff?.available || diff.prLookup === "unavailable" ? "PR lookup unavailable; check GitHub." : diff.prLookup === "found" && diff.pullRequest ? <a href={diff.pullRequest.url} target="_blank" rel="noopener noreferrer" className="text-blue-300 underline">{diff.pullRequest.isDraft === true ? "Draft PR" : diff.pullRequest.isDraft === false ? "PR (not draft)" : "PR (draft status unknown)"} #{diff.pullRequest.number} · {diff.pullRequest.state.toLowerCase()}</a> : diff.prLookup === "none" ? "No PR found for this branch commit." : "Not verified for this branch commit."}</p>
     </div>
+    {stalledStep && active?.agentId && active.taskId && <div className="space-y-2">
+      <button type="button" disabled={retrying} onClick={() => void checkIncompleteStepRuntime()}
+        className="rounded border border-amber-600 px-3 py-2 text-amber-200 disabled:opacity-50">
+        {retrying ? "Checking runtime..." : `Check ${active.label.toLowerCase()} agent runtime`}
+      </button>
+      <p className="text-xs text-zinc-400">Checks whether the Codex sandbox can execute commands. Does not queue a run, approve a plan, or change permissions.</p>
+      {retryMessage && <p role="status" className="text-xs text-amber-300">{retryMessage}</p>}
+    </div>}
   </section>;
 }
 

@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderWithProviders, screen, within } from "../test-utils.js";
+import { renderWithProviders, screen, waitFor, within } from "../test-utils.js";
+import { fireEvent } from "@testing-library/react";
 import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
+
+const apiMock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
+vi.mock("../api/client.js", async importOriginal => ({ ...(await importOriginal<typeof import("../api/client.js")>()), api: apiMock }));
 
 const state = vi.hoisted(() => ({
   status: "running",
@@ -34,6 +38,8 @@ const step = (label: string, order: number, status: string, extras: Record<strin
 const progress = () => screen.getByRole("region", { name: "Feature progress" });
 
 beforeEach(() => {
+  apiMock.get.mockReset();
+  apiMock.post.mockReset();
   state.status = "running";
   state.currentStep = 1;
   state.steps = [step("Plan", 1, "running"), step("Implement", 2, "pending"), step("Independent review", 3, "pending")];
@@ -131,6 +137,30 @@ describe("feature progress summary", () => {
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(within(progress()).getByText(/Run ended without completing plan.*Inspect its log before retrying/i)).toBeInTheDocument();
     expect(within(progress()).queryByText(/wait for the current step/i)).not.toBeInTheDocument();
+  });
+
+  it("checks the sandbox without rerunning an incomplete planning step", async () => {
+    state.steps = [step("Plan", 1, "pending", { agentId: "planner" }), step("Implement", 2, "pending"), step("Independent review", 3, "pending")];
+    state.runs = [{ id: "run_stalled_plan", status: "succeeded", taskId: "task_1", agentId: "planner" }];
+    apiMock.get.mockResolvedValue({ adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } });
+    apiMock.post.mockResolvedValueOnce({ ok: false, message: "bwrap: loopback: Failed RTM_NEWADDR" });
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    fireEvent.click(within(progress()).getByRole("button", { name: /check plan agent runtime/i }));
+    expect(await within(progress()).findByText(/Runtime unavailable: bwrap: loopback/)).toBeInTheDocument();
+    expect(apiMock.post).toHaveBeenCalledTimes(1);
+    expect(apiMock.post).toHaveBeenCalledWith("/adapter/codex_local/test-environment", { config: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } });
+  });
+
+  it("reports readiness without waking the agent after a successful runtime check", async () => {
+    state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "pending", { agentId: "implementer" }), step("Independent review", 3, "pending")];
+    state.currentStep = 2;
+    state.runs = [{ id: "run_stalled", status: "succeeded", taskId: "task_2", agentId: "implementer" }];
+    apiMock.get.mockResolvedValue({ adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } });
+    apiMock.post.mockResolvedValueOnce({ ok: true });
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    fireEvent.click(within(progress()).getByRole("button", { name: /check implement agent runtime/i }));
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
+    expect(within(progress()).getByText(/No run was queued by this check/)).toBeInTheDocument();
   });
 
   it("shows implementation rework rather than a previously rejected review", () => {
