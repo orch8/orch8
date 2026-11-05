@@ -27,6 +27,7 @@ export interface PipelineRepositoryDiff {
   committedDiff?: string;
   workingDiff?: string;
   untrackedFiles?: string[];
+  publicationOutputPaths?: string[];
   untrackedMore?: boolean;
   branch?: string;
   pullRequest?: { number: number; url: string; title: string; state: string } | null;
@@ -145,6 +146,18 @@ export function useApprovePipelineStep() {
         nextStep: unknown;
         nextTask: unknown;
       }>(`/pipelines/${pipelineId}/steps/${stepId}/approve`, {}),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["pipelines"] });
+      qc.invalidateQueries({ queryKey: ["pipeline", data.pipeline.id] });
+    },
+  });
+}
+
+export function useRequestPlanChanges() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pipelineId, stepId, feedback }: { pipelineId: string; stepId: string; feedback: string }) =>
+      api.post<{ pipeline: Pipeline }>(`/pipelines/${pipelineId}/steps/${stepId}/request-plan-changes`, { feedback }),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["pipelines"] });
       qc.invalidateQueries({ queryKey: ["pipeline", data.pipeline.id] });

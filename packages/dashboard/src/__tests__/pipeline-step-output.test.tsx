@@ -3,7 +3,7 @@ import { fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen } from "../test-utils.js";
 import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
 
-const state = vi.hoisted(() => ({ content: "# Real plan\nImplement a feature.", enabled: false, error: false, label: "Plan", approve: vi.fn() }));
+const state = vi.hoisted(() => ({ content: "# Real plan\nImplement a feature.", enabled: false, error: false, label: "Plan", changes: vi.fn(), changeError: null as Error | null, approve: vi.fn() }));
 vi.mock("../hooks/usePipelines.js", () => ({
   usePipeline: () => ({ data: { pipeline: { id: "pipe_1", name: "Build feature", projectId: "proj_1", status: "running", currentStep: 1 }, steps: [
     { id: "step_1", order: 1, label: state.label, status: "awaiting_verification", outputSummary: "Plan ready", outputFilePath: ".orch8/pipelines/pipe_1/Plan.md", taskId: null },
@@ -16,11 +16,26 @@ vi.mock("../hooks/usePipelines.js", () => ({
   useCancelPipeline: () => ({ isPending: false }),
   useRetryPipeline: () => ({ isPending: false }),
   useRejectPipelineStep: () => ({ isPending: false }),
+  useRequestPlanChanges: () => ({ isPending: false, mutate: state.changes, error: state.changeError }),
   useApprovePipelineStep: () => ({ isPending: false, mutate: state.approve }),
   usePublishPipelinePr: () => ({ isPending: false, isError: false }),
 }));
 
 describe("pipeline plan decision", () => {
+  it("requests revision with feedback without approving implementation and displays errors", () => {
+    state.changeError = new Error("Revision failed");
+    state.approve.mockClear();
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    const submit = screen.getByRole("button", { name: "Request changes" });
+    expect(submit).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox", { name: "Plan feedback" }), { target: { value: "  Add migration details  " } });
+    fireEvent.click(submit);
+    expect(state.changes).toHaveBeenCalledWith({ pipelineId: "pipe_1", stepId: "step_1", feedback: "Add migration details" });
+    expect(state.approve).not.toHaveBeenCalled();
+    expect(screen.getByText("Revision failed")).toBeInTheDocument();
+    state.changeError = null;
+  });
+
   it("shows the complete recorded plan before allowing approval", () => {
     state.content = "# Real plan\nImplement a feature.";
     state.approve.mockClear();

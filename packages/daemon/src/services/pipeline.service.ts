@@ -342,6 +342,53 @@ export class PipelineService {
     });
   }
 
+  // Derive exact historical filenames from database links, never task descriptions or directory contents.
+  async getPublicationOutputPaths(pipelineId: string): Promise<string[]> {
+    const result = await this.getWithSteps(pipelineId);
+    if (!result) return [];
+    const paths = new Set(result.steps.flatMap(step => step.outputFilePath ? [step.outputFilePath] : []));
+    const plan = result.steps.find(step => step.order === 1 && step.label.toLowerCase() === "plan");
+    if (plan && /^[\w-]+$/.test(pipelineId)) {
+      const attempts = await this.db.select({ id: tasks.id }).from(tasks).where(and(
+        eq(tasks.projectId, result.pipeline.projectId), eq(tasks.pipelineId, pipelineId), eq(tasks.pipelineStepId, plan.id),
+      ));
+      if (attempts.length) paths.add(`.orch8/pipelines/${pipelineId}/${plan.label}.md`);
+      for (const task of attempts) {
+        if (/^[\w-]+$/.test(task.id) && task.id !== plan.taskId) {
+          paths.add(`.orch8/pipelines/${pipelineId}/Plan-${task.id}.md`);
+        }
+      }
+    }
+    return [...paths];
+  }
+
+  async requestPlanChanges(pipelineId: string, stepId: string, feedback: string) {
+    feedback = feedback.trim();
+    if (!feedback || feedback.length > 10000) throw new PipelineConflict("Feedback must contain 1 to 10000 characters");
+    return this.db.transaction(async tx => {
+      const pipeline = await lockPipeline(tx, pipelineId);
+      if (!pipeline) throw new Error("Pipeline not found");
+      const [candidate] = await tx.select().from(pipelineSteps)
+        .where(and(eq(pipelineSteps.id, stepId), eq(pipelineSteps.pipelineId, pipelineId)));
+      if (!candidate) throw new PipelineConflict("Plan step not found");
+      const { step, task } = await lockPipelineAttempt(tx, pipelineId, stepId, candidate.taskId ?? "");
+      if (!["pending", "running"].includes(pipeline.status) || pipeline.currentStep !== step.order ||
+          step.order !== 1 || step.label.toLowerCase() !== "plan" || !step.requiresVerification ||
+          step.status !== "awaiting_verification") {
+        throw new PipelineConflict("Current Plan step is not awaiting verification");
+      }
+      // Keep the prior task and artifact as audit evidence. Each revision writes a new file.
+      const description = `${step.promptOverride ?? `Pipeline step: ${step.label}`}\n\nPlan revision requested. Regenerate the plan only; implementation still requires approval.\n\nPrevious planning task: ${task.id}\nPrevious plan artifact: ${step.outputFilePath ?? "not recorded"}\nPrevious plan summary: ${step.outputSummary ?? ""}\n\nUser feedback:\n${feedback}`;
+      const newTask = await this.createTaskForStep(pipeline.projectId, pipeline, { ...step, promptOverride: description }, tx);
+      const [updatedStep] = await tx.update(pipelineSteps).set({ status: "pending", taskId: newTask.id,
+        outputSummary: null, outputFilePath: `.orch8/pipelines/${pipelineId}/Plan-${newTask.id}.md`, updatedAt: new Date() })
+        .where(eq(pipelineSteps.id, stepId)).returning();
+      const [updatedPipeline] = await tx.update(pipelines).set({ status: "running", updatedAt: new Date() })
+        .where(eq(pipelines.id, pipelineId)).returning();
+      return { pipeline: updatedPipeline, step: updatedStep, newTask };
+    });
+  }
+
   async rejectStep(
     pipelineId: string,
     rejectingStepId: string,

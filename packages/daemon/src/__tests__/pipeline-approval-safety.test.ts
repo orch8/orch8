@@ -45,6 +45,105 @@ describe("pipeline approval safety", () => {
     await testDb.db.delete(pipelines);
   });
 
+  async function waitingPlan() {
+    const p = await service.create({ projectId, name: "Plan revision", steps: [
+      { label: "Plan", requiresVerification: true }, { label: "Implement" },
+    ] });
+    await service.completeStep(p.pipeline.id, p.steps[0].id, p.firstTask.id, "Original plan", p.steps[0].outputFilePath!);
+    return p;
+  }
+
+  it("revises only Plan with feedback and preserves prior task and artifact reference", async () => {
+    const p = await waitingPlan();
+    const result = await service.requestPlanChanges(p.pipeline.id, p.steps[0].id, "Add migration details");
+    expect(result.pipeline.currentStep).toBe(1);
+    expect(result.step.status).toBe("pending");
+    expect(result.step.requiresVerification).toBe(true);
+    expect(result.step.outputFilePath).not.toBe(p.steps[0].outputFilePath);
+    expect(result.newTask.description).toContain("Add migration details");
+    expect(result.newTask.description).toContain(p.steps[0].outputFilePath);
+    expect(result.newTask.description).toContain(p.firstTask.id);
+    const all = await testDb.db.select().from(tasks);
+    expect(all).toHaveLength(2);
+    expect(all.find(t => t.id === p.firstTask.id)).toBeDefined();
+    expect((await service.getWithSteps(p.pipeline.id))!.steps[1].taskId).toBeNull();
+    await expect(service.requestPlanChanges(p.pipeline.id, p.steps[0].id, "again")).rejects.toThrow("not awaiting verification");
+  });
+
+  it("exposes exact pipeline-linked artifact paths after two Plan revisions", async () => {
+    const p = await waitingPlan();
+    const first = await service.requestPlanChanges(p.pipeline.id, p.steps[0].id, "first revision");
+    await service.completeStep(p.pipeline.id, first.step.id, first.newTask.id, "First revision", first.step.outputFilePath!);
+    const second = await service.requestPlanChanges(p.pipeline.id, first.step.id, "second revision");
+    await service.completeStep(p.pipeline.id, second.step.id, second.newTask.id, "Second revision", second.step.outputFilePath!);
+    const other = await waitingPlan();
+    const paths = await service.getPublicationOutputPaths(p.pipeline.id);
+    expect(paths).toEqual(expect.arrayContaining([
+      p.steps[0].outputFilePath, first.step.outputFilePath, second.step.outputFilePath,
+    ]));
+    expect(paths).not.toContain(other.steps[0].outputFilePath);
+    expect(paths).not.toContain(`.orch8/pipelines/${p.pipeline.id}/Plan-${other.firstTask.id}.md`);
+    expect(paths).not.toContain(`.orch8/pipelines/${p.pipeline.id}/unrelated.md`);
+    const response = await app.inject({ method: "GET", url: `/api/pipelines/${p.pipeline.id}/diff` });
+    expect(response.json().publicationOutputPaths).toEqual(paths);
+  });
+
+  it("keeps the original artifact path when Plan uses different casing", async () => {
+    const p = await service.create({ projectId, name: "Lowercase plan", steps: [
+      { label: "plan", requiresVerification: true }, { label: "Implement" },
+    ] });
+    await service.completeStep(p.pipeline.id, p.steps[0].id, p.firstTask.id, "Original", p.steps[0].outputFilePath!);
+    await service.requestPlanChanges(p.pipeline.id, p.steps[0].id, "clarify");
+    expect(await service.getPublicationOutputPaths(p.pipeline.id)).toContain(p.steps[0].outputFilePath);
+  });
+
+  it("requires a current active Plan gate and nonempty feedback", async () => {
+    const p = await waitingPlan();
+    for (const feedback of [" ", "x".repeat(10001)]) {
+      await expect(service.requestPlanChanges(p.pipeline.id, p.steps[0].id, feedback)).rejects.toThrow("Feedback");
+    }
+    await testDb.db.update(pipelineSteps).set({ label: "Review" }).where(eq(pipelineSteps.id, p.steps[0].id));
+    await expect(service.requestPlanChanges(p.pipeline.id, p.steps[0].id, "revise")).rejects.toThrow("not awaiting verification");
+    await testDb.db.update(pipelineSteps).set({ label: "Plan" }).where(eq(pipelineSteps.id, p.steps[0].id));
+    await service.cancel(p.pipeline.id);
+    await expect(service.requestPlanChanges(p.pipeline.id, p.steps[0].id, "revise")).rejects.toThrow("not awaiting verification");
+  });
+
+  it("serializes duplicate revision requests and gates the regenerated plan", async () => {
+    const p = await waitingPlan();
+    const results = await Promise.allSettled([
+      service.requestPlanChanges(p.pipeline.id, p.steps[0].id, "first"),
+      service.requestPlanChanges(p.pipeline.id, p.steps[0].id, "second"),
+    ]);
+    expect(results.filter(r => r.status === "fulfilled")).toHaveLength(1);
+    const current = (await service.getWithSteps(p.pipeline.id))!.steps[0];
+    await service.completeStep(p.pipeline.id, current.id, current.taskId!, "Revised plan", current.outputFilePath!);
+    const updated = (await service.getWithSteps(p.pipeline.id))!;
+    expect(updated.pipeline.currentStep).toBe(1);
+    expect(updated.steps[0].status).toBe("awaiting_verification");
+    expect(updated.steps[1].taskId).toBeNull();
+    expect(await testDb.db.select().from(tasks)).toHaveLength(2);
+  });
+
+  it("rolls back plan revision if creating a task fails", async () => {
+    const p = await waitingPlan();
+    const before = await snapshot();
+    const failing = new PipelineService(makeFailingTxDb(testDb.db, { failInsertOnTable: tasks }), new PipelineTemplateService(testDb.db));
+    await expect(failing.requestPlanChanges(p.pipeline.id, p.steps[0].id, "revise")).rejects.toThrow();
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("validates feedback and denies agents at the plan revision API", async () => {
+    const p = await waitingPlan();
+    const url = `/api/pipelines/${p.pipeline.id}/steps/${p.steps[0].id}/request-plan-changes`;
+    const before = await snapshot();
+    expect((await app.inject({ method: "POST", url, payload: { feedback: " " } })).statusCode).toBe(400);
+    expect((await app.inject({ method: "POST", url, headers: { authorization: `Bearer ${agentToken}` }, payload: { feedback: "revise" } })).statusCode).toBe(403);
+    expect(await snapshot()).toEqual(before);
+    expect((await app.inject({ method: "POST", url, payload: { feedback: "revise" } })).statusCode).toBe(200);
+    expect((await app.inject({ method: "POST", url, payload: { feedback: "again" } })).statusCode).toBe(409);
+  });
+
   async function waiting() {
     const result = await service.create({ projectId, name: "Gate", steps: [
       { label: "work" }, { label: "review", requiresVerification: true }, { label: "ship" },

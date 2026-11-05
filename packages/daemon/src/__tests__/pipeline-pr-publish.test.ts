@@ -42,6 +42,17 @@ describe("explicit reviewed pipeline PR publishing", () => {
     expect(calls.indexOf("git push --set-upstream origin feature")).toBeGreaterThan(calls.indexOf("gh pr list --repo orch8/orch8 --head feature --state all --json number,url,headRefOid --limit 100"));
     expect(calls.at(-1)).toContain("gh pr view 123");
   });
+  it("allows two Plan revisions and rejects unrelated files in the same artifact directory", async () => {
+    const paths = ["Plan.md", "Plan-task1.md", "Plan-task2.md"].map(name => `.orch8/pipelines/p1/${name}`);
+    const status = paths.map(path => `?? ${path}\0`).join("");
+    const valid = commands({ "git status --porcelain=v1 --untracked-files=all -z": status });
+    await expect(publishPipelinePr(repo, "Build", paths, valid.run)).resolves.toHaveProperty("url");
+    for (const name of ["unrelated.md", "Plan-unlinked-task.md"]) {
+      const invalid = commands({ "git status --porcelain=v1 --untracked-files=all -z": `${status}?? .orch8/pipelines/p1/${name}\0` });
+      await expect(publishPipelinePr(repo, "Build", paths, invalid.run)).rejects.toThrow("Commit or remove");
+      expect(invalid.calls.some(c => c.includes(" push ") || c.includes(" pr create "))).toBe(false);
+    }
+  });
   it.each([
     ["dirty tree", { "git status --porcelain=v1 --untracked-files=all -z": "?? secret.txt\0" }],
     ["extra pipeline artifact", { "git status --porcelain=v1 --untracked-files=all -z": "?? .orch8/pipelines/p2/Plan.md\0" }],

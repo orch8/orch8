@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   usePipeline,
+  useRequestPlanChanges,
   usePipelineDiff,
   usePublishPipelinePr,
   useCancelPipeline,
@@ -78,6 +79,8 @@ function PlanDecision({ pipelineId, stepId, revision, outputFilePath }: { pipeli
   const [reviewedContent, setReviewedContent] = useState<string | null>(null);
   const { data, isLoading, isError, isFetching, refetch } = usePipelineStepOutput(pipelineId, stepId, revision, !!outputFilePath);
   const approve = useApprovePipelineStep();
+  const changes = useRequestPlanChanges();
+  const [feedback, setFeedback] = useState("");
   const hasPlan = !isError && !isLoading && !isFetching && !!data?.content.trim();
   return <section aria-label="Plan approval" className="mt-3 space-y-3 rounded border border-amber-700/60 bg-amber-950/20 p-3">
     <h4 className="text-sm font-semibold text-amber-200">Review the plan before implementation</h4>
@@ -91,8 +94,17 @@ function PlanDecision({ pipelineId, stepId, revision, outputFilePath }: { pipeli
       <input type="checkbox" checked={hasPlan && reviewedContent === data?.content} disabled={!hasPlan} onChange={event => setReviewedContent(event.target.checked ? data?.content ?? null : null)} />
       I have reviewed the full plan and want implementation to start.
     </label>
-    <button type="button" onClick={() => approve.mutate({ pipelineId, stepId })} disabled={!hasPlan || reviewedContent !== data?.content || approve.isPending}
+    <button type="button" onClick={() => approve.mutate({ pipelineId, stepId })} disabled={!hasPlan || reviewedContent !== data?.content || approve.isPending || changes.isPending}
       className="rounded bg-emerald-800 px-3 py-1 text-xs text-emerald-200 disabled:opacity-50">{approve.isPending ? "Approving..." : "Approve plan"}</button>
+    <form onSubmit={event => { event.preventDefault(); if (feedback.trim()) changes.mutate({ pipelineId, stepId, feedback: feedback.trim() }); }} className="space-y-2">
+      <label className="block text-xs text-zinc-200">Plan feedback
+        <textarea value={feedback} onChange={event => setFeedback(event.target.value)} maxLength={10000} disabled={changes.isPending || approve.isPending} className="mt-1 block w-full rounded bg-zinc-950 p-2" />
+      </label>
+      <p className="text-xs text-zinc-400">Request a revised plan. Implementation will still need your approval.</p>
+      <button type="submit" disabled={!feedback.trim() || changes.isPending || approve.isPending} className="rounded bg-amber-800 px-3 py-1 text-xs text-amber-100 disabled:opacity-50">{changes.isPending ? "Requesting changes..." : "Request changes"}</button>
+      {changes.error && <p role="alert" className="text-xs text-red-300">{changes.error.message}</p>}
+    </form>
+    {approve.error && <p role="alert" className="text-xs text-red-300">{approve.error.message}</p>}
   </section>;
 }
 
@@ -172,7 +184,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
   const isReviewDecision = (step: typeof steps[number]) => /\b(review|verification)\b/i.test(step.label);
   const implement = steps.find(step => step.label.toLowerCase() === "implement");
   const review = steps.find(step => ["review", "independent review"].includes(step.label.toLowerCase()));
-  const outputPaths = new Set(steps.map(step => step.outputFilePath).filter(Boolean));
+  const outputPaths = new Set([...steps.map(step => step.outputFilePath).filter(Boolean), ...(repositoryDiff?.publicationOutputPaths ?? [])]);
   const canPublish = pipeline.status === "completed" && steps.every(step => step.status === "completed") &&
     !!implement?.agentId && !!review?.agentId && !!review.requiresVerification && implement.agentId !== review.agentId &&
     review.order > implement.order && review.order === steps.length &&
@@ -262,6 +274,10 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
             {repositoryDiff.untrackedFiles?.length ? <ul className="text-xs text-zinc-400 font-mono space-y-1">
               {repositoryDiff.untrackedFiles.map(path => <li key={path} className="break-all">{path}</li>)}
             </ul> : <p className="text-xs text-zinc-500">None found</p>}
+            {repositoryDiff.publicationOutputPaths?.length ? <div className="text-xs text-zinc-400">
+              <p>Recorded pipeline artifacts allowed to remain untracked for publication:</p>
+              <ul className="font-mono">{repositoryDiff.publicationOutputPaths.map(path => <li key={path}>{path}</li>)}</ul>
+            </div> : null}
             {repositoryDiff.untrackedMore && <p className="text-xs text-amber-300">More untracked files exist; only the first 20 names are shown.</p>}
           </div>
         </div>}
