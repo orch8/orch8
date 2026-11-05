@@ -43,8 +43,6 @@ function PipelinesActivePage() {
         </div>
         <Link to="/projects/$projectSlug/board" params={{ projectSlug: projectId }} className="rounded border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:text-white">Open task board</Link>
       </div>
-      <FeatureIntake key={projectId} projectId={projectId} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />
-
       <div className="flex gap-1 border-b border-zinc-800">
         {tabs.map((tab) => (
           <Link
@@ -61,11 +59,16 @@ function PipelinesActivePage() {
         ))}
       </div>
 
-      {isLoading ? (
-        <p className="text-sm text-zinc-600">Loading...</p>
-      ) : (
-        <PipelineList pipelines={activePipelines} showActions />
-      )}
+      <section aria-label="Workflows needing attention" className="space-y-3">
+        <h2 className="text-sm font-semibold text-zinc-200">Workflows needing attention</h2>
+        {isLoading ? (
+          <p className="text-sm text-zinc-600">Loading...</p>
+        ) : (
+          <PipelineList pipelines={activePipelines} showActions />
+        )}
+      </section>
+
+      <FeatureIntake key={projectId} projectId={projectId} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />
     </div>
   );
 }
