@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { PipelineConflict } from "../../services/pipeline.service.js";
 import { publishPipelinePr } from "../../services/pipeline-pr.service.js";
 import { featureBranchReadiness, prepareFeatureBranch } from "../../services/feature-branch.service.js";
@@ -196,7 +197,7 @@ export async function pipelineRoutes(app: FastifyInstance) {
     if (publishing.has(key)) return reply.code(409).send({ error: "conflict", message: "PR publication is already running for this repository." });
     publishing.add(key);
     try {
-      const published = await publishPipelinePr(project, pipeline.name, steps.map(step => step.outputFilePath).filter((path): path is string => !!path));
+      const published = await publishPipelinePr(project, pipeline.name, await app.pipelineService.getPublicationOutputPaths(pipeline.id));
       return reply.code(201).send(published);
     } catch (error) {
       // Expected preflight failures are actionable; never expose raw git/gh stderr or credentials.
@@ -268,7 +269,21 @@ export async function pipelineRoutes(app: FastifyInstance) {
     if (!requireProjectScope(request, reply, pipeline.projectId)) return reply;
     const project = await app.projectService.getById(pipeline.projectId);
     if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
-    return repositoryDiff(project.homeDir, project.defaultBranch);
+    return { ...await repositoryDiff(project.homeDir, project.defaultBranch),
+      publicationOutputPaths: await app.pipelineService.getPublicationOutputPaths(pipeline.id) };
+  });
+
+  // Prior plans remain inspectable after a revision replaces the active step's task.
+  app.get("/api/pipelines/:id/plan-attempts", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const pipeline = await app.pipelineService.getById(request.params.id);
+    if (!pipeline) return reply.code(404).send({ error: "not_found", message: "Pipeline not found" });
+    if (!requireProjectScope(request, reply, pipeline.projectId)) return reply;
+    const project = await app.projectService.getById(pipeline.projectId);
+    if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    const attempts = await app.pipelineService.getPlanAttempts(pipeline.id);
+    return Promise.all(attempts.map(async attempt => ({ ...attempt,
+      content: await stepArtifact(project.homeDir, pipeline.id, attempt.path),
+    })));
   });
 
   // Read the recorded plan/review file; the request never supplies a filesystem path.
@@ -408,6 +423,21 @@ export async function pipelineRoutes(app: FastifyInstance) {
       }
     },
   );
+
+  app.post("/api/pipelines/:id/steps/:stepId/request-plan-changes",
+    async (request: FastifyRequest<{ Params: { id: string; stepId: string } }>, reply: FastifyReply) => {
+      if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+      const pipeline = await app.pipelineService.getById(request.params.id);
+      if (!pipeline) return reply.code(404).send({ error: "not_found", message: "Pipeline not found" });
+      if (!requireProjectScope(request, reply, pipeline.projectId)) return reply;
+      const parsed = z.object({ feedback: z.string().trim().min(1).max(10000) }).safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
+      const result = await app.pipelineService.requestPlanChanges(pipeline.id, request.params.stepId, parsed.data.feedback);
+      if (result.step.agentId) await app.heartbeatService.enqueueWakeup(result.step.agentId, pipeline.projectId, {
+        source: "automation", taskId: result.newTask.id, reason: "pipeline_plan_changes_requested",
+      });
+      return result;
+    });
 
   // POST /api/pipelines/:id/steps/:stepId/approve — Approve a verification gate
   app.post(

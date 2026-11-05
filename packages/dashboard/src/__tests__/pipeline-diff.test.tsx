@@ -3,9 +3,10 @@ import { renderWithProviders, screen } from "../test-utils.js";
 import { fireEvent } from "@testing-library/react";
 import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
 
-const state = vi.hoisted(() => ({ publish: vi.fn(), steps: [] as Array<{ id: string; label: string; order: number; agentId: string; status: string; outputSummary: string; outputFilePath?: string; requiresVerification?: boolean }>, diff: { available: true, diff: "", committedDiff: "", workingDiff: "", baseBranch: "main", untrackedFiles: [] as string[], untrackedMore: false } as { available: boolean; diff: string; committedDiff?: string; workingDiff?: string; baseBranch?: string; untrackedFiles?: string[]; untrackedMore?: boolean; reason?: string; branch?: string; prLookup?: string; pullRequest?: { number: number; title: string; state: string; url: string } | null } }));
+const state = vi.hoisted(() => ({ publish: vi.fn(), steps: [] as Array<{ id: string; label: string; order: number; agentId: string; status: string; outputSummary: string; outputFilePath?: string; requiresVerification?: boolean }>, diff: { available: true, diff: "", committedDiff: "", workingDiff: "", baseBranch: "main", untrackedFiles: [] as string[], untrackedMore: false } as { available: boolean; diff: string; committedDiff?: string; workingDiff?: string; baseBranch?: string; untrackedFiles?: string[]; publicationOutputPaths?: string[]; untrackedMore?: boolean; reason?: string; branch?: string; prLookup?: string; pullRequest?: { number: number; title: string; state: string; url: string } | null } }));
 vi.mock("../hooks/usePipelines.js", () => ({
   usePipeline: () => ({ data: { pipeline: { id: "pipe_1", name: "Build", projectId: "proj_1", status: "completed", currentStep: 1 }, steps: state.steps }, isLoading: false, refetch: vi.fn() }),
+  usePlanAttempts: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
   usePipelineDiff: () => ({ data: state.diff, isLoading: false, isError: false, refetch: vi.fn() }),
   useCancelPipeline: () => ({ isPending: false }),
   useRetryPipeline: () => ({ isPending: false }),
@@ -34,10 +35,13 @@ describe("pipeline repository inspection", () => {
       { id: "i", label: "implement", order: 1, agentId: "builder", status: "completed", outputSummary: "done", outputFilePath: ".orch8/pipelines/p1/Implement.md" },
       { id: "r", label: "Independent review", order: 2, agentId: "reviewer", status: "completed", outputSummary: "checked", outputFilePath: ".orch8/pipelines/p1/Independent review.md", requiresVerification: true },
     ];
-    state.diff = { available: true, diff: "", baseBranch: "v2", branch: "feature", committedDiff: "changes", workingDiff: "", untrackedFiles: [".orch8/pipelines/p1/Independent review.md"], prLookup: "none", pullRequest: null };
+    const plans = ["Plan.md", "Plan-task1.md", "Plan-task2.md"].map(name => `.orch8/pipelines/p1/${name}`);
+    state.diff = { available: true, diff: "", baseBranch: "v2", branch: "feature", committedDiff: "changes", workingDiff: "", publicationOutputPaths: plans, untrackedFiles: [...plans, ".orch8/pipelines/p1/Independent review.md"], prLookup: "none", pullRequest: null };
     const view = renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(screen.getByRole("button", { name: "Create pull request" })).toBeInTheDocument();
-    state.diff = { ...state.diff, untrackedFiles: [".orch8/pipelines/p1/Independent review.md", "unrelated.txt"] };
+    expect(screen.getByText(/Recorded pipeline artifacts allowed/)).toBeInTheDocument();
+    expect(screen.getAllByText(plans[0])).toHaveLength(2);
+    state.diff = { ...state.diff, untrackedFiles: [...plans, ".orch8/pipelines/p1/unrelated.md"] };
     view.rerender(<PipelineDetail pipelineId="pipe_1" />);
     expect(screen.queryByRole("button", { name: "Create pull request" })).not.toBeInTheDocument();
   });

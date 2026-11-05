@@ -5,6 +5,7 @@ import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
 
 const state = vi.hoisted(() => ({ steps: [] as Array<Record<string, unknown>> }));
 vi.mock("../hooks/usePipelines.js", () => ({
+  usePlanAttempts: () => ({ data: [], isLoading: false, isError: false }),
   usePipeline: () => ({ data: { pipeline: { id: "pipe_1", projectId: "proj_1", name: "Feature", status: "running", currentStep: 1 }, steps: state.steps }, isLoading: false, refetch: vi.fn() }),
   usePipelineDiff: () => ({ data: { available: false, reason: "No repository" }, isLoading: false, isError: false, refetch: vi.fn() }),
   usePipelineStepOutput: () => ({ data: null, isLoading: false, isError: false, refetch: vi.fn() }),

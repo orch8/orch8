@@ -27,11 +27,21 @@ export interface PipelineRepositoryDiff {
   committedDiff?: string;
   workingDiff?: string;
   untrackedFiles?: string[];
+  publicationOutputPaths?: string[];
   untrackedMore?: boolean;
   branch?: string;
   pullRequest?: { number: number; url: string; title: string; state: string } | null;
   prLookup?: "found" | "none" | "unavailable" | "not_applicable";
   reason?: string;
+}
+
+export function usePlanAttempts(pipelineId: string, enabled: boolean, poll = false) {
+  return useQuery<Array<{ taskId: string; path: string; content: string | null }>>({
+    queryKey: ["plan-attempts", pipelineId],
+    queryFn: () => api.get(`/pipelines/${encodeURIComponent(pipelineId)}/plan-attempts`),
+    enabled,
+    refetchInterval: poll ? 5000 : false,
+  });
 }
 
 export function usePipelineDiff(pipelineId: string) {
@@ -148,6 +158,19 @@ export function useApprovePipelineStep() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["pipelines"] });
       qc.invalidateQueries({ queryKey: ["pipeline", data.pipeline.id] });
+    },
+  });
+}
+
+export function useRequestPlanChanges() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pipelineId, stepId, feedback }: { pipelineId: string; stepId: string; feedback: string }) =>
+      api.post<{ pipeline: Pipeline }>(`/pipelines/${pipelineId}/steps/${stepId}/request-plan-changes`, { feedback }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["pipelines"] });
+      qc.invalidateQueries({ queryKey: ["pipeline", data.pipeline.id] });
+      qc.invalidateQueries({ queryKey: ["plan-attempts", data.pipeline.id] });
     },
   });
 }
