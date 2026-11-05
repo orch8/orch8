@@ -2,6 +2,7 @@ import { z } from "zod";
 import { PipelineConflict } from "../../services/pipeline.service.js";
 import { publishPipelinePr } from "../../services/pipeline-pr.service.js";
 import { featureBranchReadiness, prepareFeatureBranch } from "../../services/feature-branch.service.js";
+import { readPrChecks, type PrCheck } from "../../services/pr-checks.js";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import {
   CreatePipelineSchema,
@@ -61,7 +62,7 @@ async function stepArtifact(homeDir: string, pipelineId: string, outputFilePath:
 async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
   available: boolean; diff: string; reason?: string; baseBranch?: string;
   committedDiff?: string; workingDiff?: string; untrackedFiles?: string[]; untrackedMore?: boolean;
-  branch?: string; pullRequest?: { number: number; url: string; title: string; state: string } | null;
+  branch?: string; pullRequest?: { number: number; url: string; title: string; state: string; checks: PrCheck[] } | null;
   prLookup?: "found" | "none" | "unavailable" | "not_applicable";
 }> {
   // Ignore inherited Git environment overrides and global configuration. No hooks,
@@ -112,7 +113,7 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
     const untracked = (await git(["ls-files", "--others", "--exclude-standard", "-z"])).stdout;
     const paths = untracked ? untracked.split("\0").filter(Boolean) : [];
     const branch = (await git(["symbolic-ref", "--quiet", "--short", "HEAD"]).catch(() => ({ stdout: "" }))).stdout.trim();
-    let pullRequest: { number: number; url: string; title: string; state: string } | null = null;
+    let pullRequest: { number: number; url: string; title: string; state: string; checks: PrCheck[] } | null = null;
     let prLookup: "found" | "none" | "unavailable" | "not_applicable" = "not_applicable";
     if (branch && branch !== baseBranch) {
       try {
@@ -122,8 +123,8 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
           const head = (await git(["rev-parse", "HEAD"])).stdout.trim();
           const repo = `${match[1]}/${match[2]}`;
           const { stdout } = await runGit("gh", ["pr", "list", "--repo", repo, "--head", branch, "--base", baseBranch,
-            "--state", "all", "--json", "number,url,title,state,headRefOid", "--limit", "20"],
-          { cwd: homeDir, env, timeout: 10_000, maxBuffer: 64 * 1024, encoding: "utf8" });
+            "--state", "all", "--json", "number,url,title,state,headRefOid,statusCheckRollup", "--limit", "20"],
+          { cwd: homeDir, env, timeout: 10_000, maxBuffer: 1024 * 1024, encoding: "utf8" });
           const items: unknown = JSON.parse(stdout);
           if (!Array.isArray(items)) throw new Error("Invalid GitHub response");
           const found = items.find(item => item && typeof item === "object" && item.headRefOid === head &&
@@ -131,7 +132,7 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
             typeof item.url === "string" && item.url.startsWith(`https://github.com/${repo}/pull/`) &&
             ["OPEN", "CLOSED", "MERGED"].includes(item.state));
           if (found) {
-            pullRequest = { number: found.number, url: found.url, title: found.title, state: found.state };
+            pullRequest = { number: found.number, url: found.url, title: found.title, state: found.state, checks: readPrChecks(found.statusCheckRollup) };
             prLookup = "found";
           } else prLookup = items.length < 20 ? "none" : "unavailable";
         } else prLookup = "unavailable";
