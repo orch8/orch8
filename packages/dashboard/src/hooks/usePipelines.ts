@@ -35,11 +35,12 @@ export interface PipelineRepositoryDiff {
   reason?: string;
 }
 
-export function usePlanAttempts(pipelineId: string, enabled: boolean) {
+export function usePlanAttempts(pipelineId: string, enabled: boolean, poll = false) {
   return useQuery<Array<{ taskId: string; path: string; content: string | null }>>({
     queryKey: ["plan-attempts", pipelineId],
     queryFn: () => api.get(`/pipelines/${encodeURIComponent(pipelineId)}/plan-attempts`),
     enabled,
+    refetchInterval: poll ? 5000 : false,
   });
 }
 

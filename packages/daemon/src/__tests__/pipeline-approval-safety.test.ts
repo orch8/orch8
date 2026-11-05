@@ -103,6 +103,30 @@ describe("pipeline approval safety", () => {
     expect(await service.getPublicationOutputPaths(p.pipeline.id)).toContain(p.steps[0].outputFilePath);
   });
 
+  it("gives retried and rejected Plan tasks their own history artifacts", async () => {
+    const retry = await service.create({ projectId, name: "Retry plan", steps: [
+      { label: "Plan", requiresVerification: true }, { label: "Implement" },
+    ] });
+    await testDb.db.update(pipelineSteps).set({ status: "failed" }).where(eq(pipelineSteps.id, retry.steps[0].id));
+    await testDb.db.update(pipelines).set({ status: "failed" }).where(eq(pipelines.id, retry.pipeline.id));
+    const retried = await service.retry(retry.pipeline.id);
+    expect(retried.nextStep!.outputFilePath).toBe(`.orch8/pipelines/${retry.pipeline.id}/Plan-${retried.nextTask!.id}.md`);
+    expect(await service.getPlanAttempts(retry.pipeline.id)).toEqual([
+      { taskId: retry.firstTask.id, path: retry.steps[0].outputFilePath },
+      { taskId: retried.nextTask!.id, path: retried.nextStep!.outputFilePath },
+    ]);
+
+    const rejected = await waitingPlan();
+    await service.approveStep(rejected.pipeline.id, rejected.steps[0].id);
+    const implementation = (await service.getWithSteps(rejected.pipeline.id))!.steps[1];
+    const result = await service.rejectStep(rejected.pipeline.id, implementation.id, rejected.steps[0].id, "Reconsider scope");
+    expect(result.targetStep.outputFilePath).toBe(`.orch8/pipelines/${rejected.pipeline.id}/Plan-${result.newTask.id}.md`);
+    expect(await service.getPlanAttempts(rejected.pipeline.id)).toEqual([
+      { taskId: rejected.firstTask.id, path: rejected.steps[0].outputFilePath },
+      { taskId: result.newTask.id, path: result.targetStep.outputFilePath },
+    ]);
+  });
+
   it("requires a current active Plan gate and nonempty feedback", async () => {
     const p = await waitingPlan();
     for (const feedback of [" ", "x".repeat(10001)]) {

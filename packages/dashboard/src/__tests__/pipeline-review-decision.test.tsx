@@ -5,6 +5,7 @@ import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
 
 const state = vi.hoisted(() => ({ content: "# Independent review\nNo blocking findings.", freshContent: "", label: "Independent review", error: false, fetching: false, path: ".orch8/pipelines/pipe_1/Independent review.md", approve: vi.fn() }));
 vi.mock("../hooks/usePipelines.js", () => ({
+  usePlanAttempts: () => ({ data: [], isLoading: false, isError: false }),
   usePipeline: () => ({ data: { pipeline: { id: "pipe_1", name: "Build feature", projectId: "proj_1", status: "running", currentStep: 3 }, steps: [
     { id: "step_1", order: 1, label: "Plan", status: "completed" },
     { id: "step_2", order: 2, label: "Implement", agentId: "builder", status: "completed" },

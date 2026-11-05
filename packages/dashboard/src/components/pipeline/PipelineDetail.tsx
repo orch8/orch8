@@ -76,8 +76,8 @@ function StepOutput({ pipelineId, stepId, label, revision }: { pipelineId: strin
   </div>;
 }
 
-function PlanHistory({ pipelineId, projectId }: { pipelineId: string; projectId: string }) {
-  const { data: attempts, isLoading, isError, refetch } = usePlanAttempts(pipelineId, true);
+function PlanHistory({ pipelineId, projectId, poll }: { pipelineId: string; projectId: string; poll: boolean }) {
+  const { data: attempts, isLoading, isError, refetch } = usePlanAttempts(pipelineId, true, poll);
   if (isLoading) return <p className="mt-2 text-xs text-zinc-400">Loading plan history...</p>;
   if (isError) return <p role="alert" className="mt-2 text-xs text-amber-300">Plan history unavailable. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>;
   if (!attempts || attempts.length < 2) return null;
@@ -315,7 +315,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
                 step.outputFilePath && (step.status === "completed" || step.status === "awaiting_verification") &&
                 <StepOutput pipelineId={pipeline.id} stepId={step.id} label={step.label} revision={String(step.updatedAt ?? step.outputSummary ?? "")} />}
             {step.order === 1 && step.label.toLowerCase() === "plan" &&
-              <PlanHistory pipelineId={pipeline.id} projectId={projectId ?? pipeline.projectId} />}
+              <PlanHistory pipelineId={pipeline.id} projectId={projectId ?? pipeline.projectId} poll={step.status === "pending" || step.status === "running"} />}
             {step.status === "awaiting_verification" && !step.outputSummary &&
               <p role="alert" className="mt-2 text-xs text-amber-300">No plan or review summary is available. Inspect the task and run log before approving.</p>}
             {step.outputSummary && (

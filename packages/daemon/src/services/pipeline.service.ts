@@ -334,7 +334,10 @@ export class PipelineService {
         outputSummary: null, outputFilePath: null, updatedAt: new Date() })
         .where(eq(pipelineSteps.id, failedStep.id)).returning();
       const newTask = await this.createTaskForStep(pipeline.projectId, pipeline, resetStep, tx);
-      const [updatedStep] = await tx.update(pipelineSteps).set({ taskId: newTask.id, updatedAt: new Date() })
+      const [updatedStep] = await tx.update(pipelineSteps).set({ taskId: newTask.id,
+        outputFilePath: failedStep.order === 1 && failedStep.label.toLowerCase() === "plan"
+          ? `.orch8/pipelines/${pipelineId}/Plan-${newTask.id}.md` : null,
+        updatedAt: new Date() })
         .where(eq(pipelineSteps.id, failedStep.id)).returning();
       const [updatedPipeline] = await tx.update(pipelines).set({ status: "running", updatedAt: new Date() })
         .where(eq(pipelines.id, pipelineId)).returning();
@@ -474,7 +477,10 @@ export class PipelineService {
       // 6. Link task to target step
       const [updatedTargetStep] = await tx
         .update(pipelineSteps)
-        .set({ taskId: newTask.id, status: "pending", updatedAt: new Date() })
+        .set({ taskId: newTask.id, status: "pending",
+          outputFilePath: targetStep.order === 1 && targetStep.label.toLowerCase() === "plan"
+            ? `.orch8/pipelines/${pipelineId}/Plan-${newTask.id}.md` : null,
+          updatedAt: new Date() })
         .where(eq(pipelineSteps.id, targetStepId))
         .returning();
 
