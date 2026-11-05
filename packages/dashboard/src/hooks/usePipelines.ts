@@ -30,7 +30,7 @@ export interface PipelineRepositoryDiff {
   publicationOutputPaths?: string[];
   untrackedMore?: boolean;
   branch?: string;
-  pullRequest?: { number: number; url: string; title: string; state: string } | null;
+  pullRequest?: { number: number; url: string; title: string; state: string; checks: Array<{ name: string; status: string; url: string | null }> } | null;
   prLookup?: "found" | "none" | "unavailable" | "not_applicable";
   reason?: string;
 }

@@ -267,6 +267,15 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
             </p> : repositoryDiff.prLookup === "none" ? <p>No GitHub PR found for this branch commit and configured base. Uncommitted changes are not part of a PR.</p>
               : repositoryDiff.prLookup === "unavailable" ? <p>PR lookup unavailable. Check GitHub authentication and the repository origin.</p>
                 : <p>PR lookup applies to named branches other than the configured base.</p>}
+            {repositoryDiff.pullRequest && <div aria-label="GitHub checks for current commit">
+              <p>GitHub checks for this commit:</p>
+              {repositoryDiff.pullRequest.checks?.length ? <ul className="ml-4 list-disc">
+                {repositoryDiff.pullRequest.checks.map((check, index) => <li key={`${check.name}-${index}`}>
+                  {check.url ? <a className="text-blue-300 underline" href={check.url} target="_blank" rel="noopener noreferrer">{check.name}: {check.status}</a>
+                    : <span>{check.name}: {check.status}</span>}
+                </li>)}
+              </ul> : <p className="text-amber-300">No checks reported for this commit. This does not mean tests passed.</p>}
+            </div>}
             <p className="text-zinc-500">This is a repository-wide snapshot, not proof that the pipeline created the PR. Refresh to check again.</p>
           </div>
           {canPublish && <div className="rounded border border-blue-800/60 bg-blue-950/20 p-3 space-y-2 text-xs">

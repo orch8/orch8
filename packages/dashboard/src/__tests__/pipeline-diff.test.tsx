@@ -3,7 +3,7 @@ import { renderWithProviders, screen } from "../test-utils.js";
 import { fireEvent } from "@testing-library/react";
 import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
 
-const state = vi.hoisted(() => ({ publish: vi.fn(), steps: [] as Array<{ id: string; label: string; order: number; agentId: string; status: string; outputSummary: string; outputFilePath?: string; requiresVerification?: boolean }>, diff: { available: true, diff: "", committedDiff: "", workingDiff: "", baseBranch: "main", untrackedFiles: [] as string[], untrackedMore: false } as { available: boolean; diff: string; committedDiff?: string; workingDiff?: string; baseBranch?: string; untrackedFiles?: string[]; publicationOutputPaths?: string[]; untrackedMore?: boolean; reason?: string; branch?: string; prLookup?: string; pullRequest?: { number: number; title: string; state: string; url: string } | null } }));
+const state = vi.hoisted(() => ({ publish: vi.fn(), steps: [] as Array<{ id: string; label: string; order: number; agentId: string; status: string; outputSummary: string; outputFilePath?: string; requiresVerification?: boolean }>, diff: { available: true, diff: "", committedDiff: "", workingDiff: "", baseBranch: "main", untrackedFiles: [] as string[], untrackedMore: false } as { available: boolean; diff: string; committedDiff?: string; workingDiff?: string; baseBranch?: string; untrackedFiles?: string[]; publicationOutputPaths?: string[]; untrackedMore?: boolean; reason?: string; branch?: string; prLookup?: string; pullRequest?: { number: number; title: string; state: string; url: string; checks?: { name: string; status: string; url: string | null }[] } | null } }));
 vi.mock("../hooks/usePipelines.js", () => ({
   usePipeline: () => ({ data: { pipeline: { id: "pipe_1", name: "Build", projectId: "proj_1", status: "completed", currentStep: 1 }, steps: state.steps }, isLoading: false, refetch: vi.fn() }),
   usePlanAttempts: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
@@ -67,6 +67,18 @@ describe("pipeline repository inspection", () => {
     const link = screen.getByRole("link", { name: "#18 Feature" });
     expect(link).toHaveAttribute("href", "https://github.com/orch8/orch8/pull/18");
     expect(screen.getByText(/not proof that the pipeline created the PR/)).toBeInTheDocument();
+  });
+  it("shows actual check outcomes and does not call missing checks passing", () => {
+    state.diff = { available: true, diff: "", baseBranch: "v2", branch: "feature", prLookup: "found",
+      pullRequest: { number: 18, title: "Feature", state: "OPEN", url: "https://github.com/orch8/orch8/pull/18", checks: [
+        { name: "Build and test", status: "FAILURE", url: "https://github.com/orch8/orch8/actions/runs/42" },
+      ] } };
+    const view = renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(screen.getByRole("link", { name: /Build and test: FAILURE/ })).toHaveAttribute("href", "https://github.com/orch8/orch8/actions/runs/42");
+    state.diff = { ...state.diff, pullRequest: { ...state.diff.pullRequest!, checks: [] } };
+    view.rerender(<PipelineDetail pipelineId="pipe_1" />);
+    expect(screen.getByText(/No checks reported for this commit/)).toBeInTheDocument();
+    expect(screen.queryByText(/Build and test: FAILURE/)).not.toBeInTheDocument();
   });
   it("does not claim a PR exists when lookup has no match", () => {
     state.diff = { available: true, diff: "", baseBranch: "v2", branch: "feature", prLookup: "none", pullRequest: null };
