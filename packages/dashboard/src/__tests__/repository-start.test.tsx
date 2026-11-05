@@ -14,6 +14,7 @@ it("opens a repository for feature intake without starting agents or changing bu
   const user = userEvent.setup();
   await user.type(screen.getByLabelText("Repository name"), "My App");
   await user.type(screen.getByLabelText("Local repository path"), "/tmp/my-app");
+  await user.type(screen.getByLabelText(/GitHub repository URL/), "https://github.com/owner/my-app.git");
   expect(screen.getByLabelText(/Project key/)).toHaveValue("MYA");
   fireEvent.change(screen.getByLabelText(/Project spending limit/), { target: { value: "10" } });
   const form = (screen.getByLabelText(/Project spending limit/) as HTMLInputElement).closest("form")!;
@@ -24,7 +25,7 @@ it("opens a repository for feature intake without starting agents or changing bu
   const [url, options] = mockFetch.mock.calls[0];
   expect(url).toContain("/api/projects");
   expect(JSON.parse(options.body)).toMatchObject({
-    name: "My App", slug: "my-app", key: "MYA", homeDir: "/tmp/my-app", defaultBranch: "main", finishStrategy: "none", budgetLimitUsd: 10,
+    name: "My App", slug: "my-app", key: "MYA", homeDir: "/tmp/my-app", repoUrl: "https://github.com/owner/my-app.git", defaultBranch: "main", finishStrategy: "none", budgetLimitUsd: 10,
   });
 });
 
@@ -38,6 +39,19 @@ it("keeps the form and shows the API error when repository creation fails", asyn
   await user.click(screen.getByRole("button", { name: "Open and describe feature" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Repository not found");
   expect(screen.getByLabelText("Local repository path")).toHaveValue("/tmp/missing");
+});
+
+it("can start without a GitHub URL while clearly disclosing the later PR requirement", async () => {
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: "repo-id", slug: "local-only" }) });
+  renderWithProviders(<RepositoryStart onComplete={vi.fn()} />);
+  const user = userEvent.setup();
+  expect(screen.getByText(/Required only to publish a draft PR later/)).toBeInTheDocument();
+  await user.type(screen.getByLabelText("Repository name"), "Local only");
+  await user.type(screen.getByLabelText("Local repository path"), "/tmp/local-only");
+  await user.click(screen.getByLabelText(/No project spending limit/));
+  await user.click(screen.getByRole("button", { name: "Open and describe feature" }));
+  await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+  expect(JSON.parse(mockFetch.mock.calls[0][1].body)).not.toHaveProperty("repoUrl");
 });
 
 it("allows a different key when two names share a prefix, and requires an explicit budget choice", async () => {

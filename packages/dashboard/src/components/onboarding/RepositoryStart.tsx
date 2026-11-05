@@ -15,6 +15,7 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
   const [key, setKey] = useState("");
   const [keyEdited, setKeyEdited] = useState(false);
   const [path, setPath] = useState("");
+  const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("main");
   const [budget, setBudget] = useState("");
   const [noLimit, setNoLimit] = useState(false);
@@ -31,6 +32,7 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
         key: key.trim(),
         description: "",
         homeDir: path.trim(),
+        ...(repoUrl.trim() ? { repoUrl: repoUrl.trim() } : {}),
         defaultBranch: branch.trim(),
         finishStrategy: "none",
         ...(noLimit ? {} : { budgetLimitUsd: Number(budget) }),
@@ -55,6 +57,10 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
       </label>
       <label className="block text-sm text-zinc-300">Local repository path
         <input required value={path} onChange={event => setPath(event.target.value)} placeholder="/home/me/projects/my-app" className={`mt-1 ${inputClass}`} />
+      </label>
+      <label className="block text-sm text-zinc-300">GitHub repository URL (optional)
+        <input type="text" value={repoUrl} onChange={event => setRepoUrl(event.target.value)} placeholder="https://github.com/owner/repo.git" className={`mt-1 ${inputClass}`} />
+        <span className="mt-1 block text-xs text-zinc-400">Required only to publish a draft PR later. Use the origin URL for this checkout; Orch8 checks that they match before pushing. You can add it in project settings later.</span>
       </label>
       <label className="block text-sm text-zinc-300">Base branch
         <input required value={branch} onChange={event => setBranch(event.target.value)} className={`mt-1 ${inputClass}`} />
