@@ -124,6 +124,18 @@ describe("feature progress summary", () => {
     expect(within(progress()).queryByText(/Inspect the repository PR and checks/i)).not.toBeInTheDocument();
   });
 
+  it("explains why an accepted workflow cannot yet publish an uncommitted diff", () => {
+    state.status = "completed";
+    state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "completed", { agentId: "builder" }), step("Independent review", 3, "completed", { agentId: "reviewer", requiresVerification: true, outputSummary: "Approved" })];
+    state.diff = { available: true, prLookup: "none", branch: "feat/example", baseBranch: "v2", committedDiff: "", workingDiff: "diff --git a/file b/file", untrackedFiles: ["new-file.txt"] };
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(screen.getByText(/Draft PR not ready/)).toBeInTheDocument();
+    expect(screen.getByText(/No committed feature changes/)).toBeInTheDocument();
+    expect(screen.getByText(/Staged or unstaged changes remain/)).toBeInTheDocument();
+    expect(screen.getByText(/Untracked files remain/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create pull request" })).not.toBeInTheDocument();
+  });
+
   it("flags an agent run that ended while implementation remains pending", () => {
     state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "pending"), step("Independent review", 3, "pending")];
     state.runs = [{ id: "run_stalled", status: "succeeded", taskId: "task_2", agentId: "builder" }];

@@ -297,6 +297,11 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
     repositoryDiff?.available && repositoryDiff.branch && repositoryDiff.branch !== repositoryDiff.baseBranch &&
     repositoryDiff.prLookup === "none" && !!repositoryDiff.committedDiff &&
     !repositoryDiff.workingDiff && !repositoryDiff.untrackedFiles?.some(path => !outputPaths.has(path)) && !repositoryDiff.untrackedMore;
+  const publicationBlockers = pipeline.status === "completed" && repositoryDiff?.available && repositoryDiff.prLookup === "none" ? [
+    !repositoryDiff.committedDiff && "No committed feature changes. The implementer must commit the reviewed feature files on the prepared branch.",
+    !!repositoryDiff.workingDiff && "Staged or unstaged changes remain. Inspect them before publishing; only committed changes go into the PR.",
+    (repositoryDiff.untrackedFiles?.some(path => !outputPaths.has(path)) || repositoryDiff.untrackedMore) && "Untracked files remain outside recorded pipeline output. Inspect them before publishing.",
+  ].filter((message): message is string => !!message) : [];
 
   function handleRejectSubmit(stepId: string) {
     if (!targetStepId || !feedback.trim()) return;
@@ -374,6 +379,10 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
               <button type="button" disabled={publishMutation.isPending} onClick={() => publishMutation.mutate(pipeline.id, { onSuccess: () => { setConfirmPublish(false); void refreshDiff(); } })} className="rounded bg-blue-800 px-3 py-1 text-blue-100 disabled:opacity-50">{publishMutation.isPending ? "Publishing..." : "Confirm create pull request"}</button>{" "}
               <button type="button" disabled={publishMutation.isPending} onClick={() => setConfirmPublish(false)} className="text-zinc-400 underline">Cancel</button>
             </div>}
+          </div>}
+          {publicationBlockers.length > 0 && <div role="status" className="rounded border border-amber-800/60 bg-amber-950/20 p-3 text-xs text-amber-200">
+            <p className="font-medium">Draft PR not ready. Other review and repository requirements may also apply.</p>
+            <ul className="ml-4 mt-1 list-disc space-y-1">{publicationBlockers.map(message => <li key={message}>{message}</li>)}</ul>
           </div>}
           {publishMutation.isError && <p role="alert" className="text-amber-300 text-xs">{publishMutation.error instanceof Error ? publishMutation.error.message : "PR publication failed. Inspect GitHub before retrying."}</p>}
           {publishMutation.data && <p role="status" className="text-xs text-emerald-300">Pull request created: <a href={publishMutation.data.url} target="_blank" rel="noopener noreferrer" className="underline">{publishMutation.data.url}</a></p>}

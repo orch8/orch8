@@ -102,6 +102,11 @@ describe("feature intake", () => {
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Start with a plan" })); });
   expect(state.readiness).toHaveBeenLastCalledWith("/projects/canonical-id/feature-branch");
   expect(state.create).toHaveBeenCalledWith(expect.objectContaining({ projectId: "one", steps: [expect.objectContaining({ label: "Plan", requiresVerification: true }), expect.objectContaining({ label: "Implement", requiresVerification: false }), expect.objectContaining({ label: "Independent review", requiresVerification: true })] }));
+  const steps = state.create.mock.calls[0][0].steps;
+  expect(steps[1].promptOverride).toMatch(/commit only the intended feature files/);
+  expect(steps[1].promptOverride).toMatch(/Do not push, publish a PR, merge/);
+  expect(steps[2].promptOverride).toMatch(/inspect the actual committed branch diff/);
+  expect(steps[2].promptOverride).toMatch(/Do not edit or commit product files/);
   expect(localStorage.getItem("orch8:feature-draft:one")).toBeNull();
  });
  it("requires a feature branch and refuses a changed branch at submission", async () => {
