@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useCancelPipeline, usePipeline, useRetryPipeline } from "../../hooks/usePipelines.js";
+import { useRuns } from "../../hooks/useRuns.js";
 import { PipelineDetail } from "./PipelineDetail.js";
 import type { Pipeline, PipelineStep } from "../../types.js";
 
@@ -24,10 +25,39 @@ function WorkflowProgress({ pipeline }: { pipeline: Pipeline }) {
   </p>;
 }
 
+function FailedRun({ taskId, projectId }: { taskId: string; projectId: string }) {
+  const { data: runs, isError } = useRuns(projectId, { taskId, limit: 1 });
+  if (isError) return <p className="text-amber-300">Run details unavailable. Open the workflow to inspect the task.</p>;
+  const run = runs?.[0];
+  return <div className="space-y-1">
+    {run ? <p>Most recent task run: {run.status}. {run.error ? <span className="whitespace-pre-wrap break-words text-red-300">{run.error}</span> : "No error message recorded."} The run status alone does not explain why the step failed; inspect the raw log before retrying.</p>
+      : <p className="text-zinc-400">No run found for this task. Inspect the task before retrying.</p>}
+    <a className="text-blue-300 underline" href={`/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`}>Open failed task and run log</a>
+  </div>;
+}
+
+function RetryFailedStep({ pipelineId }: { pipelineId: string }) {
+  const retry = useRetryPipeline();
+  return <>
+    <button type="button" onClick={() => retry.mutate(pipelineId)} disabled={retry.isPending}
+      className="text-xs text-amber-500 hover:text-amber-300">Retry failed step</button>
+    {retry.isError && <p role="alert" className="text-xs text-red-300">Retry failed: {retry.error instanceof Error ? retry.error.message : "Open the workflow for details."}</p>}
+  </>;
+}
+
+function FailedWorkflowProgress({ pipeline }: { pipeline: Pipeline }) {
+  const { data, isError } = usePipeline(pipeline.id);
+  const failed = data?.steps.find(step => step.status === "failed");
+  return <div className="px-4 pb-3 text-xs space-y-1" role="status">
+    <p className="text-red-300">{failed ? `${failed.label} failed. Inspect the run before retrying.` : "Workflow failed. Inspect the workflow before retrying."}</p>
+    {isError && <p className="text-amber-300">Could not load the failed step. Open the workflow for details.</p>}
+    {failed?.taskId && <FailedRun taskId={failed.taskId} projectId={pipeline.projectId} />}
+  </div>;
+}
+
 export function PipelineList({ pipelines: items, showActions = false }: PipelineListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const cancelMutation = useCancelPipeline();
-  const retryMutation = useRetryPipeline();
 
   if (items.length === 0) {
     return <p className="text-sm text-zinc-600">No pipelines found.</p>;
@@ -65,6 +95,7 @@ export function PipelineList({ pipelines: items, showActions = false }: Pipeline
             </span>
           </button>
           {(pipeline.status === "pending" || pipeline.status === "running") && <WorkflowProgress pipeline={pipeline} />}
+          {pipeline.status === "failed" && <FailedWorkflowProgress pipeline={pipeline} />}
           <div className="border-t border-zinc-800 px-4 py-2">
             <a href={`/projects/${encodeURIComponent(pipeline.projectId)}/pipelines/${encodeURIComponent(pipeline.id)}`} className="text-xs text-blue-300 underline">Open workflow and copy link</a>
           </div>
@@ -89,18 +120,7 @@ export function PipelineList({ pipelines: items, showActions = false }: Pipeline
                   Cancel
                 </button>
               )}
-              {pipeline.status === "failed" && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    retryMutation.mutate(pipeline.id);
-                  }}
-                  disabled={retryMutation.isPending}
-                  className="text-xs text-amber-500 hover:text-amber-300"
-                >
-                  Retry
-                </button>
-              )}
+              {pipeline.status === "failed" && <RetryFailedStep pipelineId={pipeline.id} />}
             </div>
           )}
         </div>
