@@ -4,17 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { ProjectSwitcher } from "../components/layout/ProjectSwitcher.js";
 
 const mockNavigate = vi.fn();
+let mockProjectParam = "alpha";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, ...props }: any) => (
     <a href={to} {...props}>{children}</a>
   ),
   useNavigate: () => mockNavigate,
-  useParams: () => ({ projectSlug: "alpha" }),
-  useRouterState: ({ select }: any) =>
-    select
-      ? select({ location: { pathname: "/projects/alpha/board" } })
-      : { location: { pathname: "/projects/alpha/board" } },
+  useParams: () => ({ projectSlug: mockProjectParam }),
 }));
 
 const mockFetch = vi.fn();
@@ -28,6 +25,7 @@ const mockProjects = [
 
 describe("ProjectSwitcher", () => {
   beforeEach(() => {
+    mockProjectParam = "alpha";
     mockFetch.mockReset();
     mockNavigate.mockReset();
     mockFetch.mockResolvedValueOnce({
@@ -51,6 +49,19 @@ describe("ProjectSwitcher", () => {
     renderWithProviders(<ProjectSwitcher />);
     await waitFor(() => {
       expect(screen.getByText("Alpha")).toBeInTheDocument();
+    });
+  });
+
+  it("recognizes the project on an ID-based workflow permalink and switches safely", async () => {
+    mockProjectParam = "proj_1";
+    const user = userEvent.setup();
+    renderWithProviders(<ProjectSwitcher />);
+    const trigger = await screen.findByRole("button", { name: /PROJECT Alpha ready/ });
+    await user.click(trigger);
+    expect(screen.getByRole("link", { name: "Project settings" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Beta" }));
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/projects/$projectSlug/board", params: { projectSlug: "beta" },
     });
   });
 

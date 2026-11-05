@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Link, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { ChevronDownIcon, PlusIcon, SettingsIcon } from "lucide-react";
 import { useProjects } from "../../hooks/useProjects.js";
 
@@ -8,11 +8,11 @@ export function ProjectSwitcher() {
   const params = useParams({ strict: false }) as { projectSlug?: string };
   const currentProjectSlug = params.projectSlug;
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const currentProject = projects?.find((p) => p.slug === currentProjectSlug);
+  // Feature workflow permalinks use the project ID, while older routes use its slug.
+  const currentProject = projects?.find((p) => p.slug === currentProjectSlug || p.id === currentProjectSlug);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -25,11 +25,8 @@ export function ProjectSwitcher() {
   }, []);
 
   function switchProject(newProjectSlug: string) {
-    const currentSuffix = currentProjectSlug
-      ? pathname.replace(`/projects/${currentProjectSlug}`, "")
-      : "";
-    const target = `/projects/${newProjectSlug}${currentSuffix || ""}`;
-    navigate({ to: target as any });
+    // A workflow or task ID belongs to one project. Never carry its route into another.
+    navigate({ to: "/projects/$projectSlug/board", params: { projectSlug: newProjectSlug } });
     setOpen(false);
   }
 
@@ -67,7 +64,7 @@ export function ProjectSwitcher() {
             <div
               key={project.id}
               className={`flex items-center justify-between px-2 py-1.5 ${
-                project.slug === currentProjectSlug
+                project.slug === currentProject?.slug
                   ? "bg-surface-2"
                   : "hover:bg-surface-2"
               }`}
@@ -82,7 +79,7 @@ export function ProjectSwitcher() {
                 {!project.active && (
                   <span className="type-label text-whisper">archived</span>
                 )}
-                {project.slug === currentProjectSlug && (
+                {project.slug === currentProject?.slug && (
                   <Link
                     to={`/projects/${project.slug}/settings` as any}
                     onClick={() => setOpen(false)}

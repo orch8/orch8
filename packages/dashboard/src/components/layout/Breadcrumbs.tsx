@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useProjects } from "../../hooks/useProjects.js";
 
 const SEGMENT_LABELS: Record<string, string> = {
   board: "Board",
@@ -33,13 +34,16 @@ interface BreadcrumbsProps {
 export function Breadcrumbs({ compact = false }: BreadcrumbsProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const parts = pathname.split("/").filter(Boolean);
+  const { data: projects } = useProjects();
+  const projectPart = parts[0] === "projects" ? parts[1] : undefined;
+  const projectName = projects?.find(project => project.id === projectPart || project.slug === projectPart)?.name;
 
   if (compact) {
     // Show only the current (last meaningful) segment.
     const lastPart = [...parts].reverse().find((p) => p !== "projects") ?? "";
     return (
       <nav aria-label="Breadcrumb" className="flex items-center">
-        <span className="type-ui text-ink">{labelFor(lastPart)}</span>
+        <span className="type-ui text-ink">{parts.length === 2 && lastPart === projectPart ? projectName ?? labelFor(lastPart) : labelFor(lastPart)}</span>
       </nav>
     );
   }
@@ -59,7 +63,7 @@ export function Breadcrumbs({ compact = false }: BreadcrumbsProps) {
     const to = rewrite ? acc.replace(/\/[^/]+$/, `/${rewrite}`) : acc;
 
     crumbs.push({
-      label: labelFor(part),
+      label: i === 1 && projectPart ? projectName ?? labelFor(part) : labelFor(part),
       to,
       isCurrent: i === parts.length - 1,
     });
