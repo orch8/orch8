@@ -54,11 +54,14 @@ describe("feature progress summary", () => {
     state.steps = [step("Design", 1, "running"), step("Deploy", 2, "pending")];
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(screen.queryByRole("region", { name: "Feature progress" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Download evidence" })).not.toBeInTheDocument();
   });
 
   it("shows the active stage and the human decision at the plan gate", () => {
     state.steps[0] = step("Plan", 1, "awaiting_verification", { outputSummary: "Plan ready" });
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(screen.getByRole("button", { name: "Download evidence" })).toBeEnabled();
+    expect(apiMock.get).not.toHaveBeenCalled();
     expect(within(progress()).getByText(/Plan.*awaiting approval/i)).toBeInTheDocument();
     expect(within(progress()).getByText(/Read the plan and approve it or request changes/i)).toBeInTheDocument();
     expect(within(progress()).getByText(/No run recorded for the current implementation task/i)).toBeInTheDocument();
