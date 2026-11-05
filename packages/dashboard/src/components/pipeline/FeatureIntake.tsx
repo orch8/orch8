@@ -37,7 +37,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     setPreparing(true); setBranchError("");
     try {
       const result = await api.post<{ branch: string; baseBranch: string }>(`/projects/${encodeURIComponent(project.id)}/feature-branch`, { name: branchName.trim() });
-      setBranchState({ ready: false, ...result, reason: "Feature branch prepared. You can now start with a plan." });
+      setBranchState({ ready: false, ...result, reason: "Feature branch prepared. Check agent runtime before starting." });
       setBranchName("");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Branch preparation failed";
@@ -59,7 +59,8 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const selected = [planner, implementer, reviewer].map(id => available.find(a => a.id === id));
   const selectionKey = JSON.stringify(selected.map(a => [a?.id, a?.adapterConfig]));
   const validSelection = selected.every(Boolean) && reviewer !== implementer;
-  const ready = feature.trim().length > 0 && validSelection && checkedKey === selectionKey && !checking && !create.isPending;
+  const onFeatureBranch = !!branchState?.branch && branchState.branch !== branchState.baseBranch;
+  const ready = !!project?.id && feature.trim().length > 0 && validSelection && onFeatureBranch && checkedKey === selectionKey && !checking && !create.isPending;
 
   async function checkRuntime() {
     if (!validSelection) return;
@@ -88,6 +89,11 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     setError("");
     const request = feature.trim();
     try {
+      const current = await api.get<{ branch: string; baseBranch: string }>(`/projects/${encodeURIComponent(project!.id)}/feature-branch`);
+      if (!current.branch || current.branch === current.baseBranch || current.branch !== branchState?.branch) {
+        setBranchState(null);
+        throw new Error("Repository branch changed. Refresh the page and prepare a feature branch before starting.");
+      }
       const result = await create.mutateAsync({
         projectId,
         name: request.slice(0, 120),
@@ -109,10 +115,10 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
 
   return <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-5" aria-label="New feature">
     <h2 className="text-lg font-semibold text-zinc-100">Build a feature</h2>
-    <p className="mt-1 text-sm text-zinc-400">Describe a change, review the agent's plan, then run implementation and independent review. If the work is committed on a separate branch, you can publish it as a draft PR.</p>
+    <p className="mt-1 text-sm text-zinc-400">Describe a change on a feature branch, review the agent's plan, then run implementation and independent review. Once changes are committed, you can publish a draft PR.</p>
     <p className="mt-3 text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
     <div className="mt-3 space-y-2 rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Prepare feature branch">
-      <h3 className="font-medium">Prepare a feature branch (optional)</h3>
+      <h3 className="font-medium">Prepare a feature branch (required)</h3>
       <p>Current branch: {branchState?.branch || "Checking..."} · Configured base: {branchState?.baseBranch ?? project?.defaultBranch ?? "Checking..."}</p>
       <p className="text-xs text-zinc-400">Creates and checks out a new local branch in this repository. Does not commit, push, or start agents.</p>
       <label className="block" htmlFor="feature-branch-name">New feature branch name</label>
@@ -149,6 +155,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       <button type="button" onClick={() => { void checkRuntime(); }} disabled={!validSelection || checking} className="rounded border border-zinc-600 px-4 py-2 text-sm text-zinc-200 disabled:opacity-40">{checking ? "Checking agents..." : "Check agent runtime"}</button>
       {checkMessage && <p role="status" className={checkedKey === selectionKey ? "text-sm text-emerald-300" : "text-sm text-amber-300"}>{checkMessage}</p>}
       {validSelection && checkedKey !== selectionKey && <p className="text-xs text-amber-300">Runtime check required for this agent selection.</p>}
+      {branchState && !onFeatureBranch && <p role="status" className="text-xs text-amber-300">Start is unavailable on the base branch. Prepare a feature branch above, then check the agents.</p>}
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       <button type="submit" disabled={!ready} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Start with a plan</button>
     </form>

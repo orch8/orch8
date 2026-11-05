@@ -8,7 +8,7 @@ vi.mock("../hooks/useProjects.js", () => ({ useProject: () => ({ data: { id: "ca
 vi.mock("../hooks/usePipelines.js", () => ({ useCreatePipeline: () => ({ mutateAsync: state.create, isPending: false }) }));
 beforeEach(() => {
  state.create.mockReset(); state.probe.mockReset(); state.probe.mockResolvedValue({ ok: true });
- state.readiness.mockReset(); state.readiness.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
+ state.readiness.mockReset(); state.readiness.mockResolvedValue({ ready: false, branch: "feat/usage", baseBranch: "main" });
  state.agents = ["planner", "implementer", "reviewer"].map(id => ({ id, name: id, status: "active", adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
 });
 function select() {
@@ -25,6 +25,7 @@ describe("feature intake", () => {
   expect(screen.getByRole("button", { name: "Prepare feature branch" })).toBeEnabled();
  });
  it("shows branch readiness and explicitly prepares a named branch before starting", async () => {
+  state.readiness.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
   state.probe.mockImplementation(async path => path.includes("feature-branch") ? { branch: "feat/usage", baseBranch: "main" } : { ok: true });
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   expect(await screen.findByText(/Current branch: main/)).toBeInTheDocument();
@@ -60,7 +61,7 @@ describe("feature intake", () => {
   expect(state.create).not.toHaveBeenCalled();
  });
  it("requires different implementation and review agents", async () => {
-  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />); await screen.findByText(/Current branch: main/); select();
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />); await screen.findByText(/Current branch: feat\/usage/); select();
   fireEvent.change(screen.getByLabelText("Review agent"), { target: { value: "implementer" } });
   expect(screen.getByRole("button", { name: "Check agent runtime" })).toBeDisabled();
  });
@@ -68,7 +69,27 @@ describe("feature intake", () => {
   state.create.mockResolvedValue({ pipeline: { id: "pipeline_1" } });
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />); select(); await check();
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Start with a plan" })); });
+  expect(state.readiness).toHaveBeenLastCalledWith("/projects/canonical-id/feature-branch");
   expect(state.create).toHaveBeenCalledWith(expect.objectContaining({ projectId: "one", steps: [expect.objectContaining({ label: "Plan", requiresVerification: true }), expect.objectContaining({ label: "Implement", requiresVerification: false }), expect.objectContaining({ label: "Independent review", requiresVerification: true })] }));
+ });
+ it("requires a feature branch and refuses a changed branch at submission", async () => {
+  state.readiness.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  await screen.findByText(/Current branch: main/);
+  select(); await check();
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+  expect(screen.getByText(/Start is unavailable on the base branch/)).toBeInTheDocument();
+  expect(screen.getByText(/Prepare a feature branch \(required\)/)).toBeInTheDocument();
+ });
+ it("checks the live branch again before creating a workflow", async () => {
+  state.readiness.mockResolvedValueOnce({ ready: false, branch: "feat/usage", baseBranch: "main" })
+    .mockResolvedValueOnce({ ready: true, branch: "main", baseBranch: "main" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  await screen.findByText(/Current branch: feat\/usage/);
+  select(); await check();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Start with a plan" })); });
+  expect(state.create).not.toHaveBeenCalled();
+  expect(screen.getByRole("alert").textContent).toContain("Repository branch changed");
  });
  it("shows a failed sandbox probe and does not start a pipeline", async () => {
   state.probe.mockResolvedValue({ ok: false, message: "bwrap: loopback: Failed RTM_NEWADDR" });
