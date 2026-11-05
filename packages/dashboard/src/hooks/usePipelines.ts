@@ -7,14 +7,16 @@ export function usePipelines(projectId: string) {
   return useQuery<Pipeline[]>({
     queryKey: ["pipelines", projectId],
     queryFn: () => api.get("/pipelines", { projectId }),
+    refetchInterval: 10000,
   });
 }
 
-export function usePipeline(pipelineId: string | null) {
+export function usePipeline(pipelineId: string | null, poll = false) {
   return useQuery<PipelineWithSteps>({
     queryKey: ["pipeline", pipelineId],
     queryFn: () => api.get(`/pipelines/${pipelineId}`),
     enabled: !!pipelineId,
+    refetchInterval: poll ? 5000 : false,
   });
 }
 

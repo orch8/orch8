@@ -1,11 +1,27 @@
 import { useState } from "react";
-import { useCancelPipeline, useRetryPipeline } from "../../hooks/usePipelines.js";
+import { useCancelPipeline, usePipeline, useRetryPipeline } from "../../hooks/usePipelines.js";
 import { PipelineDetail } from "./PipelineDetail.js";
 import type { Pipeline, PipelineStep } from "../../types.js";
 
 interface PipelineListProps {
   pipelines: Array<Pipeline & { steps?: PipelineStep[] }>;
   showActions?: boolean;
+}
+
+function WorkflowProgress({ pipeline }: { pipeline: Pipeline }) {
+  const { data, isError } = usePipeline(pipeline.id, true);
+  if (isError) return <p role="alert" className="px-4 pb-2 text-xs text-amber-300">Could not load the current step. Open the workflow for details.</p>;
+  const current = data?.steps.find(step => step.status === "awaiting_verification") ??
+    data?.steps.find(step => step.status === "running") ??
+    data?.steps.find(step => step.status === "pending");
+  if (!current) return <p className="px-4 pb-2 text-xs text-zinc-400">Checking workflow progress...</p>;
+  const needsDecision = current.status === "awaiting_verification";
+  const review = /\b(review|verification)\b/i.test(current.label);
+  const decision = review ? "accept" : "approve";
+  return <p className={`px-4 pb-2 text-xs ${needsDecision ? "text-amber-300" : "text-zinc-400"}`}>
+    {needsDecision ? `Your decision needed: inspect ${current.label.toLowerCase()} and ${decision} it or ${current.order > 1 ? "reject it" : "cancel the workflow"}.` :
+      `${current.label}: ${current.status === "running" ? "step running" : "not completed"}. Open the workflow to inspect runs and logs.`}
+  </p>;
 }
 
 export function PipelineList({ pipelines: items, showActions = false }: PipelineListProps) {
@@ -48,6 +64,7 @@ export function PipelineList({ pipelines: items, showActions = false }: Pipeline
               {new Date(pipeline.createdAt).toLocaleDateString()}
             </span>
           </button>
+          {(pipeline.status === "pending" || pipeline.status === "running") && <WorkflowProgress pipeline={pipeline} />}
           <div className="border-t border-zinc-800 px-4 py-2">
             <a href={`/projects/${encodeURIComponent(pipeline.projectId)}/pipelines/${encodeURIComponent(pipeline.id)}`} className="text-xs text-blue-300 underline">Open workflow and copy link</a>
           </div>
