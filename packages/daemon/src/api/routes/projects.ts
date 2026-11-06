@@ -5,8 +5,46 @@ import { resolveProjectParam } from "../utils/project-resolver.js";
 import "../../types.js";
 import { z } from "zod";
 import { featureBranchReadiness, inspectRepository } from "../../services/feature-branch.service.js";
+import { requireProjectScope } from "../utils/project-scope.js";
+import { open } from "node:fs/promises";
+import { constants } from "node:fs";
+import { join } from "node:path";
+
+const README_MAX_BYTES = 64 * 1024;
+const README_NAMES = ["README.md", "README.markdown", "README.txt", "README"] as const;
+
+async function rootReadme(homeDir: string): Promise<{ filename: string | null; content: string | null }> {
+  for (const filename of README_NAMES) {
+    let handle;
+    try {
+      // Fixed root filenames only; refuse a symlink at the leaf rather than
+      // following it into an unrelated file. Never accept a client path.
+      handle = await open(join(homeDir, filename), constants.O_RDONLY | constants.O_NOFOLLOW);
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size > README_MAX_BYTES) return { filename: null, content: null };
+      const buffer = Buffer.alloc(stat.size);
+      const { bytesRead } = await handle.read(buffer, 0, stat.size, 0);
+      if (bytesRead !== stat.size || buffer.includes(0)) return { filename: null, content: null };
+      return { filename, content: buffer.toString("utf8") };
+    } catch (err) {
+      if (!["ENOENT", "ELOOP"].includes((err as NodeJS.ErrnoException).code ?? "")) return { filename: null, content: null };
+    } finally {
+      await handle?.close();
+    }
+  }
+  return { filename: null, content: null };
+}
 
 export async function projectRoutes(app: FastifyInstance) {
+  app.get("/api/projects/:id/repository-overview", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    if (Object.keys(request.query as object).length) return reply.code(400).send({ error: "validation_error", message: "This endpoint does not accept a file path." });
+    const projectId = await resolveProjectParam(app, request.params.id, reply);
+    if (!projectId) return reply;
+    if (!requireProjectScope(request, reply, projectId)) return reply;
+    const project = await app.projectService.getById(projectId);
+    if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    return rootReadme(project.homeDir);
+  });
   app.post("/api/projects/repository-inspection", async (request: FastifyRequest, reply: FastifyReply) => {
     if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
     const parsed = z.object({ homeDir: z.string().min(1).max(4096) }).safeParse(request.body);

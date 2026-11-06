@@ -19,6 +19,33 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("shows the selected repository README beside the feature request as safe text", async () => {
+  state.readiness.mockImplementation(async path => path.endsWith("/repository-overview")
+    ? { filename: "README.md", content: "# Project A\n<img src=x onerror=alert(1)>" }
+    : { ready: false, branch: "feat/usage", baseBranch: "main" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(await screen.findByText(/# Project A/)).toHaveTextContent("<img src=x onerror=alert(1)>");
+  expect(document.querySelector("img")).toBeNull();
+  expect(state.readiness).toHaveBeenCalledWith("/projects/canonical-id/repository-overview");
+  expect(screen.getByRole("heading", { name: "Repository overview" })).toBeInTheDocument();
+ });
+ it("explains missing README without blocking intake", async () => {
+  state.readiness.mockImplementation(async path => path.endsWith("/repository-overview")
+    ? { filename: null, content: null }
+    : { ready: false, branch: "feat/usage", baseBranch: "main" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(await screen.findByText(/No root README available/)).toBeInTheDocument();
+  expect(screen.getByLabelText("What should change?")).toBeEnabled();
+ });
+ it("shows a read failure without blocking intake", async () => {
+  state.readiness.mockImplementation(async path => {
+    if (path.endsWith("/repository-overview")) throw new Error("offline");
+    return { ready: false, branch: "feat/usage", baseBranch: "main" };
+  });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(await screen.findByText(/Could not load repository overview/)).toBeInTheDocument();
+  expect(screen.getByLabelText("What should change?")).toBeEnabled();
+ });
  it("opens with the feature entered during repository setup without starting an agent", () => {
   localStorage.setItem("orch8:feature-draft:one", JSON.stringify({ feature: "Add a keyboard shortcut" }));
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
@@ -155,8 +182,11 @@ describe("feature intake", () => {
   expect(screen.getByText(/Prepare a feature branch \(required\)/)).toBeInTheDocument();
  });
  it("checks the live branch again before creating a workflow", async () => {
-  state.readiness.mockResolvedValueOnce({ ready: false, branch: "feat/usage", baseBranch: "main" })
-    .mockResolvedValueOnce({ ready: true, branch: "main", baseBranch: "main" });
+  let branchReads = 0;
+  state.readiness.mockImplementation(async path => path.endsWith("/repository-overview")
+    ? { filename: null, content: null }
+    : ++branchReads === 1 ? { ready: false, branch: "feat/usage", baseBranch: "main" }
+      : { ready: true, branch: "main", baseBranch: "main" });
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   await screen.findByText(/Current branch: feat\/usage/);
   select(); await check();

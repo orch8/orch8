@@ -42,6 +42,8 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const [branchError, setBranchError] = useState("");
   const [preparing, setPreparing] = useState(false);
   const [returning, setReturning] = useState(false);
+  const [overview, setOverview] = useState<{ filename: string | null; content: string | null } | null>(null);
+  const [overviewError, setOverviewError] = useState(false);
   useEffect(() => {
     try {
       if (feature || branchName || planner || implementer || reviewer) localStorage.setItem(draftKey(projectId), JSON.stringify({ feature, branchName, planner, implementer, reviewer }));
@@ -60,6 +62,17 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       api.get<{ ready: boolean; branch: string; baseBranch: string; reason?: string; note?: string }>(`/projects/${encodeURIComponent(project.id)}/feature-branch`)
         .then(result => { if (active) setBranchState(result); })
         .catch(() => { if (active) setBranchError("Could not check repository branch readiness. Refresh to retry."); });
+    }
+    return () => { active = false; };
+  }, [project?.id]);
+  useEffect(() => {
+    let active = true;
+    setOverview(null);
+    setOverviewError(false);
+    if (project?.id) {
+      api.get<{ filename: string | null; content: string | null }>(`/projects/${encodeURIComponent(project.id)}/repository-overview`)
+        .then(result => { if (active) setOverview(result); })
+        .catch(() => { if (active) setOverviewError(true); });
     }
     return () => { active = false; };
   }, [project?.id]);
@@ -208,8 +221,20 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       </div>
     </details>
     <form onSubmit={submit} className="mt-4 space-y-3">
-      <label className="block text-sm text-zinc-300" htmlFor="feature-request">What should change?</label>
-      <textarea id="feature-request" rows={4} maxLength={2000} value={feature} onChange={e => setFeature(e.target.value)} placeholder="Describe the behavior users should gain and how to verify it" className="w-full rounded border border-zinc-700 bg-zinc-950 p-3 text-sm text-zinc-100" />
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+        <div className="min-w-0">
+          <label className="block text-sm text-zinc-300" htmlFor="feature-request">What should change?</label>
+          <textarea id="feature-request" rows={8} maxLength={2000} value={feature} onChange={e => setFeature(e.target.value)} placeholder="Describe the behavior users should gain and how to verify it" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-3 text-sm text-zinc-100" />
+        </div>
+        <aside className="min-w-0 rounded border border-zinc-700 bg-zinc-950 p-3" aria-label="Repository overview">
+          <h3 className="text-sm font-medium text-zinc-100">Repository overview</h3>
+          <p className="mt-1 text-xs text-zinc-400">Root README{overview?.filename ? ` · ${overview.filename}` : ""} · plain-text preview, up to 64 KiB</p>
+          {overviewError ? <p className="mt-3 text-sm text-amber-300">Could not load repository overview. You can still draft a feature.</p>
+            : !overview ? <p className="mt-3 text-sm text-zinc-400">Loading README...</p>
+              : overview.content === null ? <p className="mt-3 text-sm text-zinc-400">No root README available. You can still draft a feature.</p>
+                : <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-300">{overview.content}</pre>}
+        </aside>
+      </div>
       <div className="grid gap-3 sm:grid-cols-3">
         {([ ["Plan agent", planner, setPlanner], ["Implement agent", implementer, setImplementer], ["Review agent", reviewer, setReviewer] ] as const).map(([label, value, setter]) =>
           <label key={label} className="text-sm text-zinc-300">{label}
