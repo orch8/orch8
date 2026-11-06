@@ -3,6 +3,7 @@ import { useAgents, useCreateAgent } from "../../hooks/useAgents.js";
 import { useProject } from "../../hooks/useProjects.js";
 import { useCreatePipeline } from "../../hooks/usePipelines.js";
 import { api } from "../../api/client.js";
+import { SandboxRecoveryGuidance } from "./SandboxRecoveryGuidance.js";
 
 type FeatureDraft = { feature: string; branchName: string; planner: string; implementer: string; reviewer: string };
 const draftKey = (projectId: string) => `orch8:feature-draft:${projectId}`;
@@ -33,6 +34,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const [checking, setChecking] = useState(false);
   const [checkedKey, setCheckedKey] = useState("");
   const [checkMessage, setCheckMessage] = useState("");
+  const [failedSelectionKey, setFailedSelectionKey] = useState("");
   const [branchName, setBranchName] = useState(draft.branchName);
   const [branchState, setBranchState] = useState<{ ready: boolean; branch: string; baseBranch: string; reason?: string; note?: string } | null>(null);
   const [branchError, setBranchError] = useState("");
@@ -45,7 +47,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   }, [projectId, feature, branchName, planner, implementer, reviewer]);
   function clearDraft() {
     setFeature(""); setBranchName(""); setPlanner(""); setImplementer(""); setReviewer("");
-    setCheckedKey(""); setCheckMessage("");
+    setCheckedKey(""); setCheckMessage(""); setFailedSelectionKey("");
   }
   useEffect(() => {
     let active = true;
@@ -121,6 +123,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     if (!validSelection) return;
     setChecking(true);
     setCheckedKey("");
+    setFailedSelectionKey("");
     setCheckMessage("");
     try {
       for (const agent of selected) {
@@ -132,6 +135,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       setCheckedKey(selectionKey);
       setCheckMessage("Selected agents passed the runtime check. This does not guarantee a feature run will succeed.");
     } catch (err) {
+      setFailedSelectionKey(selectionKey);
       setCheckMessage(err instanceof Error ? err.message : "Runtime test failed");
     } finally {
       setChecking(false);
@@ -211,7 +215,9 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       {!isLoading && !available.length && <p role="status" className="text-sm text-amber-300">No eligible Codex agents yet. Set up feature agents above or configure active Codex agents in Agents.</p>}
       {reviewer && implementer && reviewer === implementer && <p role="alert" className="text-sm text-amber-300">Choose a different agent for independent review.</p>}
       <button type="button" onClick={() => { void checkRuntime(); }} disabled={!validSelection || checking} className="rounded border border-zinc-600 px-4 py-2 text-sm text-zinc-200 disabled:opacity-40">{checking ? "Checking agents..." : "Check agent runtime"}</button>
-      {checkMessage && <p role="status" className={checkedKey === selectionKey ? "text-sm text-emerald-300" : "text-sm text-amber-300"}>{checkMessage}</p>}
+      {checkMessage && failedSelectionKey === selectionKey && <p role="status" className="text-sm text-amber-300">{checkMessage}</p>}
+      {checkMessage && checkedKey === selectionKey && <p role="status" className="text-sm text-emerald-300">{checkMessage}</p>}
+      <SandboxRecoveryGuidance message={failedSelectionKey === selectionKey ? checkMessage : ""} />
       {validSelection && checkedKey !== selectionKey && <p className="text-xs text-amber-300">Runtime check required for this agent selection.</p>}
       <div className="space-y-2 rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Prepare feature branch">
         <h3 className="font-medium">Prepare a feature branch (required)</h3>
