@@ -4,9 +4,16 @@ import { isUniqueViolation } from "../utils/db-errors.js";
 import { resolveProjectParam } from "../utils/project-resolver.js";
 import "../../types.js";
 import { z } from "zod";
-import { featureBranchReadiness } from "../../services/feature-branch.service.js";
+import { featureBranchReadiness, inspectRepository } from "../../services/feature-branch.service.js";
 
 export async function projectRoutes(app: FastifyInstance) {
+  app.post("/api/projects/repository-inspection", async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+    const parsed = z.object({ homeDir: z.string().min(1).max(4096) }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
+    try { return await inspectRepository(parsed.data.homeDir); }
+    catch { return reply.code(400).send({ error: "invalid_repository", message: "Choose a repository root with a checked-out branch." }); }
+  });
   // Check the checkout before project creation can provision files in it.
   app.post("/api/projects/repository-readiness", async (request: FastifyRequest, reply: FastifyReply) => {
     if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });

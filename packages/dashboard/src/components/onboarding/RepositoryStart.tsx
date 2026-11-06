@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useCreateProject } from "../../hooks/useProjects.js";
 import { api } from "../../api/client.js";
 
@@ -22,6 +22,29 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
   const [noLimit, setNoLimit] = useState(false);
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
+  const [inspecting, setInspecting] = useState(false);
+  const [inspection, setInspection] = useState("");
+  const currentPath = useRef("");
+  const branchEdits = useRef(0);
+  const originEdits = useRef(0);
+
+  async function inspect() {
+    if (!path.trim() || inspecting) return;
+    const requestedPath = path.trim();
+    const branchVersion = branchEdits.current;
+    const originVersion = originEdits.current;
+    setInspecting(true); setInspection(""); setError("");
+    try {
+      const result = await api.post<{ branch: string; origin: string; originAvailable: boolean }>("/projects/repository-inspection", { homeDir: requestedPath });
+      if (currentPath.current.trim() !== requestedPath) return;
+      if (branchEdits.current === branchVersion) setBranch(result.branch);
+      if (originEdits.current === originVersion) setRepoUrl(result.origin);
+      setInspection(result.origin ? `Found branch ${result.branch} and GitHub origin. Review both before opening.` :
+        `Found branch ${result.branch}. ${result.originAvailable ? "Origin is not a supported GitHub URL; enter a safe GitHub URL manually if you need a PR." : "No origin found; add a GitHub URL later if you need a PR."}`);
+    } catch (cause) {
+      if (currentPath.current.trim() === requestedPath) setError(cause instanceof Error ? cause.message : "Could not inspect repository");
+    } finally { setInspecting(false); }
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -68,14 +91,16 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
         <span className="mt-1 block text-xs text-zinc-400">Used for task IDs. If another project already uses this key, choose a different 2 to 5 character key.</span>
       </label>
       <label className="block text-sm text-zinc-300">Local repository path
-        <input required value={path} onChange={event => setPath(event.target.value)} placeholder="/home/me/projects/my-app" className={`mt-1 ${inputClass}`} />
+        <input required value={path} onChange={event => { currentPath.current = event.target.value; setPath(event.target.value); setInspection(""); setRepoUrl(""); setBranch("main"); }} placeholder="/home/me/projects/my-app" className={`mt-1 ${inputClass}`} />
       </label>
+      <button type="button" onClick={() => { void inspect(); }} disabled={!path.trim() || inspecting || checking} className="rounded border border-zinc-600 px-3 py-2 text-sm text-zinc-200 disabled:opacity-40">{inspecting ? "Inspecting..." : "Detect branch and GitHub origin"}</button>
+      {inspection && <p role="status" className="text-sm text-emerald-300">{inspection}</p>}
       <label className="block text-sm text-zinc-300">GitHub repository URL (optional)
-        <input type="text" value={repoUrl} onChange={event => setRepoUrl(event.target.value)} placeholder="https://github.com/owner/repo.git" className={`mt-1 ${inputClass}`} />
+        <input type="text" value={repoUrl} onChange={event => { originEdits.current += 1; setRepoUrl(event.target.value); }} placeholder="https://github.com/owner/repo.git" className={`mt-1 ${inputClass}`} />
         <span className="mt-1 block text-xs text-zinc-400">Required only to publish a draft PR later. Use the origin URL for this checkout; Orch8 checks that they match before pushing. You can add it in project settings later.</span>
       </label>
       <label className="block text-sm text-zinc-300">Base branch
-        <input required value={branch} onChange={event => setBranch(event.target.value)} className={`mt-1 ${inputClass}`} />
+        <input required value={branch} onChange={event => { branchEdits.current += 1; setBranch(event.target.value); }} className={`mt-1 ${inputClass}`} />
       </label>
       <label className="block text-sm text-zinc-300">Project spending limit (USD)
         <input required={!noLimit} disabled={noLimit} type="number" min="0.01" step="any" value={budget} onChange={event => setBudget(event.target.value)} placeholder="10.00" className={`mt-1 ${inputClass} disabled:opacity-40`} />
