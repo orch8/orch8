@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   usePipeline,
   useRequestPlanChanges,
@@ -224,7 +224,7 @@ function PlanDecision({ pipelineId, stepId, revision, outputFilePath }: { pipeli
   </section>;
 }
 
-function ReviewDecision({ pipelineId, stepId, revision, outputFilePath, prEligibleLabel }: { pipelineId: string; stepId: string; revision: string; outputFilePath: string | null; prEligibleLabel: boolean }) {
+function ReviewDecision({ pipelineId, stepId, revision, outputFilePath, prEligibleLabel, diff, diffLoading, diffError }: { pipelineId: string; stepId: string; revision: string; outputFilePath: string | null; prEligibleLabel: boolean; diff?: PipelineRepositoryDiff; diffLoading: boolean; diffError: boolean }) {
   const [reviewedContent, setReviewedContent] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [changed, setChanged] = useState(false);
@@ -259,6 +259,21 @@ function ReviewDecision({ pipelineId, stepId, revision, outputFilePath, prEligib
     {data && <><p className="break-all font-mono text-xs text-zinc-500">{data.path}</p>
       <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-950 p-3 text-xs text-zinc-200">{data.content || "(Empty file)"}</pre></>}
     {data && !data.content.trim() && <p role="alert" className="text-xs text-amber-300">The review file is empty. Reject this step.</p>}
+    <section aria-label="Changes to inspect for review" className="space-y-2 rounded border border-zinc-700 bg-zinc-950/60 p-3 text-xs">
+      <h5 className="font-semibold text-zinc-200">Changes to inspect before deciding</h5>
+      <p className="text-zinc-400">This is a live repository-wide snapshot, not the exact diff the reviewer saw. <a href="#repository-changes" className="text-blue-300 underline">Open the full repository view</a> and use Refresh diff to update it. Test output must be checked in the <a href="#implementation-run-evidence" className="text-blue-300 underline">implementation run log</a>.</p>
+      {diffLoading && <p>Loading repository changes...</p>}
+      {diffError && <p role="alert" className="text-amber-300">Repository changes could not be loaded. Inspect the checkout before accepting.</p>}
+      {!diffLoading && !diffError && !diff?.available && <p role="alert" className="text-amber-300">Repository changes unavailable: {diff?.reason ?? "Check the checkout before accepting."}</p>}
+      {!diffLoading && !diffError && diff?.available && <>
+        <p>Branch: <span className="font-mono">{diff.branch ?? "detached HEAD"}</span> · base: <span className="font-mono">{diff.baseBranch}</span></p>
+        <details><summary className="cursor-pointer text-blue-300">Committed changes</summary><div className="mt-2 max-h-80 overflow-auto"><GitDiffViewer diff={diff.committedDiff ?? ""} /></div></details>
+        <details><summary className="cursor-pointer text-blue-300">Uncommitted changes and untracked names</summary><div className="mt-2 max-h-80 overflow-auto"><GitDiffViewer diff={diff.workingDiff ?? ""} />
+          {diff.untrackedFiles?.length ? <ul className="mt-2 font-mono text-zinc-300">{diff.untrackedFiles.map(path => <li key={path}>{path}</li>)}</ul> : <p>No untracked names reported.</p>}
+          {diff.untrackedMore && <p className="text-amber-300">More untracked names exist than shown.</p>}
+        </div></details>
+      </>}
+    </section>
     {changed && <p role="alert" className="text-xs text-amber-300">The review changed or could not be refreshed. Read the current report and confirm again.</p>}
     <label className="flex items-start gap-2 text-xs text-zinc-200">
       <input type="checkbox" checked={hasReport && reviewedContent === data?.content} disabled={!hasReport} onChange={event => { setReviewedContent(event.target.checked ? data?.content ?? null : null); setChanged(false); }} />
@@ -276,7 +291,16 @@ interface PipelineDetailProps {
 
 export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
   const { data, isLoading, refetch } = usePipeline(pipelineId);
-  const { data: repositoryDiff, isLoading: diffLoading, isError: diffError, refetch: refreshDiff } = usePipelineDiff(pipelineId);
+  const { data: repositoryDiff, isLoading: diffLoading, isFetching: diffRefreshing, isError: diffError, refetch: refreshDiff } = usePipelineDiff(pipelineId);
+  const refreshedReview = useRef("");
+  const actionableReview = data?.steps.find(step => /\b(review|verification)\b/i.test(step.label) && step.status === "awaiting_verification");
+  const reviewKey = actionableReview ? `${pipelineId}:${actionableReview.id}:${actionableReview.updatedAt ?? ""}` : "";
+  useEffect(() => {
+    if (reviewKey && refreshedReview.current !== reviewKey) {
+      refreshedReview.current = reviewKey;
+      void refreshDiff();
+    }
+  }, [reviewKey, refreshDiff]);
   const cancelMutation = useCancelPipeline();
   const retryMutation = useRetryPipeline();
   const rejectMutation = useRejectPipelineStep();
@@ -431,7 +455,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
             {step.order === 1 && step.label.toLowerCase() === "plan" && step.status === "awaiting_verification" ?
               <PlanDecision key={`${step.id}:${step.updatedAt ?? ""}`} pipelineId={pipeline.id} stepId={step.id} revision={String(step.updatedAt ?? step.outputSummary ?? "")} outputFilePath={step.outputFilePath ?? null} /> :
               isReviewDecision(step) && step.status === "awaiting_verification" ?
-                <ReviewDecision key={`${step.id}:${step.updatedAt ?? ""}`} pipelineId={pipeline.id} stepId={step.id} revision={String(step.updatedAt ?? step.outputSummary ?? "")} outputFilePath={step.outputFilePath ?? null} prEligibleLabel={["review", "independent review"].includes(step.label.toLowerCase())} /> :
+                <ReviewDecision key={`${step.id}:${step.updatedAt ?? ""}`} pipelineId={pipeline.id} stepId={step.id} revision={String(step.updatedAt ?? step.outputSummary ?? "")} outputFilePath={step.outputFilePath ?? null} prEligibleLabel={["review", "independent review"].includes(step.label.toLowerCase())} diff={repositoryDiff} diffLoading={diffLoading || !!diffRefreshing} diffError={diffError} /> :
                 step.outputFilePath && (step.status === "completed" || step.status === "awaiting_verification") &&
                 <StepOutput pipelineId={pipeline.id} stepId={step.id} label={step.label} revision={String(step.updatedAt ?? step.outputSummary ?? "")} />}
             {step.order === 1 && step.label.toLowerCase() === "plan" &&
