@@ -5,7 +5,7 @@ import { RepositoryStart } from "../components/onboarding/RepositoryStart.js";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
-beforeEach(() => mockFetch.mockReset());
+beforeEach(() => { mockFetch.mockReset(); localStorage.clear(); });
 const ready = { ok: true, json: async () => ({ ready: true, branch: "main", baseBranch: "main" }) };
 
 it("detects a repository's real branch and safe origin before opening it", async () => {
@@ -93,6 +93,23 @@ it("opens a repository for feature intake without starting agents or changing bu
   });
 });
 
+it("carries a feature request into the new repository's Build draft only after creation succeeds", async () => {
+  mockFetch.mockResolvedValueOnce(ready);
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: "repo-id", slug: "my-app" }) });
+  const onComplete = vi.fn();
+  renderWithProviders(<RepositoryStart onComplete={onComplete} />);
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText("Repository name"), "My App");
+  await user.type(screen.getByLabelText("Local repository path"), "/tmp/my-app");
+  await user.type(screen.getByLabelText(/First feature request/), "Add a keyboard shortcut");
+  await user.click(screen.getByLabelText(/No project spending limit/));
+  expect(localStorage.getItem("orch8:feature-draft:my-app")).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Open and describe feature" }));
+  await waitFor(() => expect(onComplete).toHaveBeenCalledWith("my-app"));
+  expect(JSON.parse(localStorage.getItem("orch8:feature-draft:my-app")!)).toMatchObject({ feature: "Add a keyboard shortcut" });
+  expect(mockFetch).toHaveBeenCalledTimes(2);
+});
+
 it("keeps the form and shows the API error when repository creation fails", async () => {
   mockFetch.mockResolvedValueOnce(ready);
   mockFetch.mockRejectedValueOnce(new Error("Repository not found"));
@@ -100,9 +117,11 @@ it("keeps the form and shows the API error when repository creation fails", asyn
   const user = userEvent.setup();
   await user.type(screen.getByLabelText("Repository name"), "Missing");
   await user.type(screen.getByLabelText("Local repository path"), "/tmp/missing");
+  await user.type(screen.getByLabelText(/First feature request/), "never saved");
   await user.click(screen.getByLabelText(/No project spending limit/));
   await user.click(screen.getByRole("button", { name: "Open and describe feature" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Repository not found");
+  expect(localStorage.length).toBe(0);
   expect(screen.getByLabelText("Local repository path")).toHaveValue("/tmp/missing");
 });
 
