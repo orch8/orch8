@@ -140,10 +140,33 @@ describe("feature intake", () => {
   fireEvent.change(screen.getByLabelText("New feature branch name"), { target: { value: "feat/usage" } });
   await check();
   expect(screen.getByText(/planner: bwrap: loopback/)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Codex sandbox needs host setup" })).toBeInTheDocument();
+  expect(screen.getByText(/sudo apt install bubblewrap/)).toBeInTheDocument();
+  expect(screen.getByText(/apparmor_parser -r/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Codex sandbox prerequisites" })).toHaveAttribute("href", "https://developers.openai.com/codex/concepts/sandboxing#prerequisites");
+  expect(screen.getByText(/Do not disable AppArmor globally/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Prepare feature branch" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
   expect(state.create).not.toHaveBeenCalled();
   expect(state.probe).not.toHaveBeenCalledWith("/projects/canonical-id/feature-branch", expect.anything());
+ });
+ it("hides host repair advice for unrelated failures and after a passing retry", async () => {
+  state.probe.mockResolvedValueOnce({ ok: false, message: "Model not available" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />); select(); await check();
+  expect(screen.queryByRole("heading", { name: "Codex sandbox needs host setup" })).not.toBeInTheDocument();
+  state.probe.mockReset().mockResolvedValueOnce({ ok: false, message: "bwrap: Failed RTM_NEWADDR" });
+  await check();
+  expect(screen.getByRole("heading", { name: "Codex sandbox needs host setup" })).toBeInTheDocument();
+  state.probe.mockReset().mockResolvedValue({ ok: true });
+  await check();
+  expect(screen.queryByRole("heading", { name: "Codex sandbox needs host setup" })).not.toBeInTheDocument();
+ });
+ it("clears host repair advice when choosing another agent", async () => {
+  state.probe.mockResolvedValue({ ok: false, message: "bwrap: Failed RTM_NEWADDR" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />); select(); await check();
+  expect(screen.getByRole("heading", { name: "Codex sandbox needs host setup" })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Plan agent"), { target: { value: "reviewer" } });
+  expect(screen.queryByRole("heading", { name: "Codex sandbox needs host setup" })).not.toBeInTheDocument();
  });
  it("restores a blocked feature draft after reload without restoring runtime clearance", async () => {
   state.probe.mockResolvedValue({ ok: false, message: "bwrap: Failed RTM_NEWADDR" });
