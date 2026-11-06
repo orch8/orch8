@@ -427,6 +427,41 @@ describe("Pipeline API routes", () => {
       }
     });
 
+    it("reads project repository changes without a pipeline and scopes agent access", async () => {
+      const root = await mkdtemp(join(tmpdir(), "orch-project-changes-"));
+      try {
+        const git = (...args: string[]) => execFileSync("git", args, { cwd: root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" } });
+        git("init", "-q", "-b", "stable");
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "base");
+        git("switch", "-qc", "feature");
+        await writeFile(join(root, "committed.txt"), "committed\n");
+        git("add", "committed.txt");
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "feature");
+        await writeFile(join(root, "working.txt"), "staged\n");
+        git("add", "working.txt");
+        await writeFile(join(root, "untracked.txt"), "private content\n");
+        await testDb.db.update(projects).set({ homeDir: root, defaultBranch: "stable" }).where(eq(projects.id, projectId));
+        const url = `/api/projects/${projectId}/repository-changes`;
+        const response = await app.inject({ method: "GET", url });
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toMatchObject({ available: true, branch: "feature", baseBranch: "stable", untrackedFiles: ["untracked.txt"] });
+        expect(response.json().committedDiff).toContain("+committed");
+        expect(response.json().workingDiff).toContain("+staged");
+        expect(response.body).not.toContain("private content");
+        const token = "project-changes-agent-token";
+        await testDb.db.update(agents).set({ agentTokenHash: hashAgentToken(token) }).where(eq(agents.id, "route-agent-a"));
+        const headers = { authorization: `Bearer ${token}` };
+        expect((await app.inject({ method: "GET", url, headers })).statusCode).toBe(200);
+        const [other] = await testDb.db.insert(projects).values({ name: "Private", slug: `private-${Date.now()}`, homeDir: root }).returning();
+        expect((await app.inject({ method: "GET", url: `/api/projects/${other.id}/repository-changes`, headers })).statusCode).toBe(403);
+        expect((await app.inject({ method: "GET", url: "/api/projects/does-not-exist/repository-changes" })).statusCode).toBe(404);
+        expect((await app.inject({ method: "POST", url })).statusCode).toBe(404);
+      } finally {
+        await testDb.db.update(projects).set({ homeDir: "/tmp/route", defaultBranch: "main" }).where(eq(projects.id, projectId));
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+
     it("reports a missing configured base instead of showing an incomplete working-tree-only diff", async () => {
       const root = await mkdtemp(join(tmpdir(), "orch-pipeline-no-base-"));
       try {

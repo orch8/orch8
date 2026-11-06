@@ -44,6 +44,15 @@ export function usePlanAttempts(pipelineId: string, enabled: boolean, poll = fal
   });
 }
 
+export function useRepositoryChanges(projectId: string | undefined) {
+  return useQuery<PipelineRepositoryDiff>({
+    queryKey: ["repository-changes", projectId],
+    queryFn: () => api.get(`/projects/${encodeURIComponent(projectId!)}/repository-changes`),
+    enabled: !!projectId,
+    staleTime: 0,
+  });
+}
+
 export function usePipelineDiff(pipelineId: string) {
   return useQuery<PipelineRepositoryDiff>({
     queryKey: ["pipeline-diff", pipelineId],
