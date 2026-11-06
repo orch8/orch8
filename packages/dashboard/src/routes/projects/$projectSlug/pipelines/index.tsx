@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import { usePipelines } from "../../../../hooks/usePipelines.js";
 import { PipelineList } from "../../../../components/pipeline/PipelineList.js";
 import { FeatureIntake } from "../../../../components/pipeline/FeatureIntake.js";
+import { RepositoryChanges } from "../../../../components/pipeline/RepositoryChanges.js";
 import { useProject } from "../../../../hooks/useProjects.js";
 
 // Pipelines tabs are built from runtime paths like
@@ -16,7 +17,7 @@ type Tab = "active" | "history" | "templates";
 function PipelinesActivePage() {
   const { projectSlug: projectId } = Route.useParams();
   const { data: allPipelines, isLoading } = usePipelines(projectId);
-  const { data: project } = useProject(projectId);
+  const { data: project, isError: projectError } = useProject(projectId);
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -62,6 +63,7 @@ function PipelinesActivePage() {
         ))}
       </div>
 
+      <RepositoryChanges projectId={project?.id} projectError={projectError} />
       <FeatureIntake key={projectId} projectId={projectId} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />
       <section id="active-workflows" aria-label="Workflows needing attention" className="space-y-3 scroll-mt-6">
         <h2 className="text-sm font-semibold text-zinc-200">Workflows needing attention</h2>

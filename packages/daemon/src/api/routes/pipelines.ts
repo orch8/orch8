@@ -155,6 +155,13 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
 }
 
 export async function pipelineRoutes(app: FastifyInstance) {
+  // Repository-wide live inspection; no pipeline, agent run, or publication required.
+  app.get("/api/projects/:projectId/repository-changes", async (request: FastifyRequest<{ Params: { projectId: string } }>, reply: FastifyReply) => {
+    if (!requireProjectScope(request, reply, request.params.projectId)) return reply;
+    const project = await app.projectService.getById(request.params.projectId);
+    if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    return repositoryDiff(project.homeDir, project.defaultBranch);
+  });
   const preparing = new Set<string>();
   app.get("/api/projects/:projectId/feature-branch", async (request: FastifyRequest<{ Params: { projectId: string } }>, reply: FastifyReply) => {
     if (!requireProjectScope(request, reply, request.params.projectId)) return reply;
