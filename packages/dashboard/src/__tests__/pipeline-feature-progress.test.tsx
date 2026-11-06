@@ -13,12 +13,13 @@ const state = vi.hoisted(() => ({
   runs: [] as Array<Record<string, unknown>>,
   runsLoading: false,
   runsError: false,
+  diffError: false,
   diff: { available: false, reason: "No repository" } as Record<string, unknown>,
 }));
 vi.mock("../hooks/usePipelines.js", () => ({
   usePipeline: () => ({ data: { pipeline: { id: "pipe_1", name: "Feature", projectId: "proj_1", status: state.status, currentStep: state.currentStep }, steps: state.steps }, isLoading: false, refetch: vi.fn() }),
   usePlanAttempts: () => ({ data: [], isLoading: false, isError: false }),
-  usePipelineDiff: () => ({ data: state.diff, isLoading: false, isError: false, refetch: vi.fn() }),
+  usePipelineDiff: () => ({ data: state.diff, isLoading: false, isError: state.diffError, refetch: vi.fn() }),
   usePipelineStepOutput: () => ({ data: null, isLoading: false, isError: false, refetch: vi.fn() }),
   useCancelPipeline: () => ({ isPending: false }),
   useRetryPipeline: () => ({ isPending: false }),
@@ -46,10 +47,43 @@ beforeEach(() => {
   state.runs = [];
   state.runsLoading = false;
   state.runsError = false;
+  state.diffError = false;
   state.diff = { available: false, reason: "No repository" };
 });
 
 describe("feature progress summary", () => {
+  it("links the plan, implementation log, review and live diff without inventing a PR", () => {
+    state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "running"), step("Independent review", 3, "pending")];
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    const evidence = within(progress()).getByRole("navigation", { name: "Workflow evidence" });
+    for (const [name, target] of [
+      ["Plan: completed", "workflow-step-step_1"],
+      ["Implement: running", "workflow-step-step_2"],
+      ["Independent review: pending", "workflow-step-step_3"],
+      ["Repository diff", "repository-changes"],
+    ]) {
+      expect(within(evidence).getByRole("link", { name })).toHaveAttribute("href", `#${target}`);
+      expect(document.getElementById(target)).toBeInTheDocument();
+    }
+    expect(within(evidence).queryByRole("link", { name: /PR #/ })).not.toBeInTheDocument();
+  });
+
+  it("links only a PR observed for the current branch commit", () => {
+    state.diff = { available: true, prLookup: "found", pullRequest: { number: 18, title: "Feature", state: "OPEN", url: "https://github.com/orch8/orch8/pull/18" } };
+    const view = renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    const evidence = within(progress()).getByRole("navigation", { name: "Workflow evidence" });
+    expect(within(evidence).getByRole("link", { name: "PR #18 and checks" })).toHaveAttribute("href", "https://github.com/orch8/orch8/pull/18");
+    state.diffError = true;
+    view.rerender(<PipelineDetail pipelineId="pipe_1" />);
+    expect(within(evidence).queryByRole("link", { name: /PR #/ })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Repository changes" })).queryByRole("link", { name: /#18/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Could not load repository diff/)).toBeInTheDocument();
+    state.diffError = false;
+    state.diff = { available: true, prLookup: "unavailable" };
+    view.rerender(<PipelineDetail pipelineId="pipe_1" />);
+    expect(within(evidence).queryByRole("link", { name: /PR #/ })).not.toBeInTheDocument();
+  });
+
   it("does not label a custom workflow as a feature", () => {
     state.steps = [step("Design", 1, "running"), step("Deploy", 2, "pending")];
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
@@ -103,6 +137,11 @@ describe("feature progress summary", () => {
     const view = renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(within(progress()).getByText(/Accepted.*test results still require inspection/i)).toBeInTheDocument();
     expect(within(progress()).getByRole("link", { name: /Draft PR #18/i })).toHaveAttribute("href", "https://github.com/orch8/orch8/pull/18");
+    state.diffError = true;
+    view.rerender(<PipelineDetail pipelineId="pipe_1" />);
+    expect(within(progress()).getByText(/PR status unavailable/)).toBeInTheDocument();
+    expect(within(progress()).queryByRole("link", { name: /Draft PR #18/i })).not.toBeInTheDocument();
+    state.diffError = false;
     state.diff = { available: true, prLookup: "unavailable" };
     view.rerender(<PipelineDetail pipelineId="pipe_1" />);
     expect(within(progress()).getByText(/PR lookup unavailable/i)).toBeInTheDocument();
@@ -182,9 +221,9 @@ describe("feature progress summary", () => {
     state.currentStep = 2;
     state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "pending"), step("Independent review", 3, "failed", { outputSummary: "[REJECTED] Fix the issue" })];
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
-    expect(within(progress()).getByText(/Implement.*pending/i)).toBeInTheDocument();
+    expect(within(progress()).getByText("Implement · pending")).toBeInTheDocument();
     expect(within(progress()).getByText(/Rejected; changes requested/i)).toBeInTheDocument();
     expect(within(progress()).getByRole("link", { name: /Inspect project runs for earlier attempts/i })).toHaveAttribute("href", "/projects/proj_1/runs");
-    expect(within(progress()).queryByText(/Independent review.*failed/i)).not.toBeInTheDocument();
+    expect(within(progress()).queryByText("Independent review · failed")).not.toBeInTheDocument();
   });
 });
