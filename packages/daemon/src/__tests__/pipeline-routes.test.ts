@@ -389,8 +389,9 @@ describe("Pipeline API routes", () => {
       await rm(join(root, "manual.txt"));
       const returned = await app.inject({ method: "POST", url });
       expect(returned.statusCode).toBe(200);
-      expect(returned.json()).toEqual({ branch: "main", baseBranch: "main" });
+      expect(returned.json()).toMatchObject({ ready: true, branch: "main", baseBranch: "main", note: expect.stringContaining(".gitignore") });
       expect(git("branch", "--show-current")).toBe("main");
+      expect((await app.inject({ method: "GET", url: `/api/projects/${projectId}/feature-branch` })).json()).toMatchObject({ ready: true, branch: "main" });
     } finally {
       await testDb.db.update(projects).set({ homeDir: "/tmp/route", defaultBranch: "main" }).where(eq(projects.id, projectId));
       await rm(root, { recursive: true, force: true });

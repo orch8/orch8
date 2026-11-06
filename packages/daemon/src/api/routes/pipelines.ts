@@ -208,7 +208,12 @@ export async function pipelineRoutes(app: FastifyInstance) {
         inArray(heartbeatRuns.projectId, shared), inArray(heartbeatRuns.status, ["queued", "running"]),
       )).limit(1);
       if (runs.length) return reply.code(409).send({ error: "conflict", message: "An agent run is queued or running for this project." });
-      return await returnToBaseBranch(project.homeDir, project.defaultBranch);
+      await returnToBaseBranch(project.homeDir, project.defaultBranch);
+      // The previous feature may have committed the generated ignore rule while
+      // the local base does not have it yet. Restore the same safe setup rule so
+      // .orch8/ does not block the next feature or leak into its diff.
+      await app.seedingService.ensureGitignore(project.homeDir);
+      return await featureBranchReadiness(project.homeDir, project.defaultBranch);
     } catch (error) {
       return reply.code(409).send({ error: "conflict", message: (error as Error).message });
     } finally { preparing.delete(key); }

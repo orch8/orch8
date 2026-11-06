@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { FeatureIntake } from "../components/pipeline/FeatureIntake.js";
-const state = vi.hoisted(() => ({ agents: [] as any[], requestedAgents: vi.fn(), create: vi.fn(), createAgent: vi.fn(), probe: vi.fn(), readiness: vi.fn() }));
+const state = vi.hoisted(() => ({ agents: [] as any[], requestedAgents: vi.fn(), create: vi.fn(), createAgent: vi.fn(), probe: vi.fn(), readiness: vi.fn(), invalidate: vi.fn() }));
+vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock("../api/client.js", () => ({ api: { post: state.probe, get: state.readiness } }));
 vi.mock("../hooks/useAgents.js", () => ({ useAgents: (id: string) => { state.requestedAgents(id); return { data: state.agents, isLoading: false }; }, useCreateAgent: () => ({ mutateAsync: state.createAgent }) }));
 vi.mock("../hooks/useProjects.js", () => ({ useProject: () => ({ data: { id: "canonical-id", homeDir: "/repo" } }) }));
 vi.mock("../hooks/usePipelines.js", () => ({ useCreatePipeline: () => ({ mutateAsync: state.create, isPending: false }) }));
 beforeEach(() => {
  localStorage.clear();
- state.requestedAgents.mockReset(); state.create.mockReset(); state.createAgent.mockReset(); state.createAgent.mockResolvedValue({ id: "created" }); state.probe.mockReset(); state.probe.mockResolvedValue({ ok: true });
+ state.requestedAgents.mockReset(); state.create.mockReset(); state.createAgent.mockReset(); state.createAgent.mockResolvedValue({ id: "created" }); state.probe.mockReset(); state.probe.mockResolvedValue({ ok: true }); state.invalidate.mockReset(); state.invalidate.mockResolvedValue(undefined);
  state.readiness.mockReset(); state.readiness.mockResolvedValue({ ready: false, branch: "feat/usage", baseBranch: "main" });
  state.agents = ["planner", "implementer", "reviewer"].map(id => ({ id, name: id, status: "active", adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
 });
@@ -27,14 +28,16 @@ describe("feature intake", () => {
  });
  it("returns from a previous feature branch without clearing the next feature draft or runtime gate", async () => {
   state.readiness.mockResolvedValueOnce({ ready: false, branch: "feat/previous", baseBranch: "main", reason: "Check out the configured default branch 'main' before preparing a feature branch." });
-  state.probe.mockImplementation(async path => path.includes("return-to-base") ? { branch: "main", baseBranch: "main" } : { ok: true });
+  state.probe.mockImplementation(async path => path.includes("return-to-base") ? { ready: true, branch: "main", baseBranch: "main", note: "Orch8's generated .gitignore will remain uncommitted on the feature branch." } : { ok: true });
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   await screen.findByText(/Current branch: feat\/previous/);
   select(); await check();
   fireEvent.change(screen.getByLabelText("New feature branch name"), { target: { value: "feat/next" } });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Return to base branch" })); });
   expect(state.probe).toHaveBeenCalledWith("/projects/canonical-id/return-to-base", {});
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ["repository-changes", "canonical-id"] });
   expect(screen.getByText(/Current branch: main/)).toBeInTheDocument();
+  expect(screen.getByText(/generated .gitignore will remain uncommitted/)).toBeInTheDocument();
   expect(screen.getByLabelText("What should change?")).toHaveValue("Add usage");
   expect(screen.getByLabelText("New feature branch name")).toHaveValue("feat/next");
   expect(screen.getByRole("button", { name: "Prepare feature branch" })).toBeEnabled();
@@ -100,6 +103,7 @@ describe("feature intake", () => {
   await act(async () => { fireEvent.click(button); });
   expect(state.readiness).toHaveBeenCalledWith("/projects/canonical-id/feature-branch");
   expect(state.probe).toHaveBeenCalledWith("/projects/canonical-id/feature-branch", { name: "feat/usage" });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ["repository-changes", "canonical-id"] });
   expect(screen.getByText(/Current branch: feat\/usage/)).toBeInTheDocument();
   expect(button).toBeDisabled();
  });
