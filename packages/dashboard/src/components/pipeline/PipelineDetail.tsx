@@ -224,7 +224,32 @@ function PlanDecision({ pipelineId, stepId, revision, outputFilePath }: { pipeli
   </section>;
 }
 
-function ReviewDecision({ pipelineId, stepId, revision, outputFilePath, prEligibleLabel, diff, diffLoading, diffError }: { pipelineId: string; stepId: string; revision: string; outputFilePath: string | null; prEligibleLabel: boolean; diff?: PipelineRepositoryDiff; diffLoading: boolean; diffError: boolean }) {
+function ImplementationTestLog({ projectId, taskId }: { projectId: string; taskId?: string }) {
+  const [open, setOpen] = useState(false);
+  const { data: runs, isLoading: runsLoading, isError: runsError, refetch: refreshRuns } = useRuns(
+    projectId, { taskId: taskId ?? "", limit: 1 }, !!taskId,
+  );
+  const run = runs?.[0];
+  const { data: log, isLoading: logLoading, isError: logError, refetch: refreshLog } = useRunLog(
+    open ? run?.id ?? null : null, projectId,
+  );
+  return <section aria-label="Implementation test log" className="space-y-2 rounded border border-zinc-700 bg-zinc-950/60 p-3 text-xs">
+    <h5 className="font-semibold text-zinc-200">Implementation test output</h5>
+    <p className="text-zinc-400">Read the actual agent run log here before accepting the review. A successful process exit does not mean tests passed; confirm the command, exit code and output yourself.</p>
+    {!taskId ? <p role="alert" className="text-amber-300">No implementation task was recorded.</p> : runsLoading ? <p>Loading implementation run...</p> : runsError ?
+      <p role="alert" className="text-amber-300">Could not load implementation runs. <button type="button" onClick={() => void refreshRuns()} className="underline">Retry</button></p> : !run ?
+        <p role="alert" className="text-amber-300">No implementation run found. Check the task before accepting.</p> : <>
+          <p>Latest run: <span className="font-mono">{run.id}</span> · process status: {run.status}</p>
+          <button type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} className="text-blue-300 underline">{open ? "Hide" : "Read"} implementation run log</button>
+          {open && (logLoading ? <p>Loading raw log...</p> : logError ?
+            <p role="alert" className="text-amber-300">Could not load raw log. <button type="button" onClick={() => void refreshLog()} className="underline">Retry</button></p> : log?.content ?
+              <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-900 p-3 font-mono text-zinc-200">{log.content}</pre> :
+              <p role="alert" className="text-amber-300">No raw output stored for this run. <button type="button" onClick={() => void refreshLog()} className="underline">Refresh log</button></p>)}
+        </>}
+  </section>;
+}
+
+function ReviewDecision({ pipelineId, stepId, revision, outputFilePath, prEligibleLabel, diff, diffLoading, diffError, projectId, implementationTaskId }: { pipelineId: string; stepId: string; revision: string; outputFilePath: string | null; prEligibleLabel: boolean; diff?: PipelineRepositoryDiff; diffLoading: boolean; diffError: boolean; projectId: string; implementationTaskId?: string }) {
   const [reviewedContent, setReviewedContent] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [changed, setChanged] = useState(false);
@@ -274,6 +299,7 @@ function ReviewDecision({ pipelineId, stepId, revision, outputFilePath, prEligib
         </div></details>
       </>}
     </section>
+    <ImplementationTestLog projectId={projectId} taskId={implementationTaskId} />
     {changed && <p role="alert" className="text-xs text-amber-300">The review changed or could not be refreshed. Read the current report and confirm again.</p>}
     <label className="flex items-start gap-2 text-xs text-zinc-200">
       <input type="checkbox" checked={hasReport && reviewedContent === data?.content} disabled={!hasReport} onChange={event => { setReviewedContent(event.target.checked ? data?.content ?? null : null); setChanged(false); }} />
@@ -455,7 +481,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
             {step.order === 1 && step.label.toLowerCase() === "plan" && step.status === "awaiting_verification" ?
               <PlanDecision key={`${step.id}:${step.updatedAt ?? ""}`} pipelineId={pipeline.id} stepId={step.id} revision={String(step.updatedAt ?? step.outputSummary ?? "")} outputFilePath={step.outputFilePath ?? null} /> :
               isReviewDecision(step) && step.status === "awaiting_verification" ?
-                <ReviewDecision key={`${step.id}:${step.updatedAt ?? ""}`} pipelineId={pipeline.id} stepId={step.id} revision={String(step.updatedAt ?? step.outputSummary ?? "")} outputFilePath={step.outputFilePath ?? null} prEligibleLabel={["review", "independent review"].includes(step.label.toLowerCase())} diff={repositoryDiff} diffLoading={diffLoading || !!diffRefreshing} diffError={diffError} /> :
+                <ReviewDecision key={`${step.id}:${step.updatedAt ?? ""}`} pipelineId={pipeline.id} stepId={step.id} revision={String(step.updatedAt ?? step.outputSummary ?? "")} outputFilePath={step.outputFilePath ?? null} prEligibleLabel={["review", "independent review"].includes(step.label.toLowerCase())} diff={repositoryDiff} diffLoading={diffLoading || !!diffRefreshing} diffError={diffError} projectId={pipeline.projectId} implementationTaskId={implement?.taskId ?? undefined} /> :
                 step.outputFilePath && (step.status === "completed" || step.status === "awaiting_verification") &&
                 <StepOutput pipelineId={pipeline.id} stepId={step.id} label={step.label} revision={String(step.updatedAt ?? step.outputSummary ?? "")} />}
             {step.order === 1 && step.label.toLowerCase() === "plan" &&

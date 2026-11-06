@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   currentStep: 1,
   steps: [] as Array<Record<string, unknown>>,
   runs: [] as Array<Record<string, unknown>>,
+  log: null as null | { content: string },
   runsLoading: false,
   runsError: false,
   diffError: false,
@@ -30,7 +31,7 @@ vi.mock("../hooks/usePipelines.js", () => ({
 }));
 vi.mock("../hooks/useRuns.js", () => ({
   useRuns: (_projectId: string, filters?: { taskId?: string }) => ({ data: state.runs.filter(run => run.taskId === filters?.taskId), isLoading: state.runsLoading, isError: state.runsError, refetch: vi.fn() }),
-  useRunLog: () => ({ data: null, isLoading: false, isError: false, refetch: vi.fn() }),
+  useRunLog: (runId: string | null) => ({ data: runId ? state.log : null, isLoading: false, isError: false, refetch: vi.fn() }),
 }));
 
 const step = (label: string, order: number, status: string, extras: Record<string, unknown> = {}) => ({
@@ -45,6 +46,7 @@ beforeEach(() => {
   state.currentStep = 1;
   state.steps = [step("Plan", 1, "running"), step("Implement", 2, "pending"), step("Independent review", 3, "pending")];
   state.runs = [];
+  state.log = null;
   state.runsLoading = false;
   state.runsError = false;
   state.diffError = false;
@@ -128,6 +130,25 @@ describe("feature progress summary", () => {
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(within(progress()).getByText(/Read the independent review and accept or reject it/i)).toBeInTheDocument();
     expect(within(progress()).getByText(/Awaiting your decision/i)).toBeInTheDocument();
+  });
+
+  it("opens actual implementation output beside review without equating process exit with test success", () => {
+    state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "completed"), step("Independent review", 3, "awaiting_verification", { outputSummary: "Review ready", outputFilePath: "review.md" })];
+    state.runs = [{ id: "run_implementation", status: "succeeded", taskId: "task_2", agentId: "implementer" }];
+    state.log = { content: "pnpm test\nFAIL expected result\nexit code 1" };
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    const evidence = within(screen.getByRole("region", { name: "Independent review decision" })).getByRole("region", { name: "Implementation test log" });
+    expect(within(evidence).getByText(/process status: succeeded/)).toBeInTheDocument();
+    expect(within(evidence).queryByText(/FAIL expected result/)).not.toBeInTheDocument();
+    fireEvent.click(within(evidence).getByRole("button", { name: "Read implementation run log" }));
+    expect(within(evidence).getByText(/pnpm test.*FAIL expected result.*exit code 1/s)).toBeInTheDocument();
+  });
+
+  it("shows missing implementation evidence at the review decision", () => {
+    state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "completed"), step("Independent review", 3, "awaiting_verification", { outputSummary: "Review ready", outputFilePath: "review.md" })];
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    const evidence = screen.getByRole("region", { name: "Implementation test log" });
+    expect(within(evidence).getByText(/No implementation run found/)).toBeInTheDocument();
   });
 
   it("reports a draft PR only from the observed branch-commit lookup", () => {
