@@ -75,12 +75,22 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
       : /\b(review|verification)\b/i.test(active.label) ? "Read the independent review and accept or reject it."
         : `Review ${active.label} and approve or reject it.`;
   } else if (canPublish) nextAction = "Inspect the diff and run logs, then create a draft PR.";
-  else if (pipeline.status === "completed" && diff?.prLookup === "found") nextAction = "Inspect the repository PR and checks.";
-  else if (pipeline.status === "completed" && diff?.prLookup === "none") nextAction = "Publication not ready. Check the review and repository prerequisites below.";
+  else if (pipeline.status === "completed" && !diffError && !diffLoading && diff?.available && diff.prLookup === "found") nextAction = "Inspect the repository PR and checks.";
+  else if (pipeline.status === "completed" && !diffError && !diffLoading && diff?.available && diff.prLookup === "none") nextAction = "Publication not ready. Check the review and repository prerequisites below.";
   else if (pipeline.status === "completed") nextAction = "PR status unavailable. Check GitHub and repository prerequisites below.";
   else nextAction = "No decision needed yet; wait for the current step.";
   return <section aria-label="Feature progress" className="rounded border border-zinc-700 bg-zinc-900/60 p-4 text-sm text-zinc-300 space-y-3">
     <h4 className="font-semibold text-zinc-100">Feature progress</h4>
+    <nav aria-label="Workflow evidence" className="flex flex-wrap gap-2 text-xs">
+      {steps.filter(step => ["plan", "implement", "independent review", "review"].includes(step.label.toLowerCase())).map(step => (
+        <a key={step.id} href={`#workflow-step-${step.id}`} className="rounded border border-zinc-700 px-3 py-2 text-blue-300 hover:bg-zinc-800">
+          {step.label}: {step.status === "awaiting_verification" ? "needs your decision" : step.status}
+        </a>
+      ))}
+      <a href="#repository-changes" className="rounded border border-zinc-700 px-3 py-2 text-blue-300 hover:bg-zinc-800">Repository diff</a>
+      {!diffLoading && !diffError && diff?.available && diff.prLookup === "found" && diff.pullRequest &&
+        <a href={diff.pullRequest.url} target="_blank" rel="noopener noreferrer" className="rounded border border-zinc-700 px-3 py-2 text-blue-300 hover:bg-zinc-800">PR #{diff.pullRequest.number} and checks</a>}
+    </nav>
     <div className="grid gap-3 sm:grid-cols-2">
       <p>Current stage: <span className="text-zinc-100">{pipeline.status === "completed" ? "Workflow completed" : pipeline.status === "cancelled" ? "Workflow cancelled" : active ? `${active.label} · ${active.status === "awaiting_verification" ? "awaiting approval" : active.status}` : pipeline.status}</span></p>
       <p>Next action: <span className="text-zinc-100">{nextAction}</span></p>
@@ -343,7 +353,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
         <DownloadEvidence key={pipeline.id} pipelineId={pipeline.id} />}
       <PipelineStepper steps={steps} currentStep={pipeline.currentStep} />
 
-      <section aria-label="Repository changes" className="rounded border border-zinc-800 p-3 space-y-2">
+      <section id="repository-changes" aria-label="Repository changes" className="scroll-mt-6 rounded border border-zinc-800 p-3 space-y-2">
         <div className="flex items-center justify-between gap-3">
           <h4 className="text-sm font-medium text-zinc-200">Current repository changes</h4>
           <button type="button" onClick={() => { void refreshDiff(); }} className="text-xs text-blue-300 underline">Refresh diff</button>
@@ -354,7 +364,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
         {diffLoading && <p className="text-xs text-zinc-500">Loading repository diff...</p>}
         {diffError && <p role="alert" className="text-xs text-amber-300">Could not load repository diff. Try refreshing.</p>}
         {repositoryDiff && !repositoryDiff.available && <p className="text-xs text-amber-300">{repositoryDiff.reason ?? "Repository diff unavailable."}</p>}
-        {repositoryDiff?.available && <div className="space-y-4">
+        {repositoryDiff?.available && !diffError && <div className="space-y-4">
           <div className="rounded border border-zinc-700 bg-zinc-950 p-3 text-xs text-zinc-300 space-y-1">
             <p>Checked-out branch: <span className="font-mono">{repositoryDiff.branch ?? "detached HEAD"}</span></p>
             {repositoryDiff.pullRequest ? <p>
@@ -414,7 +424,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
       {/* Step details */}
       <div className="flex flex-col gap-[var(--gap-inline)]">
         {steps.map((step) => (
-          <div key={step.id} className="rounded border border-zinc-800 p-3">
+          <div key={step.id} id={`workflow-step-${step.id}`} className="scroll-mt-6 rounded border border-zinc-800 p-3">
             <p className="text-sm font-medium text-zinc-200">{step.label} <span className="text-xs text-zinc-500">{step.status}</span></p>
             {step.taskId ? <StepEvidence taskId={step.taskId} projectId={projectId ?? pipeline.projectId} stepStatus={step.status} label={step.label} /> :
               <p className="mt-2 text-xs text-zinc-400">No task or run recorded yet for this step.</p>}
