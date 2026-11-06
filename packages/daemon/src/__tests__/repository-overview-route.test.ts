@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import { mkdtemp, rm, writeFile, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { projectRoutes } from "../api/routes/projects.js";
 
 const dirs: string[] = [];
@@ -58,5 +59,26 @@ it("rejects cross-project and arbitrary-path requests before reading another pro
     expect(getById).not.toHaveBeenCalledWith("project-b");
     expect((await read("/api/projects/missing/repository-overview")).statusCode).toBe(404);
     expect((await read("/api/projects/project-a/repository-overview?path=../secret.md")).statusCode).toBe(400);
+  } finally { await app.close(); }
+});
+
+it("lists tracked files and previews text without exposing untracked files or symlinks", async () => {
+  const { root, other, app, read } = await fixture();
+  try {
+    execFileSync("git", ["init", "-q", root]);
+    await writeFile(join(root, "feature.ts"), "export const working = true;\n");
+    await writeFile(join(root, "untracked-secret.txt"), "never show this");
+    await writeFile(join(other, "outside.txt"), "private");
+    await symlink(join(other, "outside.txt"), join(root, "outside-link"));
+    execFileSync("git", ["-C", root, "add", "feature.ts", "outside-link"]);
+    const base = "/api/projects/project-a/repository-files";
+    expect((await read(base)).json()).toEqual({ paths: ["feature.ts", "outside-link"], truncated: false });
+    expect((await read(`${base}?q=feature`)).json()).toEqual({ paths: ["feature.ts"], truncated: false });
+    expect((await read(`${base}?q=secret`)).json()).toEqual({ paths: [], truncated: false });
+    expect((await read(`${base}?path=feature.ts`)).json()).toEqual({ path: "feature.ts", content: "export const working = true;\n" });
+    expect((await read(`${base}?path=outside-link`)).json()).toEqual({ path: "outside-link", content: null });
+    expect((await read(`${base}?path=untracked-secret.txt`)).statusCode).toBe(404);
+    expect((await read(`${base}?path=../outside.txt`)).statusCode).toBe(400);
+    expect((await read("/api/projects/project-b/repository-files")).statusCode).toBe(403);
   } finally { await app.close(); }
 });
