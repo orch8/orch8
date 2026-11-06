@@ -7,14 +7,16 @@ import { api } from "../../api/client.js";
 import { SandboxRecoveryGuidance } from "./SandboxRecoveryGuidance.js";
 import { RepositoryExplorer } from "./RepositoryExplorer.js";
 
-type FeatureDraft = { feature: string; branchName: string; planner: string; implementer: string; reviewer: string };
+type FeatureDraft = { feature: string; branchName: string; planner: string; implementer: string; reviewer: string; filePaths: string[] };
+const validPath = (path: unknown): path is string => typeof path === "string" && path.length > 0 && path.length <= 240 && !/[\r\n]/.test(path);
 const draftKey = (projectId: string) => `orch8:feature-draft:${projectId}`;
 function readDraft(projectId: string): FeatureDraft {
-  const empty = { feature: "", branchName: "", planner: "", implementer: "", reviewer: "" };
+  const empty = { feature: "", branchName: "", planner: "", implementer: "", reviewer: "", filePaths: [] as string[] };
   try {
     const value = JSON.parse(localStorage.getItem(draftKey(projectId)) ?? "null");
     if (!value || typeof value !== "object") return empty;
-    return Object.fromEntries(Object.keys(empty).map(key => [key, typeof value[key] === "string" ? value[key] : ""])) as FeatureDraft;
+    const filePaths: string[] = Array.isArray(value.filePaths) ? [...new Set((value.filePaths as unknown[]).filter(validPath))].slice(0, 5) : [];
+    return { feature: typeof value.feature === "string" ? value.feature : "", branchName: typeof value.branchName === "string" ? value.branchName : "", planner: typeof value.planner === "string" ? value.planner : "", implementer: typeof value.implementer === "string" ? value.implementer : "", reviewer: typeof value.reviewer === "string" ? value.reviewer : "", filePaths };
   } catch { return empty; }
 }
 
@@ -30,6 +32,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const [setupError, setSetupError] = useState("");
   const [codexModel, setCodexModel] = useState("");
   const [feature, setFeature] = useState(draft.feature);
+  const [filePaths, setFilePaths] = useState(draft.filePaths);
   const [planner, setPlanner] = useState(draft.planner);
   const [implementer, setImplementer] = useState(draft.implementer);
   const [reviewer, setReviewer] = useState(draft.reviewer);
@@ -47,12 +50,12 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const [overviewError, setOverviewError] = useState(false);
   useEffect(() => {
     try {
-      if (feature || branchName || planner || implementer || reviewer) localStorage.setItem(draftKey(projectId), JSON.stringify({ feature, branchName, planner, implementer, reviewer }));
+      if (feature || branchName || planner || implementer || reviewer || filePaths.length) localStorage.setItem(draftKey(projectId), JSON.stringify({ feature, branchName, planner, implementer, reviewer, filePaths }));
       else localStorage.removeItem(draftKey(projectId));
     } catch { /* Private mode or disabled storage: intake remains usable. */ }
-  }, [projectId, feature, branchName, planner, implementer, reviewer]);
+  }, [projectId, feature, branchName, planner, implementer, reviewer, filePaths]);
   function clearDraft() {
-    setFeature(""); setBranchName(""); setPlanner(""); setImplementer(""); setReviewer("");
+    setFeature(""); setBranchName(""); setPlanner(""); setImplementer(""); setReviewer(""); setFilePaths([]);
     setCheckedKey(""); setCheckMessage(""); setFailedSelectionKey("");
   }
   useEffect(() => {
@@ -177,6 +180,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     if (!ready) return;
     setError("");
     const request = feature.trim();
+    const contextHint = filePaths.length ? `\nFiles the user selected as starting points (inspect these tracked paths; do not assume they are the only files to change):\n${filePaths.map(path => `- ${path}`).join("\n")}` : "";
     try {
       const current = await api.get<{ branch: string; baseBranch: string }>(`/projects/${encodeURIComponent(project!.id)}/feature-branch`);
       if (!current.branch || current.branch === current.baseBranch || current.branch !== branchState?.branch) {
@@ -188,7 +192,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
         name: request.slice(0, 120),
         steps: [
           { label: "Plan", agentId: planner, requiresVerification: true,
-            promptOverride: `Feature request: ${request}\nInspect the repository and write a concrete, scoped implementation plan to {{pipeline.outputFilePath}}. Do not edit product code. State the test command and expected result. Complete the assigned task with a concise summary of the plan so the operator can approve it.` },
+            promptOverride: `Feature request: ${request}${contextHint}\nInspect the repository and write a concrete, scoped implementation plan to {{pipeline.outputFilePath}}. Do not edit product code. State the test command and expected result. Complete the assigned task with a concise summary of the plan so the operator can approve it.` },
           { label: "Implement", agentId: implementer, requiresVerification: false,
             promptOverride: `Feature request: ${request}\nFollow the approved plan in {{pipeline.context}}. Work only on the prepared feature branch in the configured repository. Run relevant tests and record commands, exit codes and bounded output excerpts in {{pipeline.outputFilePath}}; the run log holds full output. Never copy secrets from test output into the artifact. If the implementation is complete and the tests pass, commit only the intended feature files on this branch; inspect the staged diff before committing. If branch preparation left Orch8's generated .gitignore change, inspect it and include it only if it solely adds the .orch8/ ignore rule. Do not stage unrelated work or pipeline output files. Do not push, publish a PR, merge, or change approval, permission or budget settings. If tests fail or the branch/worktree is not safe to commit, leave changes uncommitted and report the blocker instead. Report the commit hash (if any), changed files, and test results in the summary.` },
           { label: "Independent review", agentId: reviewer, requiresVerification: true,
@@ -196,6 +200,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
         ],
       });
       setFeature("");
+      setFilePaths([]);
       setBranchName("");
       setPlanner(""); setImplementer(""); setReviewer("");
       onCreated(result.pipeline.id);
@@ -210,7 +215,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     <p className="mt-3 text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
     <div className="mt-2 flex items-center gap-3 text-xs text-zinc-400">
       <span>Feature request and agent choices are saved in this browser for this project until you start a plan or clear them. Runtime approval is never saved.</span>
-      {(feature || branchName || planner || implementer || reviewer) && <button type="button" onClick={clearDraft} className="shrink-0 text-blue-300 underline">Clear draft</button>}
+      {(feature || branchName || planner || implementer || reviewer || filePaths.length > 0) && <button type="button" onClick={clearDraft} className="shrink-0 text-blue-300 underline">Clear draft</button>}
     </div>
 
     <details className="mt-2 text-xs text-zinc-500">
@@ -236,7 +241,11 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
                 : <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-300">{overview.content}</pre>}
         </aside>
       </div>
-      {project?.id && <RepositoryExplorer key={`${project.id}:${branchState?.branch ?? "checking"}`} projectId={project.id} />}
+      {project?.id && <RepositoryExplorer key={`${project.id}:${branchState?.branch ?? "checking"}`} projectId={project.id} addedPaths={filePaths} onAddFile={path => { if (validPath(path)) setFilePaths(current => current.includes(path) || current.length >= 5 ? current : [...current, path]); }} />}
+      {filePaths.length > 0 && <div aria-label="Selected feature files" className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
+        <p>Starting files for the plan ({filePaths.length}/5). Only paths are sent to the planning agent; inspect the approved plan before implementation.</p>
+        <ul className="mt-2 space-y-1">{filePaths.map(path => <li key={path} className="flex items-center gap-2"><span className="min-w-0 break-all font-mono text-xs">{path}</span><button type="button" aria-label={`Remove ${path}`} onClick={() => setFilePaths(current => current.filter(value => value !== path))} className="shrink-0 text-blue-300 underline">Remove</button></li>)}</ul>
+      </div>}
       <div className="grid gap-3 sm:grid-cols-3">
         {([ ["Plan agent", planner, setPlanner], ["Implement agent", implementer, setImplementer], ["Review agent", reviewer, setReviewer] ] as const).map(([label, value, setter]) =>
           <label key={label} className="text-sm text-zinc-300">{label}

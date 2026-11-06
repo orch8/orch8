@@ -5,7 +5,7 @@ type FileList = { paths: string[]; truncated: boolean };
 type FilePreview = { path: string; content: string | null };
 
 /** Browse only tracked files from the selected project; never edits repository state. */
-export function RepositoryExplorer({ projectId }: { projectId: string }) {
+export function RepositoryExplorer({ projectId, onAddFile, addedPaths = [] }: { projectId: string; onAddFile?: (path: string) => void; addedPaths?: string[] }) {
   const [list, setList] = useState<FileList | null>(null);
   const [listError, setListError] = useState(false);
   const [filter, setFilter] = useState("");
@@ -49,7 +49,10 @@ export function RepositoryExplorer({ projectId }: { projectId: string }) {
         <div aria-label="File preview" className="min-w-0 max-h-64 overflow-auto rounded border border-zinc-800 p-3">
           {!selected ? <p className="text-xs text-zinc-400">Select a file to read it.</p> : <>
             <h4 className="break-all font-mono text-xs text-zinc-200">{selected}</h4>
-            {previewError ? <p role="alert" className="mt-2 text-amber-300">Could not read this file.</p> : !preview ? <p className="mt-2 text-zinc-400">Loading preview...</p> : preview.content === null ? <p className="mt-2 text-xs text-zinc-400">Preview unavailable for symlinks, binary files, or files over 32 KiB.</p> : <pre className="mt-2 whitespace-pre-wrap break-words text-xs text-zinc-300">{preview.content}</pre>}
+            {previewError ? <p role="alert" className="mt-2 text-amber-300">Could not read this file.</p> : !preview ? <p className="mt-2 text-zinc-400">Loading preview...</p> : <>
+              {onAddFile && preview.path === selected && <button type="button" disabled={addedPaths.includes(selected) || addedPaths.length >= 5} onClick={() => onAddFile(selected)} className="mt-2 rounded border border-blue-500 px-2 py-1 text-xs text-blue-200 disabled:opacity-40">{addedPaths.includes(selected) ? "Added to feature" : "Add path to feature"}</button>}
+              {preview.content === null ? <p className="mt-2 text-xs text-zinc-400">Preview unavailable for symlinks, binary files, or files over 32 KiB.</p> : <pre className="mt-2 whitespace-pre-wrap break-words text-xs text-zinc-300">{preview.content}</pre>}
+            </>}
           </>}
         </div>
       </div>

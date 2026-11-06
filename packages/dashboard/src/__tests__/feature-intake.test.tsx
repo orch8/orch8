@@ -20,6 +20,37 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("adds a browsed file path to a saved feature draft and planning prompt without copying its contents", async () => {
+  state.readiness.mockImplementation(async path => path.includes("?path=") ? { path: "src/app.ts", content: "private source body" }
+    : path.includes("/repository-files?") ? { paths: ["src/app.ts"], truncated: false }
+      : path.endsWith("/repository-overview") ? { filename: null, content: null }
+        : { ready: false, branch: "feat/usage", baseBranch: "main" });
+  state.create.mockResolvedValue({ pipeline: { id: "pipeline_1" } });
+  const view = render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  fireEvent.click(screen.getByText("Explore repository files"));
+  fireEvent.click(await screen.findByRole("button", { name: "src/app.ts" }));
+  expect(await screen.findByText("private source body")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Add path to feature" }));
+  expect(screen.getByLabelText("Selected feature files")).toHaveTextContent("src/app.ts");
+  expect(localStorage.getItem("orch8:feature-draft:one")).toContain('"filePaths":["src/app.ts"]');
+  view.unmount();
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.getByLabelText("Selected feature files")).toHaveTextContent("src/app.ts");
+  select(); await check();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Start with a plan" })); });
+  const plan = state.create.mock.calls[0][0].steps[0].promptOverride;
+  expect(plan).toContain("- src/app.ts");
+  expect(plan).not.toContain("private source body");
+  expect(localStorage.getItem("orch8:feature-draft:one")).toBeNull();
+ });
+ it("removes a selected path and ignores malformed saved path lists", async () => {
+  localStorage.setItem("orch8:feature-draft:one", JSON.stringify({ feature: "Add usage", filePaths: ["src/app.ts", "src/app.ts", "bad\npath", 42] }));
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.getByLabelText("Selected feature files")).toHaveTextContent("src/app.ts");
+  expect(screen.getByLabelText("Selected feature files")).not.toHaveTextContent("bad");
+  fireEvent.click(screen.getByRole("button", { name: "Remove src/app.ts" }));
+  await waitFor(() => expect(screen.queryByLabelText("Selected feature files")).not.toBeInTheDocument());
+ });
  it("refetches a preview when the selected file is clicked again", async () => {
   state.readiness.mockImplementation(async path => path.includes("?path=")
     ? { path: "README.md", content: "Actual README" }
