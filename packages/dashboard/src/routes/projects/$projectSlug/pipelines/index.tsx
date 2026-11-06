@@ -41,7 +41,10 @@ function PipelinesActivePage() {
           <h1 className="type-section font-semibold text-zinc-100">Build in {project?.name ?? "repository"}</h1>
           <p className="mt-1 break-all text-xs text-zinc-400">{project?.homeDir ?? "Loading repository..."} {project?.defaultBranch ? `· base ${project.defaultBranch}` : ""}</p>
         </div>
-        <Link to="/projects/$projectSlug/board" params={{ projectSlug: projectId }} className="rounded border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:text-white">Open task board</Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {activePipelines.length > 0 && <a href="#active-workflows" className="rounded border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:text-white">View {activePipelines.length} {activePipelines.length === 1 ? "workflow" : "workflows"} needing attention</a>}
+          <Link to="/projects/$projectSlug/board" params={{ projectSlug: projectId }} className="rounded border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:text-white">Open task board</Link>
+        </div>
       </div>
       <div className="flex gap-1 border-b border-zinc-800">
         {tabs.map((tab) => (
@@ -59,7 +62,8 @@ function PipelinesActivePage() {
         ))}
       </div>
 
-      <section aria-label="Workflows needing attention" className="space-y-3">
+      <FeatureIntake key={projectId} projectId={projectId} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />
+      <section id="active-workflows" aria-label="Workflows needing attention" className="space-y-3 scroll-mt-6">
         <h2 className="text-sm font-semibold text-zinc-200">Workflows needing attention</h2>
         {isLoading ? (
           <p className="text-sm text-zinc-600">Loading...</p>
@@ -67,8 +71,6 @@ function PipelinesActivePage() {
           <PipelineList pipelines={activePipelines} showActions />
         )}
       </section>
-
-      <FeatureIntake key={projectId} projectId={projectId} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />
     </div>
   );
 }
