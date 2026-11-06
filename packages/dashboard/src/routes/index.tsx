@@ -19,9 +19,9 @@ export const Route = createFileRoute("/")({
       }
     } catch (e) {
       if (isRedirect(e)) throw e;
-      // API error — fall through to welcome
+      // API error — keep the repository entry visible so the operator can retry.
     }
 
-    throw redirect({ to: "/welcome" });
+    throw redirect({ to: "/projects/new" });
   },
 });
