@@ -3,15 +3,15 @@ import { fireEvent, waitFor } from "@testing-library/react";
 import { renderWithProviders, screen } from "../test-utils.js";
 import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
 
-const state = vi.hoisted(() => ({ content: "# Independent review\nNo blocking findings.", freshContent: "", label: "Independent review", error: false, fetching: false, path: ".orch8/pipelines/pipe_1/Independent review.md", approve: vi.fn() }));
+const state = vi.hoisted(() => ({ content: "# Independent review\nNo blocking findings.", freshContent: "", label: "Independent review", reviewStatus: "awaiting_verification", error: false, fetching: false, path: ".orch8/pipelines/pipe_1/Independent review.md", diff: { available: false, reason: "No repository" } as { available: boolean; reason?: string; branch?: string; baseBranch?: string; committedDiff?: string; workingDiff?: string; untrackedFiles?: string[] }, diffRefetch: vi.fn(), approve: vi.fn() }));
 vi.mock("../hooks/usePipelines.js", () => ({
   usePlanAttempts: () => ({ data: [], isLoading: false, isError: false }),
   usePipeline: () => ({ data: { pipeline: { id: "pipe_1", name: "Build feature", projectId: "proj_1", status: "running", currentStep: 3 }, steps: [
     { id: "step_1", order: 1, label: "Plan", status: "completed" },
     { id: "step_2", order: 2, label: "Implement", agentId: "builder", status: "completed" },
-    { id: "step_3", order: 3, label: state.label, agentId: "checker", requiresVerification: true, status: "awaiting_verification", outputSummary: "Review ready", outputFilePath: state.path },
+    { id: "step_3", order: 3, label: state.label, agentId: "checker", requiresVerification: true, status: state.reviewStatus, outputSummary: "Review ready", outputFilePath: state.path },
   ] }, isLoading: false, refetch: vi.fn() }),
-  usePipelineDiff: () => ({ data: { available: false, reason: "No repository" }, isLoading: false, isError: false, refetch: vi.fn() }),
+  usePipelineDiff: () => ({ data: state.diff, isLoading: false, isError: false, refetch: state.diffRefetch }),
   usePipelineStepOutput: (_pipelineId: string, stepId: string, _revision: string, enabled: boolean) => ({
     data: enabled && stepId === "step_3" && !state.error ? { path: state.path, content: state.content } : undefined,
     isLoading: false, isFetching: state.fetching, isError: enabled && state.error,
@@ -30,10 +30,33 @@ beforeEach(() => {
   state.fetching = false;
   state.freshContent = "";
   state.label = "Independent review";
+  state.reviewStatus = "awaiting_verification";
+  state.diff = { available: false, reason: "No repository" };
+  state.diffRefetch.mockClear();
   state.approve.mockClear();
 });
 
 describe("independent review decision", () => {
+  it("refreshes the repository snapshot when review becomes actionable", async () => {
+    state.reviewStatus = "running";
+    const view = renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(state.diffRefetch).not.toHaveBeenCalled();
+    state.reviewStatus = "awaiting_verification";
+    view.rerender(<PipelineDetail pipelineId="pipe_1" />);
+    await waitFor(() => expect(state.diffRefetch).toHaveBeenCalledTimes(1));
+    view.rerender(<PipelineDetail pipelineId="pipe_1" />);
+    expect(state.diffRefetch).toHaveBeenCalledTimes(1);
+  });
+  it("places the live committed and uncommitted changes beside the review decision", () => {
+    state.diff = { available: true, branch: "feat/user-visible", baseBranch: "v2", committedDiff: "diff --git a/FEATURE.md b/FEATURE.md\n@@ -0,0 +1 @@\n+new behavior\n", workingDiff: "diff --git a/README.md b/README.md\n@@ -1 +1 @@\n-old\n+new uncommitted edit\n", untrackedFiles: ["NOTES.txt"] };
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    const decision = screen.getByRole("region", { name: "Independent review decision" });
+    expect(decision).toHaveTextContent("feat/user-visible");
+    expect(decision).toHaveTextContent("new behavior");
+    expect(decision).toHaveTextContent("new uncommitted edit");
+    expect(decision).toHaveTextContent("NOTES.txt");
+    expect(decision).toHaveTextContent("Test output must be checked in the implementation run log");
+  });
   it("shows the full report and requires explicit acceptance", async () => {
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(screen.getByText(/No blocking findings/)).toBeInTheDocument();

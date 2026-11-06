@@ -63,7 +63,6 @@ function PipelinesActivePage() {
         ))}
       </div>
 
-      <RepositoryChanges projectId={project?.id} projectError={projectError} />
       <FeatureIntake key={projectId} projectId={projectId} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />
       <section id="active-workflows" aria-label="Workflows needing attention" className="space-y-3 scroll-mt-6">
         <h2 className="text-sm font-semibold text-zinc-200">Workflows needing attention</h2>
@@ -73,6 +72,7 @@ function PipelinesActivePage() {
           <PipelineList pipelines={activePipelines} showActions />
         )}
       </section>
+      <RepositoryChanges projectId={project?.id} projectError={projectError} />
     </div>
   );
 }
