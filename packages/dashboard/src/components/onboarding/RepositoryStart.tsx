@@ -19,6 +19,7 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
   const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("main");
   const [budget, setBudget] = useState("");
+  const [feature, setFeature] = useState("");
   const [noLimit, setNoLimit] = useState(false);
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
@@ -70,6 +71,11 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
         finishStrategy: "none",
         ...(noLimit ? {} : { budgetLimitUsd: Number(budget) }),
       });
+      if (feature.trim()) {
+        try {
+          localStorage.setItem(`orch8:feature-draft:${project.slug}`, JSON.stringify({ feature: feature.trim(), branchName: "", planner: "", implementer: "", reviewer: "" }));
+        } catch { /* Browser storage may be unavailable; repository creation still succeeded. */ }
+      }
       onComplete(project.slug);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not open repository");
@@ -81,7 +87,7 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
   const inputClass = "w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100";
   return <section aria-label="Open a repository" className="rounded-lg border border-zinc-700 bg-zinc-900 p-5">
     <h1 className="text-xl font-semibold text-zinc-100">Open a repository</h1>
-    <p className="mt-2 text-sm text-zinc-400">Choose a local git checkout, then describe the feature on its Build page. No agent starts when you open the repository. Plan approval and draft PR publication remain separate decisions.</p>
+    <p className="mt-2 text-sm text-zinc-400">Choose a local git checkout and describe its first feature here or on the Build page. Opening the repository does not start an agent. Plan approval and draft PR publication remain separate decisions.</p>
     <form onSubmit={event => { void submit(event); }} className="mt-5 space-y-4">
       <label className="block text-sm text-zinc-300">Repository name
         <input required value={name} onChange={event => { setName(event.target.value); if (!keyEdited) setKey(defaultKey(event.target.value)); }} placeholder="My app" className={`mt-1 ${inputClass}`} />
@@ -101,6 +107,10 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
       </label>
       <label className="block text-sm text-zinc-300">Base branch
         <input required value={branch} onChange={event => { branchEdits.current += 1; setBranch(event.target.value); }} className={`mt-1 ${inputClass}`} />
+      </label>
+      <label className="block text-sm text-zinc-300">First feature request
+        <textarea value={feature} onChange={event => setFeature(event.target.value)} maxLength={2000} rows={3} placeholder="Describe the behavior users should gain and how to verify it" className={`mt-1 ${inputClass}`} />
+        <span className="mt-1 block text-xs text-zinc-400">Optional. Saved in this browser after the new repository opens if browser storage is available; you can edit it on the Build page. No plan runs yet.</span>
       </label>
       <label className="block text-sm text-zinc-300">Project spending limit (USD)
         <input required={!noLimit} disabled={noLimit} type="number" min="0.01" step="any" value={budget} onChange={event => setBudget(event.target.value)} placeholder="10.00" className={`mt-1 ${inputClass} disabled:opacity-40`} />

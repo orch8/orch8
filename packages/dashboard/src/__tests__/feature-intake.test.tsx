@@ -18,6 +18,13 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("opens with the feature entered during repository setup without starting an agent", () => {
+  localStorage.setItem("orch8:feature-draft:one", JSON.stringify({ feature: "Add a keyboard shortcut" }));
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.getByLabelText("What should change?")).toHaveValue("Add a keyboard shortcut");
+  expect(state.create).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+ });
  it("sets up three sandboxed agents explicitly without starting a feature", async () => {
   state.agents = [];
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
