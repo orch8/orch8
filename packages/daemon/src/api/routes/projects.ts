@@ -17,7 +17,7 @@ const FILE_MAX_BYTES = 32 * 1024;
 const FILE_LIST_LIMIT = 500;
 
 async function trackedFiles(homeDir: string): Promise<string[]> {
-  const { stdout } = await execFileAsync("git", ["-C", homeDir, "ls-files", "-z", "--cached"], { encoding: "buffer", maxBuffer: 4 * 1024 * 1024 });
+  const { stdout } = await execFileAsync("git", ["-c", "core.fsmonitor=false", "-C", homeDir, "ls-files", "-z", "--cached"], { encoding: "buffer", maxBuffer: 4 * 1024 * 1024 });
   return (stdout as Buffer).toString("utf8").split("\0").filter(Boolean);
 }
 
