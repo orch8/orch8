@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { FeatureIntake } from "../components/pipeline/FeatureIntake.js";
+import { RepositoryExplorer } from "../components/pipeline/RepositoryExplorer.js";
 const state = vi.hoisted(() => ({ agents: [] as any[], requestedAgents: vi.fn(), create: vi.fn(), createAgent: vi.fn(), probe: vi.fn(), readiness: vi.fn(), invalidate: vi.fn() }));
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock("../api/client.js", () => ({ api: { post: state.probe, get: state.readiness } }));
@@ -19,6 +20,19 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("refetches a preview when the selected file is clicked again", async () => {
+  state.readiness.mockImplementation(async path => path.includes("?path=")
+    ? { path: "README.md", content: "Actual README" }
+    : { paths: ["README.md"], truncated: false });
+  render(<RepositoryExplorer projectId="canonical-id" />);
+  fireEvent.click(screen.getByText("Explore repository files"));
+  const file = await screen.findByRole("button", { name: "README.md" });
+  fireEvent.click(file);
+  expect(await screen.findByText("Actual README")).toBeInTheDocument();
+  fireEvent.click(file);
+  await waitFor(() => expect(state.readiness.mock.calls.filter(([path]) => path.includes("?path=")).length).toBe(2));
+  expect(await screen.findByText("Actual README")).toBeInTheDocument();
+ });
  it("shows the selected repository README beside the feature request as safe text", async () => {
   state.readiness.mockImplementation(async path => path.endsWith("/repository-overview")
     ? { filename: "README.md", content: "# Project A\n<img src=x onerror=alert(1)>" }

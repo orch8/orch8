@@ -5,6 +5,7 @@ import { useProject } from "../../hooks/useProjects.js";
 import { useCreatePipeline } from "../../hooks/usePipelines.js";
 import { api } from "../../api/client.js";
 import { SandboxRecoveryGuidance } from "./SandboxRecoveryGuidance.js";
+import { RepositoryExplorer } from "./RepositoryExplorer.js";
 
 type FeatureDraft = { feature: string; branchName: string; planner: string; implementer: string; reviewer: string };
 const draftKey = (projectId: string) => `orch8:feature-draft:${projectId}`;
@@ -235,6 +236,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
                 : <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-300">{overview.content}</pre>}
         </aside>
       </div>
+      {project?.id && <RepositoryExplorer key={`${project.id}:${branchState?.branch ?? "checking"}`} projectId={project.id} />}
       <div className="grid gap-3 sm:grid-cols-3">
         {([ ["Plan agent", planner, setPlanner], ["Implement agent", implementer, setImplementer], ["Review agent", reviewer, setReviewer] ] as const).map(([label, value, setter]) =>
           <label key={label} className="text-sm text-zinc-300">{label}
