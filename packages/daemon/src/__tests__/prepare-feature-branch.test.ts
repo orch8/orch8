@@ -24,6 +24,24 @@ describe("feature branch preparation", () => {
     expect(git("branch", "--show-current")).toBe("main");
     expect(git("rev-parse", "feat/previous")).toBe(previousHead);
   });
+  it("does not overwrite ignored runtime data when the base tracks the same path", async () => {
+    const { root, git } = await fixture();
+    const fs = await import("node:fs/promises");
+    await fs.mkdir(join(root, ".orch8"));
+    await writeFile(join(root, ".orch8", "run.txt"), "base version");
+    git("add", ".orch8/run.txt");
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "base runtime path");
+    git("switch", "-q", "-c", "feat/previous");
+    git("rm", "-q", ".orch8/run.txt");
+    await writeFile(join(root, ".gitignore"), ".orch8/\n");
+    git("add", ".gitignore");
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "ignore runtime");
+    await fs.mkdir(join(root, ".orch8"));
+    await writeFile(join(root, ".orch8", "run.txt"), "private runtime data");
+    await expect(returnToBaseBranch(root, "main")).rejects.toThrow(/Could not switch/);
+    expect(git("branch", "--show-current")).toBe("feat/previous");
+    expect(await fs.readFile(join(root, ".orch8", "run.txt"), "utf8")).toBe("private runtime data");
+  });
   it("refuses tracked, staged, untracked and generated ignore changes", async () => {
     const { root, git } = await fixture();
     git("switch", "-q", "-c", "feat/previous");

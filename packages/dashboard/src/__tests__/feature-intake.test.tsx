@@ -28,7 +28,7 @@ describe("feature intake", () => {
  });
  it("returns from a previous feature branch without clearing the next feature draft or runtime gate", async () => {
   state.readiness.mockResolvedValueOnce({ ready: false, branch: "feat/previous", baseBranch: "main", reason: "Check out the configured default branch 'main' before preparing a feature branch." });
-  state.probe.mockImplementation(async path => path.includes("return-to-base") ? { ready: true, branch: "main", baseBranch: "main", note: "Orch8's generated .gitignore will remain uncommitted on the feature branch." } : { ok: true });
+  state.probe.mockImplementation(async path => path.includes("return-to-base") ? { ready: true, branch: "main", baseBranch: "main" } : { ok: true });
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   await screen.findByText(/Current branch: feat\/previous/);
   select(); await check();
@@ -37,7 +37,6 @@ describe("feature intake", () => {
   expect(state.probe).toHaveBeenCalledWith("/projects/canonical-id/return-to-base", {});
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ["repository-changes", "canonical-id"] });
   expect(screen.getByText(/Current branch: main/)).toBeInTheDocument();
-  expect(screen.getByText(/generated .gitignore will remain uncommitted/)).toBeInTheDocument();
   expect(screen.getByLabelText("What should change?")).toHaveValue("Add usage");
   expect(screen.getByLabelText("New feature branch name")).toHaveValue("feat/next");
   expect(screen.getByRole("button", { name: "Prepare feature branch" })).toBeEnabled();

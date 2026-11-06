@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { lstat, readFile, realpath } from "node:fs/promises";
+import { appendFile, lstat, mkdir, readFile, realpath } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 
 const exec = promisify(execFile);
 const env = () => ({ ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"))),
@@ -79,6 +80,22 @@ export async function prepareFeatureBranch(homeDir: string, baseBranch: string, 
   return { branch: name, baseBranch };
 }
 
+async function ignoreLocalRuntimeData(homeDir: string) {
+  // Keep the configured base branch's tracked files untouched. Git's local
+  // exclude also prevents Orch8's runtime directory appearing in new branches.
+  const exclude = resolve(homeDir, await git(homeDir, ["rev-parse", "--git-path", "info/exclude"]));
+  await mkdir(dirname(exclude), { recursive: true });
+  const stat = await lstat(exclude).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (stat && !stat.isFile()) throw new Error("Git's local exclude file is not a regular file.");
+  const content = stat ? await readFile(exclude, "utf8") : "";
+  if (!content.split(/\r?\n/).includes(".orch8/")) {
+    await appendFile(exclude, `${content && !content.endsWith("\n") ? "\n" : ""}.orch8/\n`);
+  }
+}
+
 /** Switch only to the existing local configured base; never discard or carry work. */
 export async function returnToBaseBranch(homeDir: string, baseBranch: string) {
   const root = await realpath(homeDir);
@@ -97,10 +114,11 @@ export async function returnToBaseBranch(homeDir: string, baseBranch: string) {
   if (await gitRaw(homeDir, ["status", "--porcelain=v1", "--untracked-files=all"])) {
     throw new Error("The repository must be completely clean (including staged and untracked files) before returning to the base branch.");
   }
-  try { await git(homeDir, ["switch", "--no-guess", baseBranch]); }
+  try { await git(homeDir, ["switch", "--no-guess", "--no-overwrite-ignore", baseBranch]); }
   catch { throw new Error("Could not switch to the configured base branch. Inspect the repository before retrying."); }
   if (await git(homeDir, ["symbolic-ref", "--quiet", "--short", "HEAD"]) !== baseBranch) {
     throw new Error("Base branch checkout could not be verified. Inspect the repository before retrying.");
   }
+  await ignoreLocalRuntimeData(homeDir);
   return { branch: baseBranch, baseBranch };
 }

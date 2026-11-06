@@ -361,6 +361,11 @@ describe("Pipeline API routes", () => {
       git("init", "-q", "-b", "main");
       git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "base");
       git("switch", "-q", "-c", "feat/previous");
+      await writeFile(join(root, ".gitignore"), "# orch8 orchestrator data\n.orch8/\n");
+      git("add", ".gitignore");
+      git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "feature ignore");
+      await mkdir(join(root, ".orch8"));
+      await writeFile(join(root, ".orch8", "run.txt"), "runtime data");
       await testDb.db.update(projects).set({ homeDir: root, defaultBranch: "main" }).where(eq(projects.id, projectId));
       const url = `/api/projects/${projectId}/return-to-base`;
       const token = "return-to-base-agent-token";
@@ -383,13 +388,18 @@ describe("Pipeline API routes", () => {
       const [sharedRun] = await testDb.db.insert(heartbeatRuns).values({ projectId: other.id, agentId: "route-agent-a", invocationSource: "on_demand", status: "running" }).returning();
       expect((await app.inject({ method: "POST", url })).json().message).toMatch(/agent run/i);
       await testDb.db.update(heartbeatRuns).set({ status: "cancelled" }).where(eq(heartbeatRuns.id, sharedRun.id));
+      app.heartbeatService["activeRunExecutions"].add(sharedRun.id);
+      expect((await app.inject({ method: "POST", url })).json().message).toMatch(/still executing/i);
+      expect(git("branch", "--show-current")).toBe("feat/previous");
+      app.heartbeatService["activeRunExecutions"].delete(sharedRun.id);
       await writeFile(join(root, "manual.txt"), "external edit");
       expect((await app.inject({ method: "POST", url })).json().message).toMatch(/completely clean/i);
       expect(git("branch", "--show-current")).toBe("feat/previous");
       await rm(join(root, "manual.txt"));
       const returned = await app.inject({ method: "POST", url });
       expect(returned.statusCode).toBe(200);
-      expect(returned.json()).toMatchObject({ ready: true, branch: "main", baseBranch: "main", note: expect.stringContaining(".gitignore") });
+      expect(returned.json()).toMatchObject({ ready: true, branch: "main", baseBranch: "main" });
+      expect(git("status", "--porcelain")).toBe("");
       expect(git("branch", "--show-current")).toBe("main");
       expect((await app.inject({ method: "GET", url: `/api/projects/${projectId}/feature-branch` })).json()).toMatchObject({ ready: true, branch: "main" });
     } finally {

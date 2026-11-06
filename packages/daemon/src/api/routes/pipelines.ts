@@ -204,15 +204,15 @@ export async function pipelineRoutes(app: FastifyInstance) {
         inArray(pipelines.projectId, shared), inArray(pipelines.status, ["pending", "running"]),
       )).limit(1);
       if (active.length) return reply.code(409).send({ error: "conflict", message: "An active pipeline must finish or be cancelled before switching branches." });
-      const runs = await app.db.select({ id: heartbeatRuns.id }).from(heartbeatRuns).where(and(
-        inArray(heartbeatRuns.projectId, shared), inArray(heartbeatRuns.status, ["queued", "running"]),
-      )).limit(1);
-      if (runs.length) return reply.code(409).send({ error: "conflict", message: "An agent run is queued or running for this project." });
+      const runs = await app.db.select({ id: heartbeatRuns.id, status: heartbeatRuns.status }).from(heartbeatRuns).where(
+        inArray(heartbeatRuns.projectId, shared),
+      );
+      if (runs.some(run => run.status === "queued" || run.status === "running" ||
+          app.heartbeatService.isRunActive(run.id) || app.heartbeatService.isProcessTracked(run.id))) {
+        return reply.code(409).send({ error: "conflict", message: "An agent run is queued or still executing for this repository." });
+      }
       await returnToBaseBranch(project.homeDir, project.defaultBranch);
-      // The previous feature may have committed the generated ignore rule while
-      // the local base does not have it yet. Restore the same safe setup rule so
-      // .orch8/ does not block the next feature or leak into its diff.
-      await app.seedingService.ensureGitignore(project.homeDir);
+      // Do not edit the base checkout, even to restore Orch8's ignore rule.
       return await featureBranchReadiness(project.homeDir, project.defaultBranch);
     } catch (error) {
       return reply.code(409).send({ error: "conflict", message: (error as Error).message });
