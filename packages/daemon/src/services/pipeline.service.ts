@@ -5,6 +5,7 @@ import type { SchemaDb } from "../db/client.js";
 import type { PipelineTemplateService } from "./pipeline-template.service.js";
 import type { CreatePipeline, PipelineFilter, UpdatePipelineStep } from "@orch/shared";
 import { allocateTaskId } from "./task.service.js";
+import { withRepositoryWriter } from "./repository-checkout-gate.js";
 
 type Pipeline = typeof pipelines.$inferSelect;
 type PipelineStep = typeof pipelineSteps.$inferSelect;
@@ -87,6 +88,10 @@ export class PipelineService {
   ) {}
 
   async create(input: CreatePipeline): Promise<CreateResult> {
+    return withRepositoryWriter(this.db, input.projectId, () => this.createInRepository(input));
+  }
+
+  private async createInRepository(input: CreatePipeline): Promise<CreateResult> {
     let stepDefs: Array<{ label: string; agentId?: string; promptOverride?: string; requiresVerification?: boolean }>;
 
     if (input.steps && input.steps.length > 0) {

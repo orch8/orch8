@@ -24,6 +24,7 @@ import { mapStreamEvent } from "../adapter/tool-mapper.js";
 import { SessionManager } from "../adapter/session-manager.js";
 import { resolveAdapter, type AdapterMap } from "../adapter/registry.js";
 import { readAgentToken } from "./agent-token-store.js";
+import { withRepositoryWriter } from "./repository-checkout-gate.js";
 
 type Agent = typeof agents.$inferSelect;
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
@@ -218,6 +219,14 @@ export class HeartbeatService {
   }
 
   async enqueueWakeup(
+    agentId: string,
+    projectId: string,
+    opts: WakeupOpts,
+  ): Promise<WakeupRequest> {
+    return withRepositoryWriter(this.db, projectId, () => this.enqueueWakeupInRepository(agentId, projectId, opts));
+  }
+
+  private async enqueueWakeupInRepository(
     agentId: string,
     projectId: string,
     opts: WakeupOpts,

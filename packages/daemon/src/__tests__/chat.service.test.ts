@@ -13,6 +13,7 @@ import { BroadcastService } from "../services/broadcast.service.js";
 import { SessionManager } from "../adapter/session-manager.js";
 import type { ExtractedCard } from "@orch/shared";
 import { eq } from "drizzle-orm";
+import { withExclusiveRepositoryCheckout } from "../services/repository-checkout-gate.js";
 
 const TEST_API_URL = "http://localhost:3847";
 
@@ -148,6 +149,20 @@ describe("ChatService", () => {
   });
 
   // ─── Ingestion ────────────────────────────────────
+
+  it("shows a persisted error reply instead of silently dropping a chat turn during checkout", async () => {
+    const adapter = makeMockAdapter("should not run");
+    service = new ChatService(testDb.db, adapter as any, sessionMgr, broadcast, TEST_API_URL);
+    const chat = await service.createChat({ projectId, agentId });
+    await withExclusiveRepositoryCheckout(testDb.db, projectId, async () => {
+      await service.sendUserMessage(chat.id, "hello during checkout");
+      await work.drain();
+    });
+    const rows = await service.listMessages(chat.id);
+    expect(rows.map(row => [row.role, row.status])).toEqual([["user", "complete"], ["assistant", "error"]]);
+    expect(rows[1].content).toMatch(/checkout is in progress/);
+    expect(adapter.runAgent).not.toHaveBeenCalled();
+  });
 
   it("sendUserMessage writes a user row and triggers adapter.runAgent", async () => {
     const gate = work.gate();

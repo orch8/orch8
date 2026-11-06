@@ -23,6 +23,7 @@ import { extractMentionSlugs } from "@orch/shared";
 import { extractCards } from "./chat-card-parser.js";
 import { resolveWakeTargets } from "./wake-targets.js";
 import { resolveAdapter, type AdapterMap } from "../adapter/registry.js";
+import { reserveRepositoryWriter } from "./repository-checkout-gate.js";
 
 type Chat = typeof chats.$inferSelect;
 type ChatMessage = typeof chatMessages.$inferSelect;
@@ -299,6 +300,7 @@ export class ChatService {
     let assistantRowId: string | null = null;
     let runRowId: string | null = null;
     let accumulated = "";
+    let releaseWriter: (() => void) | undefined;
 
     try {
       const project = await this.getProject(chat.projectId);
@@ -325,6 +327,9 @@ export class ChatService {
         messageId: assistantRow.id,
       });
 
+      // Reserve before starting the agent; if checkout is in progress, the
+      // existing catch persists an error reply and tells the chat UI.
+      releaseWriter = await reserveRepositoryWriter(this.db, chat.projectId);
       // 2. Insert a heartbeatRuns row so the run appears in the runs viewer.
       const [runRow] = await this.db
         .insert(heartbeatRuns)
@@ -474,6 +479,8 @@ export class ChatService {
         messageId: assistantRowId,
         error: message,
       });
+    } finally {
+      releaseWriter?.();
     }
   }
 

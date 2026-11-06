@@ -2,6 +2,7 @@ import { z } from "zod";
 import { PipelineConflict } from "../../services/pipeline.service.js";
 import { publishPipelinePr } from "../../services/pipeline-pr.service.js";
 import { featureBranchReadiness, prepareFeatureBranch, returnToBaseBranch } from "../../services/feature-branch.service.js";
+import { withExclusiveRepositoryCheckout } from "../../services/repository-checkout-gate.js";
 import { heartbeatRuns, pipelines } from "@orch/shared/db";
 import { and, inArray } from "drizzle-orm";
 import { readPrChecks, type PrCheck } from "../../services/pr-checks.js";
@@ -166,6 +167,25 @@ export async function pipelineRoutes(app: FastifyInstance) {
   });
   const preparing = new Set<string>();
   const publishing = new Set<string>();
+  const assertNoActiveRepositoryWork = async (key: string) => {
+    // Aliases can point at the same checkout. Keep this check inside the
+    // exclusive gate so no new in-process writer can start before git switch.
+    const candidates = await app.projectService.list();
+    const shared = (await Promise.all(candidates.map(async candidate => ({
+      id: candidate.id, root: await realpath(candidate.homeDir).catch(() => candidate.homeDir),
+    })))).filter(candidate => candidate.root === key).map(candidate => candidate.id);
+    const active = await app.db.select({ id: pipelines.id }).from(pipelines).where(and(
+      inArray(pipelines.projectId, shared), inArray(pipelines.status, ["pending", "running"]),
+    )).limit(1);
+    if (active.length) throw new Error("An active pipeline must finish or be cancelled before switching branches.");
+    const runs = await app.db.select({ id: heartbeatRuns.id, status: heartbeatRuns.status }).from(heartbeatRuns).where(
+      inArray(heartbeatRuns.projectId, shared),
+    );
+    if (runs.some(run => run.status === "queued" || run.status === "running" ||
+        app.heartbeatService.isRunActive(run.id) || app.heartbeatService.isProcessTracked(run.id))) {
+      throw new Error("An agent run is queued or still executing for this repository.");
+    }
+  };
   app.get("/api/projects/:projectId/feature-branch", async (request: FastifyRequest<{ Params: { projectId: string } }>, reply: FastifyReply) => {
     if (!requireProjectScope(request, reply, request.params.projectId)) return reply;
     const project = await app.projectService.getById(request.params.projectId);
@@ -181,7 +201,10 @@ export async function pipelineRoutes(app: FastifyInstance) {
     const key = await realpath(project.homeDir).catch(() => project.homeDir);
     if (preparing.has(key) || publishing.has(key)) return reply.code(409).send({ error: "conflict", message: "A repository operation is already running." });
     preparing.add(key);
-    try { return reply.code(201).send(await prepareFeatureBranch(project.homeDir, project.defaultBranch, request.body.name)); }
+    try { return reply.code(201).send(await withExclusiveRepositoryCheckout(app.db, project.id, async () => {
+      await assertNoActiveRepositoryWork(key);
+      return prepareFeatureBranch(project.homeDir, project.defaultBranch, request.body.name as string);
+    })); }
     catch (error) { return reply.code(409).send({ error: "conflict", message: (error as Error).message }); }
     finally { preparing.delete(key); }
   });
@@ -194,27 +217,12 @@ export async function pipelineRoutes(app: FastifyInstance) {
     const key = await realpath(project.homeDir).catch(() => project.homeDir);
     if (preparing.has(key) || publishing.has(key)) return reply.code(409).send({ error: "conflict", message: "A repository operation is already running." });
     preparing.add(key);
-    try {
-      // Other project records may point at this same checkout. Check their writers too.
-      const candidates = await app.projectService.list();
-      const shared = (await Promise.all(candidates.map(async candidate => ({
-        id: candidate.id, root: await realpath(candidate.homeDir).catch(() => candidate.homeDir),
-      })))).filter(candidate => candidate.root === key).map(candidate => candidate.id);
-      const active = await app.db.select({ id: pipelines.id }).from(pipelines).where(and(
-        inArray(pipelines.projectId, shared), inArray(pipelines.status, ["pending", "running"]),
-      )).limit(1);
-      if (active.length) return reply.code(409).send({ error: "conflict", message: "An active pipeline must finish or be cancelled before switching branches." });
-      const runs = await app.db.select({ id: heartbeatRuns.id, status: heartbeatRuns.status }).from(heartbeatRuns).where(
-        inArray(heartbeatRuns.projectId, shared),
-      );
-      if (runs.some(run => run.status === "queued" || run.status === "running" ||
-          app.heartbeatService.isRunActive(run.id) || app.heartbeatService.isProcessTracked(run.id))) {
-        return reply.code(409).send({ error: "conflict", message: "An agent run is queued or still executing for this repository." });
-      }
+    try { return await withExclusiveRepositoryCheckout(app.db, project.id, async () => {
+      await assertNoActiveRepositoryWork(key);
       await returnToBaseBranch(project.homeDir, project.defaultBranch);
       // Do not edit the base checkout, even to restore Orch8's ignore rule.
       return await featureBranchReadiness(project.homeDir, project.defaultBranch);
-    } catch (error) {
+    }); } catch (error) {
       return reply.code(409).send({ error: "conflict", message: (error as Error).message });
     } finally { preparing.delete(key); }
   });
