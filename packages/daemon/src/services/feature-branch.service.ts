@@ -46,6 +46,17 @@ export async function featureBranchReadiness(homeDir: string, baseBranch: string
   }
 }
 
+/** Read-only details for repository setup. Never expose origins with embedded credentials. */
+export async function inspectRepository(homeDir: string) {
+  const root = await realpath(homeDir);
+  const gitRoot = await realpath(await git(homeDir, ["rev-parse", "--show-toplevel"]));
+  if (root !== gitRoot) throw new Error("Choose the Git repository root, not a subdirectory.");
+  const branch = await git(homeDir, ["symbolic-ref", "--quiet", "--short", "HEAD"]);
+  const origin = await git(homeDir, ["remote", "get-url", "origin"]).catch(() => "");
+  const safeOrigin = /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)[\w.-]+\/[\w.-]+(?:\.git)?$/.test(origin) ? origin : "";
+  return { branch, origin: safeOrigin, originAvailable: !!origin };
+}
+
 export async function prepareFeatureBranch(homeDir: string, baseBranch: string, name: string) {
   const readiness = await featureBranchReadiness(homeDir, baseBranch);
   if (!readiness.ready) throw new Error(readiness.reason);

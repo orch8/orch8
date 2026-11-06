@@ -19,6 +19,16 @@ it("checks a real checkout without creating a project or modifying its files", a
   await app.register(projectRoutes);
   const check = () => app.inject({ method: "POST", url: "/api/projects/repository-readiness", payload: { homeDir: root, defaultBranch: "main" } });
   try {
+    git("remote", "add", "origin", "https://github.com/orch8/orch8.git");
+    const inspect = () => app.inject({ method: "POST", url: "/api/projects/repository-inspection", payload: { homeDir: root } });
+    expect((await inspect()).json()).toMatchObject({ branch: "main", origin: "https://github.com/orch8/orch8.git" });
+    git("remote", "set-url", "origin", "https://user:secret@github.com/orch8/orch8.git");
+    expect((await inspect()).json()).toMatchObject({ branch: "main", origin: "", originAvailable: true });
+    git("remote", "set-url", "origin", "https://github.com/orch8/orch8.git?token=secret");
+    expect((await inspect()).json()).toMatchObject({ origin: "", originAvailable: true });
+    git("remote", "set-url", "origin", "ssh://git@github.com/orch8/orch8.git");
+    expect((await inspect()).json()).toMatchObject({ origin: "ssh://git@github.com/orch8/orch8.git" });
+    git("remote", "set-url", "origin", "https://github.com/orch8/orch8.git");
     const good = await check();
     expect(good.statusCode).toBe(200);
     expect(good.json()).toMatchObject({ ready: true, branch: "main" });
@@ -38,5 +48,6 @@ it("requires admin access to inspect local repository paths", async () => {
   try {
     const result = await app.inject({ method: "POST", url: "/api/projects/repository-readiness", payload: { homeDir: "/tmp", defaultBranch: "main" } });
     expect(result.statusCode).toBe(403);
+    expect((await app.inject({ method: "POST", url: "/api/projects/repository-inspection", payload: { homeDir: "/tmp" } })).statusCode).toBe(403);
   } finally { await app.close(); }
 });
