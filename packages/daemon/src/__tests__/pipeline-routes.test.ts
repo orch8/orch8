@@ -354,6 +354,49 @@ describe("Pipeline API routes", () => {
     }
   });
 
+  it("returns to base for an admin, but refuses agents, active pipelines and queued writers", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orch-return-route-"));
+    try {
+      const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" } }).trim();
+      git("init", "-q", "-b", "main");
+      git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "base");
+      git("switch", "-q", "-c", "feat/previous");
+      await testDb.db.update(projects).set({ homeDir: root, defaultBranch: "main" }).where(eq(projects.id, projectId));
+      const url = `/api/projects/${projectId}/return-to-base`;
+      const token = "return-to-base-agent-token";
+      await testDb.db.update(agents).set({ agentTokenHash: hashAgentToken(token) }).where(eq(agents.id, "route-agent-a"));
+      expect((await app.inject({ method: "POST", url, headers: { authorization: `Bearer ${token}` } })).statusCode).toBe(403);
+      const [other] = await testDb.db.insert(projects).values({ name: "Other return project", slug: `other-return-${Date.now()}`, homeDir: root }).returning();
+      expect((await app.inject({ method: "POST", url: `/api/projects/${other.id}/return-to-base`, headers: { authorization: `Bearer ${token}` } })).statusCode).toBe(403);
+      const active = await app.pipelineService.create({ projectId, name: "Still working", steps: [{ label: "Plan" }] });
+      const blocked = await app.inject({ method: "POST", url });
+      expect(blocked.statusCode).toBe(409);
+      expect(blocked.json().message).toMatch(/active pipeline/i);
+      expect(git("branch", "--show-current")).toBe("feat/previous");
+      await app.pipelineService.cancel(active.pipeline.id);
+      const shared = await app.pipelineService.create({ projectId: other.id, name: "Shared repository writer", steps: [{ label: "Plan" }] });
+      expect((await app.inject({ method: "POST", url })).json().message).toMatch(/active pipeline/i);
+      await app.pipelineService.cancel(shared.pipeline.id);
+      const [run] = await testDb.db.insert(heartbeatRuns).values({ projectId, agentId: "route-agent-a", invocationSource: "on_demand", status: "queued" }).returning();
+      expect((await app.inject({ method: "POST", url })).json().message).toMatch(/agent run/i);
+      await testDb.db.update(heartbeatRuns).set({ status: "cancelled" }).where(eq(heartbeatRuns.id, run.id));
+      const [sharedRun] = await testDb.db.insert(heartbeatRuns).values({ projectId: other.id, agentId: "route-agent-a", invocationSource: "on_demand", status: "running" }).returning();
+      expect((await app.inject({ method: "POST", url })).json().message).toMatch(/agent run/i);
+      await testDb.db.update(heartbeatRuns).set({ status: "cancelled" }).where(eq(heartbeatRuns.id, sharedRun.id));
+      await writeFile(join(root, "manual.txt"), "external edit");
+      expect((await app.inject({ method: "POST", url })).json().message).toMatch(/completely clean/i);
+      expect(git("branch", "--show-current")).toBe("feat/previous");
+      await rm(join(root, "manual.txt"));
+      const returned = await app.inject({ method: "POST", url });
+      expect(returned.statusCode).toBe(200);
+      expect(returned.json()).toEqual({ branch: "main", baseBranch: "main" });
+      expect(git("branch", "--show-current")).toBe("main");
+    } finally {
+      await testDb.db.update(projects).set({ homeDir: "/tmp/route", defaultBranch: "main" }).where(eq(projects.id, projectId));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   describe("Pipelines", () => {
     it("refuses publication before a completed independent review", async () => {
       const created = await app.pipelineService.create({ projectId, name: "Review gate", steps: [

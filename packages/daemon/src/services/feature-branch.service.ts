@@ -78,3 +78,29 @@ export async function prepareFeatureBranch(homeDir: string, baseBranch: string, 
   }
   return { branch: name, baseBranch };
 }
+
+/** Switch only to the existing local configured base; never discard or carry work. */
+export async function returnToBaseBranch(homeDir: string, baseBranch: string) {
+  const root = await realpath(homeDir);
+  const gitRoot = await realpath(await git(homeDir, ["rev-parse", "--show-toplevel"]));
+  if (root !== gitRoot) throw new Error("Project directory must be the Git repository root.");
+  if (!baseBranch || baseBranch.length > 200 || baseBranch.startsWith("-") ||
+      !(await git(homeDir, ["check-ref-format", "--branch", baseBranch]).catch(() => ""))) {
+    throw new Error("Configured default branch is invalid.");
+  }
+  const branch = await git(homeDir, ["symbolic-ref", "--quiet", "--short", "HEAD"]).catch(() => "");
+  if (!branch) throw new Error("Check out a branch before returning to the configured base.");
+  if (branch === baseBranch) throw new Error("Already on the configured default branch.");
+  if (!(await git(homeDir, ["show-ref", "--verify", "--quiet", `refs/heads/${baseBranch}`]).then(() => true, () => false))) {
+    throw new Error(`Configured default branch '${baseBranch}' is not available locally.`);
+  }
+  if (await gitRaw(homeDir, ["status", "--porcelain=v1", "--untracked-files=all"])) {
+    throw new Error("The repository must be completely clean (including staged and untracked files) before returning to the base branch.");
+  }
+  try { await git(homeDir, ["switch", "--no-guess", baseBranch]); }
+  catch { throw new Error("Could not switch to the configured base branch. Inspect the repository before retrying."); }
+  if (await git(homeDir, ["symbolic-ref", "--quiet", "--short", "HEAD"]) !== baseBranch) {
+    throw new Error("Base branch checkout could not be verified. Inspect the repository before retrying.");
+  }
+  return { branch: baseBranch, baseBranch };
+}

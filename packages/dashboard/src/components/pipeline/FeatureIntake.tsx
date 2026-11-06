@@ -39,6 +39,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const [branchState, setBranchState] = useState<{ ready: boolean; branch: string; baseBranch: string; reason?: string; note?: string } | null>(null);
   const [branchError, setBranchError] = useState("");
   const [preparing, setPreparing] = useState(false);
+  const [returning, setReturning] = useState(false);
   useEffect(() => {
     try {
       if (feature || branchName || planner || implementer || reviewer) localStorage.setItem(draftKey(projectId), JSON.stringify({ feature, branchName, planner, implementer, reviewer }));
@@ -61,7 +62,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     return () => { active = false; };
   }, [project?.id]);
   async function prepareBranch() {
-    if (!project?.id || !branchState?.ready || !branchName.trim() || preparing || checkedKey !== selectionKey) return;
+    if (!project?.id || !branchState?.ready || !branchName.trim() || preparing || returning || checkedKey !== selectionKey) return;
     setPreparing(true); setBranchError("");
     try {
       const result = await api.post<{ branch: string; baseBranch: string }>(`/projects/${encodeURIComponent(project.id)}/feature-branch`, { name: branchName.trim() });
@@ -71,6 +72,17 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       const message = err instanceof Error ? err.message : "Branch preparation failed";
       try { setBranchError(JSON.parse(message).message ?? message); } catch { setBranchError(message); }
     } finally { setPreparing(false); }
+  }
+  async function returnToBase() {
+    if (!project?.id || !branchState?.branch || branchState.branch === branchState.baseBranch || preparing || returning) return;
+    setReturning(true); setBranchError("");
+    try {
+      const result = await api.post<{ branch: string; baseBranch: string }>(`/projects/${encodeURIComponent(project.id)}/return-to-base`, {});
+      setBranchState({ ...result, ready: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not return to base branch";
+      try { setBranchError(JSON.parse(message).message ?? message); } catch { setBranchError(message); }
+    } finally { setReturning(false); }
   }
   // Codex defaults to bypassing its sandbox; never start this workflow with
   // that default. Claude's current adapter unconditionally skips permissions.
@@ -222,11 +234,15 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       <div className="space-y-2 rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Prepare feature branch">
         <h3 className="font-medium">Prepare a feature branch (required)</h3>
         <p>Current branch: {branchState?.branch || "Checking..."} · Configured base: {branchState?.baseBranch ?? project?.defaultBranch ?? "Checking..."}</p>
+        {onFeatureBranch && <div className="space-y-1">
+          <p className="text-xs text-zinc-400">Finished the previous feature? Return to the existing local base branch before preparing another. The repository must be completely clean; this does not reset, delete, commit, push or run agents.</p>
+          <button type="button" onClick={() => { void returnToBase(); }} disabled={returning || preparing} className="rounded border border-zinc-600 px-3 py-2 text-zinc-200 disabled:opacity-40">{returning ? "Returning..." : "Return to base branch"}</button>
+        </div>}
         <p className="text-xs text-zinc-400">Check the agent runtime first, so an unavailable sandbox does not leave an unused branch behind. This creates and checks out a new local branch; it does not commit, push, or start agents.</p>
         <label className="block" htmlFor="feature-branch-name">New feature branch name</label>
         <div className="flex flex-wrap gap-2">
           <input id="feature-branch-name" value={branchName} onChange={e => setBranchName(e.target.value)} placeholder="feat/my-feature" className="min-w-48 flex-1 rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
-          <button type="button" onClick={() => { void prepareBranch(); }} disabled={!branchState?.ready || !branchName.trim() || preparing || checkedKey !== selectionKey} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">{preparing ? "Preparing..." : "Prepare feature branch"}</button>
+          <button type="button" onClick={() => { void prepareBranch(); }} disabled={!branchState?.ready || !branchName.trim() || preparing || returning || checkedKey !== selectionKey} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">{preparing ? "Preparing..." : "Prepare feature branch"}</button>
         </div>
         {branchState?.reason && <p role="status" className="text-amber-300">{branchState.reason}</p>}
         {branchState?.note && <p role="status" className="text-amber-300">{branchState.note} Include it in the feature commit if you want the ignore rule in the PR.</p>}

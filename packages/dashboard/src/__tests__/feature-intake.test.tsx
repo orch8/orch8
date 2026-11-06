@@ -25,6 +25,28 @@ describe("feature intake", () => {
   expect(state.create).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
  });
+ it("returns from a previous feature branch without clearing the next feature draft or runtime gate", async () => {
+  state.readiness.mockResolvedValueOnce({ ready: false, branch: "feat/previous", baseBranch: "main", reason: "Check out the configured default branch 'main' before preparing a feature branch." });
+  state.probe.mockImplementation(async path => path.includes("return-to-base") ? { branch: "main", baseBranch: "main" } : { ok: true });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  await screen.findByText(/Current branch: feat\/previous/);
+  select(); await check();
+  fireEvent.change(screen.getByLabelText("New feature branch name"), { target: { value: "feat/next" } });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Return to base branch" })); });
+  expect(state.probe).toHaveBeenCalledWith("/projects/canonical-id/return-to-base", {});
+  expect(screen.getByText(/Current branch: main/)).toBeInTheDocument();
+  expect(screen.getByLabelText("What should change?")).toHaveValue("Add usage");
+  expect(screen.getByLabelText("New feature branch name")).toHaveValue("feat/next");
+  expect(screen.getByRole("button", { name: "Prepare feature branch" })).toBeEnabled();
+ });
+ it("shows a safe server refusal without pretending the branch changed", async () => {
+  state.probe.mockRejectedValue(new Error(JSON.stringify({ message: "The repository must be completely clean." })));
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  await screen.findByText(/Current branch: feat\/usage/);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Return to base branch" })); });
+  expect(screen.getByRole("alert").textContent).toContain("completely clean");
+  expect(screen.getByText(/Current branch: feat\/usage/)).toBeInTheDocument();
+ });
  it("sets up three sandboxed agents explicitly without starting a feature", async () => {
   state.agents = [];
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);

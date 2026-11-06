@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { PipelineConflict } from "../../services/pipeline.service.js";
 import { publishPipelinePr } from "../../services/pipeline-pr.service.js";
-import { featureBranchReadiness, prepareFeatureBranch } from "../../services/feature-branch.service.js";
+import { featureBranchReadiness, prepareFeatureBranch, returnToBaseBranch } from "../../services/feature-branch.service.js";
+import { heartbeatRuns, pipelines } from "@orch/shared/db";
+import { and, inArray } from "drizzle-orm";
 import { readPrChecks, type PrCheck } from "../../services/pr-checks.js";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import {
@@ -163,6 +165,7 @@ export async function pipelineRoutes(app: FastifyInstance) {
     return repositoryDiff(project.homeDir, project.defaultBranch);
   });
   const preparing = new Set<string>();
+  const publishing = new Set<string>();
   app.get("/api/projects/:projectId/feature-branch", async (request: FastifyRequest<{ Params: { projectId: string } }>, reply: FastifyReply) => {
     if (!requireProjectScope(request, reply, request.params.projectId)) return reply;
     const project = await app.projectService.getById(request.params.projectId);
@@ -176,13 +179,40 @@ export async function pipelineRoutes(app: FastifyInstance) {
     if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
     if (typeof request.body?.name !== "string") return reply.code(400).send({ error: "validation_error", message: "Enter a feature branch name." });
     const key = await realpath(project.homeDir).catch(() => project.homeDir);
-    if (preparing.has(key)) return reply.code(409).send({ error: "conflict", message: "Branch preparation is already running for this repository." });
+    if (preparing.has(key) || publishing.has(key)) return reply.code(409).send({ error: "conflict", message: "A repository operation is already running." });
     preparing.add(key);
     try { return reply.code(201).send(await prepareFeatureBranch(project.homeDir, project.defaultBranch, request.body.name)); }
     catch (error) { return reply.code(409).send({ error: "conflict", message: (error as Error).message }); }
     finally { preparing.delete(key); }
   });
-  const publishing = new Set<string>();
+  // A checkout is explicit and does not commit, reset, delete, fetch or run agents.
+  app.post("/api/projects/:projectId/return-to-base", async (request: FastifyRequest<{ Params: { projectId: string } }>, reply: FastifyReply) => {
+    if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+    if (!requireProjectScope(request, reply, request.params.projectId)) return reply;
+    const project = await app.projectService.getById(request.params.projectId);
+    if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    const key = await realpath(project.homeDir).catch(() => project.homeDir);
+    if (preparing.has(key) || publishing.has(key)) return reply.code(409).send({ error: "conflict", message: "A repository operation is already running." });
+    preparing.add(key);
+    try {
+      // Other project records may point at this same checkout. Check their writers too.
+      const candidates = await app.projectService.list();
+      const shared = (await Promise.all(candidates.map(async candidate => ({
+        id: candidate.id, root: await realpath(candidate.homeDir).catch(() => candidate.homeDir),
+      })))).filter(candidate => candidate.root === key).map(candidate => candidate.id);
+      const active = await app.db.select({ id: pipelines.id }).from(pipelines).where(and(
+        inArray(pipelines.projectId, shared), inArray(pipelines.status, ["pending", "running"]),
+      )).limit(1);
+      if (active.length) return reply.code(409).send({ error: "conflict", message: "An active pipeline must finish or be cancelled before switching branches." });
+      const runs = await app.db.select({ id: heartbeatRuns.id }).from(heartbeatRuns).where(and(
+        inArray(heartbeatRuns.projectId, shared), inArray(heartbeatRuns.status, ["queued", "running"]),
+      )).limit(1);
+      if (runs.length) return reply.code(409).send({ error: "conflict", message: "An agent run is queued or running for this project." });
+      return await returnToBaseBranch(project.homeDir, project.defaultBranch);
+    } catch (error) {
+      return reply.code(409).send({ error: "conflict", message: (error as Error).message });
+    } finally { preparing.delete(key); }
+  });
   // Explicit admin action only. No implicit commit, checkout, or publication.
   app.post("/api/pipelines/:id/pull-request", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
@@ -202,8 +232,8 @@ export async function pipelineRoutes(app: FastifyInstance) {
     }
     const project = await app.projectService.getById(pipeline.projectId);
     if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
-    const key = project.homeDir;
-    if (publishing.has(key)) return reply.code(409).send({ error: "conflict", message: "PR publication is already running for this repository." });
+    const key = await realpath(project.homeDir).catch(() => project.homeDir);
+    if (publishing.has(key) || preparing.has(key)) return reply.code(409).send({ error: "conflict", message: "A repository operation is already running." });
     publishing.add(key);
     try {
       const published = await publishPipelinePr(project, pipeline.name, await app.pipelineService.getPublicationOutputPaths(pipeline.id));

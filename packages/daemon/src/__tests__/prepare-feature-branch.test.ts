@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { prepareFeatureBranch, featureBranchReadiness } from "../services/feature-branch.service.js";
+import { prepareFeatureBranch, featureBranchReadiness, returnToBaseBranch } from "../services/feature-branch.service.js";
 
 const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
@@ -15,6 +15,39 @@ async function fixture() {
   return { root, git };
 }
 describe("feature branch preparation", () => {
+  it("returns to the configured local base without deleting the previous branch", async () => {
+    const { root, git } = await fixture();
+    git("switch", "-q", "-c", "feat/previous");
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "feature");
+    const previousHead = git("rev-parse", "HEAD");
+    expect(await returnToBaseBranch(root, "main")).toEqual({ branch: "main", baseBranch: "main" });
+    expect(git("branch", "--show-current")).toBe("main");
+    expect(git("rev-parse", "feat/previous")).toBe(previousHead);
+  });
+  it("refuses tracked, staged, untracked and generated ignore changes", async () => {
+    const { root, git } = await fixture();
+    git("switch", "-q", "-c", "feat/previous");
+    for (const staged of [false, true]) {
+      await writeFile(join(root, "file.txt"), "work");
+      if (staged) git("add", "file.txt");
+      await expect(returnToBaseBranch(root, "main")).rejects.toThrow(/completely clean/);
+      git("reset", "-q", "--hard", "HEAD");
+      await rm(join(root, "file.txt"), { force: true });
+    }
+    await writeFile(join(root, ".gitignore"), "# orch8 orchestrator data\n.orch8/\n");
+    await expect(returnToBaseBranch(root, "main")).rejects.toThrow(/completely clean/);
+    expect(git("branch", "--show-current")).toBe("feat/previous");
+  });
+  it("refuses a missing target, detached HEAD, subdirectory and invalid base", async () => {
+    const { root, git } = await fixture();
+    git("switch", "-q", "-c", "feat/previous");
+    await expect(returnToBaseBranch(root, "missing")).rejects.toThrow(/not available/);
+    await expect(returnToBaseBranch(root, "-evil")).rejects.toThrow(/invalid/);
+    const sub = join(root, "sub"); await import("node:fs/promises").then(fs => fs.mkdir(sub));
+    await expect(returnToBaseBranch(sub, "main")).rejects.toThrow(/root/);
+    git("checkout", "--detach", "-q");
+    await expect(returnToBaseBranch(root, "main")).rejects.toThrow(/Check out a branch/);
+  });
   it("allows only Orch8's generated ignore change to follow a newly provisioned project onto the feature branch", async () => {
     const { root, git } = await fixture();
     await writeFile(join(root, ".gitignore"), "# orch8 orchestrator data\n.orch8/\n");
