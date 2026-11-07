@@ -39,6 +39,42 @@ describe("active feature workflow list", () => {
     await waitFor(() => expect(screen.getByText(/Your decision needed: inspect independent review and accept it or reject it/)).toBeInTheDocument());
   });
 
+  it("shows a terminal run without mistaking it for a completed plan", async () => {
+    fetchMock.mockImplementation(async (url: string) => ({
+      ok: true, headers: { get: () => null }, json: async () => url.includes("/runs?")
+        ? [{ id: "run_1", agentId: "planner", status: "succeeded", error: null }]
+        : { pipeline, steps: [{ id: "one", label: "Plan", status: "pending", taskId: "task_1", agentId: "planner", order: 1 }] },
+    }));
+    renderWithProviders(<PipelineList pipelines={[pipeline]} />);
+    expect(await screen.findByText(/Agent run ended \(succeeded\), but plan is still pending/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Inspect the task and raw run log" })).toHaveAttribute("href", "/projects/proj_1/tasks/task_1");
+    expect(screen.queryByText(/Your decision needed/)).not.toBeInTheDocument();
+  });
+
+  it("does not claim a pending step is stalled before a run ends", async () => {
+    fetchMock.mockImplementation(async (url: string) => ({
+      ok: true, headers: { get: () => null }, json: async () => url.includes("/runs?")
+        ? [{ id: "run_1", agentId: "planner", status: "running", error: null }]
+        : { pipeline, steps: [{ id: "one", label: "Plan", status: "pending", taskId: "task_1", agentId: "planner", order: 1 }] },
+    }));
+    renderWithProviders(<PipelineList pipelines={[pipeline]} />);
+    expect(await screen.findByText(/Plan: not completed/)).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/runs?"), expect.anything()));
+    expect(screen.queryByText(/Agent run ended/)).not.toBeInTheDocument();
+  });
+
+  it("does not attribute another agent's run to the current step", async () => {
+    fetchMock.mockImplementation(async (url: string) => ({
+      ok: true, headers: { get: () => null }, json: async () => url.includes("/runs?")
+        ? [{ id: "run_1", agentId: "old-planner", status: "succeeded" }]
+        : { pipeline, steps: [{ id: "one", label: "Plan", status: "pending", taskId: "task_1", agentId: "planner", order: 1 }] },
+    }));
+    renderWithProviders(<PipelineList pipelines={[pipeline]} />);
+    expect(await screen.findByText(/Plan: not completed/)).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/runs?"), expect.anything()));
+    expect(screen.queryByText(/Agent run ended/)).not.toBeInTheDocument();
+  });
+
   it("shows the failed step, actual run error and a route to the log before retry", async () => {
     fetchMock.mockImplementation(async (url: string) => ({
       ok: true, headers: { get: () => null }, json: async () => url.includes("/runs?")

@@ -19,9 +19,23 @@ function WorkflowProgress({ pipeline }: { pipeline: Pipeline }) {
   const needsDecision = current.status === "awaiting_verification";
   const review = /\b(review|verification)\b/i.test(current.label);
   const decision = review ? "accept" : "approve";
-  return <p className={`px-4 pb-2 text-xs ${needsDecision ? "text-amber-300" : "text-zinc-400"}`}>
-    {needsDecision ? `Your decision needed: inspect ${current.label.toLowerCase()} and ${decision} it or ${current.order > 1 ? "reject it" : "cancel the workflow"}.` :
-      `${current.label}: ${current.status === "running" ? "step running" : "not completed"}. Open the workflow to inspect runs and logs.`}
+  return <div className="px-4 pb-2 text-xs space-y-1">
+    <p className={needsDecision ? "text-amber-300" : "text-zinc-400"}>
+      {needsDecision ? `Your decision needed: inspect ${current.label.toLowerCase()} and ${decision} it or ${current.order > 1 ? "reject it" : "cancel the workflow"}.` :
+        `${current.label}: ${current.status === "running" ? "step running" : "not completed"}. Open the workflow to inspect runs and logs.`}
+    </p>
+    {current.status === "pending" && current.taskId && current.agentId && <PendingStepRun taskId={current.taskId} projectId={pipeline.projectId} label={current.label} agentId={current.agentId} />}
+  </div>;
+}
+
+function PendingStepRun({ taskId, projectId, label, agentId }: { taskId: string; projectId: string; label: string; agentId: string }) {
+  const { data: runs, isError } = useRuns(projectId, { taskId, limit: 1 });
+  if (isError) return <p className="text-amber-300">Could not check the latest {label.toLowerCase()} run. Open the workflow to inspect it.</p>;
+  const run = runs?.[0];
+  if (!run || run.agentId !== agentId || !["succeeded", "failed", "cancelled"].includes(run.status)) return null;
+  return <p className="text-amber-300">
+    Agent run ended ({run.status}), but {label.toLowerCase()} is still pending. The exit status does not finish this workflow.{" "}
+    <a className="text-blue-300 underline" href={`/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`}>Inspect the task and raw run log</a> before starting another run.
   </p>;
 }
 
