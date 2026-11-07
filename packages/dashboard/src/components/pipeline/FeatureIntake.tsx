@@ -21,7 +21,7 @@ function readDraft(projectId: string): FeatureDraft {
 }
 
 /** An opinionated entry point to the existing pipeline runner, not a second executor. */
-export function FeatureIntake({ projectId, onCreated }: { projectId: string; onCreated: (id: string) => void }) {
+export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: { projectId: string; onCreated: (id: string) => void; activeWorkflow?: boolean }) {
   const queryClient = useQueryClient();
   useEffect(() => {
     if (window.location.hash === "#new-feature") document.getElementById("new-feature")?.scrollIntoView();
@@ -87,7 +87,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     return () => { active = false; };
   }, [project?.id]);
   async function prepareBranch() {
-    if (!project?.id || !branchState?.ready || !branchName.trim() || preparing || returning || checkedKey !== selectionKey) return;
+    if (activeWorkflow || !project?.id || !branchState?.ready || !branchName.trim() || preparing || returning || checkedKey !== selectionKey) return;
     setPreparing(true); setBranchError("");
     try {
       const result = await api.post<{ branch: string; baseBranch: string }>(`/projects/${encodeURIComponent(project.id)}/feature-branch`, { name: branchName.trim() });
@@ -100,7 +100,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     } finally { setPreparing(false); }
   }
   async function returnToBase() {
-    if (!project?.id || !branchState?.branch || branchState.branch === branchState.baseBranch || preparing || returning) return;
+    if (activeWorkflow || !project?.id || !branchState?.branch || branchState.branch === branchState.baseBranch || preparing || returning) return;
     setReturning(true); setBranchError("");
     try {
       const result = await api.post<{ ready: boolean; branch: string; baseBranch: string; note?: string; reason?: string }>(`/projects/${encodeURIComponent(project.id)}/return-to-base`, {});
@@ -168,8 +168,9 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const selectionKey = JSON.stringify(selected.map(a => [a?.id, a?.adapterType, a?.adapterConfig]));
   const validSelection = selected.every(Boolean) && reviewer !== implementer;
   const onFeatureBranch = !!branchState?.branch && branchState.branch !== branchState.baseBranch;
-  const ready = !!project?.id && feature.trim().length > 0 && validSelection && onFeatureBranch && checkedKey === selectionKey && !checking && !create.isPending;
-  const nextStep = !feature.trim() ? { label: "Describe your feature", target: "feature-request" }
+  const ready = !activeWorkflow && !!project?.id && feature.trim().length > 0 && validSelection && onFeatureBranch && checkedKey === selectionKey && !checking && !create.isPending;
+  const nextStep = activeWorkflow ? { label: "Inspect existing workflows", target: "active-feature-workflows" }
+    : !feature.trim() ? { label: "Describe your feature", target: "feature-request" }
     : !validSelection ? available.length < 2
       ? { label: "Set up feature agents", target: "feature-agent-setup" }
       : { label: "Choose three feature agents", target: "feature-plan-agent" }
@@ -214,7 +215,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!ready) return;
+    if (!ready || activeWorkflow) return;
     setError("");
     const request = feature.trim();
     const contextHint = filePaths.length ? `\nFiles the user selected as starting points (inspect these tracked paths; do not assume they are the only files to change):\n${filePaths.map(path => `- ${path}`).join("\n")}` : "";
@@ -249,6 +250,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   return <section id="new-feature" className="scroll-mt-6 rounded-lg border border-zinc-700 bg-zinc-900 p-5" aria-label="New feature">
     <h2 className="text-lg font-semibold text-zinc-100">Build a feature</h2>
     <p className="mt-1 text-sm text-zinc-400">Describe a change on a feature branch, approve the plan, then inspect implementation and independent review. If tests pass, the implementer commits its feature files locally. After accepting the review, inspect the diff and publish a draft PR explicitly.</p>
+    {activeWorkflow && <p role="status" className="mt-3 rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200">Existing workflow work may still need attention. <a href="#active-feature-workflows" className="underline">Inspect existing workflows</a> and finish, retry or cancel them before starting another plan. Your draft stays here.</p>}
     <p className="mt-3 text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-blue-800 bg-blue-950/40 p-3 text-sm" aria-label="Next feature step">
       <div>
@@ -336,13 +338,13 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
         <p>Current branch: {branchState?.branch || "Checking..."} · Configured base: {branchState?.baseBranch ?? project?.defaultBranch ?? "Checking..."}</p>
         {onFeatureBranch && <div className="space-y-1">
           <p className="text-xs text-zinc-400">Finished the previous feature? Return to the existing local base branch before preparing another. The repository must be clean except for Orch8's unchanged generated .gitignore addition, which stays uncommitted. This does not reset, delete, commit, push, edit the base branch, or run agents.</p>
-          <button type="button" onClick={() => { void returnToBase(); }} disabled={returning || preparing} className="rounded border border-zinc-600 px-3 py-2 text-zinc-200 disabled:opacity-40">{returning ? "Returning..." : "Return to base branch"}</button>
+          <button type="button" onClick={() => { void returnToBase(); }} disabled={activeWorkflow || returning || preparing} className="rounded border border-zinc-600 px-3 py-2 text-zinc-200 disabled:opacity-40">{returning ? "Returning..." : "Return to base branch"}</button>
         </div>}
         <p className="text-xs text-zinc-400">Check the agent runtime first, so an unavailable sandbox does not leave an unused branch behind. This creates and checks out a new local branch; it does not commit, push, or start agents.</p>
         <label className="block" htmlFor="feature-branch-name">New feature branch name</label>
         <div className="flex flex-wrap gap-2">
           <input id="feature-branch-name" value={branchName} onChange={e => setBranchName(e.target.value)} placeholder="feat/my-feature" className="min-w-48 flex-1 rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
-          <button type="button" onClick={() => { void prepareBranch(); }} disabled={!branchState?.ready || !branchName.trim() || preparing || returning || checkedKey !== selectionKey} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">{preparing ? "Preparing..." : "Prepare feature branch"}</button>
+          <button type="button" onClick={() => { void prepareBranch(); }} disabled={activeWorkflow || !branchState?.ready || !branchName.trim() || preparing || returning || checkedKey !== selectionKey} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">{preparing ? "Preparing..." : "Prepare feature branch"}</button>
         </div>
         {branchState?.reason && <p role="status" className="text-amber-300">{branchState.reason}</p>}
         {branchState?.note && <p role="status" className="text-amber-300">{branchState.note} Include it in the feature commit if you want the ignore rule in the PR.</p>}

@@ -16,7 +16,7 @@ type Tab = "active" | "history" | "templates";
 
 function PipelinesActivePage() {
   const { projectSlug: projectId } = Route.useParams();
-  const { data: allPipelines, isLoading } = usePipelines(projectId);
+  const { data: allPipelines, isLoading, isError } = usePipelines(projectId);
   const { data: project, isError: projectError } = useProject(projectId);
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -62,14 +62,14 @@ function PipelinesActivePage() {
         ))}
       </div>
 
-      {(isLoading || activePipelines.length > 0) && <section aria-label="Continue feature work" className="space-y-3 rounded-lg border border-blue-900/60 bg-blue-950/20 p-4">
+      {(isLoading || isError || activePipelines.length > 0) && <section id="active-feature-workflows" aria-label="Continue feature work" className="scroll-mt-6 space-y-3 rounded-lg border border-blue-900/60 bg-blue-950/20 p-4">
         <div>
           <h2 className="text-base font-semibold text-zinc-100">Continue feature work</h2>
           <p className="mt-1 text-sm text-zinc-400">Open a workflow to inspect its plan, agent runs and next decision before starting another feature in this checkout.</p>
         </div>
-        {isLoading ? <p className="text-sm text-zinc-400">Loading workflows...</p> : <PipelineList pipelines={activePipelines} showActions />}
+        {isLoading ? <p className="text-sm text-zinc-400">Loading workflows...</p> : isError ? <p role="alert" className="text-sm text-amber-300">Could not load existing workflows. Refresh before starting another feature in this checkout.</p> : <PipelineList pipelines={activePipelines} showActions />}
       </section>}
-      <FeatureIntake key={projectId} projectId={projectId} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />
+      <FeatureIntake key={projectId} projectId={projectId} activeWorkflow={isLoading || isError || activePipelines.length > 0} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />
       <RepositoryChanges projectId={project?.id} projectError={projectError} />
     </div>
   );
