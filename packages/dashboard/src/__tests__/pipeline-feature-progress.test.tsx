@@ -3,7 +3,7 @@ import { renderWithProviders, screen, waitFor, within } from "../test-utils.js";
 import { fireEvent } from "@testing-library/react";
 import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
 
-const apiMock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
+const apiMock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), cancel: vi.fn() }));
 vi.mock("../api/client.js", async importOriginal => ({ ...(await importOriginal<typeof import("../api/client.js")>()), api: apiMock }));
 
 const state = vi.hoisted(() => ({
@@ -22,7 +22,7 @@ vi.mock("../hooks/usePipelines.js", () => ({
   usePlanAttempts: () => ({ data: [], isLoading: false, isError: false }),
   usePipelineDiff: () => ({ data: state.diff, isLoading: false, isError: state.diffError, refetch: vi.fn() }),
   usePipelineStepOutput: () => ({ data: null, isLoading: false, isError: false, refetch: vi.fn() }),
-  useCancelPipeline: () => ({ isPending: false }),
+  useCancelPipeline: () => ({ isPending: false, mutateAsync: apiMock.cancel }),
   useRetryPipeline: () => ({ isPending: false }),
   useRejectPipelineStep: () => ({ isPending: false }),
   useApprovePipelineStep: () => ({ isPending: false }),
@@ -40,6 +40,8 @@ const step = (label: string, order: number, status: string, extras: Record<strin
 const progress = () => screen.getByRole("region", { name: "Feature progress" });
 
 beforeEach(() => {
+  localStorage.clear();
+  apiMock.cancel.mockReset();
   apiMock.get.mockReset();
   apiMock.post.mockReset();
   state.status = "running";
@@ -212,6 +214,18 @@ describe("feature progress summary", () => {
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(within(progress()).getByText(/Run ended without completing plan.*Inspect its log before retrying/i)).toBeInTheDocument();
     expect(within(progress()).queryByText(/wait for the current step/i)).not.toBeInTheDocument();
+  });
+
+  it("offers a new request after a failed run but never starts it if cancelling the old workflow fails", async () => {
+    state.steps = [step("Plan", 1, "pending"), step("Implement", 2, "pending", { promptOverride: "Feature request: Add the complete usage guide\nFollow the approved plan" }), step("Independent review", 3, "pending")];
+    state.runs = [{ id: "run_failed", status: "failed", taskId: "task_1", agentId: "planner" }];
+    apiMock.cancel.mockRejectedValue(new Error("Cannot cancel while an agent is active"));
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(within(progress()).getByText(/Run ended without completing plan/)).toBeInTheDocument();
+    fireEvent.click(within(progress()).getByRole("button", { name: "Start again with this request" }));
+    expect(await within(progress()).findByText(/Cannot cancel while an agent is active/)).toBeInTheDocument();
+    expect(apiMock.cancel).toHaveBeenCalledWith("pipe_1");
+    expect(localStorage.getItem("orch8:feature-draft:proj_1")).toBeNull();
   });
 
   it("checks the sandbox without rerunning an incomplete planning step", async () => {

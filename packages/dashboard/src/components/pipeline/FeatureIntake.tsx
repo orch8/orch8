@@ -23,6 +23,9 @@ function readDraft(projectId: string): FeatureDraft {
 /** An opinionated entry point to the existing pipeline runner, not a second executor. */
 export function FeatureIntake({ projectId, onCreated }: { projectId: string; onCreated: (id: string) => void }) {
   const queryClient = useQueryClient();
+  useEffect(() => {
+    if (window.location.hash === "#new-feature") document.getElementById("new-feature")?.scrollIntoView();
+  }, []);
   const [draft] = useState(() => readDraft(projectId));
   const { data: project } = useProject(projectId);
   const { data: agents, isLoading } = useAgents(project?.id ?? projectId);
@@ -224,7 +227,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     }
   }
 
-  return <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-5" aria-label="New feature">
+  return <section id="new-feature" className="scroll-mt-6 rounded-lg border border-zinc-700 bg-zinc-900 p-5" aria-label="New feature">
     <h2 className="text-lg font-semibold text-zinc-100">Build a feature</h2>
     <p className="mt-1 text-sm text-zinc-400">Describe a change on a feature branch, approve the plan, then inspect implementation and independent review. If tests pass, the implementer commits its feature files locally. After accepting the review, inspect the diff and publish a draft PR explicitly.</p>
     <p className="mt-3 text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
