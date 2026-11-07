@@ -15,8 +15,10 @@ export function buildArgs(
     "--print", "-",
     "--output-format", "stream-json",
     "--verbose",
-    "--dangerously-skip-permissions",
-    "--setting-sources", "project,local",
+    // Print mode cannot ask for consent interactively. Respect only permissions
+    // already granted by Claude's user/project/local settings; denied tools stay denied.
+    "--permission-mode", "default",
+    "--setting-sources", "user,project,local",
   ];
 
   if (config.model) {
@@ -47,6 +49,9 @@ export function buildArgs(
     args.push("--chrome");
   }
 
+  if (config.extraArgs?.some(arg => /^--(?:dangerously-skip-permissions|allow-dangerously-skip-permissions|permission-mode|allowedTools|allowed-tools|setting-sources|settings|bare|tools)(?:=|$)/.test(arg))) {
+    throw new Error("Unsafe Claude permission or settings override in extraArgs");
+  }
   if (config.extraArgs) {
     args.push(...config.extraArgs);
   }

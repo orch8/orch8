@@ -31,6 +31,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const [settingUpAgents, setSettingUpAgents] = useState(false);
   const [setupError, setSetupError] = useState("");
   const [codexModel, setCodexModel] = useState("");
+  const [agentRuntime, setAgentRuntime] = useState<"codex_local" | "claude_local">("codex_local");
   const [feature, setFeature] = useState(draft.feature);
   const [filePaths, setFilePaths] = useState(draft.filePaths);
   const [planner, setPlanner] = useState(draft.planner);
@@ -105,15 +106,21 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       try { setBranchError(JSON.parse(message).message ?? message); } catch { setBranchError(message); }
     } finally { setReturning(false); }
   }
-  // Codex defaults to bypassing its sandbox; never start this workflow with
-  // that default. Claude's current adapter unconditionally skips permissions.
+  // Keep Codex's workspace-write gate intact. Claude uses its existing
+  // user/project/local permission rules, never an unreviewed CLI override.
   const available = (agents ?? []).filter(a => {
     const config = a.adapterConfig as {
-      dangerouslyBypassApprovalsAndSandbox?: boolean; sandbox?: string;
-      extraArgs?: string[]; configOverrides?: Record<string, string>; profile?: string;
+      dangerouslyBypassApprovalsAndSandbox?: boolean; dangerouslySkipPermissions?: boolean;
+      sandbox?: string; extraArgs?: string[]; configOverrides?: Record<string, string>;
+      profile?: string; command?: string; cwd?: string; env?: Record<string, string>;
+      chrome?: boolean; workspaceStrategy?: unknown;
     } | null;
-    return a.status === "active" && a.adapterType === "codex_local" &&
-      config?.dangerouslyBypassApprovalsAndSandbox === false &&
+    if (a.status !== "active" || !config) return false;
+    if (a.adapterType === "claude_local") return config.dangerouslySkipPermissions === false &&
+      !config.extraArgs?.length && !config.command && !config.cwd && !config.env &&
+      !config.chrome && !config.workspaceStrategy;
+    return a.adapterType === "codex_local" &&
+      config.dangerouslyBypassApprovalsAndSandbox === false &&
       config.sandbox === "workspace-write" &&
       !config.extraArgs?.length && !Object.keys(config.configOverrides ?? {}).length && !config.profile;
   });
@@ -122,27 +129,30 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const canUsePreferred = preferred.every(Boolean) && new Set(preferred.map(agent => agent?.id)).size === 3;
   const selected = [planner, implementer, reviewer].map(id => available.find(a => a.id === id));
   async function setupAgents() {
-    if (settingUpAgents || isLoading || !project?.id || !codexModel.trim()) return;
+    if (settingUpAgents || isLoading || !project?.id || (agentRuntime === "codex_local" && !codexModel.trim())) return;
     setSettingUpAgents(true);
     setSetupError("");
     try {
       const roles = ["planner", "implementer", "reviewer"] as const;
-      const incompatible = roles.map(role => `feature-${role}`).filter(id =>
-        (agents ?? []).some(agent => agent.id === id && !available.some(candidate => candidate.id === id)));
-      if (incompatible.length) throw new Error(`${incompatible.join(", ")} already exists but is not eligible. Fix its Codex sandbox and status in Agents; existing settings will not be changed.`);
+      const agentId = (role: typeof roles[number]) => agentRuntime === "claude_local" ? `feature-claude-${role}` : `feature-${role}`;
+      const incompatible = roles.map(agentId).filter(id =>
+        (agents ?? []).some(agent => agent.id === id && !available.some(candidate => candidate.id === id && candidate.adapterType === agentRuntime)));
+      if (incompatible.length) throw new Error(`${incompatible.join(", ")} already exists but is not eligible. Check its status and runtime permissions in Agents; existing settings will not be changed.`);
       for (const role of roles) {
-        const id = `feature-${role}`;
+        const id = agentId(role);
         if ((agents ?? []).some(agent => agent.id === id)) continue;
         await createAgent.mutateAsync({
           id, projectId: project.id, name: `Feature ${role}`, role,
-          adapterType: "codex_local", model: codexModel.trim(),
-          adapterConfig: { model: codexModel.trim(), sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false },
+          adapterType: agentRuntime, model: agentRuntime === "codex_local" ? codexModel.trim() : undefined,
+          adapterConfig: agentRuntime === "codex_local"
+            ? { model: codexModel.trim(), sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false }
+            : { dangerouslySkipPermissions: false },
           heartbeatEnabled: false, wakeOnAssignment: true, maxConcurrentRuns: 1,
         });
       }
-      setPlanner("feature-planner");
-      setImplementer("feature-implementer");
-      setReviewer("feature-reviewer");
+      setPlanner(agentId("planner"));
+      setImplementer(agentId("implementer"));
+      setReviewer(agentId("reviewer"));
       setCheckedKey("");
     } catch (err) {
       setSetupError(`Could not finish agent setup. Check Agents before retrying. ${err instanceof Error ? err.message : ""}`);
@@ -150,7 +160,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       setSettingUpAgents(false);
     }
   }
-  const selectionKey = JSON.stringify(selected.map(a => [a?.id, a?.adapterConfig]));
+  const selectionKey = JSON.stringify(selected.map(a => [a?.id, a?.adapterType, a?.adapterConfig]));
   const validSelection = selected.every(Boolean) && reviewer !== implementer;
   const onFeatureBranch = !!branchState?.branch && branchState.branch !== branchState.baseBranch;
   const ready = !!project?.id && feature.trim().length > 0 && validSelection && onFeatureBranch && checkedKey === selectionKey && !checking && !create.isPending;
@@ -164,7 +174,8 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     try {
       for (const agent of selected) {
         const result = await api.post<{ ok: boolean; message?: string }>(
-          "/adapter/codex_local/test-environment", { config: agent!.adapterConfig },
+          `/adapter/${agent!.adapterType}/test-environment`, { config: agent!.adapterConfig,
+            ...(agent!.adapterType === "claude_local" ? { projectId: project!.id } : {}) },
         );
         if (!result.ok) throw new Error(`${agent!.name}: ${result.message ?? "Runtime test failed"}`);
       }
@@ -226,7 +237,8 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       <div className="mt-2 space-y-1 pl-3">
         <p>Planning agents can write to the repository. Planning-only behavior is a prompt instruction, not a read-only sandbox.</p>
         <p>Uses the configured repository and agent permissions, not a new isolated worktree. Keep selected agents' sandbox settings unchanged during the workflow. PR creation is an explicit action after review.</p>
-        <p>Check the selected agents before preparing a branch. On Linux this tests a shell command in the configured Codex sandbox; other hosts are not supported yet. A text-only response is not proof that planning can inspect the repository.</p>
+        <p>Codex checks its workspace-write shell on Linux. Claude checks a real Bash command and temporary file write with the selected repository's existing permissions. A text-only answer does not pass.</p>
+        <p>Claude print mode cannot ask interactively. If the existing Claude permission settings deny Bash or Write, the check blocks the workflow; configure permissions deliberately in Claude settings, never via bypass flags.</p>
       </div>
     </details>
     <form onSubmit={submit} className="mt-4 space-y-3">
@@ -261,16 +273,23 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       {canUsePreferred && <button type="button" onClick={() => {
         setPlanner(preferred[0]!.id); setImplementer(preferred[1]!.id); setReviewer(preferred[2]!.id);
       }} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use feature agents</button>}
-      {!isLoading && available.length < 3 && <div className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
-        <p>Feature workflows need three Codex agents, with a separate reviewer. Set them up here instead of configuring each agent by hand.</p>
-        <p className="mt-1 text-xs text-zinc-400">Creates missing Feature planner, implementer and reviewer agents for this project with workspace-write sandbox and approval bypass off. It does not run agents or change existing agent settings. You still need to check the runtime and approve the plan.</p>
-        <label className="mt-2 block text-xs text-zinc-300" htmlFor="feature-codex-model">Codex model for new agents</label>
-        <input id="feature-codex-model" value={codexModel} onChange={event => setCodexModel(event.target.value)} placeholder="Model available to your Codex account" className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
-        <p className="mt-1 text-xs text-zinc-400">Use a model supported by your Codex account. Existing agents keep their model; change it in Agents if needed. The runtime check may report a host sandbox failure before it can check model access.</p>
-        <button type="button" onClick={() => { void setupAgents(); }} disabled={settingUpAgents || !project?.id || !codexModel.trim()} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:opacity-40">{settingUpAgents ? "Setting up agents..." : "Set up feature agents"}</button>
+      {!isLoading && <div className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
+        <p>Feature workflows need three eligible agents, with a separate reviewer. Set them up here instead of configuring each by hand.</p>
+        <label className="mt-2 block text-xs text-zinc-300" htmlFor="feature-agent-runtime">Feature agent runtime</label>
+        <select id="feature-agent-runtime" value={agentRuntime} onChange={event => setAgentRuntime(event.target.value as "codex_local" | "claude_local")} className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100">
+          <option value="codex_local">Codex (workspace-write sandbox)</option>
+          <option value="claude_local">Claude Code (existing permissions)</option>
+        </select>
+        <p className="mt-1 text-xs text-zinc-400">Creates missing agents without running them or changing existing agents. Codex keeps workspace-write and approval bypass off. Claude uses default permission mode; headless runs cannot grant new permissions. Check the runtime before preparing a branch, then approve the plan.</p>
+        {agentRuntime === "codex_local" && <>
+          <label className="mt-2 block text-xs text-zinc-300" htmlFor="feature-codex-model">Codex model for new agents</label>
+          <input id="feature-codex-model" value={codexModel} onChange={event => setCodexModel(event.target.value)} placeholder="Model available to your Codex account" className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
+          <p className="mt-1 text-xs text-zinc-400">Use a model supported by your Codex account. Existing agents keep their model; change it in Agents if needed. The runtime check may report a host sandbox failure before it can check model access.</p>
+        </>}
+        <button type="button" onClick={() => { void setupAgents(); }} disabled={settingUpAgents || !project?.id || (agentRuntime === "codex_local" && !codexModel.trim())} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:opacity-40">{settingUpAgents ? "Setting up agents..." : "Set up feature agents"}</button>
         {setupError && <p role="alert" className="mt-2 text-red-300">{setupError}</p>}
       </div>}
-      {!isLoading && !available.length && <p role="status" className="text-sm text-amber-300">No eligible Codex agents yet. Set up feature agents above or configure active Codex agents in Agents.</p>}
+      {!isLoading && !available.length && <p role="status" className="text-sm text-amber-300">No eligible feature agents yet. Set up feature agents above or configure active agents in Agents.</p>}
       {reviewer && implementer && reviewer === implementer && <p role="alert" className="text-sm text-amber-300">Choose a different agent for independent review.</p>}
       <button type="button" onClick={() => { void checkRuntime(); }} disabled={!validSelection || checking} className="rounded border border-zinc-600 px-4 py-2 text-sm text-zinc-200 disabled:opacity-40">{checking ? "Checking agents..." : "Check agent runtime"}</button>
       {checkMessage && failedSelectionKey === selectionKey && <p role="status" className="text-sm text-amber-300">{checkMessage}</p>}

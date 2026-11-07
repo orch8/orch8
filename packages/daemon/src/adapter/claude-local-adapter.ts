@@ -1,7 +1,8 @@
 // packages/daemon/src/adapter/claude-local-adapter.ts
 import { spawn as nodeSpawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import type { SpawnFn } from "./types.js";
 import type { SchemaDb } from "../db/client.js";
@@ -207,8 +208,17 @@ export class ClaudeLocalAdapter implements AgentAdapter {
 
   async testEnvironment(config: unknown): Promise<TestEnvironmentResult> {
     const claudeConfig = config as ClaudeLocalAdapterConfig;
-    const cwd = await mkdtemp(join(tmpdir(), "orch8-claude-probe-"));
+    const projectCwd = claudeConfig.cwd;
+    // Run in the selected repository so Claude loads the same project/local
+    // permission settings as a feature run. The marker stays temporary.
+    let cwd: string | undefined;
+    let probeDir: string | undefined;
+    const nonce = randomUUID();
     try {
+      cwd = projectCwd ?? await mkdtemp(join(tmpdir(), "orch8-claude-project-probe-"));
+      probeDir = await mkdtemp(join(cwd, ".orch8-claude-probe-"));
+      const marker = join(probeDir, "shell-marker");
+      const quotedMarker = `'${marker.replaceAll("'", "'\"'\"'")}'`;
       const result = await runProcess(
         {
           command: claudeConfig.command ?? resolveClaudePath(),
@@ -223,26 +233,36 @@ export class ClaudeLocalAdapter implements AgentAdapter {
             apiUrl: "http://localhost:3847",
             cwd,
           }, process.env as Record<string, string | undefined>),
-          prompt: "hi",
-          timeoutSec: claudeConfig.timeoutSec ?? 30,
+          prompt: `Runtime preflight only. Use the Bash tool to execute exactly this command: printf '%s' '${nonce}' > ${quotedMarker}. Do not edit any other file. Report whether it succeeded.`,
+          timeoutSec: Math.min(claudeConfig.timeoutSec ?? 60, 120),
           graceSec: claudeConfig.graceSec ?? 5,
         },
         this.spawnFn,
       );
 
-      if (result.errorCode) {
+      if (result.errorCode || /OAuth access token has expired|Failed to authenticate/i.test(result.result ?? "")) {
+        const expired = /OAuth access token has expired|Failed to authenticate/i.test(result.result ?? "");
         return {
           ok: false,
-          errorCode: result.errorCode,
-          message: result.error ?? "Claude environment test failed",
+          costUsd: result.costUsd,
+          errorCode: expired ? "auth_required" : result.errorCode ?? "process_error",
+          message: expired ? "Claude authentication expired. Re-authenticate with the Claude CLI before retrying the runtime check."
+            : result.error ?? result.result?.slice(0, 400) ?? "Claude environment test failed",
           sessionId: result.sessionId ?? undefined,
         };
       }
 
+      const actual = await readFile(marker, "utf8").catch(() => null);
+      if (actual !== nonce) {
+        return { ok: false, errorCode: "process_error",
+          costUsd: result.costUsd,
+          message: "Claude did not complete the shell write under current permissions. A text response is insufficient. Check Claude's user/project permissions for Bash; no approvals were bypassed." };
+      }
       return {
         ok: true,
+        costUsd: result.costUsd,
         sessionId: result.sessionId ?? undefined,
-        message: result.result ?? undefined,
+        message: "Claude executed a shell write with the selected repository's existing permissions. This does not guarantee a feature run will succeed.",
       };
     } catch (err) {
       const error = err as NodeJS.ErrnoException;
@@ -252,7 +272,8 @@ export class ClaudeLocalAdapter implements AgentAdapter {
         message: error.message,
       };
     } finally {
-      await rm(cwd, { recursive: true, force: true }).catch(() => {});
+      if (probeDir) await rm(probeDir, { recursive: true, force: true }).catch(() => {});
+      if (!projectCwd && cwd) await rm(cwd, { recursive: true, force: true }).catch(() => {});
     }
   }
 }

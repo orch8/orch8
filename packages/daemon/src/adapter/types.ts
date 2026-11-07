@@ -57,6 +57,7 @@ export interface RunAgentInstructions {
 
 export interface TestEnvironmentResult {
   ok: boolean;
+  costUsd?: number | null;
   errorCode?: RunErrorCode | "not_found";
   message?: string;
   sessionId?: string;

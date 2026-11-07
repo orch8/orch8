@@ -18,7 +18,7 @@ function makeAdapters() {
       sessionId: null, model: null, result: "ok", usage: null, costUsd: null,
       billingType: "api" as const, exitCode: 0, signal: null, error: null, errorCode: null, events: [],
     })),
-    testEnvironment: vi.fn(async () => ({ ok: true })),
+    testEnvironment: vi.fn(async (): Promise<{ ok: boolean; costUsd?: number }> => ({ ok: true })),
   });
   return { claude_local: make("claude_local"), codex_local: make("codex_local") };
 }
@@ -92,14 +92,43 @@ describe("adapter environment route", () => {
     await app.register(adapterTestRoutes);
     try {
       const response = await app.inject({ method: "POST", url: `/api/adapter/${type}/test-environment`, payload: {} });
-      const supported = type === "claude_local" || type === "codex_local";
-      expect(response.statusCode).toBe(supported ? 200 : 400);
-      if (supported) expect(map[type].testEnvironment).toHaveBeenCalledTimes(1);
+      const supported = type === "codex_local";
+      expect(response.statusCode).toBe(supported ? 200 : type === "claude_local" ? 403 : 400);
+      if (supported) expect(map.codex_local.testEnvironment).toHaveBeenCalledTimes(1);
       else {
-        expect(response.json().error).toBe("validation_error");
+        expect(response.json().error).toBe(type === "claude_local" ? "forbidden" : "validation_error");
         expect(map.claude_local.testEnvironment).not.toHaveBeenCalled();
         expect(map.codex_local.testEnvironment).not.toHaveBeenCalled();
       }
     } finally { await app.close(); }
+  });
+  it("binds Claude probe to the selected admin project and rejects caller paths and bypass flags", async () => {
+    const testDb = await setupTestDb();
+    const [project] = await testDb.db.insert(projects).values({ name: "Selected", slug: "selected-probe", homeDir: "/repo/selected", budgetLimitUsd: 1 }).returning();
+    const app = Fastify();
+    const map = makeAdapters();
+    app.decorate("adapters", map);
+    app.decorate("db", testDb.db);
+    app.decorate("projectService", { getById: vi.fn(async (id: string) => id === project.id ? (await testDb.db.select().from(projects).where(eq(projects.id, id)))[0] : null) } as never);
+    app.addHook("onRequest", async request => { request.isAdmin = true; });
+    await app.register(adapterTestRoutes);
+    try {
+      for (const config of [{ cwd: "/repo/other" }, { dangerouslySkipPermissions: true }, { extraArgs: ["--allowedTools", "Bash"] }]) {
+        const response = await app.inject({ method: "POST", url: "/api/adapter/claude_local/test-environment", payload: { projectId: project.id, config } });
+        expect(response.statusCode).toBe(400);
+      }
+      expect(map.claude_local.testEnvironment).not.toHaveBeenCalled();
+      const missing = await app.inject({ method: "POST", url: "/api/adapter/claude_local/test-environment", payload: { projectId: "unknown", config: {} } });
+      expect(missing.statusCode).toBe(404);
+      map.claude_local.testEnvironment.mockResolvedValueOnce({ ok: false, costUsd: 0.25 });
+      const allowed = await app.inject({ method: "POST", url: "/api/adapter/claude_local/test-environment", payload: { projectId: project.id, config: { dangerouslySkipPermissions: false } } });
+      expect(allowed.statusCode).toBe(200);
+      expect(map.claude_local.testEnvironment).toHaveBeenCalledWith({ dangerouslySkipPermissions: false, cwd: "/repo/selected" });
+      expect((await testDb.db.select().from(projects).where(eq(projects.id, project.id)))[0].budgetSpentUsd).toBe(0.25);
+      await testDb.db.update(projects).set({ budgetPaused: true }).where(eq(projects.id, project.id));
+      const blocked = await app.inject({ method: "POST", url: "/api/adapter/claude_local/test-environment", payload: { projectId: project.id, config: {} } });
+      expect(blocked.statusCode).toBe(403);
+      expect(map.claude_local.testEnvironment).toHaveBeenCalledTimes(1);
+    } finally { await app.close(); await teardownTestDb(testDb); }
   });
 });

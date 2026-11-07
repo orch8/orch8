@@ -83,6 +83,30 @@ describe("ClaudeLocalAdapter", () => {
     await writeFile(join(agentDir, "AGENTS.md"), "# Test Agent\n\nYou are a test agent.\n", "utf-8");
   });
 
+  it("rejects a text-only Claude environment response without an executed shell write", async () => {
+    const spawnFn = vi.fn(() => createMockProcess([
+      JSON.stringify({ type: "result", session_id: "probe", result: "I wrote it", model: "claude", usage: { input_tokens: 1, output_tokens: 1 }, total_cost_usd: 0 }),
+    ]) as unknown as ReturnType<SpawnFn>);
+    const adapter = new ClaudeLocalAdapter(testDb.db, spawnFn as unknown as SpawnFn);
+    const result = await adapter.testEnvironment({ cwd: tempRoot, dangerouslySkipPermissions: false });
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/shell.*write|write.*shell/i);
+    expect(spawnFn).toHaveBeenCalledTimes(1);
+    const args = (spawnFn as ReturnType<typeof vi.fn>).mock.calls[0][1] as string[];
+    expect(args).not.toContain("--dangerously-skip-permissions");
+    expect(args[args.indexOf("--permission-mode") + 1]).toBe("default");
+  });
+
+  it("reports expired Claude authentication from a failed runtime check", async () => {
+    const spawnFn = vi.fn(() => createMockProcess([
+      JSON.stringify({ type: "result", is_error: true, result: "OAuth access token has expired. Re-authenticate to continue.", session_id: "probe" }),
+    ], 1) as unknown as ReturnType<SpawnFn>);
+    const adapter = new ClaudeLocalAdapter(testDb.db, spawnFn as unknown as SpawnFn);
+    const result = await adapter.testEnvironment({ cwd: tempRoot, dangerouslySkipPermissions: false });
+    expect(result).toMatchObject({ ok: false, errorCode: "auth_required" });
+    expect(result.message).toMatch(/re-authenticate/i);
+  });
+
   it("runs an agent and returns session + result", async () => {
     const initEvent = JSON.stringify({
       type: "system", subtype: "init", session_id: "new-sess", model: "claude-sonnet-4-6",
