@@ -1,8 +1,8 @@
 # Orch8
 
-Orch8 is a local-first control plane for AI agent organizations. It gives a team of agents a shared operating board, durable memory, budgets, skills, run logs, and a dashboard where humans can supervise work across an entire project, department, or company.
+Orch8 is a local software factory. Open a Git repository in the dashboard, describe a feature, review the agent's plan, run implementation and independent review, inspect the real repository changes and test output, then explicitly publish a draft pull request. It runs a local daemon, React dashboard, and CLI agent adapters. The feature workflow currently supports Codex on Linux only; it does not yet isolate each feature in its own worktree.
 
-The current runtime is built around a daemon that runs on your machine, a React dashboard, and local agent adapters for tools such as Claude Code and Codex CLI. Software work is one strong use case, but the orchestration model is broader: any repeatable, reviewable workflow can become agent work.
+The repository also contains a broader task board, chat, budgets, and reusable pipelines. Those are not required to start a feature.
 
 ## What Orch8 Does
 
@@ -73,6 +73,19 @@ Then open the dashboard:
 - Dashboard: `http://localhost:5173`
 - Daemon API: `http://localhost:3847/api`
 - OpenAPI UI: `http://localhost:3847/docs`
+
+### Build a feature in a repository
+
+1. In the dashboard, choose **Open a repository** and select a clean, local Git checkout. Detect its base branch and GitHub origin, set a project spending limit, and optionally enter the first feature request. Use a disposable clone for your first run. The feature workflow changes the configured checkout rather than making a separate worktree.
+2. Open **Pipelines** for that repository and find **Build a feature**. Describe the change and optionally browse and select starting files. Choose separate planning, implementation, and review agents. If you have no eligible agents, use **Set up feature agents** with a model available to your Codex account. This creates active Codex agents with `workspace-write` sandbox and approval bypass disabled.
+3. Click **Check agent runtime**. This runs an actual command inside the configured Codex sandbox; it is not a test of the model's ability to finish the feature. On a host where the Linux sandbox cannot create its network namespace, the page blocks branch preparation and execution. Follow the scoped host setup link shown there with an administrator. Do not turn off approvals or sandboxing to make the check pass.
+4. Enter a new branch name and click **Prepare feature branch**, then **Start with a plan**. Inspect the generated plan and explicitly approve it before implementation. A prompt asks the planner not to edit product code, but its `workspace-write` sandbox does not enforce read-only planning.
+5. Inspect the implementation run's commands, test output, committed diff, and the independent review. Accept or reject the review explicitly. A successful run report alone is not proof of passing tests. A clean feature commit and accepted review are required before the explicit draft PR action.
+6. After publishing, open the PR and check its actual diff and CI status on GitHub. Orch8 does not merge it automatically. Return the clean checkout to its configured base branch before beginning another feature.
+
+This is the intended path, not a claim that it has completed end to end on every host. In particular, this host's Codex `workspace-write` preflight failed with `Failed RTM_NEWADDR: Operation not permitted` during a live dashboard check. Start remained disabled, and no plan, implementation, review, or PR was created in that check. The dashboard reports the blocker instead of treating a fixture run as proof.
+
+![Live feature intake with sandbox blocker](docs/pr-assets/factory-guide/live-runtime-blocker.png)
 
 On first boot the daemon writes an admin token to:
 
