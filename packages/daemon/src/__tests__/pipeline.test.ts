@@ -438,6 +438,32 @@ describe("PipelineService", () => {
   });
 
   describe("rejectStep", () => {
+    it("lets a rejected review return through implementation to a fresh approval decision", async () => {
+      const { pipeline, steps, firstTask } = await service.create({
+        projectId, name: "Review rework", steps: [
+          { label: "Implement", agentId: "agent-a" },
+          { label: "Review", agentId: "agent-b", requiresVerification: true },
+        ],
+      });
+      const firstReview = await service.completeStep(pipeline.id, steps[0].id, firstTask.id, "first implementation");
+      const firstReviewTask = firstReview.nextTask!.id;
+      await service.completeStep(pipeline.id, steps[1].id, firstReviewTask, "review found a bug");
+      const rejected = await service.rejectStep(pipeline.id, steps[1].id, steps[0].id, "Fix the bug");
+      expect(rejected.newTask.description).toContain("Fix the bug");
+      const revised = await service.completeStep(pipeline.id, steps[0].id, rejected.newTask.id, "bug fixed");
+      expect(revised.nextStep?.status).toBe("pending");
+      expect(revised.nextStep?.outputSummary).toBeNull();
+      expect(revised.nextTask?.id).not.toBe(firstReviewTask);
+      expect(revised.nextStep?.outputFilePath).toBe(`.orch8/pipelines/${pipeline.id}/Review-${revised.nextTask!.id}.md`);
+      expect(revised.nextStep?.outputFilePath).not.toBe(firstReview.completedStep.outputFilePath);
+      const secondReview = await service.completeStep(pipeline.id, steps[1].id, revised.nextTask!.id, "independent review passed");
+      expect(secondReview.completedStep.outputFilePath).toBe(revised.nextStep?.outputFilePath);
+      expect(secondReview.completedStep.status).toBe("awaiting_verification");
+      const accepted = await service.approveStep(pipeline.id, steps[1].id);
+      expect(accepted.pipeline.status).toBe("completed");
+      expect((await testDb.db.select().from(tasks)).find(t => t.id === firstReviewTask)?.column).toBe("done");
+    });
+
     it("rejects a step back to an earlier step", async () => {
       const { pipeline, steps } = await service.create({
         projectId,
