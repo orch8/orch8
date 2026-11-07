@@ -117,6 +117,9 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       config.sandbox === "workspace-write" &&
       !config.extraArgs?.length && !Object.keys(config.configOverrides ?? {}).length && !config.profile;
   });
+  const preferred = (["planner", "implementer", "reviewer"] as const).map(role =>
+    available.find(agent => agent.id === `feature-${role}` && agent.role === role) ?? available.find(agent => agent.role === role));
+  const canUsePreferred = preferred.every(Boolean) && new Set(preferred.map(agent => agent?.id)).size === 3;
   const selected = [planner, implementer, reviewer].map(id => available.find(a => a.id === id));
   async function setupAgents() {
     if (settingUpAgents || isLoading || !project?.id || !codexModel.trim()) return;
@@ -255,6 +258,9 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
             </select>
           </label>) }
       </div>
+      {canUsePreferred && <button type="button" onClick={() => {
+        setPlanner(preferred[0]!.id); setImplementer(preferred[1]!.id); setReviewer(preferred[2]!.id);
+      }} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use feature agents</button>}
       {!isLoading && available.length < 3 && <div className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
         <p>Feature workflows need three Codex agents, with a separate reviewer. Set them up here instead of configuring each agent by hand.</p>
         <p className="mt-1 text-xs text-zinc-400">Creates missing Feature planner, implementer and reviewer agents for this project with workspace-write sandbox and approval bypass off. It does not run agents or change existing agent settings. You still need to check the runtime and approve the plan.</p>
