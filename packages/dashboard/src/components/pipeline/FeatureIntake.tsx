@@ -281,7 +281,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
         <h3 className="font-medium">Prepare a feature branch (required)</h3>
         <p>Current branch: {branchState?.branch || "Checking..."} · Configured base: {branchState?.baseBranch ?? project?.defaultBranch ?? "Checking..."}</p>
         {onFeatureBranch && <div className="space-y-1">
-          <p className="text-xs text-zinc-400">Finished the previous feature? Return to the existing local base branch before preparing another. The repository must be completely clean; this does not reset, delete, commit, push, edit the base branch, or run agents.</p>
+          <p className="text-xs text-zinc-400">Finished the previous feature? Return to the existing local base branch before preparing another. The repository must be clean except for Orch8's unchanged generated .gitignore addition, which stays uncommitted. This does not reset, delete, commit, push, edit the base branch, or run agents.</p>
           <button type="button" onClick={() => { void returnToBase(); }} disabled={returning || preparing} className="rounded border border-zinc-600 px-3 py-2 text-zinc-200 disabled:opacity-40">{returning ? "Returning..." : "Return to base branch"}</button>
         </div>}
         <p className="text-xs text-zinc-400">Check the agent runtime first, so an unavailable sandbox does not leave an unused branch behind. This creates and checks out a new local branch; it does not commit, push, or start agents.</p>

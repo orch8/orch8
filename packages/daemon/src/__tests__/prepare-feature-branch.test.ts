@@ -42,7 +42,7 @@ describe("feature branch preparation", () => {
     expect(git("branch", "--show-current")).toBe("feat/previous");
     expect(await fs.readFile(join(root, ".orch8", "run.txt"), "utf8")).toBe("private runtime data");
   });
-  it("refuses tracked, staged, untracked and generated ignore changes", async () => {
+  it("refuses tracked, staged, untracked and user-edited ignore changes", async () => {
     const { root, git } = await fixture();
     git("switch", "-q", "-c", "feat/previous");
     for (const staged of [false, true]) {
@@ -52,9 +52,39 @@ describe("feature branch preparation", () => {
       git("reset", "-q", "--hard", "HEAD");
       await rm(join(root, "file.txt"), { force: true });
     }
-    await writeFile(join(root, ".gitignore"), "# orch8 orchestrator data\n.orch8/\n");
+    await writeFile(join(root, ".gitignore"), "# user content\n.orch8/\n");
     await expect(returnToBaseBranch(root, "main")).rejects.toThrow(/completely clean/);
     expect(git("branch", "--show-current")).toBe("feat/previous");
+  });
+  it("returns with only the unchanged generated ignore and permits the next feature branch", async () => {
+    const { root, git } = await fixture();
+    git("switch", "-q", "-c", "feat/previous");
+    const generated = "# orch8 orchestrator data\n.orch8/\n";
+    await writeFile(join(root, ".gitignore"), generated);
+    expect(await returnToBaseBranch(root, "main")).toEqual({ branch: "main", baseBranch: "main" });
+    expect(git("status", "--short")).toBe("?? .gitignore");
+    expect(await import("node:fs/promises").then(fs => fs.readFile(join(root, ".gitignore"), "utf8"))).toBe(generated);
+    expect(await featureBranchReadiness(root, "main")).toMatchObject({ ready: true });
+    await prepareFeatureBranch(root, "main", "feat/next");
+    expect(git("branch", "--show-current")).toBe("feat/next");
+    expect(git("status", "--short")).toBe("?? .gitignore");
+  });
+  it("preserves an exact generated append to a tracked ignore but refuses staged or additional edits", async () => {
+    const { root, git } = await fixture();
+    await writeFile(join(root, ".gitignore"), "node_modules/\n");
+    git("add", ".gitignore");
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "base ignore");
+    git("switch", "-q", "-c", "feat/previous");
+    const generated = "node_modules/\n\n# orch8 orchestrator data\n.orch8/\n";
+    await writeFile(join(root, ".gitignore"), generated);
+    git("add", ".gitignore");
+    await expect(returnToBaseBranch(root, "main")).rejects.toThrow(/completely clean/);
+    git("reset", "-q", ".gitignore");
+    await writeFile(join(root, ".gitignore"), `${generated}# user edit\n`);
+    await expect(returnToBaseBranch(root, "main")).rejects.toThrow(/completely clean/);
+    await writeFile(join(root, ".gitignore"), generated);
+    await returnToBaseBranch(root, "main");
+    expect(git("status", "--short")).toBe("M .gitignore");
   });
   it("refuses a missing target, detached HEAD, subdirectory and invalid base", async () => {
     const { root, git } = await fixture();
