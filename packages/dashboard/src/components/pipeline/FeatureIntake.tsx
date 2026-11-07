@@ -169,6 +169,18 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const validSelection = selected.every(Boolean) && reviewer !== implementer;
   const onFeatureBranch = !!branchState?.branch && branchState.branch !== branchState.baseBranch;
   const ready = !!project?.id && feature.trim().length > 0 && validSelection && onFeatureBranch && checkedKey === selectionKey && !checking && !create.isPending;
+  const nextStep = !feature.trim() ? { label: "Describe your feature", target: "feature-request" }
+    : !validSelection ? available.length < 2
+      ? { label: "Set up feature agents", target: "feature-agent-setup" }
+      : { label: "Choose three feature agents", target: "feature-plan-agent" }
+      : checkedKey !== selectionKey ? { label: "Check agent runtime", target: "feature-runtime-check" }
+        : !onFeatureBranch ? { label: "Prepare a feature branch", target: "feature-branch-name" }
+          : { label: "Start with a plan", target: "feature-start-plan" };
+  function goToNextStep() {
+    const target = document.getElementById(nextStep.target);
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    target?.focus({ preventScroll: true });
+  }
 
   async function checkRuntime() {
     if (!validSelection) return;
@@ -238,6 +250,14 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     <h2 className="text-lg font-semibold text-zinc-100">Build a feature</h2>
     <p className="mt-1 text-sm text-zinc-400">Describe a change on a feature branch, approve the plan, then inspect implementation and independent review. If tests pass, the implementer commits its feature files locally. After accepting the review, inspect the diff and publish a draft PR explicitly.</p>
     <p className="mt-3 text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-blue-800 bg-blue-950/40 p-3 text-sm" aria-label="Next feature step">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-blue-300">Next step</p>
+        <p className="mt-1 text-zinc-100">{nextStep.label}</p>
+        {failedSelectionKey === selectionKey && <p className="mt-1 text-xs text-amber-300">The runtime check failed. Read the result below before retrying.</p>}
+      </div>
+      <button type="button" onClick={goToNextStep} className="rounded border border-blue-500 px-3 py-2 text-blue-200">Go to step</button>
+    </div>
     <div className="mt-2 flex items-center gap-3 text-xs text-zinc-400">
       <span>Feature request and agent choices are saved in this browser for this project until you start a plan or clear them. Runtime approval is never saved.</span>
       {(feature || branchName || planner || implementer || reviewer || filePaths.length > 0) && <button type="button" onClick={clearDraft} className="shrink-0 text-blue-300 underline">Clear draft</button>}
@@ -275,7 +295,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       <div className="grid gap-3 sm:grid-cols-3">
         {([ ["Plan agent", planner, setPlanner], ["Implement agent", implementer, setImplementer], ["Review agent", reviewer, setReviewer] ] as const).map(([label, value, setter]) =>
           <label key={label} className="text-sm text-zinc-300">{label}
-            <select aria-label={label} value={value} onChange={e => setter(e.target.value)} className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100">
+            <select id={label === "Plan agent" ? "feature-plan-agent" : undefined} aria-label={label} value={value} onChange={e => setter(e.target.value)} className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100">
               <option value="">Select agent</option>
               {available.map(a => <option key={a.id} value={a.id}>{a.name} ({a.adapterType})</option>)}
             </select>
@@ -285,7 +305,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
         setPlanner(preferred[0]!.id); setImplementer(preferred[1]!.id); setReviewer(preferred[2]!.id);
       }} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use feature agents</button>}
       {!isLoading && <details open={setupExpanded ?? available.length < 3} className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
-        <summary className="cursor-pointer font-medium text-blue-200" onClick={event => {
+        <summary id="feature-agent-setup" className="cursor-pointer font-medium text-blue-200" onClick={event => {
           event.preventDefault();
           setSetupExpanded(!(setupExpanded ?? available.length < 3));
         }}>Feature agent setup{available.length >= 3 ? " (optional)" : ""}</summary>
@@ -306,7 +326,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       </details>}
       {!isLoading && !available.length && <p role="status" className="text-sm text-amber-300">No eligible feature agents yet. Set up feature agents above or configure active agents in Agents.</p>}
       {reviewer && implementer && reviewer === implementer && <p role="alert" className="text-sm text-amber-300">Choose a different agent for independent review.</p>}
-      <button type="button" onClick={() => { void checkRuntime(); }} disabled={!validSelection || checking} className="rounded border border-zinc-600 px-4 py-2 text-sm text-zinc-200 disabled:opacity-40">{checking ? "Checking agents..." : "Check agent runtime"}</button>
+      <button id="feature-runtime-check" type="button" onClick={() => { void checkRuntime(); }} disabled={!validSelection || checking} className="rounded border border-zinc-600 px-4 py-2 text-sm text-zinc-200 disabled:opacity-40">{checking ? "Checking agents..." : "Check agent runtime"}</button>
       {checkMessage && failedSelectionKey === selectionKey && <p role="status" className="text-sm text-amber-300">{checkMessage}</p>}
       {checkMessage && checkedKey === selectionKey && <p role="status" className="text-sm text-emerald-300">{checkMessage}</p>}
       <SandboxRecoveryGuidance message={failedSelectionKey === selectionKey ? checkMessage : ""} adapterType={failedAdapter} />
@@ -330,7 +350,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       </div>
       {branchState && !onFeatureBranch && <p role="status" className="text-xs text-amber-300">Start is unavailable on the base branch. Check the agents above, then prepare a feature branch.</p>}
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-      <button type="submit" disabled={!ready} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Start with a plan</button>
+      <button id="feature-start-plan" type="submit" disabled={!ready} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Start with a plan</button>
     </form>
   </section>;
 }

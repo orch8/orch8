@@ -1,8 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { FeatureIntake } from "../components/pipeline/FeatureIntake.js";
 import { RepositoryExplorer } from "../components/pipeline/RepositoryExplorer.js";
 const state = vi.hoisted(() => ({ agents: [] as any[], requestedAgents: vi.fn(), create: vi.fn(), createAgent: vi.fn(), probe: vi.fn(), readiness: vi.fn(), invalidate: vi.fn() }));
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+afterEach(() => {
+ if (originalScrollIntoView) Element.prototype.scrollIntoView = originalScrollIntoView;
+ else delete (Element.prototype as { scrollIntoView?: typeof Element.prototype.scrollIntoView }).scrollIntoView;
+});
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock("../api/client.js", () => ({ api: { post: state.probe, get: state.readiness } }));
 vi.mock("../hooks/useAgents.js", () => ({ useAgents: (id: string) => { state.requestedAgents(id); return { data: state.agents, isLoading: false }; }, useCreateAgent: () => ({ mutateAsync: state.createAgent }) }));
@@ -20,6 +25,26 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("points to the next real action without starting agents or bypassing runtime checks", async () => {
+  const scroll = vi.fn();
+  Element.prototype.scrollIntoView = scroll;
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  const step = screen.getByLabelText("Next feature step");
+  expect(step).toHaveTextContent("Describe your feature");
+  fireEvent.click(screen.getByRole("button", { name: "Go to step" }));
+  expect(screen.getByLabelText("What should change?")).toHaveFocus();
+  expect(scroll).toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("What should change?"), { target: { value: "Add usage" } });
+  expect(step).toHaveTextContent("Choose three feature agents");
+  for (const [label, value] of [["Plan agent", "planner"], ["Implement agent", "implementer"], ["Review agent", "reviewer"]]) fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  expect(step).toHaveTextContent("Check agent runtime");
+  fireEvent.click(screen.getByRole("button", { name: "Go to step" }));
+  expect(screen.getByRole("button", { name: "Check agent runtime" })).toHaveFocus();
+  expect(state.probe).not.toHaveBeenCalled();
+  await check();
+  expect(step).toHaveTextContent("Start with a plan");
+  expect(state.create).not.toHaveBeenCalled();
+ });
  it("fills three eligible role agents with one explicit action without clearing a saved request or approving runtime", async () => {
   state.agents = ["planner", "implementer", "reviewer"].map(role => ({
    id: `feature-${role}`, name: `Feature ${role}`, role, status: "active", adapterType: "codex_local",
