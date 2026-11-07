@@ -22,13 +22,13 @@ function commands(overrides: Record<string, string> = {}) {
     "gh pr list --repo orch8/orch8 --head feature --state all --json number,url,headRefOid --limit 100": "[]",
     "gh auth status": "",
     "git push --set-upstream origin feature": "",
-    "gh pr create --repo orch8/orch8 --base v2 --head feature --title Build --draft --body Operator-confirmed repository branch from an Orch8 pipeline. Review the exact commit, diff, tests, and checks on GitHub before merging; pipeline review is not bound to this commit.": "https://github.com/orch8/orch8/pull/123\n",
     "gh pr view 123 --repo orch8/orch8 --json url,headRefName,baseRefName,headRefOid": JSON.stringify({ url: "https://github.com/orch8/orch8/pull/123", headRefName: "feature", baseRefName: "v2", headRefOid: "abc123" }),
     ...overrides,
   };
   const run: PublishCommand = vi.fn(async (tool, args) => {
     const command = `${tool} ${args.join(" ")}`;
     calls.push(command);
+    if (tool === "gh" && args[0] === "pr" && args[1] === "create") return "https://github.com/orch8/orch8/pull/123\n";
     if (!(command in responses)) throw new Error(`Unexpected command: ${command}`);
     return responses[command];
   });
@@ -41,6 +41,25 @@ describe("explicit reviewed pipeline PR publishing", () => {
     await expect(publishPipelinePr(repo, "Build", [".orch8/pipelines/p1/Plan.md"], run)).resolves.toEqual({ url: "https://github.com/orch8/orch8/pull/123" });
     expect(calls.indexOf("git push --set-upstream origin feature")).toBeGreaterThan(calls.indexOf("gh pr list --repo orch8/orch8 --head feature --state all --json number,url,headRefOid --limit 100"));
     expect(calls.at(-1)).toContain("gh pr view 123");
+    expect(calls.find(call => call.startsWith("gh pr create"))).toContain("No test results were supplied");
+    expect(calls.find(call => call.startsWith("gh pr create"))).toContain("/compare/v2...abc123");
+  });
+  it("carries operator-supplied summary and test notes into the draft without claiming they passed", async () => {
+    const { run, calls } = commands();
+    await publishPipelinePr(repo, "Build", [".orch8/pipelines/p1/Plan.md"], run, { summary: "Adds a search field", tests: "pnpm test: exit 0" });
+    const create = calls.find(call => call.startsWith("gh pr create"));
+    expect(create).toContain("Operator summary (not independently verified)");
+    expect(create).toContain("Adds a search field");
+    expect(create).toContain("Test notes (operator supplied, not verified by Orch8)");
+    expect(create).toContain("pnpm test: exit 0");
+  });
+  it("keeps carriage-return lines inside the unverified operator note", async () => {
+    const { run, calls } = commands();
+    await publishPipelinePr(repo, "Build", [".orch8/pipelines/p1/Plan.md"], run,
+      { summary: "Feature\r## Verified by Orch8\rTests passed", tests: "" });
+    const create = calls.find(call => call.startsWith("gh pr create"))!;
+    expect(create).toContain("> Feature\n> ## Verified by Orch8\n> Tests passed");
+    expect(create).not.toContain("\r");
   });
   it("allows two Plan revisions and rejects unrelated files in the same artifact directory", async () => {
     const paths = ["Plan.md", "Plan-task1.md", "Plan-task2.md"].map(name => `.orch8/pipelines/p1/${name}`);

@@ -4,6 +4,7 @@ import { realpath } from "node:fs/promises";
 
 const exec = promisify(execFile);
 export type PublishCommand = (tool: "git" | "gh", args: string[], cwd: string) => Promise<string>;
+export type PrHandoff = { summary: string; tests: string };
 
 export const runPublishCommand: PublishCommand = async (tool, args, cwd) => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
@@ -27,6 +28,7 @@ export async function publishPipelinePr(
   name: string,
   outputPaths: string[],
   run: PublishCommand = runPublishCommand,
+  handoff?: PrHandoff,
 ): Promise<{ url: string }> {
   const { homeDir, defaultBranch } = project;
   const intended = project.repoUrl && githubSlug(project.repoUrl);
@@ -65,8 +67,18 @@ export async function publishPipelinePr(
   }
   await git(["push", "--set-upstream", "origin", branch]);
   const title = name.replace(/[\r\n]/g, " ").trim().slice(0, 200) || "Reviewed pipeline changes";
+  const quote = (value: string) => value.trim().replace(/\r\n?/g, "\n").split("\n").map(line => `> ${line}`).join("\n");
+  const code = (value: string) => value.replace(/`/g, "\\`");
+  const body = [
+    "## Review handoff",
+    `Branch: \`${code(branch)}\` into \`${code(defaultBranch)}\`. Commit: \`${sha}\`.`,
+    `Inspect the [exact committed comparison](https://github.com/${intended}/compare/${encodeURIComponent(defaultBranch)}...${sha}) and GitHub checks before merging.`,
+    "Orch8 recorded an independent review decision, but does not bind that review or its test log to this commit. Check the local workflow evidence against this commit before merging.",
+    handoff?.summary.trim() ? `## Operator summary (not independently verified)\n${quote(handoff.summary)}` : "",
+    handoff?.tests.trim() ? `## Test notes (operator supplied, not verified by Orch8)\n${quote(handoff.tests)}` : "## Tests\nNo test results were supplied with this PR. Inspect the local implementation run log and GitHub checks.",
+  ].filter(Boolean).join("\n\n");
   const output = (await gh(["pr", "create", "--repo", intended, "--base", defaultBranch, "--head", branch,
-    "--title", title, "--draft", "--body", "Operator-confirmed repository branch from an Orch8 pipeline. Review the exact commit, diff, tests, and checks on GitHub before merging; pipeline review is not bound to this commit."])).trim();
+    "--title", title, "--draft", "--body", body])).trim();
   const match = new RegExp(`^https://github\\.com/${intended.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/pull/([1-9][0-9]*)/?$`, "i").exec(output);
   if (!match) throw new Error("GitHub did not return a verifiable pull request URL; inspect GitHub before retrying.");
   const viewed: unknown = JSON.parse(await gh(["pr", "view", match[1], "--repo", intended,

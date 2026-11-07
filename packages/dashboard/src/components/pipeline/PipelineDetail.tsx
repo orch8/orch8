@@ -333,6 +333,8 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
   const approveMutation = useApprovePipelineStep();
   const publishMutation = usePublishPipelinePr();
   const [confirmPublish, setConfirmPublish] = useState(false);
+  const [prSummary, setPrSummary] = useState("");
+  const [prTests, setPrTests] = useState("");
   const [rejectingStepId, setRejectingStepId] = useState<string | null>(null);
   const [targetStepId, setTargetStepId] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -438,8 +440,15 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
           {canPublish && <div className="rounded border border-blue-800/60 bg-blue-950/20 p-3 space-y-2 text-xs">
             <p className="text-zinc-300">Independent review completed. Create a draft PR from the current committed branch to {repositoryDiff.baseBranch}. Review the exact diff and tests on GitHub: this branch commit is not cryptographically tied to the pipeline review. This does not commit files, run checks, or merge.</p>
             {!confirmPublish ? <button type="button" onClick={() => setConfirmPublish(true)} className="rounded bg-blue-800 px-3 py-1 text-blue-100">Create pull request</button> : <div className="space-y-2">
-              <p>Confirm: this publishes the committed branch {repositoryDiff.branch} to {repositoryDiff.baseBranch} on GitHub. Verify the review and diff first.</p>
-              <button type="button" disabled={publishMutation.isPending} onClick={() => publishMutation.mutate(pipeline.id, { onSuccess: () => { setConfirmPublish(false); void refreshDiff(); } })} className="rounded bg-blue-800 px-3 py-1 text-blue-100 disabled:opacity-50">{publishMutation.isPending ? "Publishing..." : "Confirm create pull request"}</button>{" "}
+              <p>Confirm: this publishes the committed branch {repositoryDiff.branch} to {repositoryDiff.baseBranch} on GitHub. The PR includes the current commit and your notes. Do not include secrets. Verify the review and diff first.</p>
+              <label className="block text-zinc-200">Summary for PR reviewers
+                <textarea value={prSummary} onChange={event => setPrSummary(event.target.value)} maxLength={2000} rows={3} className="mt-1 block w-full rounded border border-zinc-700 bg-zinc-950 p-2" placeholder="What changed and why?" />
+              </label>
+              <label className="block text-zinc-200">Test notes for PR reviewers
+                <textarea value={prTests} onChange={event => setPrTests(event.target.value)} maxLength={2000} rows={3} className="mt-1 block w-full rounded border border-zinc-700 bg-zinc-950 p-2" placeholder="Copy the command, exit code, and relevant result you inspected in the implementation log. Leave blank if unknown." />
+              </label>
+              <p className="text-zinc-400">These are operator-supplied notes, not verified test results. The draft PR says so even when this field is filled.</p>
+              <button type="button" disabled={publishMutation.isPending} onClick={() => publishMutation.mutate({ pipelineId: pipeline.id, summary: prSummary, tests: prTests }, { onSuccess: () => { setConfirmPublish(false); void refreshDiff(); } })} className="rounded bg-blue-800 px-3 py-1 text-blue-100 disabled:opacity-50">{publishMutation.isPending ? "Publishing..." : "Confirm create pull request"}</button>{" "}
               <button type="button" disabled={publishMutation.isPending} onClick={() => setConfirmPublish(false)} className="text-zinc-400 underline">Cancel</button>
             </div>}
           </div>}

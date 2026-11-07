@@ -227,8 +227,15 @@ export async function pipelineRoutes(app: FastifyInstance) {
     } finally { preparing.delete(key); }
   });
   // Explicit admin action only. No implicit commit, checkout, or publication.
-  app.post("/api/pipelines/:id/pull-request", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  app.post("/api/pipelines/:id/pull-request", async (request: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply: FastifyReply) => {
     if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+    const body = request.body ?? {};
+    const notes = body as { summary?: unknown; tests?: unknown };
+    if (typeof body !== "object" || Array.isArray(body) ||
+        (notes.summary !== undefined && (typeof notes.summary !== "string" || notes.summary.length > 2000)) ||
+        (notes.tests !== undefined && (typeof notes.tests !== "string" || notes.tests.length > 2000))) {
+      return reply.code(400).send({ error: "validation_error", message: "Summary and test notes must be text up to 2000 characters each." });
+    }
     const result = await app.pipelineService.getWithSteps(request.params.id);
     if (!result) return reply.code(404).send({ error: "not_found", message: "Pipeline not found" });
     if (!requireProjectScope(request, reply, result.pipeline.projectId)) return reply;
@@ -249,7 +256,8 @@ export async function pipelineRoutes(app: FastifyInstance) {
     if (publishing.has(key) || preparing.has(key)) return reply.code(409).send({ error: "conflict", message: "A repository operation is already running." });
     publishing.add(key);
     try {
-      const published = await publishPipelinePr(project, pipeline.name, await app.pipelineService.getPublicationOutputPaths(pipeline.id));
+      const published = await publishPipelinePr(project, pipeline.name, await app.pipelineService.getPublicationOutputPaths(pipeline.id), undefined,
+        { summary: notes.summary as string ?? "", tests: notes.tests as string ?? "" });
       return reply.code(201).send(published);
     } catch (error) {
       // Expected preflight failures are actionable; never expose raw git/gh stderr or credentials.

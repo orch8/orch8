@@ -27,8 +27,10 @@ describe("pipeline repository inspection", () => {
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     fireEvent.click(screen.getByRole("button", { name: "Create pull request" }));
     expect(screen.getByText(/publishes the committed branch/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Summary for PR reviewers" }), { target: { value: "A real summary" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Test notes for PR reviewers" }), { target: { value: "Tests not run" } });
     fireEvent.click(screen.getByRole("button", { name: "Confirm create pull request" }));
-    expect(state.publish).toHaveBeenCalledWith("pipe_1", expect.anything());
+    expect(state.publish).toHaveBeenCalledWith({ pipelineId: "pipe_1", summary: "A real summary", tests: "Tests not run" }, expect.anything());
   });
   it("allows recorded pipeline output files but not unrelated untracked changes", () => {
     state.steps = [
