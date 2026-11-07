@@ -107,6 +107,17 @@ describe("ClaudeLocalAdapter", () => {
     expect(result.message).toMatch(/re-authenticate/i);
   });
 
+  it("does not call a generic authentication failure an expired token", async () => {
+    const spawnFn = vi.fn(() => createMockProcess([
+      JSON.stringify({ type: "result", is_error: true, result: "Failed to authenticate. Check your account settings." }),
+    ], 1) as unknown as ReturnType<SpawnFn>);
+    const adapter = new ClaudeLocalAdapter(testDb.db, spawnFn as unknown as SpawnFn);
+    const result = await adapter.testEnvironment({ cwd: tempRoot, dangerouslySkipPermissions: false });
+    expect(result).toMatchObject({ ok: false, errorCode: "auth_required" });
+    expect(result.message).toMatch(/authentication failed/i);
+    expect(result.message).not.toMatch(/expired/i);
+  });
+
   it("runs an agent and returns session + result", async () => {
     const initEvent = JSON.stringify({
       type: "system", subtype: "init", session_id: "new-sess", model: "claude-sonnet-4-6",

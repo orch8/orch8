@@ -241,12 +241,14 @@ export class ClaudeLocalAdapter implements AgentAdapter {
       );
 
       if (result.errorCode || /OAuth access token has expired|Failed to authenticate/i.test(result.result ?? "")) {
-        const expired = /OAuth access token has expired|Failed to authenticate/i.test(result.result ?? "");
+        const expired = /OAuth access token has expired/i.test(result.result ?? "");
+        const authFailed = /Failed to authenticate/i.test(result.result ?? "");
         return {
           ok: false,
           costUsd: result.costUsd,
-          errorCode: expired ? "auth_required" : result.errorCode ?? "process_error",
+          errorCode: expired || authFailed ? "auth_required" : result.errorCode ?? "process_error",
           message: expired ? "Claude authentication expired. Re-authenticate with the Claude CLI before retrying the runtime check."
+            : authFailed ? "Claude authentication failed. Check the Claude CLI sign-in and retry the runtime check."
             : result.error ?? result.result?.slice(0, 400) ?? "Claude environment test failed",
           sessionId: result.sessionId ?? undefined,
         };
