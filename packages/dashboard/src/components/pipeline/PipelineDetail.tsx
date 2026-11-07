@@ -52,15 +52,24 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
       const agent = await api.get<{ adapterType: string; adapterConfig: Record<string, unknown> }>(
         `/agents/${encodeURIComponent(active.agentId)}`, { projectId: pipeline.projectId },
       );
-      if (agent.adapterType !== "codex_local" || agent.adapterConfig?.sandbox !== "workspace-write" ||
-        agent.adapterConfig?.dangerouslyBypassApprovalsAndSandbox !== false) {
-        throw new Error("This agent does not have the supported sandbox configuration. Check its settings before retrying.");
+      if (agent.adapterType === "codex_local") {
+        if (agent.adapterConfig?.sandbox !== "workspace-write" ||
+          agent.adapterConfig?.dangerouslyBypassApprovalsAndSandbox !== false) {
+          throw new Error("This agent does not have the supported sandbox configuration. Check its settings before retrying.");
+        }
+      } else if (agent.adapterType === "claude_local") {
+        if (agent.adapterConfig?.dangerouslySkipPermissions !== false) {
+          throw new Error("This agent does not have the supported permission configuration. Check its settings before retrying.");
+        }
+      } else {
+        throw new Error("This agent runtime is not supported for feature workflows.");
       }
       const check = await api.post<{ ok: boolean; message?: string }>(
-        "/adapter/codex_local/test-environment", { config: agent.adapterConfig },
+        `/adapter/${agent.adapterType}/test-environment`, { config: agent.adapterConfig,
+          ...(agent.adapterType === "claude_local" ? { projectId: pipeline.projectId } : {}) },
       );
-      if (!check.ok) throw new Error(check.message ?? "Codex runtime check failed. No new run was started.");
-      setRetryMessage("Codex sandbox can run commands. No run was queued by this check. Inspect the task and its previous run before resuming.");
+      if (!check.ok) throw new Error(check.message ?? "Agent runtime check failed. No new run was started.");
+      setRetryMessage("Agent runtime check passed. No run was queued by this check. Inspect the task and its previous run before resuming.");
     } catch (error) {
       setRetryMessage(`Runtime unavailable: ${error instanceof Error ? error.message : "Could not check the runtime."} No run was queued.`);
     } finally {
@@ -104,7 +113,7 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
         className="rounded border border-amber-600 px-3 py-2 text-amber-200 disabled:opacity-50">
         {retrying ? "Checking runtime..." : `Check ${active.label.toLowerCase()} agent runtime`}
       </button>
-      <p className="text-xs text-zinc-400">Checks whether the Codex sandbox can execute commands. Does not queue a run, approve a plan, or change permissions.</p>
+      <p className="text-xs text-zinc-400">Checks the configured agent's runtime: Codex sandbox commands or Claude permissions in a disposable directory. Does not queue a run, approve a plan, or change permissions.</p>
       {retryMessage && <p role="status" className="text-xs text-amber-300">{retryMessage}</p>}
     </div>}
     {(stalledStep || pipeline.status === "failed" || pipeline.status === "cancelled") &&
