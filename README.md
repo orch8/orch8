@@ -1,6 +1,6 @@
 # Orch8
 
-Orch8 is a local software factory. Open a Git repository in the dashboard, describe a feature, review the agent's plan, run implementation and independent review, inspect the real repository changes and test output, then explicitly publish a draft pull request. It runs a local daemon, React dashboard, and CLI agent adapters. The feature workflow currently supports Codex on Linux only; it does not yet isolate each feature in its own worktree.
+Orch8 is a local software factory. Open a Git repository in the dashboard, describe a feature, review the agent's plan, run implementation and independent review, inspect the real repository changes and test output, then explicitly publish a draft pull request. It runs a local daemon, React dashboard, and CLI agent adapters. The feature workflow supports Codex and Claude Code with their existing permissions; it does not yet isolate each feature in its own worktree.
 
 The repository also contains a broader task board, chat, budgets, and reusable pipelines. Those are not required to start a feature.
 
@@ -242,7 +242,7 @@ The optional `auth.allow_localhost_admin` shortcut is off by default. Keep it of
 
 ## Agent Runtime Notes
 
-Claude agents are launched with `--dangerously-skip-permissions` inside task workspaces. Codex agents default to bypassing approvals and sandboxing unless their adapter config says otherwise. Treat every configured workspace as a privileged execution environment: agents can run commands and edit files there.
+The feature setup creates Claude agents in default permission mode with existing Claude settings, and Codex agents in `workspace-write` mode without approval bypass. Other agent configurations can differ; inspect the adapter settings before running work. Treat configured workspaces as places where approved agents may run commands and edit files.
 
 Do not point Orch8 at workspaces, repositories, or secrets you would not trust an automated local agent to access.
 

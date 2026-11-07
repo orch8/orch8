@@ -6,15 +6,22 @@ function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 function defaultKey(name: string): string {
-  return slugify(name).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3);
+  const letters = slugify(name).toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^[0-9]+/, "");
+  return (letters || "REPO").padEnd(2, "R").slice(0, 3);
+}
+function nameFromPath(path: string): string {
+  const folder = path.replace(/\/+$/, "").split("/").pop() ?? "";
+  return folder.replace(/[-_]+/g, " ").replace(/\b[a-z]/g, letter => letter.toUpperCase()).trim();
 }
 
 /** A short path into feature intake; the existing project wizard remains available. */
 export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => void }) {
   const create = useCreateProject();
   const [name, setName] = useState("");
+  const nameEdited = useRef(false);
   const [key, setKey] = useState("");
   const [keyEdited, setKeyEdited] = useState(false);
+  const keyEditedDuringInspection = useRef(false);
   const [path, setPath] = useState("");
   const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("main");
@@ -38,6 +45,11 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
     try {
       const result = await api.post<{ branch: string; origin: string; originAvailable: boolean }>("/projects/repository-inspection", { homeDir: requestedPath });
       if (currentPath.current.trim() !== requestedPath) return;
+      if (!nameEdited.current) {
+        const detectedName = nameFromPath(requestedPath);
+        setName(detectedName);
+        if (!keyEditedDuringInspection.current) setKey(defaultKey(detectedName));
+      }
       if (branchEdits.current === branchVersion) setBranch(result.branch);
       if (originEdits.current === originVersion) setRepoUrl(result.origin);
       setInspection(result.origin ? `Found branch ${result.branch} and GitHub origin. Review both before opening.` :
@@ -87,20 +99,21 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
   const inputClass = "w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100";
   return <section aria-label="Open a repository" className="rounded-lg border border-zinc-700 bg-zinc-900 p-5">
     <h1 className="text-xl font-semibold text-zinc-100">Open a repository</h1>
-    <p className="mt-2 text-sm text-zinc-400">Choose a local git checkout and describe its first feature here or on the Build page. Opening the repository does not start an agent. Plan approval and draft PR publication remain separate decisions.</p>
+    <p className="mt-2 text-sm text-zinc-400">Paste a local Git checkout, detect its details, then describe what you want to build. Opening it does not start an agent. Plan approval and draft PR publication remain separate decisions.</p>
     <form onSubmit={event => { void submit(event); }} className="mt-5 space-y-4">
-      <label className="block text-sm text-zinc-300">Repository name
-        <input required value={name} onChange={event => { setName(event.target.value); if (!keyEdited) setKey(defaultKey(event.target.value)); }} placeholder="My app" className={`mt-1 ${inputClass}`} />
-      </label>
-      <label className="block text-sm text-zinc-300">Project key
-        <input required value={key} maxLength={5} pattern="[A-Z][A-Z0-9]{1,4}" onChange={event => { setKeyEdited(true); setKey(event.target.value.toUpperCase()); }} className={`mt-1 ${inputClass}`} />
-        <span className="mt-1 block text-xs text-zinc-400">Used for task IDs. If another project already uses this key, choose a different 2 to 5 character key.</span>
-      </label>
       <label className="block text-sm text-zinc-300">Local repository path
-        <input required value={path} onChange={event => { currentPath.current = event.target.value; setPath(event.target.value); setInspection(""); setRepoUrl(""); setBranch("main"); }} placeholder="/home/me/projects/my-app" className={`mt-1 ${inputClass}`} />
+        <input required value={path} onChange={event => { currentPath.current = event.target.value; setPath(event.target.value); setInspection(""); setRepoUrl(""); setBranch("main"); if (!nameEdited.current) setName(""); if (!keyEditedDuringInspection.current && !nameEdited.current) setKey(""); }} placeholder="/home/me/projects/my-app" className={`mt-1 ${inputClass}`} />
       </label>
       <button type="button" onClick={() => { void inspect(); }} disabled={!path.trim() || inspecting || checking} className="rounded border border-zinc-600 px-3 py-2 text-sm text-zinc-200 disabled:opacity-40">{inspecting ? "Inspecting..." : "Detect branch and GitHub origin"}</button>
       {inspection && <p role="status" className="text-sm text-emerald-300">{inspection}</p>}
+      <label className="block text-sm text-zinc-300">Repository name
+        <input required value={name} aria-describedby={name.trim() && !slugify(name) ? "repository-name-error" : undefined} onChange={event => { nameEdited.current = true; setName(event.target.value); if (!keyEdited) setKey(defaultKey(event.target.value)); }} placeholder="Detected from the folder name" className={`mt-1 ${inputClass}`} />
+      </label>
+      {name.trim() && !slugify(name) && <p id="repository-name-error" role="alert" className="text-xs text-amber-300">Enter a name with at least one Latin letter or digit to create a repository identifier.</p>}
+      <label className="block text-sm text-zinc-300">Project key
+        <input required value={key} maxLength={5} pattern="[A-Z][A-Z0-9]{1,4}" onChange={event => { keyEditedDuringInspection.current = true; setKeyEdited(true); setKey(event.target.value.toUpperCase()); }} className={`mt-1 ${inputClass}`} />
+        <span className="mt-1 block text-xs text-zinc-400">Used for task IDs. If another project already uses this key, choose a different 2 to 5 character key.</span>
+      </label>
       <label className="block text-sm text-zinc-300">GitHub repository URL (optional)
         <input type="text" value={repoUrl} onChange={event => { originEdits.current += 1; setRepoUrl(event.target.value); }} placeholder="https://github.com/owner/repo.git" className={`mt-1 ${inputClass}`} />
         <span className="mt-1 block text-xs text-zinc-400">Required only to publish a draft PR later. Use the origin URL for this checkout; Orch8 checks that they match before pushing. You can add it in project settings later.</span>
@@ -118,7 +131,7 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
       <label className="flex items-center gap-2 text-sm text-zinc-300"><input type="checkbox" checked={noLimit} onChange={event => setNoLimit(event.target.checked)} /> No project spending limit (I understand agents can incur costs)</label>
       <p className="text-xs text-zinc-400">Choose a clean git checkout at its repository root, on the base branch. Orch8 checks the checkout before creating the project. The project starts with no automatic merge or PR strategy. Feature work requires a separate branch, and draft PR publication is an explicit action.</p>
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-      <button type="submit" disabled={checking || create.isPending || !name.trim() || !/^[A-Z][A-Z0-9]{1,4}$/.test(key.trim()) || !path.trim() || !branch.trim() || (!noLimit && !(Number(budget) > 0))} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{checking ? "Checking repository..." : create.isPending ? "Opening..." : "Open and describe feature"}</button>
+      <button type="submit" disabled={checking || create.isPending || !slugify(name) || !/^[A-Z][A-Z0-9]{1,4}$/.test(key.trim()) || !path.trim() || !branch.trim() || (!noLimit && !(Number(budget) > 0))} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{checking ? "Checking repository..." : create.isPending ? "Opening..." : "Open and describe feature"}</button>
     </form>
   </section>;
 }
