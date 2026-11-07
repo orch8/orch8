@@ -219,8 +219,14 @@ export class PipelineService {
       }).where(eq(pipelines.id, pipelineId)).returning();
       if (!nextStep) return { pipeline: updatedPipeline, completedStep, nextStep: null, nextTask: null };
       const nextTask = await this.createTaskForStep(pipeline.projectId, updatedPipeline, nextStep, tx);
-      const [updatedNextStep] = await tx.update(pipelineSteps).set({ taskId: nextTask.id, updatedAt: new Date() })
-        .where(eq(pipelineSteps.id, nextStep.id)).returning();
+      // A rejected review keeps its failed state while implementation is reworked.
+      // On return, replace that decision with a fresh review task and output.
+      const [updatedNextStep] = await tx.update(pipelineSteps).set({
+        taskId: nextTask.id, status: "pending", outputSummary: null,
+        outputFilePath: nextStep.status === "failed"
+          ? `.orch8/pipelines/${pipelineId}/${nextStep.label}-${nextTask.id}.md` : null,
+        updatedAt: new Date(),
+      }).where(eq(pipelineSteps.id, nextStep.id)).returning();
       return { pipeline: updatedPipeline, completedStep, nextStep: updatedNextStep, nextTask };
     });
     if (transition) this.broadcastService?.taskTransitioned(result.pipeline.projectId, transition);
@@ -290,7 +296,10 @@ export class PipelineService {
 
       const [updatedNextStep] = await tx
         .update(pipelineSteps)
-        .set({ taskId: nextTask.id, updatedAt: new Date() })
+        .set({ taskId: nextTask.id, status: "pending", outputSummary: null,
+          outputFilePath: nextStep.status === "failed"
+            ? `.orch8/pipelines/${pipelineId}/${nextStep.label}-${nextTask.id}.md` : null,
+          updatedAt: new Date() })
         .where(eq(pipelineSteps.id, nextStep.id))
         .returning();
 
