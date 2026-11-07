@@ -111,8 +111,11 @@ export async function returnToBaseBranch(homeDir: string, baseBranch: string) {
   if (!(await git(homeDir, ["show-ref", "--verify", "--quiet", `refs/heads/${baseBranch}`]).then(() => true, () => false))) {
     throw new Error(`Configured default branch '${baseBranch}' is not available locally.`);
   }
-  if (await gitRaw(homeDir, ["status", "--porcelain=v1", "--untracked-files=all"])) {
-    throw new Error("The repository must be completely clean (including staged and untracked files) before returning to the base branch.");
+  const status = (await gitRaw(homeDir, ["status", "--porcelain=v1", "--untracked-files=all"])).trimEnd();
+  // Provisioning may have left only Orch8's exact .gitignore addition. Carry
+  // those bytes back unchanged; git switch still refuses any target conflict.
+  if (status && !(await onlyGeneratedIgnoreChange(homeDir, status))) {
+    throw new Error("The repository must be completely clean (including staged and untracked files) before returning to the base branch, except Orch8's unchanged generated .gitignore addition.");
   }
   try { await git(homeDir, ["switch", "--no-guess", "--no-overwrite-ignore", baseBranch]); }
   catch { throw new Error("Could not switch to the configured base branch. Inspect the repository before retrying."); }
