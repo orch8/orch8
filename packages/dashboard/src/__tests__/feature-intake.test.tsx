@@ -25,6 +25,24 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("puts an unfinished workflow ahead of new planning without losing the next draft", async () => {
+  const scroll = vi.fn();
+  Element.prototype.scrollIntoView = scroll;
+  localStorage.setItem("orch8:feature-draft:one", JSON.stringify({ feature: "Add usage" }));
+  const view = render(<FeatureIntake projectId="one" onCreated={vi.fn()} activeWorkflow />);
+  expect(screen.getByLabelText("Next feature step")).toHaveTextContent("Inspect existing workflows");
+  expect(screen.getByRole("link", { name: "Inspect existing workflows" })).toHaveAttribute("href", "#active-feature-workflows");
+  expect(screen.getByLabelText("What should change?")).toHaveValue("Add usage");
+  select(); await check();
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Return to base branch" })).toBeDisabled();
+  fireEvent.submit(screen.getByRole("button", { name: "Start with a plan" }).closest("form")!);
+  expect(state.create).not.toHaveBeenCalled();
+  expect(localStorage.getItem("orch8:feature-draft:one")).toContain("Add usage");
+  view.rerender(<FeatureIntake projectId="one" onCreated={vi.fn()} activeWorkflow={false} />);
+  expect(screen.getByLabelText("Next feature step")).toHaveTextContent("Start with a plan");
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeEnabled();
+ });
  it("points to the next real action without starting agents or bypassing runtime checks", async () => {
   const scroll = vi.fn();
   Element.prototype.scrollIntoView = scroll;
