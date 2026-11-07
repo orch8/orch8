@@ -158,6 +158,7 @@ describe("feature intake", () => {
  it("sets up three sandboxed agents explicitly without starting a feature", async () => {
   state.agents = [];
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.getByText("Feature agent setup").closest("details")).toHaveAttribute("open");
   expect(state.requestedAgents).toHaveBeenCalledWith("canonical-id");
   fireEvent.change(screen.getByLabelText("Codex model for new agents"), { target: { value: "  gpt-6.1-sol  " } });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Set up feature agents" })); });
@@ -188,6 +189,8 @@ describe("feature intake", () => {
  it("offers Claude setup even when three Codex agents already exist", async () => {
   state.agents = ["planner", "implementer", "reviewer"].map(role => ({ id: `feature-${role}`, name: role, role, status: "active", adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
   const view = render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.getByText("Feature agent setup (optional)").closest("details")).not.toHaveAttribute("open");
+  fireEvent.click(screen.getByText("Feature agent setup (optional)"));
   fireEvent.change(screen.getByLabelText("Feature agent runtime"), { target: { value: "claude_local" } });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Set up feature agents" })); });
   expect(state.createAgent).toHaveBeenCalledTimes(3);
@@ -195,6 +198,23 @@ describe("feature intake", () => {
   state.agents = [...state.agents, ...["planner", "implementer", "reviewer"].map(role => ({ id: `feature-claude-${role}`, name: role, role, status: "active", adapterType: "claude_local", adapterConfig: { dangerouslySkipPermissions: false } }))];
   view.rerender(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   expect(screen.getByLabelText("Plan agent")).toHaveValue("feature-claude-planner");
+ });
+ it("keeps the setup panel open when agents become available", () => {
+  state.agents = [];
+  const view = render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("Feature agent runtime"), { target: { value: "claude_local" } });
+  state.agents = ["planner", "implementer", "reviewer"].map(role => ({ id: `feature-${role}`, name: role, role, status: "active", adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
+  view.rerender(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  // An operator who is configuring Claude must not lose the open setup action.
+  expect(screen.getByText("Feature agent setup (optional)").closest("details")).toHaveAttribute("open");
+  expect(screen.getByLabelText("Feature agent runtime")).toHaveValue("claude_local");
+ });
+ it("does not require setup when three manually selectable agents have nonstandard roles", () => {
+  state.agents = ["alpha", "beta", "gamma"].map(id => ({ id, name: id, role: "custom", status: "active", adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.getByText("Feature agent setup (optional)").closest("details")).not.toHaveAttribute("open");
+  expect(screen.queryByRole("button", { name: "Use feature agents" })).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Plan agent")).toHaveTextContent("alpha");
  });
  it("rejects Claude agents with override arguments or permission bypass", () => {
   state.agents = [
