@@ -13,16 +13,16 @@ describe("buildArgs", () => {
     expect(args).toContain("--verbose");
   });
 
-  it("includes --setting-sources project,local", () => {
-    const args = buildArgs({});
-    const idx = args.indexOf("--setting-sources");
-    expect(idx).toBeGreaterThan(-1);
-    expect(args[idx + 1]).toBe("project,local");
+  it("loads user, project and local permissions in default mode", () => {
+    const args = buildArgs({ dangerouslySkipPermissions: false });
+    expect(args).toContain("--permission-mode");
+    expect(args[args.indexOf("--permission-mode") + 1]).toBe("default");
+    expect(args[args.indexOf("--setting-sources") + 1]).toBe("user,project,local");
+    expect(args).not.toContain("--dangerously-skip-permissions");
   });
 
-  it("includes --dangerously-skip-permissions always", () => {
-    const args = buildArgs({});
-    expect(args).toContain("--dangerously-skip-permissions");
+  it("does not bypass permissions even for legacy dangerous config", () => {
+    expect(buildArgs({ dangerouslySkipPermissions: true })).not.toContain("--dangerously-skip-permissions");
   });
 
   it("adds --model when configured", () => {
@@ -84,6 +84,12 @@ describe("buildArgs", () => {
     const idx = args.indexOf("--add-dir");
     expect(idx).toBeGreaterThan(-1);
     expect(args[idx + 1]).toBe("/tmp/orch-skills-xyz");
+  });
+
+  it("rejects permission and settings overrides in extra arguments", () => {
+    for (const arg of ["--dangerously-skip-permissions", "--permission-mode", "--permission-mode=bypassPermissions", "--allowedTools", "--setting-sources", "--settings", "--bare"]) {
+      expect(() => buildArgs({ extraArgs: [arg] })).toThrow(/permission|setting|unsafe/i);
+    }
   });
 
   it("appends extraArgs at the end", () => {

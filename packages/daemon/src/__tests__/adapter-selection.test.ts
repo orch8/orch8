@@ -92,14 +92,34 @@ describe("adapter environment route", () => {
     await app.register(adapterTestRoutes);
     try {
       const response = await app.inject({ method: "POST", url: `/api/adapter/${type}/test-environment`, payload: {} });
-      const supported = type === "claude_local" || type === "codex_local";
-      expect(response.statusCode).toBe(supported ? 200 : 400);
-      if (supported) expect(map[type].testEnvironment).toHaveBeenCalledTimes(1);
+      const supported = type === "codex_local";
+      expect(response.statusCode).toBe(supported ? 200 : type === "claude_local" ? 403 : 400);
+      if (supported) expect(map.codex_local.testEnvironment).toHaveBeenCalledTimes(1);
       else {
-        expect(response.json().error).toBe("validation_error");
+        expect(response.json().error).toBe(type === "claude_local" ? "forbidden" : "validation_error");
         expect(map.claude_local.testEnvironment).not.toHaveBeenCalled();
         expect(map.codex_local.testEnvironment).not.toHaveBeenCalled();
       }
+    } finally { await app.close(); }
+  });
+  it("binds Claude probe to the selected admin project and rejects caller paths and bypass flags", async () => {
+    const app = Fastify();
+    const map = makeAdapters();
+    app.decorate("adapters", map);
+    app.decorate("projectService", { getById: vi.fn(async (id: string) => id === "selected" ? { homeDir: "/repo/selected" } : null) } as never);
+    app.addHook("onRequest", async request => { request.isAdmin = true; });
+    await app.register(adapterTestRoutes);
+    try {
+      for (const config of [{ cwd: "/repo/other" }, { dangerouslySkipPermissions: true }, { extraArgs: ["--allowedTools", "Bash"] }]) {
+        const response = await app.inject({ method: "POST", url: "/api/adapter/claude_local/test-environment", payload: { projectId: "selected", config } });
+        expect(response.statusCode).toBe(400);
+      }
+      expect(map.claude_local.testEnvironment).not.toHaveBeenCalled();
+      const missing = await app.inject({ method: "POST", url: "/api/adapter/claude_local/test-environment", payload: { projectId: "unknown", config: {} } });
+      expect(missing.statusCode).toBe(404);
+      const allowed = await app.inject({ method: "POST", url: "/api/adapter/claude_local/test-environment", payload: { projectId: "selected", config: { dangerouslySkipPermissions: false } } });
+      expect(allowed.statusCode).toBe(200);
+      expect(map.claude_local.testEnvironment).toHaveBeenCalledWith({ dangerouslySkipPermissions: false, cwd: "/repo/selected" });
     } finally { await app.close(); }
   });
 });
