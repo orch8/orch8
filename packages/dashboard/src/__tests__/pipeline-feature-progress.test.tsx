@@ -249,6 +249,31 @@ describe("feature progress summary", () => {
     expect(apiMock.post).toHaveBeenCalledWith("/adapter/codex_local/test-environment", { config: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } });
   });
 
+  it("checks Claude authentication and permissions for a stalled plan without starting another run", async () => {
+    state.steps = [step("Plan", 1, "pending", { agentId: "claude-planner" }), step("Implement", 2, "pending"), step("Independent review", 3, "pending")];
+    state.runs = [{ id: "run_stalled_plan", status: "failed", taskId: "task_1", agentId: "claude-planner" }];
+    apiMock.get.mockResolvedValue({ adapterType: "claude_local", adapterConfig: { dangerouslySkipPermissions: false } });
+    apiMock.post.mockResolvedValueOnce({ ok: false, errorCode: "auth_required", message: "Claude authentication expired. Re-authenticate with the Claude CLI." });
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    fireEvent.click(within(progress()).getByRole("button", { name: /check plan agent runtime/i }));
+    expect(await within(progress()).findByText(/Claude authentication expired.*Re-authenticate with the Claude CLI/)).toBeInTheDocument();
+    expect(apiMock.post).toHaveBeenCalledWith("/adapter/claude_local/test-environment", {
+      config: { dangerouslySkipPermissions: false }, projectId: "proj_1",
+    });
+    expect(within(progress()).getByText(/Claude permissions in a disposable directory/)).toBeInTheDocument();
+    expect(apiMock.cancel).not.toHaveBeenCalled();
+  });
+
+  it("rejects bypass-permissions configuration before checking a stalled Claude run", async () => {
+    state.steps = [step("Plan", 1, "pending", { agentId: "claude-planner" }), step("Implement", 2, "pending"), step("Independent review", 3, "pending")];
+    state.runs = [{ id: "run_stalled_plan", status: "failed", taskId: "task_1", agentId: "claude-planner" }];
+    apiMock.get.mockResolvedValue({ adapterType: "claude_local", adapterConfig: { dangerouslySkipPermissions: true } });
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    fireEvent.click(within(progress()).getByRole("button", { name: /check plan agent runtime/i }));
+    expect(await within(progress()).findByText(/supported permission configuration/)).toBeInTheDocument();
+    expect(apiMock.post).not.toHaveBeenCalled();
+  });
+
   it("reports readiness without waking the agent after a successful runtime check", async () => {
     state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "pending", { agentId: "implementer" }), step("Independent review", 3, "pending")];
     state.currentStep = 2;
