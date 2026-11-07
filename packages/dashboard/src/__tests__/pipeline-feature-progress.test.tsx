@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders, screen, waitFor, within } from "../test-utils.js";
 import { fireEvent } from "@testing-library/react";
 import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
+import { recognizedRuntimeBlocker } from "../components/pipeline/StalledRunDiagnosis.js";
 
 const apiMock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), cancel: vi.fn() }));
 vi.mock("../api/client.js", async importOriginal => ({ ...(await importOriginal<typeof import("../api/client.js")>()), api: apiMock }));
@@ -43,6 +44,7 @@ beforeEach(() => {
   localStorage.clear();
   apiMock.cancel.mockReset();
   apiMock.get.mockReset();
+  apiMock.get.mockResolvedValue({ adapterType: "codex_local" });
   apiMock.post.mockReset();
   state.status = "running";
   state.currentStep = 1;
@@ -199,6 +201,47 @@ describe("feature progress summary", () => {
     expect(screen.getByText(/Staged or unstaged changes remain/)).toBeInTheDocument();
     expect(screen.getByText(/Untracked files remain/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Create pull request" })).not.toBeInTheDocument();
+  });
+
+  it("shows a log-derived sandbox hint beside a stalled plan without running agents", async () => {
+    state.steps[0] = step("Plan", 1, "pending", { agentId: "planner" });
+    state.runs = [{ id: "run_stalled_plan", status: "succeeded", taskId: "task_1", agentId: "planner" }];
+    state.log = { content: 'Agent said every shell command fails with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.' };
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(await screen.findByRole("complementary", { name: "Codex sandbox recovery" })).toBeInTheDocument();
+    expect(within(progress()).getByText(/run log mentions a known Codex runtime error/i)).toBeInTheDocument();
+    expect(apiMock.post).not.toHaveBeenCalled();
+  });
+
+  it("shows the hint for a failed plan and refuses an adapter mismatch", async () => {
+    state.status = "failed";
+    state.steps[0] = step("Plan", 1, "failed", { agentId: "planner" });
+    state.runs = [{ id: "run_failed_plan", status: "failed", taskId: "task_1", agentId: "planner" }];
+    state.log = { content: "bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted" };
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(await screen.findByRole("complementary", { name: "Codex sandbox recovery" })).toBeInTheDocument();
+    expect(within(progress()).getByRole("button", { name: "Check plan agent runtime" })).toBeEnabled();
+    expect(recognizedRuntimeBlocker(state.log.content, "claude_local")).toBeNull();
+    expect(recognizedRuntimeBlocker("OAuth access token has expired", "codex_local")).toBeNull();
+  });
+
+  it("does not attribute another agent's run to the selected step agent", () => {
+    state.steps[0] = step("Plan", 1, "failed", { agentId: "selected-planner" });
+    state.status = "failed";
+    state.runs = [{ id: "run_other", status: "failed", taskId: "task_1", agentId: "other-planner" }];
+    state.log = { content: "bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted" };
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(within(progress()).queryByRole("complementary", { name: "Codex sandbox recovery" })).not.toBeInTheDocument();
+    expect(within(progress()).queryByRole("button", { name: "Check plan agent runtime" })).not.toBeInTheDocument();
+  });
+
+  it("does not invent a blocker when the recorded run log has no recognized failure", async () => {
+    state.steps[0] = step("Plan", 1, "pending", { agentId: "planner" });
+    state.runs = [{ id: "run_stalled_plan", status: "succeeded", taskId: "task_1", agentId: "planner" }];
+    state.log = { content: "The agent stopped before it finished the plan." };
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(await screen.findByText(/No known runtime blocker found/i)).toBeInTheDocument();
+    expect(within(progress()).queryByRole("complementary", { name: /recovery/ })).not.toBeInTheDocument();
   });
 
   it("flags an agent run that ended while implementation remains pending", () => {

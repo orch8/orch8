@@ -13,6 +13,7 @@ import {
 } from "../../hooks/usePipelines.js";
 import { DownloadEvidence } from "./DownloadEvidence.js";
 import { PipelineStepper } from "./PipelineStepper.js";
+import { StalledRunDiagnosis } from "./StalledRunDiagnosis.js";
 import { useRuns, useRunLog } from "../../hooks/useRuns.js";
 import type { Run } from "../../types.js";
 import { api, ApiError } from "../../api/client.js";
@@ -37,15 +38,17 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
   );
   const { data: activeRuns } = useRuns(
     pipeline.projectId, { taskId: active?.taskId ?? "", limit: 20 },
-    active?.status === "pending" && !!active.taskId && active.taskId !== implement?.taskId,
+    (active?.status === "pending" || active?.status === "failed") && !!active.taskId && active.taskId !== implement?.taskId,
   );
   const latestRun = implementationRuns?.[0];
   const activeRun = active?.taskId === implement?.taskId ? latestRun : activeRuns?.[0];
   const stalledStep = active?.status === "pending" && !!activeRun && ["succeeded", "failed", "cancelled"].includes(activeRun.status);
+  const diagnosableRun = !!activeRun && !!active?.agentId && activeRun.agentId === active.agentId &&
+    (stalledStep || active?.status === "failed") && ["succeeded", "failed", "cancelled"].includes(activeRun.status);
   const [retrying, setRetrying] = useState(false);
   const [retryMessage, setRetryMessage] = useState("");
   async function checkIncompleteStepRuntime() {
-    if (!stalledStep || !active?.agentId || !active.taskId || retrying) return;
+    if (!diagnosableRun || !active?.agentId || !active.taskId || retrying) return;
     setRetrying(true);
     setRetryMessage("");
     try {
@@ -108,7 +111,8 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
       <p>Review decision: <span className="text-zinc-100">{!review ? "No review step recorded" : review.outputSummary?.startsWith("[REJECTED]") ? "Rejected; changes requested" : review.status === "completed" ? review.requiresVerification ? "Accepted (test results still require inspection)" : "Completed; no human decision recorded" : review.status === "awaiting_verification" ? "Awaiting your decision" : review.status === "failed" ? "Review failed" : "Not decided"}</span></p>
       <p className="sm:col-span-2">Draft PR: {diffLoading ? "Checking repository..." : diffError || !diff?.available || diff.prLookup === "unavailable" ? "PR lookup unavailable; check GitHub." : diff.prLookup === "found" && diff.pullRequest ? <a href={diff.pullRequest.url} target="_blank" rel="noopener noreferrer" className="text-blue-300 underline">{diff.pullRequest.isDraft === true ? "Draft PR" : diff.pullRequest.isDraft === false ? "PR (not draft)" : "PR (draft status unknown)"} #{diff.pullRequest.number} · {diff.pullRequest.state.toLowerCase()}</a> : diff.prLookup === "none" ? "No PR found for this branch commit." : "Not verified for this branch commit."}</p>
     </div>
-    {stalledStep && active?.agentId && active.taskId && <div className="space-y-2">
+    {diagnosableRun && activeRun && active?.agentId && <StalledRunDiagnosis runId={activeRun.id} projectId={pipeline.projectId} agentId={active.agentId} />}
+    {diagnosableRun && active?.agentId && active.taskId && <div className="space-y-2">
       <button type="button" disabled={retrying} onClick={() => void checkIncompleteStepRuntime()}
         className="rounded border border-amber-600 px-3 py-2 text-amber-200 disabled:opacity-50">
         {retrying ? "Checking runtime..." : `Check ${active.label.toLowerCase()} agent runtime`}
