@@ -14,7 +14,9 @@ function NewProjectPage() {
   const open = (projectSlug: string) => void navigate({ to: "/projects/$projectSlug/pipelines", params: { projectSlug } });
 
   return <div className="mx-auto max-w-2xl space-y-4 p-[var(--gap-section)]">
-    <ExistingRepositories onOpen={open} />
+    <ExistingRepositories onOpen={open} onResume={(projectSlug, pipelineId) => void navigate({
+      to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug, pipelineId },
+    })} />
     {showAdvanced ? <WelcomeWizard
       showIntro={false}
       onComplete={open}
