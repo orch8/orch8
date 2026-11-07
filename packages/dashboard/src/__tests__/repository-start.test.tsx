@@ -8,6 +8,80 @@ globalThis.fetch = mockFetch;
 beforeEach(() => { mockFetch.mockReset(); localStorage.clear(); });
 const ready = { ok: true, json: async () => ({ ready: true, branch: "main", baseBranch: "main" }) };
 
+it("opens a pasted checkout without making the user invent its name, key, or branch", async () => {
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ branch: "release", origin: "https://github.com/org/my-app.git", originAvailable: true }) });
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ready: true, branch: "release", baseBranch: "release" }) });
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: "repo-id", slug: "my-app" }) });
+  const onComplete = vi.fn();
+  renderWithProviders(<RepositoryStart onComplete={onComplete} />);
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText("Local repository path"), "/tmp/my-app/");
+  await user.click(screen.getByRole("button", { name: "Detect branch and GitHub origin" }));
+  await waitFor(() => expect(screen.getByLabelText("Repository name")).toHaveValue("My App"));
+  expect(screen.getByLabelText(/Project key/)).toHaveValue("MYA");
+  expect(screen.getByLabelText("Base branch")).toHaveValue("release");
+  await user.type(screen.getByLabelText(/First feature request/), "Add an export button");
+  await user.click(screen.getByLabelText(/No project spending limit/));
+  await user.click(screen.getByRole("button", { name: "Open and describe feature" }));
+  await waitFor(() => expect(onComplete).toHaveBeenCalledWith("my-app"));
+  expect(JSON.parse(mockFetch.mock.calls[2][1].body)).toMatchObject({ name: "My App", key: "MYA", defaultBranch: "release" });
+  expect(JSON.parse(localStorage.getItem("orch8:feature-draft:my-app")!)).toMatchObject({ feature: "Add an export button" });
+});
+
+it("does not overwrite a custom repository name while inspection is in flight", async () => {
+  let resolveInspection!: (value: unknown) => void;
+  mockFetch.mockImplementationOnce(() => new Promise(resolve => { resolveInspection = resolve; }));
+  renderWithProviders(<RepositoryStart onComplete={vi.fn()} />);
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText("Local repository path"), "/tmp/my-app");
+  await user.click(screen.getByRole("button", { name: "Detect branch and GitHub origin" }));
+  await user.type(screen.getByLabelText("Repository name"), "Custom name");
+  resolveInspection({ ok: true, json: async () => ({ branch: "main", origin: "", originAvailable: false }) });
+  await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+  expect(screen.getByLabelText("Repository name")).toHaveValue("Custom name");
+  expect(screen.getByLabelText(/Project key/)).toHaveValue("CUS");
+});
+
+it("clears inferred identity when switching checkouts without losing user edits", async () => {
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ branch: "main", origin: "", originAvailable: false }) });
+  renderWithProviders(<RepositoryStart onComplete={vi.fn()} />);
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText("Local repository path"), "/tmp/old-repo");
+  await user.click(screen.getByRole("button", { name: "Detect branch and GitHub origin" }));
+  await waitFor(() => expect(screen.getByLabelText("Repository name")).toHaveValue("Old Repo"));
+  await user.clear(screen.getByLabelText("Local repository path"));
+  await user.type(screen.getByLabelText("Local repository path"), "/tmp/new-repo");
+  expect(screen.getByLabelText("Repository name")).toHaveValue("");
+  expect(screen.getByLabelText(/Project key/)).toHaveValue("");
+  await user.type(screen.getByLabelText("Repository name"), "My project");
+  await user.clear(screen.getByLabelText("Local repository path"));
+  await user.type(screen.getByLabelText("Local repository path"), "/tmp/third-repo");
+  expect(screen.getByLabelText("Repository name")).toHaveValue("My project");
+  expect(screen.getByLabelText(/Project key/)).toHaveValue("MYP");
+});
+
+it.each([["x", "XR"], ["1password", "PAS"]])("infers a valid key for folder %s", async (folder, key) => {
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ branch: "main", origin: "", originAvailable: false }) });
+  renderWithProviders(<RepositoryStart onComplete={vi.fn()} />);
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText("Local repository path"), `/tmp/${folder}`);
+  await user.click(screen.getByRole("button", { name: "Detect branch and GitHub origin" }));
+  await waitFor(() => expect(screen.getByLabelText(/Project key/)).toHaveValue(key));
+  expect((screen.getByLabelText(/Project key/) as HTMLInputElement).checkValidity()).toBe(true);
+});
+
+it("explains when a folder name cannot produce a repository identifier", async () => {
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ branch: "main", origin: "", originAvailable: false }) });
+  renderWithProviders(<RepositoryStart onComplete={vi.fn()} />);
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText("Local repository path"), "/tmp/日本語");
+  await user.click(screen.getByRole("button", { name: "Detect branch and GitHub origin" }));
+  await waitFor(() => expect(screen.getByLabelText("Repository name")).toHaveValue("日本語"));
+  await user.click(screen.getByLabelText(/No project spending limit/));
+  expect(screen.getByRole("alert")).toHaveTextContent("Enter a name with at least one Latin letter or digit");
+  expect(screen.getByRole("button", { name: "Open and describe feature" })).toBeDisabled();
+});
+
 it("detects a repository's real branch and safe origin before opening it", async () => {
   mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ branch: "v2", origin: "https://github.com/orch8/orch8.git", originAvailable: true }) });
   mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ready: true, branch: "v2", baseBranch: "v2" }) });
