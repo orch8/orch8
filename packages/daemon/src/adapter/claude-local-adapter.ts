@@ -244,6 +244,7 @@ export class ClaudeLocalAdapter implements AgentAdapter {
         const expired = /OAuth access token has expired|Failed to authenticate/i.test(result.result ?? "");
         return {
           ok: false,
+          costUsd: result.costUsd,
           errorCode: expired ? "auth_required" : result.errorCode ?? "process_error",
           message: expired ? "Claude authentication expired. Re-authenticate with the Claude CLI before retrying the runtime check."
             : result.error ?? result.result?.slice(0, 400) ?? "Claude environment test failed",
@@ -254,10 +255,12 @@ export class ClaudeLocalAdapter implements AgentAdapter {
       const actual = await readFile(marker, "utf8").catch(() => null);
       if (actual !== nonce) {
         return { ok: false, errorCode: "process_error",
+          costUsd: result.costUsd,
           message: "Claude did not complete the shell write under current permissions. A text response is insufficient. Check Claude's user/project permissions for Bash; no approvals were bypassed." };
       }
       return {
         ok: true,
+        costUsd: result.costUsd,
         sessionId: result.sessionId ?? undefined,
         message: "Claude executed a shell write with the selected repository's existing permissions. This does not guarantee a feature run will succeed.",
       };
