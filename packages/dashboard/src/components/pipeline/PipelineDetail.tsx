@@ -22,10 +22,10 @@ import { useEffect } from "react";
 import type { Pipeline, PipelineStep } from "../../types.js";
 import type { PipelineRepositoryDiff } from "../../hooks/usePipelines.js";
 
-function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPublish, onReuse, reusing, reuseError }: {
+function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPublish, onReuse, reusableRequest, reusing, reuseError }: {
   pipeline: Pipeline; steps: PipelineStep[]; diff?: PipelineRepositoryDiff;
   diffLoading: boolean; diffError: boolean; canPublish: boolean;
-  onReuse: () => void; reusing: boolean; reuseError: string;
+  onReuse: () => void; reusableRequest: boolean; reusing: boolean; reuseError: string;
 }) {
   const active = steps.find(step => step.order === pipeline.currentStep && step.status !== "completed")
     ?? steps.find(step => ["awaiting_verification", "running", "failed"].includes(step.status))
@@ -109,10 +109,10 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
     </div>}
     {(stalledStep || pipeline.status === "failed" || pipeline.status === "cancelled") &&
       <div className="space-y-2 rounded border border-zinc-700 p-3">
-        <p>Want to try a different agent or model? Reuse this request in a new workflow. If this workflow is still open, it will be cancelled first. The repository branch and files are not changed; return to the base branch before starting again.</p>
-        <button type="button" onClick={onReuse} disabled={reusing} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:opacity-50">
+        {reusableRequest && <p>Want to try a different agent or model? Reuse this request in a new workflow. If this workflow is still open, it will be cancelled first. The repository branch and files are not changed; return to the base branch before starting again.</p>}
+        {reusableRequest ? <button type="button" onClick={onReuse} disabled={reusing} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:opacity-50">
           {reusing ? "Opening new feature..." : "Start again with this request"}
-        </button>
+        </button> : <p>Could not recover the original feature request from this workflow. Copy it from the steps before creating a new feature; this workflow has not been cancelled.</p>}
         {reuseError && <p role="alert" className="text-red-300">{reuseError}</p>}
       </div>}
   </section>;
@@ -363,6 +363,11 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
   const isReviewDecision = (step: typeof steps[number]) => /\b(review|verification)\b/i.test(step.label);
   const implement = steps.find(step => step.label.toLowerCase() === "implement");
   const review = steps.find(step => ["review", "independent review"].includes(step.label.toLowerCase()));
+  const originalPrompt = implement?.promptOverride;
+  const suffix = "\nFollow the approved plan in {{pipeline.context}}.";
+  const suffixAt = originalPrompt?.lastIndexOf(suffix) ?? -1;
+  const reusableRequest = originalPrompt?.startsWith("Feature request: ") && suffixAt > "Feature request: ".length
+    ? originalPrompt.slice("Feature request: ".length, suffixAt).trim() : "";
   const outputPaths = new Set([...steps.map(step => step.outputFilePath).filter(Boolean), ...(repositoryDiff?.publicationOutputPaths ?? [])]);
   const canPublish = pipeline.status === "completed" && steps.every(step => step.status === "completed") &&
     !!implement?.agentId && !!review?.agentId && !!review.requiresVerification && implement.agentId !== review.agentId &&
@@ -381,19 +386,14 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
     if (reusing) return;
     setReuseError("");
     const key = `orch8:feature-draft:${pipeline.projectId}`;
-    const originalPrompt = implement?.promptOverride;
-    const suffix = "\nFollow the approved plan in {{pipeline.context}}.";
-    const suffixAt = originalPrompt?.lastIndexOf(suffix) ?? -1;
-    const request = originalPrompt?.startsWith("Feature request: ") && suffixAt > 0
-      ? originalPrompt.slice("Feature request: ".length, suffixAt)
-      : pipeline.name;
+    if (!reusableRequest) { setReuseError("Could not recover the original request. This workflow has not been cancelled."); return; }
     let previousDraft: string | null = null;
     let draftWritten = false;
     try {
       previousDraft = localStorage.getItem(key);
       if (previousDraft && !window.confirm("Replace the unsent feature draft in this browser with this workflow's request?")) return;
       setReusing(true);
-      localStorage.setItem(key, JSON.stringify({ feature: request, branchName: "", planner: "", implementer: "", reviewer: "", filePaths: [] }));
+      localStorage.setItem(key, JSON.stringify({ feature: reusableRequest, branchName: "", planner: "", implementer: "", reviewer: "", filePaths: [] }));
       draftWritten = true;
       // A failed cancel must not open another workflow against this checkout.
       if (pipeline.status === "pending" || pipeline.status === "running") await cancelMutation.mutateAsync(pipeline.id);
@@ -445,7 +445,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
       </div>
 
       {steps[0]?.label.toLowerCase() === "plan" && implement && review &&
-        <FeatureProgress pipeline={pipeline} steps={steps} diff={repositoryDiff} diffLoading={diffLoading} diffError={diffError} canPublish={!!canPublish} onReuse={() => void reuseRequest()} reusing={reusing} reuseError={reuseError} />}
+        <FeatureProgress pipeline={pipeline} steps={steps} diff={repositoryDiff} diffLoading={diffLoading} diffError={diffError} canPublish={!!canPublish} onReuse={() => void reuseRequest()} reusableRequest={!!reusableRequest} reusing={reusing} reuseError={reuseError} />}
       {steps[0]?.label.toLowerCase() === "plan" && implement && review &&
         <DownloadEvidence key={pipeline.id} pipelineId={pipeline.id} />}
       <PipelineStepper steps={steps} currentStep={pipeline.currentStep} />

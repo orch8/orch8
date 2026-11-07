@@ -217,7 +217,7 @@ describe("feature progress summary", () => {
   });
 
   it("offers a new request after a failed run but never starts it if cancelling the old workflow fails", async () => {
-    state.steps = [step("Plan", 1, "pending"), step("Implement", 2, "pending", { promptOverride: "Feature request: Add the complete usage guide\nFollow the approved plan" }), step("Independent review", 3, "pending")];
+    state.steps = [step("Plan", 1, "pending"), step("Implement", 2, "pending", { promptOverride: "Feature request: Add the complete usage guide\nFollow the approved plan in {{pipeline.context}}. Work only on the prepared feature branch." }), step("Independent review", 3, "pending")];
     state.runs = [{ id: "run_failed", status: "failed", taskId: "task_1", agentId: "planner" }];
     apiMock.cancel.mockRejectedValue(new Error("Cannot cancel while an agent is active"));
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
@@ -226,6 +226,15 @@ describe("feature progress summary", () => {
     expect(await within(progress()).findByText(/Cannot cancel while an agent is active/)).toBeInTheDocument();
     expect(apiMock.cancel).toHaveBeenCalledWith("pipe_1");
     expect(localStorage.getItem("orch8:feature-draft:proj_1")).toBeNull();
+  });
+
+  it("does not cancel a custom workflow whose original request cannot be recovered", () => {
+    state.status = "failed";
+    state.steps = [step("Plan", 1, "failed"), step("Implement", 2, "pending", { promptOverride: "Build the requested change without a feature-intake template" }), step("Independent review", 3, "pending")];
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(within(progress()).queryByRole("button", { name: "Start again with this request" })).not.toBeInTheDocument();
+    expect(within(progress()).getByText(/Could not recover the original feature request/)).toBeInTheDocument();
+    expect(apiMock.cancel).not.toHaveBeenCalled();
   });
 
   it("checks the sandbox without rerunning an incomplete planning step", async () => {
