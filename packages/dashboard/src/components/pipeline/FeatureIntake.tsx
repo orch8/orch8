@@ -43,6 +43,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
   const [checkedKey, setCheckedKey] = useState("");
   const [checkMessage, setCheckMessage] = useState("");
   const [failedSelectionKey, setFailedSelectionKey] = useState("");
+  const [failedAdapter, setFailedAdapter] = useState("");
   const [branchName, setBranchName] = useState(draft.branchName);
   const [branchState, setBranchState] = useState<{ ready: boolean; branch: string; baseBranch: string; reason?: string; note?: string } | null>(null);
   const [branchError, setBranchError] = useState("");
@@ -171,14 +172,20 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
     setChecking(true);
     setCheckedKey("");
     setFailedSelectionKey("");
+    setFailedAdapter("");
     setCheckMessage("");
     try {
       for (const agent of selected) {
-        const result = await api.post<{ ok: boolean; message?: string }>(
-          `/adapter/${agent!.adapterType}/test-environment`, { config: agent!.adapterConfig,
-            ...(agent!.adapterType === "claude_local" ? { projectId: project!.id } : {}) },
-        );
-        if (!result.ok) throw new Error(`${agent!.name}: ${result.message ?? "Runtime test failed"}`);
+        try {
+          const result = await api.post<{ ok: boolean; message?: string }>(
+            `/adapter/${agent!.adapterType}/test-environment`, { config: agent!.adapterConfig,
+              ...(agent!.adapterType === "claude_local" ? { projectId: project!.id } : {}) },
+          );
+          if (!result.ok) throw new Error(`${agent!.name}: ${result.message ?? "Runtime test failed"}`);
+        } catch (err) {
+          setFailedAdapter(agent!.adapterType);
+          throw err;
+        }
       }
       setCheckedKey(selectionKey);
       setCheckMessage("Selected agents passed the runtime check. This does not guarantee a feature run will succeed.");
@@ -299,7 +306,7 @@ export function FeatureIntake({ projectId, onCreated }: { projectId: string; onC
       <button type="button" onClick={() => { void checkRuntime(); }} disabled={!validSelection || checking} className="rounded border border-zinc-600 px-4 py-2 text-sm text-zinc-200 disabled:opacity-40">{checking ? "Checking agents..." : "Check agent runtime"}</button>
       {checkMessage && failedSelectionKey === selectionKey && <p role="status" className="text-sm text-amber-300">{checkMessage}</p>}
       {checkMessage && checkedKey === selectionKey && <p role="status" className="text-sm text-emerald-300">{checkMessage}</p>}
-      <SandboxRecoveryGuidance message={failedSelectionKey === selectionKey ? checkMessage : ""} />
+      <SandboxRecoveryGuidance message={failedSelectionKey === selectionKey ? checkMessage : ""} adapterType={failedAdapter} />
       {validSelection && checkedKey !== selectionKey && <p className="text-xs text-amber-300">Runtime check required for this agent selection.</p>}
       <div className="space-y-2 rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Prepare feature branch">
         <h3 className="font-medium">Prepare a feature branch (required)</h3>

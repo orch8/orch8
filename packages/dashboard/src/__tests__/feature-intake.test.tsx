@@ -186,6 +186,31 @@ describe("feature intake", () => {
   expect(state.probe).toHaveBeenCalledWith("/adapter/claude_local/test-environment", { config: { dangerouslySkipPermissions: false }, projectId: "canonical-id" });
   expect(screen.getByRole("button", { name: "Start with a plan" })).toBeEnabled();
  });
+ it("explains expired Claude authentication without approving the runtime or starting a plan", async () => {
+  state.agents = ["planner", "implementer", "reviewer"].map(role => ({ id: `feature-claude-${role}`, name: role, role, status: "active", adapterType: "claude_local", adapterConfig: { dangerouslySkipPermissions: false } }));
+  state.probe.mockResolvedValue({ ok: false, errorCode: "auth_required", message: "Claude authentication expired. Re-authenticate with the Claude CLI before retrying the runtime check." });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Use feature agents" }));
+  await check();
+  expect(screen.getByLabelText("Claude authentication recovery")).toHaveTextContent("claude auth login");
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+  expect(state.create).not.toHaveBeenCalled();
+ });
+ it("does not claim a Claude token expired for a generic authentication failure", async () => {
+  state.agents = ["planner", "implementer", "reviewer"].map(role => ({ id: `feature-claude-${role}`, name: role, role, status: "active", adapterType: "claude_local", adapterConfig: { dangerouslySkipPermissions: false } }));
+  state.probe.mockResolvedValue({ ok: false, errorCode: "auth_required", message: "auth_required" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Use feature agents" }));
+  await check();
+  expect(screen.queryByLabelText("Claude authentication recovery")).not.toBeInTheDocument();
+ });
+ it("does not show Claude sign-in instructions for a Codex auth failure", async () => {
+  state.probe.mockResolvedValue({ ok: false, errorCode: "auth_required", message: "auth_required" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  select(); await check();
+  expect(screen.queryByLabelText("Claude authentication recovery")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+ });
  it("offers Claude setup even when three Codex agents already exist", async () => {
   state.agents = ["planner", "implementer", "reviewer"].map(role => ({ id: `feature-${role}`, name: role, role, status: "active", adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
   const view = render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);

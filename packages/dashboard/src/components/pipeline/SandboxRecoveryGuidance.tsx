@@ -1,8 +1,16 @@
 const PREREQUISITES = "https://developers.openai.com/codex/concepts/sandboxing#prerequisites";
 
-/** Shown only for the known Linux bubblewrap namespace failure, not for arbitrary agent errors. */
-export function SandboxRecoveryGuidance({ message }: { message: string }) {
-  if (!/\b(?:bwrap|bubblewrap)\b/i.test(message) || !/Failed RTM_NEWADDR|user namespace/i.test(message)) return null;
+/** Show recovery only for recognized failures from the agent that failed. */
+export function SandboxRecoveryGuidance({ message, adapterType }: { message: string; adapterType: string }) {
+  if (adapterType === "claude_local" && /Claude authentication expired|OAuth access token has expired/i.test(message)) {
+    return <aside aria-label="Claude authentication recovery" className="space-y-2 rounded border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-100">
+      <h3 className="font-semibold">Claude Code needs a fresh sign-in</h3>
+      <p>Claude Code's saved account may still appear logged in even after its access token expires. Sign in from a terminal as the same user running Orch8, then retry Check agent runtime. No feature run was started.</p>
+      <pre className="overflow-auto rounded bg-zinc-950 p-2 text-zinc-200">claude auth login</pre>
+      <p>If sign-in needs a browser, complete it interactively; Orch8 cannot approve it for you. Do not bypass agent permissions or the runtime check.</p>
+    </aside>;
+  }
+  if (adapterType !== "codex_local" || !/\b(?:bwrap|bubblewrap)\b/i.test(message) || !/Failed RTM_NEWADDR|user namespace/i.test(message)) return null;
 
   return <aside aria-label="Codex sandbox recovery" className="space-y-2 rounded border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-100">
     <h3 className="font-semibold">Codex sandbox needs host setup</h3>
