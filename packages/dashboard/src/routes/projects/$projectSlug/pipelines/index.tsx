@@ -43,7 +43,6 @@ function PipelinesActivePage() {
           <p className="mt-1 break-all text-xs text-zinc-400">{project?.homeDir ?? "Loading repository..."} {project?.defaultBranch ? `· base ${project.defaultBranch}` : ""}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {activePipelines.length > 0 && <a href="#active-workflows" className="rounded border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:text-white">View {activePipelines.length} {activePipelines.length === 1 ? "workflow" : "workflows"} needing attention</a>}
           <Link to="/projects/$projectSlug/board" params={{ projectSlug: projectId }} className="rounded border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:text-white">Open task board</Link>
         </div>
       </div>
@@ -63,15 +62,14 @@ function PipelinesActivePage() {
         ))}
       </div>
 
+      {(isLoading || activePipelines.length > 0) && <section aria-label="Continue feature work" className="space-y-3 rounded-lg border border-blue-900/60 bg-blue-950/20 p-4">
+        <div>
+          <h2 className="text-base font-semibold text-zinc-100">Continue feature work</h2>
+          <p className="mt-1 text-sm text-zinc-400">Open a workflow to inspect its plan, agent runs and next decision before starting another feature in this checkout.</p>
+        </div>
+        {isLoading ? <p className="text-sm text-zinc-400">Loading workflows...</p> : <PipelineList pipelines={activePipelines} showActions />}
+      </section>}
       <FeatureIntake key={projectId} projectId={projectId} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />
-      <section id="active-workflows" aria-label="Workflows needing attention" className="space-y-3 scroll-mt-6">
-        <h2 className="text-sm font-semibold text-zinc-200">Workflows needing attention</h2>
-        {isLoading ? (
-          <p className="text-sm text-zinc-600">Loading...</p>
-        ) : (
-          <PipelineList pipelines={activePipelines} showActions />
-        )}
-      </section>
       <RepositoryChanges projectId={project?.id} projectError={projectError} />
     </div>
   );
