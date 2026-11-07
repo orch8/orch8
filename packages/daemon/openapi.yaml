@@ -3964,6 +3964,21 @@ paths:
         diff and test results on GitHub. It never
         commits, switches branches, runs checks, or merges. GitHub CLI auth
         must be available on the daemon host.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                summary:
+                  type: string
+                  maxLength: 2000
+                  description: Optional operator-supplied PR summary, explicitly labeled unverified.
+                tests:
+                  type: string
+                  maxLength: 2000
+                  description: Optional operator-supplied test notes, explicitly labeled unverified.
       parameters:
         - name: id
           in: path

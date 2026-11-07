@@ -63,8 +63,9 @@ export function usePipelineDiff(pipelineId: string) {
 export function usePublishPipelinePr() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (pipelineId: string) => api.post<{ url: string }>(`/pipelines/${encodeURIComponent(pipelineId)}/pull-request`, {}),
-    onSuccess: (_data, pipelineId) => {
+    mutationFn: ({ pipelineId, summary, tests }: { pipelineId: string; summary: string; tests: string }) =>
+      api.post<{ url: string }>(`/pipelines/${encodeURIComponent(pipelineId)}/pull-request`, { summary, tests }),
+    onSuccess: (_data, { pipelineId }) => {
       void qc.invalidateQueries({ queryKey: ["pipeline-diff", pipelineId] });
     },
   });
