@@ -20,6 +20,40 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("fills three eligible role agents with one explicit action without clearing a saved request or approving runtime", async () => {
+  state.agents = ["planner", "implementer", "reviewer"].map(role => ({
+   id: `feature-${role}`, name: `Feature ${role}`, role, status: "active", adapterType: "codex_local",
+   adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false },
+  }));
+  localStorage.setItem("orch8:feature-draft:one", JSON.stringify({ feature: "Add usage" }));
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.getByLabelText("Plan agent")).toHaveValue("");
+  fireEvent.click(screen.getByRole("button", { name: "Use feature agents" }));
+  expect(screen.getByLabelText("Plan agent")).toHaveValue("feature-planner");
+  expect(screen.getByLabelText("Implement agent")).toHaveValue("feature-implementer");
+  expect(screen.getByLabelText("Review agent")).toHaveValue("feature-reviewer");
+  expect(screen.getByLabelText("What should change?")).toHaveValue("Add usage");
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+  expect(state.probe).not.toHaveBeenCalled();
+  expect(state.create).not.toHaveBeenCalled();
+ });
+ it("does not suggest missing or unsafe feature agents", () => {
+  state.agents = state.agents.map(agent => ({ ...agent, role: agent.id, status: agent.id === "reviewer" ? "paused" : "active" }));
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.queryByRole("button", { name: "Use feature agents" })).not.toBeInTheDocument();
+ });
+ it("does not select an agent with a role-mismatched feature ID", () => {
+  state.agents = [
+   { id: "feature-reviewer", role: "planner" },
+   { id: "feature-planner", role: "planner" },
+   { id: "feature-implementer", role: "implementer" },
+   { id: "actual-reviewer", role: "reviewer" },
+  ].map(agent => ({ ...agent, name: agent.id, status: "active", adapterType: "codex_local",
+   adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Use feature agents" }));
+  expect(screen.getByLabelText("Review agent")).toHaveValue("actual-reviewer");
+ });
  it("adds a browsed file path to a saved feature draft and planning prompt without copying its contents", async () => {
   state.readiness.mockImplementation(async path => path.includes("?path=") ? { path: "src/app.ts", content: "private source body" }
     : path.includes("/repository-files?") ? { paths: ["src/app.ts"], truncated: false }
