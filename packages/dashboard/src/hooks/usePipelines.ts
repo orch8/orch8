@@ -3,11 +3,11 @@ import { api } from "../api/client.js";
 import type { Pipeline } from "../types.js";
 import type { PipelineWithSteps } from "@orch/shared";
 
-export function usePipelines(projectId: string) {
+export function usePipelines(projectId: string, poll = true) {
   return useQuery<Pipeline[]>({
     queryKey: ["pipelines", projectId],
     queryFn: () => api.get("/pipelines", { projectId }),
-    refetchInterval: 10000,
+    refetchInterval: poll ? 10000 : false,
   });
 }
 
