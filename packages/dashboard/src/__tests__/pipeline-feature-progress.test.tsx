@@ -203,13 +203,19 @@ describe("feature progress summary", () => {
     expect(screen.queryByRole("button", { name: "Create pull request" })).not.toBeInTheDocument();
   });
 
-  it("shows a log-derived sandbox hint beside a stalled plan without running agents", async () => {
+  it("takes an operator straight to the stalled run log without making repair instructions the first screen", async () => {
     state.steps[0] = step("Plan", 1, "pending", { agentId: "planner" });
     state.runs = [{ id: "run_stalled_plan", status: "succeeded", taskId: "task_1", agentId: "planner" }];
     state.log = { content: 'Agent said every shell command fails with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.' };
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
-    expect(await screen.findByRole("complementary", { name: "Codex sandbox recovery" })).toBeInTheDocument();
-    expect(within(progress()).getByText(/run log mentions a known Codex runtime error/i)).toBeInTheDocument();
+    const action = within(progress()).getByRole("link", { name: "Inspect plan run and log" });
+    expect(action).toHaveAttribute("href", "#workflow-step-step_1");
+    expect(await within(progress()).findByText(/run log mentions a known Codex runtime error/i)).toBeInTheDocument();
+    const repair = within(progress()).getByText("Host repair details").closest("details");
+    expect(repair).not.toHaveAttribute("open");
+    expect(within(progress()).queryByRole("complementary", { name: "Codex sandbox recovery" })).not.toBeVisible();
+    fireEvent.click(within(progress()).getByText("Host repair details"));
+    expect(await within(progress()).findByRole("complementary", { name: "Codex sandbox recovery" })).toBeVisible();
     expect(apiMock.post).not.toHaveBeenCalled();
   });
 
