@@ -2,13 +2,21 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { cloneGitHubRepository, parseGitHubUrl } from "../services/repository-clone.service.js";
+import { cloneGitHubRepository, parseGitHubUrl, publicCloneEnvironment } from "../services/repository-clone.service.js";
 
 let parent: string;
 beforeAll(async () => { parent = await mkdtemp(join(tmpdir(), "orch8-clone-test-")); });
 afterAll(async () => { await rm(parent, { recursive: true, force: true }); });
 
 describe("GitHub clone boundary", () => {
+  it("isolates the public clone from the daemon user's netrc and Git config", () => {
+    const env = publicCloneEnvironment("/tmp/isolated-empty-home", {
+      HOME: "/home/daemon-with-private-netrc", XDG_CONFIG_HOME: "/home/daemon-with-private-config",
+      CURL_HOME: "/home/daemon-with-private-curl", GIT_CONFIG_GLOBAL: "/home/daemon/.gitconfig",
+    });
+    expect(env).toMatchObject({ HOME: "/tmp/isolated-empty-home", XDG_CONFIG_HOME: "/tmp/isolated-empty-home",
+      CURL_HOME: "/tmp/isolated-empty-home", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0" });
+  });
   it.each([
     "git@github.com:org/repo.git", "http://github.com/org/repo", "https://github.com/org/repo/extra",
     "https://user:password@github.com/org/repo", "https://github.com.evil.example/org/repo",
