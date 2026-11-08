@@ -1,9 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { renderWithProviders, screen } from "../test-utils.js";
+import { renderWithProviders, screen, waitFor } from "../test-utils.js";
 
-const { useProjects, usePipelines, usePipeline } = vi.hoisted(() => ({
-  useProjects: vi.fn(), usePipelines: vi.fn(), usePipeline: vi.fn(),
+const { useProjects, usePipelines, usePipeline, get } = vi.hoisted(() => ({
+  useProjects: vi.fn(), usePipelines: vi.fn(), usePipeline: vi.fn(), get: vi.fn(),
 }));
+vi.mock("../api/client.js", () => ({ api: { get } }));
 vi.mock("../hooks/useProjects.js", () => ({ useProjects }));
 vi.mock("../hooks/usePipelines.js", () => ({ usePipelines, usePipeline }));
 vi.mock("@tanstack/react-router", () => ({
@@ -22,9 +23,39 @@ beforeEach(() => {
   useProjects.mockReturnValue({ data: [project], isLoading: false, isError: false });
   usePipelines.mockReturnValue({ data: [], isError: false });
   usePipeline.mockReturnValue({ data: undefined });
+  get.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
 });
 
 describe("repository chooser progress", () => {
+  it("shows live checkout readiness before opening a repository", async () => {
+    renderWithProviders(<RepositoryChooser />);
+    expect(await screen.findByText("Checkout clean on base · main")).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith("/projects/proj-1/feature-branch");
+  });
+
+  it("warns when existing feature work occupies the checkout", async () => {
+    get.mockResolvedValue({ ready: false, branch: "feat/work", baseBranch: "main", reason: "Check out the configured default branch 'main' before preparing a feature branch." });
+    renderWithProviders(<RepositoryChooser />);
+    expect(await screen.findByText(/On feat\/work · Check out the configured default branch/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /My repo.*Open feature workflows/ })).toBeInTheDocument();
+  });
+
+  it("does not claim readiness when the checkout cannot be checked", async () => {
+    get.mockRejectedValue(new Error("Unavailable"));
+    renderWithProviders(<RepositoryChooser />);
+    await waitFor(() => expect(screen.getByText(/Checkout status unavailable/)).toBeInTheDocument());
+    expect(screen.queryByText(/Checkout clean on base/)).not.toBeInTheDocument();
+  });
+
+  it("removes a previous ready claim when a manual refresh fails", async () => {
+    get.mockResolvedValueOnce({ ready: true, branch: "main", baseBranch: "main" }).mockRejectedValueOnce(new Error("Unavailable"));
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    expect(await screen.findByText("Checkout clean on base · main")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Refresh checkout status" }));
+    await waitFor(() => expect(screen.getByText(/Checkout status unavailable/)).toBeInTheDocument());
+    expect(screen.queryByText("Checkout clean on base · main")).not.toBeInTheDocument();
+  });
+
   it("links directly to an active plan awaiting a decision ahead of a later failed workflow", () => {
     usePipelines.mockReturnValue({ data: [
       pipeline("failed-2", "failed", "2026-11-08T02:00:00Z"),

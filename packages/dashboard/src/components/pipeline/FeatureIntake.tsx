@@ -92,6 +92,7 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
     try {
       const result = await api.post<{ branch: string; baseBranch: string }>(`/projects/${encodeURIComponent(project.id)}/feature-branch`, { name: branchName.trim() });
       setBranchState({ ready: false, ...result, reason: "Feature branch prepared. Check agent runtime before starting." });
+      void queryClient.invalidateQueries({ queryKey: ["feature-branch", project.id] });
       void queryClient.invalidateQueries({ queryKey: ["repository-changes", project.id] });
       setBranchName("");
     } catch (err) {
@@ -105,6 +106,7 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
     try {
       const result = await api.post<{ ready: boolean; branch: string; baseBranch: string; note?: string; reason?: string }>(`/projects/${encodeURIComponent(project.id)}/return-to-base`, {});
       setBranchState(result);
+      void queryClient.invalidateQueries({ queryKey: ["feature-branch", project.id] });
       void queryClient.invalidateQueries({ queryKey: ["repository-changes", project.id] });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not return to base branch";
