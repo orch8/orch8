@@ -24,6 +24,8 @@ describe("pipeline approval safety", () => {
       config: globalConfigSchema.parse({ auth: { allow_localhost_admin: true } }),
     });
     await app.ready();
+    // Startup rehydrates agent tokens; insert the fixture only after it finishes.
+    await app.initPromise;
     const [project] = await testDb.db.insert(projects).values({
       name: "Approval safety", slug: "approval-safety", homeDir: "/tmp/approval-safety",
     }).returning();
