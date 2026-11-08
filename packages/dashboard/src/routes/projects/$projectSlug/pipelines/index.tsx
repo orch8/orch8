@@ -24,6 +24,8 @@ function PipelinesActivePage() {
   const activePipelines = allPipelines?.filter(
     (p) => p.status === "pending" || p.status === "running" || p.status === "failed",
   ) ?? [];
+  const completedPipelines = allPipelines?.filter((p) => p.status === "completed")
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()) ?? [];
 
   const tabs: Array<{ key: Tab; label: string; to: string }> = [
     { key: "active", label: "Active", to: `/projects/${projectId}/pipelines` },
@@ -68,6 +70,13 @@ function PipelinesActivePage() {
           <p className="mt-1 text-sm text-zinc-400">Open a workflow to inspect its plan, agent runs and next decision before starting another feature in this checkout.</p>
         </div>
         {isLoading ? <p className="text-sm text-zinc-400">Loading workflows...</p> : isError ? <p role="alert" className="text-sm text-amber-300">Could not load existing workflows. Refresh before starting another feature in this checkout.</p> : <PipelineList pipelines={activePipelines} showActions />}
+      </section>}
+      {completedPipelines.length > 0 && <section aria-label="Completed work" className="space-y-2 rounded-lg border border-zinc-700 bg-zinc-900/50 p-4">
+        <h2 className="text-base font-semibold text-zinc-100">Completed work: inspect PR status</h2>
+        <p className="text-sm text-zinc-400">A completed review does not publish a PR. Open the workflow to inspect the run log and PR status. Its diff reflects the current checkout; verify the reviewed branch before publishing.</p>
+        <ul className="space-y-2 text-sm">{completedPipelines.map(pipeline => <li key={pipeline.id}>
+          <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: projectId, pipelineId: pipeline.id }} className="text-blue-300 underline">Inspect {pipeline.name}</Link>
+        </li>)}</ul>
       </section>}
       <FeatureIntake key={projectId} projectId={projectId} activeWorkflow={isLoading || isError || activePipelines.length > 0} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />
       <RepositoryChanges projectId={project?.id} projectError={projectError} />

@@ -51,6 +51,20 @@ describe("repository chooser progress", () => {
     expect(screen.getByText("Your decision needed: review plan")).toBeInTheDocument();
   });
 
+  it("keeps completed work discoverable for PR publication without claiming a PR exists", () => {
+    usePipelines.mockReturnValue({ data: [
+      { ...pipeline("older-done", "completed", "2026-11-08T01:00:00Z"), updatedAt: "2026-11-08T01:00:00Z" },
+      { ...pipeline("newer-done", "completed", "2026-11-08T02:00:00Z"), updatedAt: "2026-11-08T02:00:00Z" },
+    ], isError: false });
+    renderWithProviders(<RepositoryChooser />);
+    const links = screen.getAllByRole("link", { name: /Inspect .*done/ });
+    expect(links.map(link => link.textContent)).toEqual(["Inspect newer-done", "Inspect older-done"]);
+    expect(links[0]).toHaveAttribute("href", "/projects/my-repo/pipelines/newer-done");
+    expect(screen.getByText("Completed work: inspect PR status")).toBeInTheDocument();
+    expect(screen.getByText(/verify the branch before publishing/)).toBeInTheDocument();
+    expect(usePipeline).not.toHaveBeenCalled();
+  });
+
   it("shows implementation rework instead of a prior rejected review", () => {
     usePipelines.mockReturnValue({ data: [pipeline("rework-1", "running", "2026-11-08T01:00:00Z")], isError: false });
     usePipeline.mockReturnValue({ data: { steps: [
