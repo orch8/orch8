@@ -7,7 +7,8 @@ import type { Pipeline, Project } from "../types.js";
 
 function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline: Pipeline }) {
   const { data: detail, isError: detailError } = usePipeline(pipeline.id, true);
-  const step = detail?.steps.find(item => item.status === "awaiting_verification")
+  const step = (pipeline.status === "failed" ? detail?.steps.find(item => item.status === "failed") : undefined)
+    ?? detail?.steps.find(item => item.status === "awaiting_verification")
     ?? detail?.steps.find(item => item.status === "running")
     ?? detail?.steps.find(item => item.status === "pending")
     ?? detail?.steps.find(item => item.status === "failed");
@@ -15,9 +16,14 @@ function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline:
     : step?.status === "awaiting_verification" ? `Your decision needed: review ${step.label.toLowerCase()}`
     : pipeline.status === "failed" ? `Workflow failed${step ? ` at ${step.label.toLowerCase()}` : ""}: inspect the run`
       : step ? `${step.label}: ${step.status}` : "Open unfinished workflow";
+  const workflowUrl = `/projects/${encodeURIComponent(project.slug)}/pipelines/${encodeURIComponent(pipeline.id)}`;
   return <li className="border-t border-zinc-700 pt-3 text-sm">
     <p className={detailError || step?.status === "awaiting_verification" || pipeline.status === "failed" ? "text-amber-300" : "text-zinc-300"}>{action}</p>
     <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className="mt-1 inline-block text-blue-300 underline">Continue {pipeline.name}</Link>
+    {step?.id && (step.status === "awaiting_verification" || step.status === "failed") &&
+      <a href={`${workflowUrl}#workflow-step-${encodeURIComponent(step.id)}`} className="ml-3 inline-block rounded border border-amber-700 px-2 py-1 text-amber-200 hover:bg-amber-950/50">
+        {step.status === "awaiting_verification" ? `Review ${step.label.toLowerCase()} now` : `Inspect failed ${step.label.toLowerCase()}`}
+      </a>}
   </li>;
 }
 

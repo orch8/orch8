@@ -34,6 +34,18 @@ beforeEach(() => {
 });
 
 describe("pipeline step run evidence", () => {
+  it("scrolls and focuses a deep-linked step after it renders", async () => {
+    state.steps = [step("step_1", "Plan", null), step("step_2", "Independent review", null)];
+    window.history.replaceState(null, "", "#workflow-step-step_2");
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    const target = document.getElementById("workflow-step-step_2");
+    await waitFor(() => expect(document.activeElement).toBe(target));
+    expect(scroll).toHaveBeenCalledWith({ block: "start" });
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+
   it("labels steps without an assigned task as having no run yet", () => {
     state.steps = [step("step_1", "Plan", null)];
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);

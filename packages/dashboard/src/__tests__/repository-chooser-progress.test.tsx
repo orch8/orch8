@@ -68,6 +68,33 @@ describe("repository chooser progress", () => {
     expect(screen.getByRole("link", { name: "Continue plan-1" })).toHaveAttribute("href", "/projects/my-repo/pipelines/plan-1");
     expect(screen.getByRole("link", { name: "Continue failed-2" })).toHaveAttribute("href", "/projects/my-repo/pipelines/failed-2");
     expect(usePipeline).toHaveBeenCalledWith("plan-1", true);
+    expect(screen.queryByRole("link", { name: /Review plan now/ })).not.toBeInTheDocument(); // No step ID: do not invent an anchor.
+  });
+
+  it("links straight to the recorded plan or failed step without starting another run", () => {
+    usePipelines.mockReturnValue({ data: [
+      pipeline("plan-1", "running", "2026-11-08T01:00:00Z"),
+      pipeline("failed-2", "failed", "2026-11-08T02:00:00Z"),
+    ], isError: false });
+    usePipeline.mockImplementation((id: string) => ({ data: { steps: [{
+      id: id === "plan-1" ? "plan-step" : "implement-step",
+      label: id === "plan-1" ? "Plan" : "Implement",
+      status: id === "plan-1" ? "awaiting_verification" : "failed",
+    }] } }));
+    renderWithProviders(<RepositoryChooser />);
+    expect(screen.getByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/my-repo/pipelines/plan-1#workflow-step-plan-step");
+    expect(screen.getByRole("link", { name: "Inspect failed implement" })).toHaveAttribute("href", "/projects/my-repo/pipelines/failed-2#workflow-step-implement-step");
+  });
+
+  it("links to the failed step rather than a later pending review", () => {
+    usePipelines.mockReturnValue({ data: [pipeline("failed-2", "failed", "2026-11-08T02:00:00Z")], isError: false });
+    usePipeline.mockReturnValue({ data: { steps: [
+      { id: "implement-step", label: "Implement", status: "failed" },
+      { id: "review-step", label: "Independent review", status: "pending" },
+    ] } });
+    renderWithProviders(<RepositoryChooser />);
+    expect(screen.getByRole("link", { name: "Inspect failed implement" })).toHaveAttribute("href", "/projects/my-repo/pipelines/failed-2#workflow-step-implement-step");
+    expect(screen.queryByRole("link", { name: /Inspect failed independent review/ })).not.toBeInTheDocument();
   });
 
   it("shows every active feature and its pending decision instead of hiding an older workflow", () => {

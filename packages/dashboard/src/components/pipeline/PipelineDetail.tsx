@@ -377,6 +377,25 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
     const timer = setInterval(() => { void refetch(); }, 5000);
     return () => clearInterval(timer);
   }, [data?.pipeline.status, pipelineId, refetch]);
+  const focusedStep = useRef("");
+  useEffect(() => {
+    if (!data) return;
+    const showLinkedStep = () => {
+      const step = data.steps.find(item => window.location.hash === `#workflow-step-${encodeURIComponent(item.id)}`);
+      if (!step) return;
+      const key = `${pipelineId}:${step.id}`;
+      if (focusedStep.current === key) return;
+      const target = document.getElementById(`workflow-step-${step.id}`);
+      if (!target) return;
+      focusedStep.current = key;
+      target.scrollIntoView({ block: "start" });
+      target.focus({ preventScroll: true });
+    };
+    const frame = requestAnimationFrame(showLinkedStep);
+    const onHashChange = () => { focusedStep.current = ""; requestAnimationFrame(showLinkedStep); };
+    window.addEventListener("hashchange", onHashChange);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("hashchange", onHashChange); };
+  }, [data, pipelineId]);
 
   if (isLoading || !data) {
     return <p className="text-sm text-zinc-600">Loading pipeline...</p>;
@@ -551,7 +570,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
       {/* Step details */}
       <div className="flex flex-col gap-[var(--gap-inline)]">
         {steps.map((step) => (
-          <div key={step.id} id={`workflow-step-${step.id}`} className="scroll-mt-6 rounded border border-zinc-800 p-3">
+          <div key={step.id} id={`workflow-step-${step.id}`} tabIndex={-1} className="scroll-mt-6 rounded border border-zinc-800 p-3">
             <p className="text-sm font-medium text-zinc-200">{step.label} <span className="text-xs text-zinc-500">{step.status}</span></p>
             {step.taskId ? <StepEvidence taskId={step.taskId} projectId={projectId ?? pipeline.projectId} stepStatus={step.status} label={step.label} /> :
               <p className="mt-2 text-xs text-zinc-400">No task or run recorded yet for this step.</p>}
