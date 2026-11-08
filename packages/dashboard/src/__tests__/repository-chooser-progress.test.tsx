@@ -31,11 +31,34 @@ describe("repository chooser progress", () => {
       pipeline("plan-1", "running", "2026-11-08T01:00:00Z"),
       pipeline("done-3", "completed", "2026-11-08T03:00:00Z"),
     ], isError: false });
-    usePipeline.mockReturnValue({ data: { steps: [{ label: "Plan", status: "awaiting_verification" }] } });
+    usePipeline.mockImplementation((id: string) => ({ data: { steps: [{ label: id === "plan-1" ? "Plan" : "Implement", status: id === "plan-1" ? "awaiting_verification" : "failed" }] } }));
     renderWithProviders(<RepositoryChooser />);
     expect(screen.getByText("Your decision needed: review plan")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Continue plan-1" })).toHaveAttribute("href", "/projects/my-repo/pipelines/plan-1");
+    expect(screen.getByRole("link", { name: "Continue failed-2" })).toHaveAttribute("href", "/projects/my-repo/pipelines/failed-2");
     expect(usePipeline).toHaveBeenCalledWith("plan-1", true);
+  });
+
+  it("shows every active feature and its pending decision instead of hiding an older workflow", () => {
+    usePipelines.mockReturnValue({ data: [
+      pipeline("newer-2", "running", "2026-11-08T02:00:00Z"),
+      pipeline("older-1", "running", "2026-11-08T01:00:00Z"),
+    ], isError: false });
+    usePipeline.mockImplementation((id: string) => ({ data: { steps: [{ label: "Plan", status: id === "older-1" ? "awaiting_verification" : "running" }] } }));
+    renderWithProviders(<RepositoryChooser />);
+    expect(screen.getByRole("link", { name: "Continue newer-2" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continue older-1" })).toBeInTheDocument();
+    expect(screen.getByText("Your decision needed: review plan")).toBeInTheDocument();
+  });
+
+  it("shows implementation rework instead of a prior rejected review", () => {
+    usePipelines.mockReturnValue({ data: [pipeline("rework-1", "running", "2026-11-08T01:00:00Z")], isError: false });
+    usePipeline.mockReturnValue({ data: { steps: [
+      { label: "Implement", status: "pending" }, { label: "Review", status: "failed" },
+    ] } });
+    renderWithProviders(<RepositoryChooser />);
+    expect(screen.getByText("Implement: pending")).toBeInTheDocument();
+    expect(screen.queryByText("Review: failed")).not.toBeInTheDocument();
   });
 
   it("identifies a failed workflow and keeps the repository open link", () => {
@@ -58,6 +81,6 @@ describe("repository chooser progress", () => {
     usePipelines.mockReturnValue({ data: undefined, isError: true });
     renderWithProviders(<RepositoryChooser />);
     expect(screen.getByText("Workflow status unavailable. Open the repository to check it.")).toBeInTheDocument();
-    expect(usePipeline).toHaveBeenCalledWith(null, true);
+    expect(usePipeline).not.toHaveBeenCalled();
   });
 });
