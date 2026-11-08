@@ -24,10 +24,10 @@ import { useEffect } from "react";
 import type { Pipeline, PipelineStep } from "../../types.js";
 import type { PipelineRepositoryDiff } from "../../hooks/usePipelines.js";
 
-function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPublish, onReuse, reusableRequest, reusing, reuseError }: {
+function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPublish, onReuse, featureRequest, reusing, reuseError }: {
   pipeline: Pipeline; steps: PipelineStep[]; diff?: PipelineRepositoryDiff;
   diffLoading: boolean; diffError: boolean; canPublish: boolean;
-  onReuse: () => void; reusableRequest: boolean; reusing: boolean; reuseError: string;
+  onReuse: () => void; featureRequest: string; reusing: boolean; reuseError: string;
 }) {
   const active = steps.find(step => step.order === pipeline.currentStep && step.status !== "completed")
     ?? steps.find(step => ["awaiting_verification", "running", "failed"].includes(step.status))
@@ -95,6 +95,10 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
   else nextAction = "No decision needed yet; wait for the current step.";
   return <section aria-label="Feature progress" className="rounded border border-zinc-700 bg-zinc-900/60 p-4 text-sm text-zinc-300 space-y-3">
     <h4 className="font-semibold text-zinc-100">Feature progress</h4>
+    {featureRequest && <details className="rounded border border-zinc-700 bg-zinc-950/60 p-3">
+      <summary className="cursor-pointer font-medium text-zinc-200">Read the full feature request</summary>
+      <p className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words text-zinc-300">{featureRequest}</p>
+    </details>}
     <nav aria-label="Workflow evidence" className="flex flex-wrap gap-2 text-xs">
       {steps.filter(step => ["plan", "implement", "independent review", "review"].includes(step.label.toLowerCase())).map(step => (
         <a key={step.id} href={`#workflow-step-${step.id}`} className="rounded border border-zinc-700 px-3 py-2 text-blue-300 hover:bg-zinc-800">
@@ -123,8 +127,8 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
     </div>}
     {(stalledStep || pipeline.status === "failed" || pipeline.status === "cancelled") &&
       <div className="space-y-2 rounded border border-zinc-700 p-3">
-        {reusableRequest && <p>Want to try a different agent or model? Reuse this request in a new workflow. If this workflow is still open, it will be cancelled first. The repository branch and files are not changed; return to the base branch before starting again.</p>}
-        {reusableRequest ? <button type="button" onClick={onReuse} disabled={reusing} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:opacity-50">
+        {featureRequest && <p>Want to try a different agent or model? Reuse this request in a new workflow. If this workflow is still open, it will be cancelled first. The repository branch and files are not changed; return to the base branch before starting again.</p>}
+        {featureRequest ? <button type="button" onClick={onReuse} disabled={reusing} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:opacity-50">
           {reusing ? "Opening new feature..." : "Start again with this request"}
         </button> : <p>Could not recover the original feature request from this workflow. Copy it from the steps before creating a new feature; this workflow has not been cancelled.</p>}
         {reuseError && <p role="alert" className="text-red-300">{reuseError}</p>}
@@ -487,7 +491,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
       </div>
 
       {steps[0]?.label.toLowerCase() === "plan" && implement && review &&
-        <FeatureProgress pipeline={pipeline} steps={steps} diff={repositoryDiff} diffLoading={diffLoading} diffError={diffError} canPublish={!!canPublish} onReuse={() => void reuseRequest()} reusableRequest={!!reusableRequest} reusing={reusing} reuseError={reuseError} />}
+        <FeatureProgress pipeline={pipeline} steps={steps} diff={repositoryDiff} diffLoading={diffLoading} diffError={diffError} canPublish={!!canPublish} onReuse={() => void reuseRequest()} featureRequest={reusableRequest} reusing={reusing} reuseError={reuseError} />}
       {steps[0]?.label.toLowerCase() === "plan" && implement && review &&
         <DownloadEvidence key={pipeline.id} pipelineId={pipeline.id} />}
       <PipelineStepper steps={steps} currentStep={pipeline.currentStep} />

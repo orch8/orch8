@@ -59,6 +59,18 @@ beforeEach(() => {
 });
 
 describe("feature progress summary", () => {
+  it("reveals the complete saved feature request when the workflow title is truncated", () => {
+    const request = "Add a Usage section to README.md. Preserve existing content and check the actual diff before reporting completion.";
+    state.steps[1] = step("Implement", 2, "pending", {
+      promptOverride: `Feature request: ${request}\nFollow the approved plan in {{pipeline.context}}.`,
+    });
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    const disclosure = within(progress()).getByText("Read the full feature request");
+    expect(disclosure.closest("details")).not.toHaveAttribute("open");
+    fireEvent.click(disclosure);
+    expect(within(progress()).getByText(request)).toBeVisible();
+  });
+
   it("links the plan, implementation log, review and live diff without inventing a PR", () => {
     state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "running"), step("Independent review", 3, "pending")];
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
