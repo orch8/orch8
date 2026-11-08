@@ -27,6 +27,8 @@ function RepositoryCard({ project }: { project: Project }) {
       const bActive = b.status === "failed" ? 1 : 0;
       return aActive - bActive || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
+  const completed = pipelines?.filter(pipeline => pipeline.status === "completed")
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   return <li className="rounded border border-zinc-700 bg-zinc-900 p-4">
     <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} className="block hover:text-blue-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400">
       <span className="block font-medium text-zinc-100">{project.name}</span>
@@ -36,6 +38,15 @@ function RepositoryCard({ project }: { project: Project }) {
     {!!unfinished?.length && <ul className="mt-3 space-y-3" aria-label={`Unfinished workflows for ${project.name}`}>
       {unfinished.map(pipeline => <UnfinishedWorkflow key={pipeline.id} project={project} pipeline={pipeline} />)}
     </ul>}
+    {!!completed?.length && <div className="mt-3 border-t border-zinc-700 pt-3 text-sm">
+      <p className="text-zinc-300">Completed work: inspect PR status</p>
+      <p className="mt-1 text-xs text-zinc-400">A completed workflow may or may not have a PR. Its diff reflects the current checkout; verify the branch before publishing.</p>
+      <ul className="mt-2 space-y-2" aria-label={`Completed workflows for ${project.name}`}>
+        {completed.map(pipeline => <li key={pipeline.id}>
+          <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className="text-blue-300 underline">Inspect {pipeline.name}</Link>
+        </li>)}
+      </ul>
+    </div>}
     {isError && <p role="status" className="mt-3 text-xs text-amber-300">Workflow status unavailable. Open the repository to check it.</p>}
   </li>;
 }
