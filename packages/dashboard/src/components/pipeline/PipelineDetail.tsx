@@ -106,7 +106,7 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
     </nav>
     <div className="grid gap-3 sm:grid-cols-2">
       <p>Current stage: <span className="text-zinc-100">{pipeline.status === "completed" ? "Workflow completed" : pipeline.status === "cancelled" ? "Workflow cancelled" : active ? `${active.label} · ${active.status === "awaiting_verification" ? "awaiting approval" : active.status}` : pipeline.status}</span></p>
-      <p>Next action: <span className="text-zinc-100">{nextAction}</span>{(stalledStep || pipeline.status === "failed") && active && activeRun && <a href={`#workflow-step-${active.id}`} className="mt-2 block w-fit rounded border border-blue-600 px-3 py-2 text-blue-200">Inspect {active.label.toLowerCase()} run and log</a>}</p>
+      <p>Next action: <span className="text-zinc-100">{nextAction}</span>{(stalledStep || pipeline.status === "failed") && active && activeRun && <a href={`#workflow-run-${activeRun.id}`} className="mt-2 block w-fit rounded border border-blue-600 px-3 py-2 text-blue-200">Inspect {active.label.toLowerCase()} run and log</a>}</p>
       <div>Implementation test evidence: {implement?.taskId ? <ImplementationEvidence run={latestRun} projectId={pipeline.projectId} isLoading={runsLoading} isError={runsError} /> : <span>No implementation run recorded yet.</span>}</div>
       <p>Review decision: <span className="text-zinc-100">{!review ? "No review step recorded" : review.outputSummary?.startsWith("[REJECTED]") ? "Rejected; changes requested" : review.status === "completed" ? review.requiresVerification ? "Accepted (test results still require inspection)" : "Completed; no human decision recorded" : review.status === "awaiting_verification" ? "Awaiting your decision" : review.status === "failed" ? "Review failed" : "Not decided"}</span></p>
       <p className="sm:col-span-2">Draft PR: {diffLoading ? "Checking repository..." : diffError || !diff?.available || diff.prLookup === "unavailable" ? "PR lookup unavailable; check GitHub." : diff.prLookup === "found" && diff.pullRequest ? <a href={diff.pullRequest.url} target="_blank" rel="noopener noreferrer" className="text-blue-300 underline">{diff.pullRequest.isDraft === true ? "Draft PR" : diff.pullRequest.isDraft === false ? "PR (not draft)" : "PR (draft status unknown)"} #{diff.pullRequest.number} · {diff.pullRequest.state.toLowerCase()}</a> : diff.prLookup === "none" ? "No PR found for this branch commit." : "Not verified for this branch commit."}</p>
@@ -136,13 +136,22 @@ function ImplementationEvidence({ run, projectId, isLoading, isError }: { run?: 
   if (isError) return <span>Could not load implementation runs; test results unverified.</span>;
 
   if (!run) return <span>No run recorded for the current implementation task; test results unverified. <a href={`/projects/${encodeURIComponent(projectId)}/runs`} className="text-blue-300 underline">Inspect project runs for earlier attempts</a>.</span>;
-  return <span>Run status: {run.status}; test results unverified. <a href={`#implementation-run-${encodeURIComponent(run.id)}`} className="text-blue-300 underline">Open run {run.id} and raw log</a>.</span>;
+  return <span>Run status: {run.status}; test results unverified. <a href={`#workflow-run-${run.id}`} className="text-blue-300 underline">Open run {run.id} and raw log</a>.</span>;
 }
 
-function RunEvidence({ run, projectId, onOpen, implementation }: { run: Run; projectId: string; onOpen: () => void; implementation: boolean }) {
-  const [open, setOpen] = useState(false);
+function RunEvidence({ run, projectId, onOpen }: { run: Run; projectId: string; onOpen: () => void }) {
+  const anchor = `workflow-run-${run.id}`;
+  const [open, setOpen] = useState(() => window.location.hash === `#${anchor}`);
+  useEffect(() => {
+    const openLinkedRun = () => {
+      if (window.location.hash === `#${anchor}`) setOpen(true);
+    };
+    openLinkedRun();
+    window.addEventListener("hashchange", openLinkedRun);
+    return () => window.removeEventListener("hashchange", openLinkedRun);
+  }, [anchor]);
   const { data: log, isLoading, isError, error, refetch } = useRunLog(open ? run.id : null, projectId);
-  return <div id={implementation ? `implementation-run-${run.id}` : undefined} className="rounded border border-zinc-700 bg-zinc-950/60 p-2 space-y-2">
+  return <div id={anchor} className="scroll-mt-6 rounded border border-zinc-700 bg-zinc-950/60 p-2 space-y-2">
     <div className="flex flex-wrap items-center gap-2 text-zinc-300">
       <span className="font-mono">{run.id}</span>
       <span>{run.agentId} · Run status: {run.status}</span>
@@ -173,7 +182,7 @@ function StepEvidence({ taskId, projectId, stepStatus, label }: { taskId: string
     {isLoading && <p role="status" className="text-zinc-400">Loading runs...</p>}
     {isError && <p role="alert" className="text-amber-300">Could not load runs. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>}
     {!isLoading && !isError && runs?.length === 0 && <p className="text-zinc-400">No run recorded yet for this step.</p>}
-    {runs?.map(run => <RunEvidence key={run.id} run={run} projectId={projectId} implementation={label.toLowerCase() === "implement"} onOpen={() => setSelectedRun(run.id)} />)}
+    {runs?.map(run => <RunEvidence key={run.id} run={run} projectId={projectId} onOpen={() => setSelectedRun(run.id)} />)}
     {stepStatus === "pending" && runs?.[0]?.status === "succeeded" &&
       <p role="status" className="text-amber-300">Agent run ended without completing this step. Inspect its log before retrying.</p>}
     {selectedRun && <RunViewer runId={selectedRun} projectId={projectId} onClose={() => setSelectedRun(null)} />}

@@ -43,6 +43,20 @@ it("shows a clone conflict without proceeding to project creation", async () => 
   expect(mockFetch).toHaveBeenCalledTimes(1);
 });
 
+it("accepts the advertised .git clone URL and rejects paths beyond a repository", async () => {
+  renderWithProviders(<RepositoryStart onComplete={vi.fn()} />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Clone from GitHub" }));
+  const url = screen.getByLabelText("GitHub HTTPS repository URL");
+  await user.type(screen.getByLabelText("Local parent directory"), "/tmp/checkouts");
+  await user.type(url, "https://github.com/sample/demo.git");
+  expect(screen.getByRole("button", { name: "Clone repository" })).toBeEnabled();
+  await user.clear(url);
+  await user.type(url, "https://github.com/sample/demo/tree/main");
+  expect(screen.getByRole("button", { name: "Clone repository" })).toBeDisabled();
+  expect(mockFetch).not.toHaveBeenCalled();
+});
+
 it("opens a pasted checkout without making the user invent its name, key, or branch", async () => {
   mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ branch: "release", origin: "https://github.com/org/my-app.git", originAvailable: true }) });
   mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ready: true, branch: "release", baseBranch: "release" }) });
