@@ -3,6 +3,10 @@ import { render, screen } from "@testing-library/react";
 
 const useProjects = vi.fn();
 vi.mock("../hooks/useProjects.js", () => ({ useProjects: () => useProjects() }));
+vi.mock("../hooks/usePipelines.js", () => ({
+  usePipelines: () => ({ data: [], isError: false }),
+  usePipeline: () => ({ data: undefined, isError: false }),
+}));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => options,
   Link: ({ to, params, children, ...props }: { to: string; params?: { projectSlug: string }; children: React.ReactNode }) =>
