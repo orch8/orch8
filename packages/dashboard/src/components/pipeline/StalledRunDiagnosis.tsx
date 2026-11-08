@@ -27,7 +27,10 @@ export function StalledRunDiagnosis({ runId, projectId, agentId }: { runId: stri
   if (!message || !agent.data) return <p className="text-xs text-zinc-400">No known runtime blocker found for this agent. Inspect the raw run log before deciding how to continue.</p>;
   return <div className="space-y-2">
     <p className="text-xs text-amber-200">This run log mentions a known {agent.data.adapterType === "codex_local" ? "Codex" : "Claude"} runtime error. Verify it in the raw log before retrying.</p>
-    <SandboxRecoveryGuidance message={message} adapterType={agent.data.adapterType} />
+    <details className="rounded border border-amber-800/60 p-2 text-xs">
+      <summary className="cursor-pointer text-amber-200">Host repair details</summary>
+      <div className="mt-2"><SandboxRecoveryGuidance message={message} adapterType={agent.data.adapterType} /></div>
+    </details>
     <p className="text-xs text-zinc-400">This is a hint from stored log text, not a verified cause. Check the full run log and agent runtime before another run.</p>
   </div>;
 }
