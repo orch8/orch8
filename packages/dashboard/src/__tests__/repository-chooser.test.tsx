@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { renderWithProviders, screen } from "../test-utils.js";
 
 const useProjects = vi.fn();
 vi.mock("../hooks/useProjects.js", () => ({ useProjects: () => useProjects() }));
+vi.mock("../api/client.js", () => ({ api: { get: vi.fn().mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" }) } }));
 vi.mock("../hooks/usePipelines.js", () => ({
   usePipelines: () => ({ data: [], isError: false }),
   usePipeline: () => ({ data: undefined, isError: false }),
@@ -21,7 +22,7 @@ describe("repository chooser", () => {
       { id: "1", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true },
       { id: "2", name: "Archived", slug: "old", homeDir: "/tmp/old", active: false },
     ], isLoading: false, isError: false });
-    render(<Chooser />);
+    renderWithProviders(<Chooser />);
     expect(screen.getByRole("link", { name: /Demo/ })).toHaveAttribute("href", "/projects/demo/pipelines");
     expect(screen.queryByRole("link", { name: /Archived/ })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add repository" })).toHaveAttribute("href", "/projects/new");
@@ -30,7 +31,7 @@ describe("repository chooser", () => {
   it("offers recovery if repositories cannot load", () => {
     const refetch = vi.fn();
     useProjects.mockReturnValue({ data: undefined, isLoading: false, isError: true, refetch });
-    render(<Chooser />);
+    renderWithProviders(<Chooser />);
     screen.getByRole("button", { name: "Retry" }).click();
     expect(refetch).toHaveBeenCalledOnce();
   });

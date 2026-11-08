@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../api/client.js";
 import { useProjects } from "../hooks/useProjects.js";
 import { usePipeline, usePipelines } from "../hooks/usePipelines.js";
 import type { Pipeline, Project } from "../types.js";
@@ -21,6 +23,15 @@ function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline:
 
 function RepositoryCard({ project }: { project: Project }) {
   const { data: pipelines, isError } = usePipelines(project.id);
+  const { data: checkout, isError: checkoutError, isFetching: checkingCheckout, refetch: refreshCheckout } = useQuery({
+    queryKey: ["feature-branch", project.id],
+    queryFn: () => api.get<{ ready: boolean; branch: string; baseBranch: string; reason?: string }>(
+      `/projects/${encodeURIComponent(project.id)}/feature-branch`,
+    ),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+    retry: false,
+  });
   const unfinished = pipelines?.filter(pipeline => ["pending", "running", "failed"].includes(pipeline.status))
     .sort((a, b) => {
       const aActive = a.status === "failed" ? 1 : 0;
@@ -33,8 +44,17 @@ function RepositoryCard({ project }: { project: Project }) {
     <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} className="block hover:text-blue-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400">
       <span className="block font-medium text-zinc-100">{project.name}</span>
       <span className="mt-1 block break-all font-mono text-xs text-zinc-400">{project.homeDir}</span>
+      {checkout && !checkoutError && !checkingCheckout && <span className={`mt-2 block text-xs ${checkout.ready ? "text-emerald-300" : "text-amber-300"}`}>
+        {checkout.ready ? `Checkout clean on base · ${checkout.branch}` :
+          checkout.branch && checkout.branch !== checkout.baseBranch
+            ? `On ${checkout.branch} · ${checkout.reason ?? "Finish or inspect existing work before starting another feature."}`
+            : `Not ready for a new feature · ${checkout.reason ?? "Inspect the checkout."}`}
+      </span>}
+      {checkingCheckout && <span className="mt-2 block text-xs text-zinc-400">Checking checkout...</span>}
+      {checkoutError && <span className="mt-2 block text-xs text-amber-300">Checkout status unavailable. Inspect the repository before starting.</span>}
       <span className="mt-2 block text-xs text-blue-300">Open feature workflows →</span>
     </Link>
+    <button type="button" onClick={() => void refreshCheckout()} className="mt-2 text-xs text-blue-300 underline">Refresh checkout status</button>
     {!!unfinished?.length && <ul className="mt-3 space-y-3" aria-label={`Unfinished workflows for ${project.name}`}>
       {unfinished.map(pipeline => <UnfinishedWorkflow key={pipeline.id} project={project} pipeline={pipeline} />)}
     </ul>}
