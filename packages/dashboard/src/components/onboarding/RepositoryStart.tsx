@@ -143,7 +143,7 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
       </label>
       <p className="text-xs text-zinc-400">Clones into a new folder named after the repository. The parent must already exist on the machine running Orch8. Existing paths are never replaced. Only public GitHub HTTPS repositories work; no sign-in prompt appears.</p>
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-      <button type="button" onClick={() => void clone()} disabled={cloning || !/^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(cloneUrl.trim()) || !parentDir.trim()} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{cloning ? "Cloning repository..." : "Clone repository"}</button>
+      <button type="button" onClick={() => void clone()} disabled={cloning || !/^https:\/\/github\.com\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9_][A-Za-z0-9_.-]*?(?:\.git)?$/.test(cloneUrl.trim()) || !parentDir.trim()} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{cloning ? "Cloning repository..." : "Clone repository"}</button>
     </div>}
     {!cloneMode && <form onSubmit={event => { void submit(event); }} className="mt-5 space-y-4">
       <label className="block text-sm text-zinc-300">Local repository path

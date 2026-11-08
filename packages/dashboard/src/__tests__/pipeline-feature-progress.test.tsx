@@ -41,6 +41,7 @@ const step = (label: string, order: number, status: string, extras: Record<strin
 const progress = () => screen.getByRole("region", { name: "Feature progress" });
 
 beforeEach(() => {
+  window.history.replaceState(null, "", window.location.pathname);
   localStorage.clear();
   apiMock.cancel.mockReset();
   apiMock.get.mockReset();
@@ -107,16 +108,19 @@ describe("feature progress summary", () => {
     expect(within(progress()).getByText(/No run recorded for the current implementation task/i)).toBeInTheDocument();
   });
 
-  it("links to the recorded implementation run without claiming its tests passed", () => {
+  it("opens the recorded implementation run without claiming its tests passed", async () => {
     state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "running"), step("Independent review", 3, "pending")];
     state.runs = [{ id: "run_42", status: "succeeded", taskId: "task_2", agentId: "builder" }];
+    state.log = { content: "pnpm test: 1 failed" };
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     const link = within(progress()).getByRole("link", { name: /run_42.*raw log/i });
-    expect(link).toHaveAttribute("href", "#implementation-run-run_42");
-    expect(screen.getByRole("region", { name: "Implement run evidence" }).querySelector("#implementation-run-run_42")).toBeInTheDocument();
+    expect(link).toHaveAttribute("href", "#workflow-run-run_42");
+    const evidence = screen.getByRole("region", { name: "Implement run evidence" });
+    expect(evidence.querySelector("#workflow-run-run_42")).toBeInTheDocument();
     expect(within(progress()).getByText(/Run status: succeeded.*test results unverified/i)).toBeInTheDocument();
     expect(within(progress()).queryByText(/tests passed/i)).not.toBeInTheDocument();
-    expect(within(progress()).getByText(/No decision needed yet/i)).toBeInTheDocument();
+    fireEvent.click(link);
+    await waitFor(() => expect(within(evidence).getByText("pnpm test: 1 failed")).toBeVisible());
   });
 
   it("distinguishes unavailable run lookup from missing evidence", () => {
@@ -209,7 +213,11 @@ describe("feature progress summary", () => {
     state.log = { content: 'Agent said every shell command fails with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.' };
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     const action = within(progress()).getByRole("link", { name: "Inspect plan run and log" });
-    expect(action).toHaveAttribute("href", "#workflow-step-step_1");
+    expect(action).toHaveAttribute("href", "#workflow-run-run_stalled_plan");
+    const evidence = screen.getByRole("region", { name: "Plan run evidence" });
+    expect(evidence.querySelector("#workflow-run-run_stalled_plan")).toBeInTheDocument();
+    fireEvent.click(action);
+    await waitFor(() => expect(within(evidence).getByText(/every shell command fails/)).toBeVisible());
     expect(await within(progress()).findByText(/run log mentions a known Codex runtime error/i)).toBeInTheDocument();
     const repair = within(progress()).getByText("Host repair details").closest("details");
     expect(repair).not.toHaveAttribute("open");
