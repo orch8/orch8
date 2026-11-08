@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import Fastify from "fastify";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { projects } from "@orch/shared/db";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
@@ -31,6 +34,24 @@ describe("Project Routes", () => {
     app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(projectRoutes);
     await app.ready();
+  });
+
+  describe("POST /api/projects/repository-clone", () => {
+    it("rejects unsupported input before touching the filesystem", async () => {
+      const res = await app.inject({ method: "POST", url: "/api/projects/repository-clone", payload: { url: "git@github.com:org/repo.git", parentDir: "/tmp" } });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().message).toMatch(/GitHub HTTPS URL/);
+    });
+
+    it("refuses an existing destination without replacing it", async () => {
+      const parent = await mkdtemp(join(tmpdir(), "orch8-route-clone-"));
+      try {
+        await mkdir(join(parent, "orch8"));
+        const res = await app.inject({ method: "POST", url: "/api/projects/repository-clone", payload: { url: "https://github.com/orch8/orch8.git", parentDir: parent } });
+        expect(res.statusCode).toBe(409);
+        expect(res.json().message).toMatch(/already exists/);
+      } finally { await rm(parent, { recursive: true, force: true }); }
+    });
   });
 
   describe("POST /api/projects", () => {

@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useCreateProject } from "../../hooks/useProjects.js";
-import { api } from "../../api/client.js";
+import { api, ApiError } from "../../api/client.js";
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -23,6 +23,10 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
   const [keyEdited, setKeyEdited] = useState(false);
   const keyEditedDuringInspection = useRef(false);
   const [path, setPath] = useState("");
+  const [cloneMode, setCloneMode] = useState(false);
+  const [cloneUrl, setCloneUrl] = useState("");
+  const [parentDir, setParentDir] = useState("");
+  const [cloning, setCloning] = useState(false);
   const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("main");
   const [budget, setBudget] = useState("");
@@ -35,6 +39,32 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
   const currentPath = useRef("");
   const branchEdits = useRef(0);
   const originEdits = useRef(0);
+
+  async function clone() {
+    if (cloning) return;
+    setCloning(true); setError(""); setInspection("");
+    try {
+      const result = await api.post<{ homeDir: string; branch: string; origin: string }>("/projects/repository-clone", {
+        url: cloneUrl.trim(), parentDir: parentDir.trim(),
+      });
+      currentPath.current = result.homeDir;
+      setPath(result.homeDir);
+      setRepoUrl(result.origin);
+      setBranch(result.branch);
+      const detectedName = nameFromPath(result.homeDir);
+      if (!nameEdited.current) {
+        setName(detectedName);
+        if (!keyEditedDuringInspection.current) setKey(defaultKey(detectedName));
+      }
+      setCloneMode(false);
+      setInspection(`Cloned to ${result.homeDir} on ${result.branch}. Review the details below, then open the repository. No agent has started.`);
+    } catch (cause) {
+      if (cause instanceof ApiError) {
+        try { setError((JSON.parse(cause.message) as { message?: string }).message ?? "Could not clone repository."); }
+        catch { setError("Could not clone repository. Check the URL and parent directory."); }
+      } else setError("Could not clone repository. Check the network connection.");
+    } finally { setCloning(false); }
+  }
 
   async function inspect() {
     if (!path.trim() || inspecting) return;
@@ -99,8 +129,23 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
   const inputClass = "w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100";
   return <section aria-label="Open a repository" className="rounded-lg border border-zinc-700 bg-zinc-900 p-5">
     <h1 className="text-xl font-semibold text-zinc-100">Open a repository</h1>
-    <p className="mt-2 text-sm text-zinc-400">Paste a local Git checkout, detect its details, then describe what you want to build. Opening it does not start an agent. Plan approval and draft PR publication remain separate decisions.</p>
-    <form onSubmit={event => { void submit(event); }} className="mt-5 space-y-4">
+    <p className="mt-2 text-sm text-zinc-400">Open a local Git checkout or clone a public GitHub repository, then describe what you want to build. Opening it does not start an agent.</p>
+    <div className="mt-5 flex gap-2" role="group" aria-label="Repository source">
+      <button type="button" aria-pressed={!cloneMode} onClick={() => { setCloneMode(false); setError(""); }} disabled={cloning} className={`rounded border px-3 py-2 text-sm ${!cloneMode ? "border-blue-500 text-blue-200" : "border-zinc-600 text-zinc-300"}`}>Local checkout</button>
+      <button type="button" aria-pressed={cloneMode} onClick={() => { setCloneMode(true); setError(""); }} disabled={cloning} className={`rounded border px-3 py-2 text-sm ${cloneMode ? "border-blue-500 text-blue-200" : "border-zinc-600 text-zinc-300"}`}>Clone from GitHub</button>
+    </div>
+    {cloneMode && <div className="mt-5 space-y-4">
+      <label className="block text-sm text-zinc-300">GitHub HTTPS repository URL
+        <input type="url" required value={cloneUrl} onChange={event => setCloneUrl(event.target.value)} placeholder="https://github.com/owner/repo.git" className={`mt-1 ${inputClass}`} />
+      </label>
+      <label className="block text-sm text-zinc-300">Local parent directory
+        <input required value={parentDir} onChange={event => setParentDir(event.target.value)} placeholder="/home/me/projects" className={`mt-1 ${inputClass}`} />
+      </label>
+      <p className="text-xs text-zinc-400">Clones into a new folder named after the repository. The parent must already exist on the machine running Orch8. Existing paths are never replaced. Only public GitHub HTTPS repositories work; no sign-in prompt appears.</p>
+      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+      <button type="button" onClick={() => void clone()} disabled={cloning || !/^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(cloneUrl.trim()) || !parentDir.trim()} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{cloning ? "Cloning repository..." : "Clone repository"}</button>
+    </div>}
+    {!cloneMode && <form onSubmit={event => { void submit(event); }} className="mt-5 space-y-4">
       <label className="block text-sm text-zinc-300">Local repository path
         <input required value={path} onChange={event => { currentPath.current = event.target.value; setPath(event.target.value); setInspection(""); setRepoUrl(""); setBranch("main"); if (!nameEdited.current) setName(""); if (!keyEditedDuringInspection.current && !nameEdited.current) setKey(""); }} placeholder="/home/me/projects/my-app" className={`mt-1 ${inputClass}`} />
       </label>
@@ -132,6 +177,6 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
       <p className="text-xs text-zinc-400">Choose a clean git checkout at its repository root, on the base branch. Orch8 checks the checkout before creating the project. The project starts with no automatic merge or PR strategy. Feature work requires a separate branch, and draft PR publication is an explicit action.</p>
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       <button type="submit" disabled={checking || create.isPending || !slugify(name) || !/^[A-Z][A-Z0-9]{1,4}$/.test(key.trim()) || !path.trim() || !branch.trim() || (!noLimit && !(Number(budget) > 0))} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{checking ? "Checking repository..." : create.isPending ? "Opening..." : "Open and describe feature"}</button>
-    </form>
+    </form>}
   </section>;
 }
