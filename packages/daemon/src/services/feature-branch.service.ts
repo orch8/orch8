@@ -80,7 +80,7 @@ export async function prepareFeatureBranch(homeDir: string, baseBranch: string, 
   return { branch: name, baseBranch };
 }
 
-async function ignoreLocalRuntimeData(homeDir: string) {
+export async function ignoreLocalRuntimeData(homeDir: string) {
   // Keep the configured base branch's tracked files untouched. Git's local
   // exclude also prevents Orch8's runtime directory appearing in new branches.
   const exclude = resolve(homeDir, await git(homeDir, ["rev-parse", "--git-path", "info/exclude"]));

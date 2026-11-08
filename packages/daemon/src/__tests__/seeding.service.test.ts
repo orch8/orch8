@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { mkdtemp, rm, readdir, readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { and, eq } from "drizzle-orm";
 import { projects, agents } from "@orch/shared/db";
@@ -392,6 +393,43 @@ describe("SeedingService", () => {
   });
 
   describe("ensureGitignore", () => {
+    it("keeps an opened Git checkout clean and ignores runtime files locally", async () => {
+      execFileSync("git", ["init", "-q", tempDir]);
+      await writeFile(join(tempDir, ".gitignore"), "node_modules/\n");
+      execFileSync("git", ["-C", tempDir, "add", ".gitignore"]);
+      execFileSync("git", ["-C", tempDir, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "initial"]);
+      const service = new SeedingService();
+      await service.ensureGitignore(tempDir);
+      await service.ensureGitignore(tempDir);
+      await mkdir(join(tempDir, ".orch8"));
+      await writeFile(join(tempDir, ".orch8", "run.json"), "{}");
+
+      expect(await readFile(join(tempDir, ".gitignore"), "utf8")).toBe("node_modules/\n");
+      expect(await readFile(join(tempDir, ".git", "info", "exclude"), "utf8")).toMatch(/\.orch8\/\n$/);
+      expect(execFileSync("git", ["status", "--short"], { cwd: tempDir, encoding: "utf8" })).toBe("");
+    });
+
+    it("shares the runtime ignore across linked worktrees without touching either branch", async () => {
+      execFileSync("git", ["init", "-q", "-b", "main", tempDir]);
+      await writeFile(join(tempDir, "README.md"), "hello\n");
+      execFileSync("git", ["-C", tempDir, "add", "README.md"]);
+      execFileSync("git", ["-C", tempDir, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "initial"]);
+      const linked = await mkdtemp(join(tmpdir(), "seed-linked-"));
+      await rm(linked, { recursive: true });
+      execFileSync("git", ["-C", tempDir, "worktree", "add", "-q", "--detach", linked]);
+      try {
+        await new SeedingService().ensureGitignore(linked);
+        for (const checkout of [tempDir, linked]) {
+          await mkdir(join(checkout, ".orch8"));
+          await writeFile(join(checkout, ".orch8", "run.json"), "{}");
+          expect(execFileSync("git", ["status", "--short"], { cwd: checkout, encoding: "utf8" })).toBe("");
+          expect(execFileSync("git", ["check-ignore", ".orch8/run.json"], { cwd: checkout, encoding: "utf8" }).trim()).toBe(".orch8/run.json");
+        }
+      } finally {
+        execFileSync("git", ["-C", tempDir, "worktree", "remove", "--force", linked]);
+      }
+    });
+
     it("creates .gitignore with .orch8/ if none exists", async () => {
       const service = new SeedingService();
       await service.ensureGitignore(tempDir);
