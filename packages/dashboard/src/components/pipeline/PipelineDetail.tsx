@@ -12,6 +12,7 @@ import {
   usePipelineStepOutput,
 } from "../../hooks/usePipelines.js";
 import { DownloadEvidence } from "./DownloadEvidence.js";
+import { LogSearch } from "./LogSearch.js";
 import { PipelineStepper } from "./PipelineStepper.js";
 import { StalledRunDiagnosis } from "./StalledRunDiagnosis.js";
 import { useRuns, useRunLog } from "../../hooks/useRuns.js";
@@ -166,7 +167,7 @@ function RunEvidence({ run, projectId, onOpen }: { run: Run; projectId: string; 
           ? <p className="text-zinc-400">No stored log found for this run. It may not have been written or may be missing. <button type="button" onClick={() => void refetch()} className="text-blue-300 underline">Retry</button></p>
           : <p role="alert" className="text-amber-300">Could not load run log. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>)}
         {!isLoading && !isError && log && (log.content
-          ? <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-900 p-3 font-mono text-xs text-zinc-200">{log.content}</pre>
+          ? <div className="space-y-3"><LogSearch content={log.content} /><pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-900 p-3 font-mono text-xs text-zinc-200">{log.content}</pre></div>
           : <p className="text-zinc-400">Log is empty. <button type="button" onClick={() => void refetch()} className="text-blue-300 underline">Refresh log</button></p>)}
       </div>}
     </details>
@@ -274,7 +275,7 @@ function ImplementationTestLog({ projectId, taskId }: { projectId: string; taskI
           <button type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} className="text-blue-300 underline">{open ? "Hide" : "Read"} implementation run log</button>
           {open && (logLoading ? <p>Loading raw log...</p> : logError ?
             <p role="alert" className="text-amber-300">Could not load raw log. <button type="button" onClick={() => void refreshLog()} className="underline">Retry</button></p> : log?.content ?
-              <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-900 p-3 font-mono text-zinc-200">{log.content}</pre> :
+              <div className="space-y-3"><LogSearch content={log.content} /><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-900 p-3 font-mono text-zinc-200" aria-label="Full implementation run log">{log.content}</pre></div> :
               <p role="alert" className="text-amber-300">No raw output stored for this run. <button type="button" onClick={() => void refreshLog()} className="underline">Refresh log</button></p>)}
         </>}
   </section>;
