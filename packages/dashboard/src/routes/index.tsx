@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { api } from "../api/client.js";
 import { useProjects } from "../hooks/useProjects.js";
 import { usePipeline, usePipelines } from "../hooks/usePipelines.js";
@@ -28,6 +29,24 @@ function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline:
 }
 
 function RepositoryCard({ project }: { project: Project }) {
+  const draftKey = `orch8:feature-draft:${project.slug}`;
+  const [request, setRequest] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(draftKey) ?? "null");
+      return typeof saved?.feature === "string" ? saved.feature : "";
+    } catch { return ""; }
+  });
+  const [draftError, setDraftError] = useState(false);
+  function saveRequest(nextRequest: string) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(draftKey) ?? "null");
+      const previous = saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
+      const changed = previous.feature !== nextRequest;
+      localStorage.setItem(draftKey, JSON.stringify({ ...previous, feature: nextRequest, ...(changed ? { branchName: "", filePaths: [] } : {}) }));
+      setDraftError(false);
+      return true;
+    } catch { setDraftError(true); return false; }
+  }
   const { data: pipelines, isError } = usePipelines(project.id);
   const { data: checkout, isError: checkoutError, isFetching: checkingCheckout, refetch: refreshCheckout } = useQuery({
     queryKey: ["feature-branch", project.id],
@@ -61,6 +80,14 @@ function RepositoryCard({ project }: { project: Project }) {
       <span className="mt-2 block text-xs text-blue-300">Open feature workflows →</span>
     </Link>
     <button type="button" onClick={() => void refreshCheckout()} className="mt-2 text-xs text-blue-300 underline">Refresh checkout status</button>
+    <details className="mt-3 border-t border-zinc-700 pt-3 text-sm text-zinc-300">
+      <summary className="cursor-pointer text-blue-300">Describe a feature</summary>
+      <label htmlFor={`quick-feature-${project.id}`} className="mt-3 block">What should change in {project.name}?</label>
+      <textarea id={`quick-feature-${project.id}`} value={request} maxLength={2000} rows={3} onChange={event => { setRequest(event.target.value); saveRequest(event.target.value); }} placeholder="Describe the result you want" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
+      <p className="mt-1 text-xs text-zinc-400">Saves a browser draft and opens plan setup. Check the runtime before starting the planning agent; implementation waits for your plan approval.</p>
+      {request.trim() && <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} hash="new-feature" onClick={event => { if (!saveRequest(request)) event.preventDefault(); }} className="mt-2 inline-block rounded border border-blue-500 px-3 py-2 text-blue-200">Continue to plan setup</Link>}
+      {draftError && <p role="alert" className="mt-2 text-amber-300">Browser storage is unavailable. Copy your request into the feature form after opening the repository.</p>}
+    </details>
     {!!unfinished?.length && <ul className="mt-3 space-y-3" aria-label={`Unfinished workflows for ${project.name}`}>
       {unfinished.map(pipeline => <UnfinishedWorkflow key={pipeline.id} project={project} pipeline={pipeline} />)}
     </ul>}

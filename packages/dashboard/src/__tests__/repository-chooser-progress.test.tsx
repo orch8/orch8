@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { renderWithProviders, screen, waitFor } from "../test-utils.js";
+import { renderWithProviders, screen, waitFor, within } from "../test-utils.js";
 
 const { useProjects, usePipelines, usePipeline, get } = vi.hoisted(() => ({
   useProjects: vi.fn(), usePipelines: vi.fn(), usePipeline: vi.fn(), get: vi.fn(),
@@ -9,8 +9,8 @@ vi.mock("../hooks/useProjects.js", () => ({ useProjects }));
 vi.mock("../hooks/usePipelines.js", () => ({ usePipelines, usePipeline }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: unknown) => options,
-  Link: ({ to, params, children, ...props }: { to: string; params?: Record<string, string>; children: React.ReactNode }) =>
-    <a href={Object.entries(params ?? {}).reduce((url, [key, value]) => url.replace(`$${key}`, value), to)} {...props}>{children}</a>,
+  Link: ({ to, params, hash, children, ...props }: { to: string; params?: Record<string, string>; hash?: string; children: React.ReactNode }) =>
+    <a href={`${Object.entries(params ?? {}).reduce((url, [key, value]) => url.replace(`$${key}`, value), to)}${hash ? `#${hash}` : ""}`} {...props}>{children}</a>,
 }));
 import { Route } from "../routes/index.js";
 
@@ -20,6 +20,7 @@ const pipeline = (id: string, status: string, createdAt: string) => ({ id, proje
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   useProjects.mockReturnValue({ data: [project], isLoading: false, isError: false });
   usePipelines.mockReturnValue({ data: [], isError: false });
   usePipeline.mockReturnValue({ data: undefined });
@@ -27,6 +28,35 @@ beforeEach(() => {
 });
 
 describe("repository chooser progress", () => {
+  it("carries a feature request into the selected repository without starting an agent", async () => {
+    localStorage.setItem("orch8:feature-draft:my-repo", JSON.stringify({ feature: "Old request", planner: "feature-planner", branchName: "feat/old", filePaths: ["old.ts"] }));
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    await user.click(screen.getByText("Describe a feature"));
+    const input = screen.getByRole("textbox", { name: "What should change in My repo?" });
+    expect(input).toHaveValue("Old request");
+    await user.clear(input);
+    await user.type(input, "Add a useful usage example");
+    expect(JSON.parse(localStorage.getItem("orch8:feature-draft:my-repo")!)).toMatchObject({ feature: "Add a useful usage example", planner: "feature-planner", branchName: "", filePaths: [] });
+    const link = screen.getByRole("link", { name: "Continue to plan setup" });
+    expect(link).toHaveAttribute("href", "/projects/my-repo/pipelines#new-feature");
+    await user.click(link);
+    expect(JSON.parse(localStorage.getItem("orch8:feature-draft:my-repo")!)).toMatchObject({ feature: "Add a useful usage example", planner: "feature-planner" });
+    expect(get).toHaveBeenCalledWith("/projects/proj-1/feature-branch");
+  });
+
+  it("keeps the request when leaving via the repository link rather than the continue button", async () => {
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    await user.click(screen.getByText("Describe a feature"));
+    await user.type(screen.getByRole("textbox", { name: "What should change in My repo?" }), "Add setup guide");
+    expect(JSON.parse(localStorage.getItem("orch8:feature-draft:my-repo")!)).toMatchObject({ feature: "Add setup guide" });
+    expect(screen.getByRole("link", { name: /My repo.*Open feature workflows/ })).toHaveAttribute("href", "/projects/my-repo/pipelines");
+  });
+
+  it("does not offer plan setup for an empty request", async () => {
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    await user.click(screen.getByText("Describe a feature"));
+    expect(within(screen.getByRole("listitem")).queryByRole("link", { name: "Continue to plan setup" })).not.toBeInTheDocument();
+  });
   it("shows live checkout readiness before opening a repository", async () => {
     renderWithProviders(<RepositoryChooser />);
     expect(await screen.findByText("Checkout clean on base · main")).toBeInTheDocument();
