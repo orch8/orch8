@@ -5,6 +5,7 @@ import { resolveProjectParam } from "../utils/project-resolver.js";
 import "../../types.js";
 import { z } from "zod";
 import { featureBranchReadiness, inspectRepository } from "../../services/feature-branch.service.js";
+import { cloneGitHubRepository, CloneError } from "../../services/repository-clone.service.js";
 import { requireProjectScope } from "../utils/project-scope.js";
 import { open, realpath } from "node:fs/promises";
 import { constants } from "node:fs";
@@ -110,6 +111,18 @@ export async function projectRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
     try { return await inspectRepository(parsed.data.homeDir); }
     catch { return reply.code(400).send({ error: "invalid_repository", message: "Choose a repository root with a checked-out branch." }); }
+  });
+  // Clone only public GitHub HTTPS repositories into a fresh directory. Project creation remains explicit.
+  app.post("/api/projects/repository-clone", async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+    const parsed = z.object({ url: z.string().min(1).max(500), parentDir: z.string().min(1).max(4096) }).strict().safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "validation_error", message: "Enter a GitHub HTTPS URL and an existing local parent directory." });
+    try { return reply.code(201).send(await cloneGitHubRepository(parsed.data.url, parsed.data.parentDir)); }
+    catch (error) {
+      if (error instanceof CloneError) return reply.code(error.status).send({ error: "clone_failed", message: error.message });
+      request.log.error({ err: error }, "repository clone failed");
+      return reply.code(422).send({ error: "clone_failed", message: "Could not clone the repository. Check the parent directory and network connection." });
+    }
   });
   // Check the checkout before project creation can provision files in it.
   app.post("/api/projects/repository-readiness", async (request: FastifyRequest, reply: FastifyReply) => {

@@ -43,7 +43,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
-        target: "http://localhost:3847",
+        target: `http://localhost:${process.env.ORCH_PORT ?? 3847}`,
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on("proxyReq", (proxyReq) => {
@@ -53,7 +53,7 @@ export default defineConfig({
         },
       },
       "/ws": {
-        target: "ws://localhost:3847",
+        target: `ws://localhost:${process.env.ORCH_PORT ?? 3847}`,
         ws: true,
         configure: (proxy) => {
           proxy.on("proxyReqWs", (proxyReq) => {

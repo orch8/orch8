@@ -8,6 +8,41 @@ globalThis.fetch = mockFetch;
 beforeEach(() => { mockFetch.mockReset(); localStorage.clear(); });
 const ready = { ok: true, json: async () => ({ ready: true, branch: "main", baseBranch: "main" }) };
 
+it("clones then opens the checkout through existing readiness and project creation", async () => {
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ homeDir: "/tmp/checkouts/demo", branch: "trunk", origin: "https://github.com/sample/demo.git" }) });
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ready: true, branch: "trunk" }) });
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ slug: "demo" }) });
+  const onComplete = vi.fn();
+  renderWithProviders(<RepositoryStart onComplete={onComplete} />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Clone from GitHub" }));
+  await user.type(screen.getByLabelText("GitHub HTTPS repository URL"), "https://github.com/sample/demo.git");
+  await user.type(screen.getByLabelText("Local parent directory"), "/tmp/checkouts");
+  await user.click(screen.getByRole("button", { name: "Clone repository" }));
+  await waitFor(() => expect(screen.getByLabelText("Local repository path")).toHaveValue("/tmp/checkouts/demo"));
+  expect(screen.getByLabelText("Base branch")).toHaveValue("trunk");
+  expect(screen.getByLabelText(/GitHub repository URL/)).toHaveValue("https://github.com/sample/demo.git");
+  await user.type(screen.getByLabelText(/First feature request/), "Improve settings");
+  await user.click(screen.getByLabelText(/No project spending limit/));
+  await user.click(screen.getByRole("button", { name: "Open and describe feature" }));
+  await waitFor(() => expect(onComplete).toHaveBeenCalledWith("demo"));
+  expect(mockFetch.mock.calls.map(call => call[0])).toEqual(["/api/projects/repository-clone", "/api/projects/repository-readiness", "/api/projects"]);
+  expect(JSON.parse(mockFetch.mock.calls[2][1].body)).toMatchObject({ homeDir: "/tmp/checkouts/demo", defaultBranch: "trunk", repoUrl: "https://github.com/sample/demo.git" });
+  expect(JSON.parse(localStorage.getItem("orch8:feature-draft:demo")!)).toMatchObject({ feature: "Improve settings" });
+});
+
+it("shows a clone conflict without proceeding to project creation", async () => {
+  mockFetch.mockResolvedValueOnce({ ok: false, status: 409, text: async () => JSON.stringify({ message: "The destination already exists. Choose another parent." }) });
+  renderWithProviders(<RepositoryStart onComplete={vi.fn()} />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Clone from GitHub" }));
+  await user.type(screen.getByLabelText("GitHub HTTPS repository URL"), "https://github.com/sample/demo.git");
+  await user.type(screen.getByLabelText("Local parent directory"), "/tmp/checkouts");
+  await user.click(screen.getByRole("button", { name: "Clone repository" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("destination already exists");
+  expect(mockFetch).toHaveBeenCalledTimes(1);
+});
+
 it("opens a pasted checkout without making the user invent its name, key, or branch", async () => {
   mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ branch: "release", origin: "https://github.com/org/my-app.git", originAvailable: true }) });
   mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ready: true, branch: "release", baseBranch: "release" }) });
