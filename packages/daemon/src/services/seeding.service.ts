@@ -22,6 +22,7 @@ import type { BundledAgent } from "@orch/shared";
 import { agents, chats, projects } from "@orch/shared/db";
 import { eq, and } from "drizzle-orm";
 import type { SchemaDb } from "../db/client.js";
+import { ignoreLocalRuntimeData } from "./feature-branch.service.js";
 
 /**
  * Filename used inside each bundled-skill destination directory to record
@@ -240,12 +241,17 @@ export class SeedingService {
     return results;
   }
 
-  /**
-   * Ensures .orch8/ is in the project's .gitignore.
-   * Creates .gitignore if it doesn't exist.
-   * Only appends — never modifies existing entries.
-   */
+  /** Keep local runtime files out of Git without changing tracked repository files. */
   async ensureGitignore(projectHomeDir: string): Promise<void> {
+    // A checkout (including a linked worktree) has a .git entry at its root.
+    // Git's info/exclude is shared by linked worktrees. Ignoring Orch8's
+    // runtime directory in all of them avoids dirtying tracked files; do not
+    // use this for user-specific patterns that differ between worktrees.
+    if (existsSync(join(projectHomeDir, ".git"))) {
+      await ignoreLocalRuntimeData(projectHomeDir);
+      return;
+    }
+    // Non-Git project directories keep the earlier .gitignore behavior.
     const gitignorePath = join(projectHomeDir, ".gitignore");
 
     if (!existsSync(gitignorePath)) {
