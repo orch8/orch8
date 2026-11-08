@@ -51,7 +51,8 @@ interface NavSection {
 function useProjectSections(): NavSection[] {
   const params = useParams({ strict: false }) as { projectSlug?: string };
   const projectSlug = params.projectSlug;
-  const prefix = projectSlug ? `/projects/${projectSlug}` : "";
+  if (!projectSlug) return [];
+  const prefix = `/projects/${projectSlug}`;
 
   return [
     {

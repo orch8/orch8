@@ -60,6 +60,7 @@ export function ProjectSwitcher() {
       {/* Popover */}
       {open && (
         <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-md border border-edge-soft bg-surface py-1 shadow-xl">
+          <Link to="/" onClick={() => setOpen(false)} className="focus-ring block border-b border-edge-soft px-2 py-2 type-body text-ink hover:bg-surface-2">All repositories</Link>
           {projects?.map((project) => (
             <div
               key={project.id}
