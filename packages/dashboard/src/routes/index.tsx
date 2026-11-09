@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api/client.js";
 import { useProjects } from "../hooks/useProjects.js";
@@ -29,6 +29,9 @@ function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline:
 }
 
 function RepositoryCard({ project }: { project: Project }) {
+  const queryClient = useQueryClient();
+  const [returning, setReturning] = useState(false);
+  const [returnError, setReturnError] = useState("");
   const draftKey = `orch8:feature-draft:${project.slug}`;
   const [request, setRequest] = useState(() => {
     try {
@@ -65,6 +68,24 @@ function RepositoryCard({ project }: { project: Project }) {
     });
   const completed = pipelines?.filter(pipeline => pipeline.status === "completed")
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  async function returnToBase() {
+    if (!checkout?.branch || checkout.branch === checkout.baseBranch || returning) return;
+    setReturning(true);
+    setReturnError("");
+    try {
+      const result = await api.post<{ ready: boolean; branch: string; baseBranch: string; reason?: string }>(
+        `/projects/${encodeURIComponent(project.id)}/return-to-base`, {},
+      );
+      // A window-focus/readiness refetch started during the POST must not restore
+      // the old branch after the server has switched the checkout.
+      await queryClient.cancelQueries({ queryKey: ["feature-branch", project.id] });
+      queryClient.setQueryData(["feature-branch", project.id], result);
+      void queryClient.invalidateQueries({ queryKey: ["repository-changes", project.id] });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not return to base";
+      try { setReturnError(JSON.parse(message).message ?? message); } catch { setReturnError(message); }
+    } finally { setReturning(false); }
+  }
   return <li className="rounded border border-zinc-700 bg-zinc-900 p-4">
     <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} className="block hover:text-blue-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400">
       <span className="block font-medium text-zinc-100">{project.name}</span>
@@ -80,6 +101,12 @@ function RepositoryCard({ project }: { project: Project }) {
       <span className="mt-2 block text-xs text-blue-300">Open feature workflows →</span>
     </Link>
     <button type="button" onClick={() => void refreshCheckout()} className="mt-2 text-xs text-blue-300 underline">Refresh checkout status</button>
+    {checkout?.branch && checkout.branch !== checkout.baseBranch && !checkoutError && <div className="mt-2 text-xs text-zinc-400">
+      <button type="button" onClick={() => void returnToBase()} disabled={returning || checkingCheckout || !!pipelines?.some(pipeline => pipeline.status === "running" || pipeline.status === "pending")}
+        className="rounded border border-zinc-600 px-2 py-1 text-blue-300 disabled:opacity-40">{returning ? "Returning..." : `Return to ${checkout.baseBranch}`}</button>
+      <p className="mt-1">Only a clean, idle checkout can switch branches. This does not reset or delete feature work.</p>
+    </div>}
+    {returnError && <p role="alert" className="mt-2 text-xs text-amber-300">{returnError}</p>}
     <section className="mt-3 border-t border-zinc-700 pt-3 text-sm text-zinc-300" aria-label={`New feature for ${project.name}`}>
       <label htmlFor={`quick-feature-${project.id}`} className="block font-medium text-zinc-200">Describe a new feature for {project.name}</label>
       <textarea id={`quick-feature-${project.id}`} value={request} maxLength={2000} rows={3} onChange={event => { setRequest(event.target.value); saveRequest(event.target.value); }} placeholder="What should change in this repository?" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
