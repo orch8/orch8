@@ -108,7 +108,13 @@ function RepositoryCard({ project }: { project: Project }) {
 
 function RepositoryChooser() {
   const { data: projects, isLoading, isError, refetch } = useProjects();
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const active = projects?.filter(project => project.active) ?? [];
+  const matching = active.filter(project =>
+    `${project.name} ${project.homeDir}`.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+  const selected = matching.find(project => project.id === selectedId) ?? matching[0];
 
   return <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
@@ -121,9 +127,25 @@ function RepositoryChooser() {
     {isLoading && <p role="status" className="text-zinc-400">Loading repositories...</p>}
     {isError && <div role="alert" className="rounded border border-amber-700 p-4 text-amber-200">Could not load repositories. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></div>}
     {!isLoading && !isError && active.length === 0 && <p className="rounded border border-zinc-700 p-5 text-zinc-300">No active repositories yet. Add a local checkout to start a feature.</p>}
-    {active.length > 0 && <ul className="space-y-3" aria-label="Available repositories">
-      {active.map(project => <RepositoryCard key={project.id} project={project} />)}
-    </ul>}
+    {active.length > 0 && <>
+      <div>
+        <label htmlFor="repository-search" className="block text-sm font-medium text-zinc-200">Find a repository</label>
+        <input id="repository-search" type="search" value={search} onChange={event => setSearch(event.target.value)}
+          placeholder="Search name or checkout path" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
+      </div>
+      {matching.length === 0 ? <p role="status" className="text-sm text-zinc-400">No repositories match your search.</p> : <>
+        <ul className="grid gap-2 sm:grid-cols-2" aria-label="Available repositories">
+          {matching.map(project => <li key={project.id}>
+            <button type="button" onClick={() => setSelectedId(project.id)} aria-pressed={selected.id === project.id}
+              className={`w-full rounded border p-3 text-left text-sm hover:border-blue-500 ${selected.id === project.id ? "border-blue-500 bg-blue-950/40 text-white" : "border-zinc-700 bg-zinc-900 text-zinc-300"}`}>
+              <span className="block font-medium">{project.name}</span>
+              <span className="mt-1 block truncate font-mono text-xs text-zinc-400" title={project.homeDir}>{project.homeDir}</span>
+            </button>
+          </li>)}
+        </ul>
+        <ul aria-label="Selected repository details"><RepositoryCard key={selected.id} project={selected} /></ul>
+      </>}
+    </>}
   </div>;
 }
 
