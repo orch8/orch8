@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAgents, useCreateAgent } from "../../hooks/useAgents.js";
 import { useProject } from "../../hooks/useProjects.js";
@@ -10,6 +10,22 @@ import { RepositoryExplorer } from "./RepositoryExplorer.js";
 type FeatureDraft = { feature: string; branchName: string; planner: string; implementer: string; reviewer: string; filePaths: string[] };
 const validPath = (path: unknown): path is string => typeof path === "string" && path.length > 0 && path.length <= 240 && !/[\r\n]/.test(path);
 const draftKey = (projectId: string) => `orch8:feature-draft:${projectId}`;
+function featureHandoff(repository: string | undefined, request: string, filePaths: string[], branchName: string): string {
+  return [
+    "Feature handoff (manual; does not run agents)",
+    `Repository path: ${repository ?? "Not loaded; confirm the repository path before proceeding"}`,
+    "Feature request (verbatim):",
+    request,
+    "",
+    "Starting file paths (inspect these; they may not be the only files to change):",
+    ...(filePaths.length ? filePaths.map(path => `- ${path}`) : ["None selected"]),
+    ...(branchName.trim() ? [`Proposed branch name (not prepared): ${branchName.trim()}`] : []),
+    "",
+    "Inspect the repository and relevant files before making changes. Write a scoped plan and review it before implementation.",
+    "Implement only after the plan is reviewed. Run relevant tests and record the actual results. Obtain an independent review of the diff and test evidence before publishing.",
+    "This handoff only copies text. No agents have run as part of this handoff and no branch has been prepared by this action.",
+  ].join("\n");
+}
 function readDraft(projectId: string): FeatureDraft {
   const empty = { feature: "", branchName: "", planner: "", implementer: "", reviewer: "", filePaths: [] as string[] };
   try {
@@ -37,6 +53,9 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
   const [codexModel, setCodexModel] = useState("");
   const [agentRuntime, setAgentRuntime] = useState<"codex_local" | "claude_local">("codex_local");
   const [feature, setFeature] = useState(draft.feature);
+  const [handoffFeedback, setHandoffFeedback] = useState<"copied" | "manual" | null>(null);
+  const copyPending = useRef(false);
+  const [copying, setCopying] = useState(false);
   const [filePaths, setFilePaths] = useState(draft.filePaths);
   const [planner, setPlanner] = useState(draft.planner);
   const [implementer, setImplementer] = useState(draft.implementer);
@@ -62,7 +81,26 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
   }, [projectId, feature, branchName, planner, implementer, reviewer, filePaths]);
   function clearDraft() {
     setFeature(""); setBranchName(""); setPlanner(""); setImplementer(""); setReviewer(""); setFilePaths([]);
+    setHandoffFeedback(null);
     setCheckedKey(""); setCheckMessage(""); setFailedSelectionKey("");
+  }
+  const handoff = featureHandoff(project?.homeDir, feature, filePaths, branchName);
+  const currentHandoff = useRef(handoff);
+  currentHandoff.current = handoff;
+  useEffect(() => { setHandoffFeedback(null); }, [handoff]);
+  async function copyHandoff() {
+    if (copyPending.current || !project?.homeDir || !feature.trim()) return;
+    copyPending.current = true;
+    setCopying(true);
+    try {
+      await navigator.clipboard.writeText(handoff);
+      if (currentHandoff.current === handoff) setHandoffFeedback("copied");
+    } catch {
+      if (currentHandoff.current === handoff) setHandoffFeedback("manual");
+    } finally {
+      copyPending.current = false;
+      setCopying(false);
+    }
   }
   useEffect(() => {
     let active = true;
@@ -291,6 +329,16 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
                 : <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-300">{overview.content}</pre>}
         </aside>
       </div>
+      {feature.trim() && <div className="rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Manual feature handoff">
+        <p className="text-xs text-zinc-400">Copy the request for a manual handoff. This does not prepare a branch, check agents, or start a workflow.</p>
+        <button type="button" onClick={() => { void copyHandoff(); }} disabled={!project?.homeDir || copying} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">Copy feature handoff</button>
+        {!project?.homeDir && <p className="mt-2 text-amber-300">Load the repository path before copying the handoff.</p>}
+        {handoffFeedback === "copied" && <p role="status" className="mt-2 text-emerald-300">Handoff copied to clipboard.</p>}
+        {handoffFeedback === "manual" && <div className="mt-2">
+          <label htmlFor="manual-feature-handoff" className="block text-amber-300">Clipboard unavailable. Select and copy the handoff below.</label>
+          <textarea id="manual-feature-handoff" aria-label="Feature handoff for manual copy" readOnly value={handoff} rows={12} onFocus={event => event.currentTarget.select()} className="mt-2 w-full rounded border border-zinc-600 bg-zinc-950 p-2 font-mono text-xs text-zinc-100" />
+        </div>}
+      </div>}
       {project?.id && <RepositoryExplorer key={`${project.id}:${branchState?.branch ?? "checking"}`} projectId={project.id} addedPaths={filePaths} onAddFile={path => { if (validPath(path)) setFilePaths(current => current.includes(path) || current.length >= 5 ? current : [...current, path]); }} />}
       {filePaths.length > 0 && <div aria-label="Selected feature files" className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
         <p>Starting files for the plan ({filePaths.length}/5). Only paths are sent to the planning agent; inspect the approved plan before implementation.</p>
