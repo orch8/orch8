@@ -201,9 +201,20 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
       config.sandbox === "workspace-write" &&
       !config.extraArgs?.length && !Object.keys(config.configOverrides ?? {}).length && !config.profile;
   });
-  const preferred = (["planner", "implementer", "reviewer"] as const).map(role =>
-    available.find(agent => agent.id === `feature-${role}` && agent.role === role) ?? available.find(agent => agent.role === role));
-  const canUsePreferred = preferred.every(Boolean) && new Set(preferred.map(agent => agent?.id)).size === 3;
+  const roles = ["planner", "implementer", "reviewer"] as const;
+  const preferred = roles.map(role =>
+    available.find(agent => agent.id === `feature-${role}` && agent.role === role && agent.adapterType === "codex_local")
+    ?? available.find(agent => agent.role === role && agent.adapterType === "codex_local"));
+  const preferredClaude = roles.map(role =>
+    available.find(agent => agent.id === `feature-claude-${role}` && agent.role === role && agent.adapterType === "claude_local")
+    ?? available.find(agent => agent.role === role && agent.adapterType === "claude_local"));
+  const completeTeam = (team: typeof preferred) => team.every(Boolean) && new Set(team.map(agent => agent?.id)).size === 3;
+  const canUsePreferred = completeTeam(preferred);
+  const canUseClaude = completeTeam(preferredClaude);
+  function selectTeam(team: typeof preferred) {
+    setPlanner(team[0]!.id); setImplementer(team[1]!.id); setReviewer(team[2]!.id);
+    setCheckedKey(""); setCheckMessage(""); setFailedSelectionKey("");
+  }
   const selected = [planner, implementer, reviewer].map(id => available.find(a => a.id === id));
   async function setupAgents() {
     if (settingUpAgents || isLoading || !project?.id || (agentRuntime === "codex_local" && !codexModel.trim())) return;
@@ -405,9 +416,10 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
             </select>
           </label>) }
       </div>
-      {canUsePreferred && <button type="button" onClick={() => {
-        setPlanner(preferred[0]!.id); setImplementer(preferred[1]!.id); setReviewer(preferred[2]!.id);
-      }} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use feature agents</button>}
+      {(canUsePreferred || canUseClaude) && <div className="flex flex-wrap gap-2" aria-label="Choose a feature team">
+        {canUsePreferred && <button type="button" onClick={() => selectTeam(preferred)} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use Codex feature agents</button>}
+        {canUseClaude && <button type="button" onClick={() => selectTeam(preferredClaude)} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use Claude feature agents</button>}
+      </div>}
       {!isLoading && <details open={setupExpanded ?? available.length < 3} className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
         <summary id="feature-agent-setup" className="cursor-pointer font-medium text-blue-200" onClick={event => {
           event.preventDefault();
