@@ -11,7 +11,7 @@ const ready = { ok: true, json: async () => ({ ready: true, branch: "main", base
 it("clones then opens the checkout through existing readiness and project creation", async () => {
   mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ homeDir: "/tmp/checkouts/demo", branch: "trunk", origin: "https://github.com/sample/demo.git" }) });
   mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ready: true, branch: "trunk" }) });
-  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ slug: "demo" }) });
+  mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: "repo-demo", slug: "demo" }) });
   const onComplete = vi.fn();
   renderWithProviders(<RepositoryStart onComplete={onComplete} />);
   const user = userEvent.setup();
@@ -28,7 +28,7 @@ it("clones then opens the checkout through existing readiness and project creati
   await waitFor(() => expect(onComplete).toHaveBeenCalledWith("demo"));
   expect(mockFetch.mock.calls.map(call => call[0])).toEqual(["/api/projects/repository-clone", "/api/projects/repository-readiness", "/api/projects"]);
   expect(JSON.parse(mockFetch.mock.calls[2][1].body)).toMatchObject({ homeDir: "/tmp/checkouts/demo", defaultBranch: "trunk", repoUrl: "https://github.com/sample/demo.git" });
-  expect(JSON.parse(localStorage.getItem("orch8:feature-draft:demo")!)).toMatchObject({ feature: "Improve settings" });
+  expect(JSON.parse(localStorage.getItem("orch8:feature-draft:repo-demo")!)).toMatchObject({ feature: "Improve settings" });
 });
 
 it("shows a clone conflict without proceeding to project creation", async () => {
@@ -74,7 +74,7 @@ it("opens a pasted checkout without making the user invent its name, key, or bra
   await user.click(screen.getByRole("button", { name: "Open and describe feature" }));
   await waitFor(() => expect(onComplete).toHaveBeenCalledWith("my-app"));
   expect(JSON.parse(mockFetch.mock.calls[2][1].body)).toMatchObject({ name: "My App", key: "MYA", defaultBranch: "release" });
-  expect(JSON.parse(localStorage.getItem("orch8:feature-draft:my-app")!)).toMatchObject({ feature: "Add an export button" });
+  expect(JSON.parse(localStorage.getItem("orch8:feature-draft:repo-id")!)).toMatchObject({ feature: "Add an export button" });
 });
 
 it("does not overwrite a custom repository name while inspection is in flight", async () => {
@@ -226,10 +226,10 @@ it("carries a feature request into the new repository's Build draft only after c
   await user.type(screen.getByLabelText("Local repository path"), "/tmp/my-app");
   await user.type(screen.getByLabelText(/First feature request/), "Add a keyboard shortcut");
   await user.click(screen.getByLabelText(/No project spending limit/));
-  expect(localStorage.getItem("orch8:feature-draft:my-app")).toBeNull();
+  expect(localStorage.getItem("orch8:feature-draft:repo-id")).toBeNull();
   await user.click(screen.getByRole("button", { name: "Open and describe feature" }));
   await waitFor(() => expect(onComplete).toHaveBeenCalledWith("my-app"));
-  expect(JSON.parse(localStorage.getItem("orch8:feature-draft:my-app")!)).toMatchObject({ feature: "Add a keyboard shortcut" });
+  expect(JSON.parse(localStorage.getItem("orch8:feature-draft:repo-id")!)).toMatchObject({ feature: "Add a keyboard shortcut" });
   expect(mockFetch).toHaveBeenCalledTimes(2);
 });
 

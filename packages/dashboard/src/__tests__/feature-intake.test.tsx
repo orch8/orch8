@@ -32,6 +32,13 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("recovers a previous slug-keyed request once under the project id", () => {
+  localStorage.setItem("orch8:feature-draft:demo", JSON.stringify({ feature: "Restore legacy request" }));
+  render(<FeatureIntake projectId="canonical-id" legacySlug="demo" onCreated={vi.fn()} />);
+  expect(screen.getByLabelText("What should change?")).toHaveValue("Restore legacy request");
+  expect(JSON.parse(localStorage.getItem("orch8:feature-draft:canonical-id")!)).toMatchObject({ feature: "Restore legacy request" });
+  expect(localStorage.getItem("orch8:feature-draft:demo")).toBeNull();
+ });
  it("discloses the real PR destination before planning, without claiming push access", async () => {
   state.readiness.mockImplementation(async path => path.endsWith("/repository-origin")
    ? { origin: "https://github.com/orch8/orch8.git", originAvailable: true, configuredRepository: "https://github.com/orch8/orch8", originMatchesProject: true, pushMatchesProject: true }
@@ -590,7 +597,7 @@ describe("feature intake", () => {
   state.create.mockResolvedValue({ pipeline: { id: "pipeline_1" } });
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />); select(); await check();
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Start with a plan" })); });
-  expect(state.readiness).toHaveBeenLastCalledWith("/projects/canonical-id/feature-branch");
+  expect(state.readiness).toHaveBeenCalledWith("/projects/canonical-id/feature-branch");
   expect(state.create).toHaveBeenCalledWith(expect.objectContaining({ projectId: "one", steps: [expect.objectContaining({ label: "Plan", requiresVerification: true }), expect.objectContaining({ label: "Implement", requiresVerification: false }), expect.objectContaining({ label: "Independent review", requiresVerification: true })] }));
   const steps = state.create.mock.calls[0][0].steps;
   expect(steps[1].promptOverride).toMatch(/commit only the intended feature files/);

@@ -35,18 +35,19 @@ describe("repository chooser progress", () => {
     expect(input).toHaveValue("Old request");
     await user.clear(input);
     await user.type(input, "Add a useful usage example");
-    expect(JSON.parse(localStorage.getItem("orch8:feature-draft:my-repo")!)).toMatchObject({ feature: "Add a useful usage example", planner: "feature-planner", branchName: "", filePaths: [] });
+    expect(JSON.parse(localStorage.getItem("orch8:feature-draft:proj-1")!)).toMatchObject({ feature: "Add a useful usage example", planner: "feature-planner", branchName: "", filePaths: [] });
+    expect(localStorage.getItem("orch8:feature-draft:my-repo")).toBeNull();
     const link = screen.getByRole("link", { name: "Continue to plan setup" });
     expect(link).toHaveAttribute("href", "/projects/my-repo/pipelines#new-feature");
     await user.click(link);
-    expect(JSON.parse(localStorage.getItem("orch8:feature-draft:my-repo")!)).toMatchObject({ feature: "Add a useful usage example", planner: "feature-planner" });
+    expect(JSON.parse(localStorage.getItem("orch8:feature-draft:proj-1")!)).toMatchObject({ feature: "Add a useful usage example", planner: "feature-planner" });
     expect(get).toHaveBeenCalledWith("/projects/proj-1/feature-branch");
   });
 
   it("keeps the request when leaving via the repository link rather than the continue button", async () => {
     const { user } = renderWithProviders(<RepositoryChooser />);
     await user.type(screen.getByRole("textbox", { name: "Describe a new feature for My repo" }), "Add setup guide");
-    expect(JSON.parse(localStorage.getItem("orch8:feature-draft:my-repo")!)).toMatchObject({ feature: "Add setup guide" });
+    expect(JSON.parse(localStorage.getItem("orch8:feature-draft:proj-1")!)).toMatchObject({ feature: "Add setup guide" });
     expect(screen.getByRole("link", { name: /My repo.*Open feature workflows/ })).toHaveAttribute("href", "/projects/my-repo/pipelines");
   });
 

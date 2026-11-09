@@ -78,7 +78,8 @@ function PipelinesActivePage() {
           <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: projectId, pipelineId: pipeline.id }} className="text-blue-300 underline">Inspect {pipeline.name}</Link>
         </li>)}</ul>
       </section>}
-      <FeatureIntake key={projectId} projectId={projectId} activeWorkflow={isLoading || isError || activePipelines.length > 0} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />
+      {project && <FeatureIntake key={project.id} projectId={project.id} legacySlug={project.slug} activeWorkflow={isLoading || isError || activePipelines.length > 0} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />}
+      {projectError && <p role="alert" className="text-sm text-amber-300">Could not load this repository. Refresh before planning a feature.</p>}
       <RepositoryChanges projectId={project?.id} projectError={projectError} />
     </div>
   );
