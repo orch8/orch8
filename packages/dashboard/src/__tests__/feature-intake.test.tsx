@@ -93,6 +93,29 @@ describe("feature intake", () => {
   expect(screen.queryByText(/Clipboard unavailable/)).not.toBeInTheDocument();
   expect(writeText).toHaveBeenCalledTimes(2);
  });
+ it("does not start a second clipboard write for a changed draft while the first is pending", async () => {
+  let resolveFirst!: () => void;
+  const first = new Promise<void>(resolve => { resolveFirst = resolve; });
+  const writeText = vi.fn().mockReturnValueOnce(first).mockResolvedValue(undefined);
+  mockClipboard(writeText);
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("What should change?"), { target: { value: "Draft A" } });
+  const button = screen.getByRole("button", { name: "Copy feature handoff" });
+  act(() => { fireEvent.click(button); fireEvent.click(button); });
+  expect(writeText).toHaveBeenCalledTimes(1);
+  fireEvent.change(screen.getByLabelText("What should change?"), { target: { value: "Draft B" } });
+  expect(button).toBeDisabled();
+  fireEvent.click(button);
+  expect(writeText).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText("Handoff copied to clipboard.")).not.toBeInTheDocument();
+  await act(async () => { resolveFirst(); await first; });
+  expect(screen.queryByText("Handoff copied to clipboard.")).not.toBeInTheDocument();
+  expect(button).toBeEnabled();
+  await act(async () => { fireEvent.click(button); });
+  expect(writeText).toHaveBeenCalledTimes(2);
+  expect(writeText.mock.calls[1][0]).toContain("Draft B");
+  expect(screen.getByText("Handoff copied to clipboard.")).toBeInTheDocument();
+ });
  it("does not copy while the repository path is loading", () => {
   state.project = undefined;
   const writeText = vi.fn().mockResolvedValue(undefined);

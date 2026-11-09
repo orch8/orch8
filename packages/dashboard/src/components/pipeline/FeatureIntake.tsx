@@ -54,6 +54,8 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
   const [agentRuntime, setAgentRuntime] = useState<"codex_local" | "claude_local">("codex_local");
   const [feature, setFeature] = useState(draft.feature);
   const [handoffFeedback, setHandoffFeedback] = useState<"copied" | "manual" | null>(null);
+  const copyPending = useRef(false);
+  const [copying, setCopying] = useState(false);
   const [filePaths, setFilePaths] = useState(draft.filePaths);
   const [planner, setPlanner] = useState(draft.planner);
   const [implementer, setImplementer] = useState(draft.implementer);
@@ -87,12 +89,17 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
   currentHandoff.current = handoff;
   useEffect(() => { setHandoffFeedback(null); }, [handoff]);
   async function copyHandoff() {
-    if (!project?.homeDir || !feature.trim()) return;
+    if (copyPending.current || !project?.homeDir || !feature.trim()) return;
+    copyPending.current = true;
+    setCopying(true);
     try {
       await navigator.clipboard.writeText(handoff);
       if (currentHandoff.current === handoff) setHandoffFeedback("copied");
     } catch {
       if (currentHandoff.current === handoff) setHandoffFeedback("manual");
+    } finally {
+      copyPending.current = false;
+      setCopying(false);
     }
   }
   useEffect(() => {
@@ -324,7 +331,7 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
       </div>
       {feature.trim() && <div className="rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Manual feature handoff">
         <p className="text-xs text-zinc-400">Copy the request for a manual handoff. This does not prepare a branch, check agents, or start a workflow.</p>
-        <button type="button" onClick={() => { void copyHandoff(); }} disabled={!project?.homeDir} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">Copy feature handoff</button>
+        <button type="button" onClick={() => { void copyHandoff(); }} disabled={!project?.homeDir || copying} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">Copy feature handoff</button>
         {!project?.homeDir && <p className="mt-2 text-amber-300">Load the repository path before copying the handoff.</p>}
         {handoffFeedback === "copied" && <p role="status" className="mt-2 text-emerald-300">Handoff copied to clipboard.</p>}
         {handoffFeedback === "manual" && <div className="mt-2">
