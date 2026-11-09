@@ -93,6 +93,13 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
   else if (pipeline.status === "completed" && !diffError && !diffLoading && diff?.available && diff.prLookup === "none") nextAction = "Publication not ready. Check the review and repository prerequisites below.";
   else if (pipeline.status === "completed") nextAction = "PR status unavailable. Check GitHub and repository prerequisites below.";
   else nextAction = "No decision needed yet; wait for the current step.";
+  const decisionTarget = (pipeline.status === "running" || pipeline.status === "pending") && active?.status === "awaiting_verification"
+    ? `#workflow-step-${active.id}` : null;
+  const nextTarget = decisionTarget ?? (!diffError && !diffLoading && (canPublish || (pipeline.status === "completed" && diff?.prLookup === "none" && diff?.available))
+    ? "#repository-changes" : null);
+  const decisionLabel = active?.label ?? "step";
+  const nextLabel = decisionTarget ? decisionLabel.toLowerCase() === "plan" ? "Review plan and decide" : /\b(review|verification)\b/i.test(decisionLabel) ? "Review findings and decide" : `Review ${decisionLabel} and decide`
+    : canPublish ? "Inspect changes and publish draft PR" : "Inspect publication requirements";
   return <section aria-label="Feature progress" className="rounded border border-zinc-700 bg-zinc-900/60 p-4 text-sm text-zinc-300 space-y-3">
     <h4 className="font-semibold text-zinc-100">Feature progress</h4>
     {featureRequest && <details className="rounded border border-zinc-700 bg-zinc-950/60 p-3">
@@ -109,6 +116,7 @@ function FeatureProgress({ pipeline, steps, diff, diffLoading, diffError, canPub
       {!diffLoading && !diffError && diff?.available && diff.prLookup === "found" && diff.pullRequest &&
         <a href={diff.pullRequest.url} target="_blank" rel="noopener noreferrer" className="rounded border border-zinc-700 px-3 py-2 text-blue-300 hover:bg-zinc-800">PR #{diff.pullRequest.number} and checks</a>}
     </nav>
+    {nextTarget && <a href={nextTarget} className="inline-flex w-fit rounded bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300">{nextLabel}</a>}
     <div className="grid gap-3 sm:grid-cols-2">
       <p>Current stage: <span className="text-zinc-100">{pipeline.status === "completed" ? "Workflow completed" : pipeline.status === "cancelled" ? "Workflow cancelled" : active ? `${active.label} · ${active.status === "awaiting_verification" ? "awaiting approval" : active.status}` : pipeline.status}</span></p>
       <p>Next action: <span className="text-zinc-100">{nextAction}</span>{(stalledStep || pipeline.status === "failed") && active && activeRun && <a href={`#workflow-run-${activeRun.id}`} className="mt-2 block w-fit rounded border border-blue-600 px-3 py-2 text-blue-200">Inspect {active.label.toLowerCase()} run and log</a>}</p>
