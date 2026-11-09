@@ -1,10 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithProviders, screen, waitFor, within } from "../test-utils.js";
 
-const { useProjects, usePipelines, usePipeline, get } = vi.hoisted(() => ({
-  useProjects: vi.fn(), usePipelines: vi.fn(), usePipeline: vi.fn(), get: vi.fn(),
+const { useProjects, usePipelines, usePipeline, get, post } = vi.hoisted(() => ({
+  useProjects: vi.fn(), usePipelines: vi.fn(), usePipeline: vi.fn(), get: vi.fn(), post: vi.fn(),
 }));
-vi.mock("../api/client.js", () => ({ api: { get } }));
+vi.mock("../api/client.js", () => ({ api: { get, post } }));
 vi.mock("../hooks/useProjects.js", () => ({ useProjects }));
 vi.mock("../hooks/usePipelines.js", () => ({ usePipelines, usePipeline }));
 vi.mock("@tanstack/react-router", () => ({
@@ -70,6 +70,26 @@ describe("repository chooser progress", () => {
     renderWithProviders(<RepositoryChooser />);
     expect(await screen.findByText(/On feat\/work · Check out the configured default branch/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /My repo.*Open feature workflows/ })).toBeInTheDocument();
+  });
+
+  it("returns an idle clean feature checkout to base from the chooser", async () => {
+    get.mockResolvedValueOnce({ ready: false, branch: "feat/work", baseBranch: "main", reason: "Check out the configured default branch 'main' before preparing a feature branch." })
+      .mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
+    post.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    await user.click(await screen.findByRole("button", { name: "Return to main" }));
+    expect(post).toHaveBeenCalledWith("/projects/proj-1/return-to-base", {});
+    expect(await screen.findByText("Checkout clean on base · main")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Return to main" })).not.toBeInTheDocument();
+  });
+
+  it("shows a blocked return without claiming the checkout changed", async () => {
+    get.mockResolvedValue({ ready: false, branch: "feat/work", baseBranch: "main", reason: "Finish existing work." });
+    post.mockRejectedValue(new Error(JSON.stringify({ message: "Commit or remove working changes first." })));
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    await user.click(await screen.findByRole("button", { name: "Return to main" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Commit or remove working changes first.");
+    expect(screen.getByText(/On feat\/work/)).toBeInTheDocument();
   });
 
   it("does not claim readiness when the checkout cannot be checked", async () => {
