@@ -53,7 +53,7 @@ describe("repository chooser progress", () => {
   it("shows the new feature form without a disclosure and keeps existing work first", () => {
     usePipelines.mockReturnValue({ data: [pipeline("plan-1", "running", "2026-11-08T01:00:00Z")], isError: false });
     renderWithProviders(<RepositoryChooser />);
-    const card = within(screen.getByRole("list", { name: "Available repositories" })).getAllByRole("listitem")[0];
+    const card = within(screen.getByRole("list", { name: "Selected repository details" })).getAllByRole("listitem")[0];
     const form = within(card).getByRole("region", { name: "New feature for My repo" });
     expect(within(form).getByRole("textbox", { name: "Describe a new feature for My repo" })).toBeVisible();
     expect(within(card).getByRole("region", { name: "Unfinished workflows for My repo" }).compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

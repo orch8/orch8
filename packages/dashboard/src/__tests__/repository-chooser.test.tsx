@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen } from "../test-utils.js";
 
 const useProjects = vi.fn();
@@ -26,6 +27,24 @@ describe("repository chooser", () => {
     expect(screen.getByRole("link", { name: /Demo/ })).toHaveAttribute("href", "/projects/demo/pipelines");
     expect(screen.queryByRole("link", { name: /Archived/ })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add repository" })).toHaveAttribute("href", "/projects/new");
+  });
+
+  it("selects one checkout and searches names and paths without showing other workflow details", () => {
+    useProjects.mockReturnValue({ data: [
+      { id: "1", name: "Factory", slug: "factory", homeDir: "/tmp/factory", active: true },
+      { id: "2", name: "Demo", slug: "demo", homeDir: "/work/demo", active: true },
+    ], isLoading: false, isError: false });
+    renderWithProviders(<Chooser />);
+    expect(screen.getByRole("link", { name: /Factory/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Demo/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Demo \/work\/demo/ }));
+    expect(screen.getByRole("link", { name: /Demo/ })).toHaveAttribute("href", "/projects/demo/pipelines");
+    expect(screen.queryByRole("link", { name: /Factory/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Find a repository" }), { target: { value: "/tmp/factory" } });
+    expect(screen.getByRole("link", { name: /Factory/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Demo \/work\/demo/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Find a repository" }), { target: { value: "missing" } });
+    expect(screen.getByRole("status")).toHaveTextContent("No repositories match your search.");
   });
 
   it("offers recovery if repositories cannot load", () => {
