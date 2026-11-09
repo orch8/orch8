@@ -17,7 +17,7 @@ export const runPublishCommand: PublishCommand = async (tool, args, cwd) => {
   return stdout;
 };
 
-function githubSlug(url: string): string | null {
+export function githubSlug(url: string): string | null {
   const match = /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(url.trim());
   return match ? `${match[1]}/${match[2]}`.toLowerCase() : null;
 }

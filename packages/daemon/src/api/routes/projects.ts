@@ -5,6 +5,7 @@ import { resolveProjectParam } from "../utils/project-resolver.js";
 import "../../types.js";
 import { z } from "zod";
 import { featureBranchReadiness, inspectRepository } from "../../services/feature-branch.service.js";
+import { githubSlug, runPublishCommand } from "../../services/pipeline-pr.service.js";
 import { cloneGitHubRepository, CloneError } from "../../services/repository-clone.service.js";
 import { requireProjectScope } from "../utils/project-scope.js";
 import { open, realpath } from "node:fs/promises";
@@ -72,6 +73,27 @@ async function rootReadme(homeDir: string): Promise<{ filename: string | null; c
 }
 
 export async function projectRoutes(app: FastifyInstance) {
+  app.get("/api/projects/:id/repository-origin", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const projectId = await resolveProjectParam(app, request.params.id, reply);
+    if (!projectId) return reply;
+    if (!requireProjectScope(request, reply, projectId)) return reply;
+    const project = await app.projectService.getById(projectId);
+    if (!project) return reply.code(404).send({ error: "not_found" });
+    try {
+      const repository = await inspectRepository(project.homeDir);
+      const configured = project.repoUrl && githubSlug(project.repoUrl);
+      const originMatchesProject = !!configured && !!repository.origin && githubSlug(repository.origin) === configured;
+      let pushMatchesProject = false;
+      if (originMatchesProject) {
+        const pushUrls = (await runPublishCommand("git", ["remote", "get-url", "--push", "--all", "origin"], project.homeDir))
+          .trim().split("\n").filter(Boolean);
+        pushMatchesProject = !!pushUrls.length && pushUrls.every(url => githubSlug(url) === configured);
+      }
+      return { ...repository, configuredRepository: configured ? `https://github.com/${configured}` : null,
+        originMatchesProject, pushMatchesProject };
+    }
+    catch { return reply.code(422).send({ error: "repository_unavailable", message: "Could not inspect the repository origin." }); }
+  });
   app.get("/api/projects/:id/repository-files", async (request: FastifyRequest<{ Params: { id: string }; Querystring: { path?: string; q?: string } }>, reply: FastifyReply) => {
     const projectId = await resolveProjectParam(app, request.params.id, reply);
     if (!projectId) return reply;

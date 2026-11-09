@@ -13,7 +13,7 @@ async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "orch8-overview-")); dirs.push(root);
   const other = await mkdtemp(join(tmpdir(), "orch8-overview-other-")); dirs.push(other);
   const app = Fastify();
-  const getById = vi.fn(async (id: string) => id === "project-a" ? { id, homeDir: root } : id === "project-b" ? { id, homeDir: other } : null);
+  const getById = vi.fn(async (id: string) => id === "project-a" ? { id, homeDir: root, repoUrl: "https://github.com/orch8/orch8.git" } : id === "project-b" ? { id, homeDir: other } : null);
   app.decorate("projectService", { resolveProjectId: async (id: string) => {
     if (["project-a", "project-b"].includes(id)) return id;
     throw new Error("Project not found");
@@ -35,6 +35,26 @@ it("reads only a root README for the authorized project", async () => {
     const response = await read();
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ filename: "README.md", content: "# Project A\nA useful overview." });
+  } finally { await app.close(); }
+});
+
+it("shows the authorized checkout's PR destination without exposing unsupported origins", async () => {
+  const { root, app, read, getById } = await fixture();
+  const url = "/api/projects/project-a/repository-origin";
+  try {
+    execFileSync("git", ["init", "-q", root]);
+    execFileSync("git", ["-C", root, "checkout", "-q", "-b", "main"]);
+    expect((await read(url)).json()).toMatchObject({ origin: "", originAvailable: false, branch: "main" });
+    execFileSync("git", ["-C", root, "remote", "add", "origin", "https://github.com/orch8/orch8.git"]);
+    expect((await read(url)).json()).toMatchObject({ origin: "https://github.com/orch8/orch8.git", originAvailable: true,
+      configuredRepository: "https://github.com/orch8/orch8", originMatchesProject: true, pushMatchesProject: true });
+    execFileSync("git", ["-C", root, "config", "remote.origin.pushurl", "https://github.com/other/repo.git"]);
+    expect((await read(url)).json()).toMatchObject({ originMatchesProject: true, pushMatchesProject: false });
+    execFileSync("git", ["-C", root, "config", "--unset", "remote.origin.pushurl"]);
+    execFileSync("git", ["-C", root, "remote", "set-url", "origin", "https://secret@example.com/team/repo.git"]);
+    expect((await read(url)).json()).toMatchObject({ origin: "", originAvailable: true });
+    expect((await read("/api/projects/project-b/repository-origin")).statusCode).toBe(403);
+    expect(getById).not.toHaveBeenCalledWith("project-b");
   } finally { await app.close(); }
 });
 
