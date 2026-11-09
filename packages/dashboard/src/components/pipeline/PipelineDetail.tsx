@@ -328,8 +328,8 @@ function ReviewDecision({ pipelineId, stepId, revision, outputFilePath, prEligib
       {!diffLoading && !diffError && !diff?.available && <p role="alert" className="text-amber-300">Repository changes unavailable: {diff?.reason ?? "Check the checkout before accepting."}</p>}
       {!diffLoading && !diffError && diff?.available && <>
         <p>Branch: <span className="font-mono">{diff.branch ?? "detached HEAD"}</span> · base: <span className="font-mono">{diff.baseBranch}</span></p>
-        <details><summary className="cursor-pointer text-blue-300">Committed changes</summary><div className="mt-2 max-h-80 overflow-auto"><GitDiffViewer diff={diff.committedDiff ?? ""} /></div></details>
-        <details><summary className="cursor-pointer text-blue-300">Uncommitted changes and untracked names</summary><div className="mt-2 max-h-80 overflow-auto"><GitDiffViewer diff={diff.workingDiff ?? ""} />
+        <details><summary className="cursor-pointer text-blue-300">Committed changes</summary><div className="mt-2 max-h-80 overflow-auto"><GitDiffViewer diff={diff.committedDiff ?? ""} projectId={projectId} /></div></details>
+        <details><summary className="cursor-pointer text-blue-300">Uncommitted changes and untracked names</summary><div className="mt-2 max-h-80 overflow-auto"><GitDiffViewer diff={diff.workingDiff ?? ""} projectId={projectId} />
           {diff.untrackedFiles?.length ? <ul className="mt-2 font-mono text-zinc-300">{diff.untrackedFiles.map(path => <li key={path}>{path}</li>)}</ul> : <p>No untracked names reported.</p>}
           {diff.untrackedMore && <p className="text-amber-300">More untracked names exist than shown.</p>}
         </div></details>
@@ -551,11 +551,11 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
           {publishMutation.data && <p role="status" className="text-xs text-emerald-300">Pull request created: <a href={publishMutation.data.url} target="_blank" rel="noopener noreferrer" className="underline">{publishMutation.data.url}</a></p>}
           <div>
             <h5 className="text-xs font-medium text-zinc-300 mb-2">Committed changes since {repositoryDiff.baseBranch}</h5>
-            <GitDiffViewer diff={repositoryDiff.committedDiff ?? ""} />
+            <GitDiffViewer diff={repositoryDiff.committedDiff ?? ""} projectId={pipeline.projectId} />
           </div>
           <div>
             <h5 className="text-xs font-medium text-zinc-300 mb-2">Staged and unstaged changes</h5>
-            <GitDiffViewer diff={repositoryDiff.workingDiff ?? ""} />
+            <GitDiffViewer diff={repositoryDiff.workingDiff ?? ""} projectId={pipeline.projectId} />
           </div>
           <div>
             <h5 className="text-xs font-medium text-zinc-300 mb-1">Untracked files (names only)</h5>
