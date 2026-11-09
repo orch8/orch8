@@ -66,6 +66,25 @@ describe("repository chooser progress", () => {
     expect(get).toHaveBeenCalledWith("/projects/proj-1/feature-branch");
   });
 
+  it("warns about Orch8's pending ignore change instead of calling that checkout clean", async () => {
+    get.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main", note: "Orch8's generated .gitignore will remain uncommitted." });
+    renderWithProviders(<RepositoryChooser />);
+    expect(await screen.findByText("Ready on base (Orch8 ignore change pending) · main")).toBeInTheDocument();
+    expect(screen.queryByText(/Checkout clean on base/)).not.toBeInTheDocument();
+  });
+
+  it("checks Claude in the selected checkout without preparing a branch or approving runtime", async () => {
+    post.mockResolvedValue({ ok: false, message: "Claude authentication expired. Re-authenticate with the Claude CLI before retrying the runtime check." });
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    await user.click(screen.getByRole("button", { name: "Check Claude in this repository" }));
+    expect(post).toHaveBeenCalledWith("/adapter/claude_local/test-environment", {
+      projectId: project.id, config: { dangerouslySkipPermissions: false },
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent("Claude authentication expired");
+    expect(screen.getByRole("complementary", { name: "Claude authentication recovery" })).toHaveTextContent("claude auth login");
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
   it("warns when existing feature work occupies the checkout", async () => {
     get.mockResolvedValue({ ready: false, branch: "feat/work", baseBranch: "main", reason: "Check out the configured default branch 'main' before preparing a feature branch." });
     renderWithProviders(<RepositoryChooser />);

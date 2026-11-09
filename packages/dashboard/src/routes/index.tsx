@@ -5,6 +5,7 @@ import { api } from "../api/client.js";
 import { useProjects } from "../hooks/useProjects.js";
 import { usePipeline, usePipelines } from "../hooks/usePipelines.js";
 import type { Pipeline, Project } from "../types.js";
+import { SandboxRecoveryGuidance } from "../components/pipeline/SandboxRecoveryGuidance.js";
 
 function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline: Pipeline }) {
   const { data: detail, isError: detailError } = usePipeline(pipeline.id, true);
@@ -32,6 +33,8 @@ function RepositoryCard({ project }: { project: Project }) {
   const queryClient = useQueryClient();
   const [returning, setReturning] = useState(false);
   const [returnError, setReturnError] = useState("");
+  const [checkingClaude, setCheckingClaude] = useState(false);
+  const [claudeResult, setClaudeResult] = useState<{ ok: boolean; message: string } | null>(null);
   // FeatureIntake reads drafts by project id; the URL slug is only for navigation.
   const draftKey = `orch8:feature-draft:${project.id}`;
   const [request, setRequest] = useState(() => {
@@ -55,7 +58,7 @@ function RepositoryCard({ project }: { project: Project }) {
   const { data: pipelines, isError } = usePipelines(project.id);
   const { data: checkout, isError: checkoutError, isFetching: checkingCheckout, refetch: refreshCheckout } = useQuery({
     queryKey: ["feature-branch", project.id],
-    queryFn: () => api.get<{ ready: boolean; branch: string; baseBranch: string; reason?: string }>(
+    queryFn: () => api.get<{ ready: boolean; branch: string; baseBranch: string; reason?: string; note?: string }>(
       `/projects/${encodeURIComponent(project.id)}/feature-branch`,
     ),
     refetchOnMount: "always",
@@ -88,12 +91,27 @@ function RepositoryCard({ project }: { project: Project }) {
       try { setReturnError(JSON.parse(message).message ?? message); } catch { setReturnError(message); }
     } finally { setReturning(false); }
   }
+  async function checkClaude() {
+    if (checkingClaude) return;
+    setCheckingClaude(true);
+    setClaudeResult(null);
+    try {
+      const result = await api.post<{ ok: boolean; message?: string }>("/adapter/claude_local/test-environment", {
+        projectId: project.id, config: { dangerouslySkipPermissions: false },
+      });
+      setClaudeResult({ ok: result.ok, message: result.message ?? (result.ok ? "Claude can run a command in this checkout." : "Claude could not run a command in this checkout.") });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Claude runtime check failed.";
+      try { setClaudeResult({ ok: false, message: JSON.parse(message).message ?? message }); }
+      catch { setClaudeResult({ ok: false, message }); }
+    } finally { setCheckingClaude(false); }
+  }
   return <li className="rounded border border-zinc-700 bg-zinc-900 p-4">
     <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} className="block hover:text-blue-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400">
       <span className="block font-medium text-zinc-100">{project.name}</span>
       <span className="mt-1 block break-all font-mono text-xs text-zinc-400">{project.homeDir}</span>
       {checkout && !checkoutError && !checkingCheckout && <span className={`mt-2 block text-xs ${checkout.ready ? "text-emerald-300" : "text-amber-300"}`}>
-        {checkout.ready ? `Checkout clean on base · ${checkout.branch}` :
+        {checkout.ready ? `${checkout.note ? "Ready on base (Orch8 ignore change pending)" : "Checkout clean on base"} · ${checkout.branch}` :
           checkout.branch && checkout.branch !== checkout.baseBranch
             ? `On ${checkout.branch} · ${checkout.reason ?? "Finish or inspect existing work before starting another feature."}`
             : `Not ready for a new feature · ${checkout.reason ?? "Inspect the checkout."}`}
@@ -109,6 +127,13 @@ function RepositoryCard({ project }: { project: Project }) {
       <p className="mt-1">Only a clean, idle checkout can switch branches. This does not reset or delete feature work.</p>
     </div>}
     {returnError && <p role="alert" className="mt-2 text-xs text-amber-300">{returnError}</p>}
+    <section className="mt-3 border-t border-zinc-700 pt-3 text-sm" aria-label={`Runtime readiness for ${project.name}`}>
+      <p className="text-zinc-300">Check Claude Code before setting up a feature</p>
+      <p className="mt-1 text-xs text-zinc-400">Runs a real model and temporary write in this checkout with existing permissions. This may incur cost against the project budget. It does not prepare a branch or start a feature.</p>
+      <button type="button" onClick={() => void checkClaude()} disabled={checkingClaude} className="mt-2 rounded border border-zinc-600 px-2 py-1 text-blue-300 disabled:opacity-40">{checkingClaude ? "Checking Claude..." : "Check Claude in this repository"}</button>
+      {claudeResult && <p role="status" className={`mt-2 text-xs ${claudeResult.ok ? "text-emerald-300" : "text-amber-300"}`}>{claudeResult.message} {claudeResult.ok && "Check all selected agents again in the feature workflow."}</p>}
+      {claudeResult && !claudeResult.ok && <div className="mt-2"><SandboxRecoveryGuidance adapterType="claude_local" message={claudeResult.message} /></div>}
+    </section>
     <section className="mt-3 border-t border-zinc-700 pt-3 text-sm text-zinc-300" aria-label={`New feature for ${project.name}`}>
       <label htmlFor={`quick-feature-${project.id}`} className="block font-medium text-zinc-200">Describe a new feature for {project.name}</label>
       <textarea id={`quick-feature-${project.id}`} value={request} maxLength={2000} rows={3} onChange={event => { setRequest(event.target.value); saveRequest(event.target.value); }} placeholder="What should change in this repository?" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
