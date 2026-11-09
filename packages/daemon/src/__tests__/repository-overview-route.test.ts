@@ -58,6 +58,30 @@ it("shows the authorized checkout's PR destination without exposing unsupported 
   } finally { await app.close(); }
 });
 
+it("connects an existing checkout to GitHub once, without pushing or replacing an origin", async () => {
+  const root = await mkdtemp(join(tmpdir(), "orch8-connect-origin-")); dirs.push(root);
+  execFileSync("git", ["init", "-q", "-b", "main", root]);
+  const app = Fastify();
+  const project = { id: "project-a", homeDir: root, repoUrl: null as string | null };
+  const update = vi.fn(async (_id: string, changes: { repoUrl: string }) => { project.repoUrl = changes.repoUrl; return project; });
+  app.decorate("projectService", { resolveProjectId: async () => project.id, getById: async () => project, update } as never);
+  let admin = true;
+  app.addHook("onRequest", async request => { request.isAdmin = admin; });
+  await app.register(projectRoutes);
+  const post = (url: string) => app.inject({ method: "POST", url: "/api/projects/project-a/repository-origin", payload: { url } });
+  try {
+    admin = false;
+    expect((await post("https://github.com/orch8/orch8.git")).statusCode).toBe(403);
+    admin = true;
+    expect((await post("https://user:password@github.com/orch8/orch8.git")).statusCode).toBe(400);
+    expect((await post("https://github.com/orch8/orch8.git")).statusCode).toBe(201);
+    expect(project.repoUrl).toBe("https://github.com/orch8/orch8.git");
+    expect(execFileSync("git", ["-C", root, "remote", "get-url", "origin"], { encoding: "utf8" }).trim()).toBe(project.repoUrl);
+    expect((await post("https://github.com/other/repo.git")).statusCode).toBe(409);
+    expect(update).toHaveBeenCalledTimes(1);
+  } finally { await app.close(); }
+});
+
 it("returns no README for a missing file, symlink, or oversized file", async () => {
   const { root, other, app, read } = await fixture();
   try {

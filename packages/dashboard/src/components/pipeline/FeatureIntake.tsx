@@ -75,6 +75,9 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
   const [overviewError, setOverviewError] = useState(false);
   const [repositoryOrigin, setRepositoryOrigin] = useState<{ origin: string; originAvailable: boolean; configuredRepository: string | null; originMatchesProject: boolean; pushMatchesProject: boolean } | null>(null);
   const [originError, setOriginError] = useState(false);
+  const [githubUrl, setGithubUrl] = useState("");
+  const [connectingOrigin, setConnectingOrigin] = useState(false);
+  const [connectError, setConnectError] = useState("");
   useEffect(() => {
     try {
       if (feature || branchName || planner || implementer || reviewer || filePaths.length) localStorage.setItem(draftKey(projectId), JSON.stringify({ feature, branchName, planner, implementer, reviewer, filePaths }));
@@ -138,6 +141,7 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
     return () => { active = false; };
   }, [project?.id]);
   async function prepareBranch() {
+    // Branch preparation is separate from connecting a publishing destination.
     if (activeWorkflow || !project?.id || !branchState?.ready || !branchName.trim() || preparing || returning || checkedKey !== selectionKey) return;
     setPreparing(true); setBranchError("");
     try {
@@ -150,6 +154,21 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
       const message = err instanceof Error ? err.message : "Branch preparation failed";
       try { setBranchError(JSON.parse(message).message ?? message); } catch { setBranchError(message); }
     } finally { setPreparing(false); }
+  }
+  async function connectOrigin() {
+    if (!project?.id || repositoryOrigin?.originAvailable || repositoryOrigin?.configuredRepository || connectingOrigin || activeWorkflow) return;
+    setConnectingOrigin(true);
+    setConnectError("");
+    try {
+      await api.post(`/projects/${encodeURIComponent(project.id)}/repository-origin`, { url: githubUrl.trim() });
+      const result = await api.get<NonNullable<typeof repositoryOrigin>>(`/projects/${encodeURIComponent(project.id)}/repository-origin`);
+      setRepositoryOrigin(result);
+      void queryClient.invalidateQueries({ queryKey: ["project", project.id] });
+      setGithubUrl("");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not connect GitHub origin";
+      try { setConnectError(JSON.parse(message).message ?? message); } catch { setConnectError(message); }
+    } finally { setConnectingOrigin(false); }
   }
   async function returnToBase() {
     if (activeWorkflow || !project?.id || !branchState?.branch || branchState.branch === branchState.baseBranch || preparing || returning) return;
@@ -309,7 +328,18 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
       <p className="font-medium text-zinc-100">GitHub PR setup</p>
       {originError ? <p role="status" className="mt-1 text-amber-300">Could not check this checkout's origin. Inspect it before expecting a PR.</p>
         : !repositoryOrigin ? <p className="mt-1">Checking repository origin...</p>
-          : !repositoryOrigin.origin ? <p role="status" className="mt-1 text-amber-300">{repositoryOrigin.originAvailable ? "This checkout's origin is not a supported GitHub URL." : "This checkout has no origin."} You can build locally, but Orch8 cannot publish a PR from it. Configure a GitHub origin before starting if a PR is the goal. No remote is changed here.</p>
+          : !repositoryOrigin.origin ? <>
+            <p role="status" className="mt-1 text-amber-300">{repositoryOrigin.originAvailable ? "This checkout's origin is not a supported GitHub URL." : "This checkout has no origin."} You can build locally, but Orch8 cannot publish a PR from it.</p>
+            {!repositoryOrigin.originAvailable && !repositoryOrigin.configuredRepository && <div className="mt-3 space-y-2">
+              <label htmlFor="feature-github-origin" className="block text-zinc-200">Connect an existing checkout to GitHub</label>
+              <div className="flex flex-wrap gap-2">
+                <input id="feature-github-origin" type="url" value={githubUrl} onChange={event => setGithubUrl(event.target.value)} placeholder="https://github.com/owner/repo.git" className="min-w-64 flex-1 rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
+                <button type="button" onClick={() => { void connectOrigin(); }} disabled={!githubUrl.trim() || connectingOrigin || activeWorkflow} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:opacity-40">{connectingOrigin ? "Connecting..." : "Connect GitHub origin"}</button>
+              </div>
+              <p className="text-zinc-400">Adds this URL as the checkout's origin and saves it on the project. It does not fetch, push, or check your access. Existing origins are never replaced.</p>
+              {connectError && <p role="alert" className="text-amber-300">{connectError}</p>}
+            </div>}
+          </>
             : !repositoryOrigin.configuredRepository ? <p role="status" className="mt-1 text-amber-300">Origin: {repositoryOrigin.origin}. This project has no supported GitHub repository URL in Settings. You can build locally, but Orch8 cannot publish a PR until you configure it.</p>
               : !repositoryOrigin.originMatchesProject || !repositoryOrigin.pushMatchesProject ? <p role="status" className="mt-1 text-amber-300">Origin: {repositoryOrigin.origin}. Project URL: {repositoryOrigin.configuredRepository}. {repositoryOrigin.originMatchesProject ? "The origin push URL does not match the project URL." : "The origin does not match the project URL."} Fix this before expecting Orch8 to publish a PR. No remote is changed here.</p>
                 : <p className="mt-1 break-all">Origin and push destination match {repositoryOrigin.configuredRepository}. Publishing still requires push access, a clean feature commit, and an accepted review.</p>}

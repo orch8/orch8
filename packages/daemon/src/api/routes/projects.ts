@@ -73,6 +73,43 @@ async function rootReadme(homeDir: string): Promise<{ filename: string | null; c
 }
 
 export async function projectRoutes(app: FastifyInstance) {
+  // Connect an existing local checkout without replacing an origin or credentials.
+  app.post("/api/projects/:id/repository-origin", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+    const projectId = await resolveProjectParam(app, request.params.id, reply);
+    if (!projectId) return reply;
+    const project = await app.projectService.getById(projectId);
+    if (!project) return reply.code(404).send({ error: "not_found" });
+    const parsed = z.object({ url: z.string().trim().max(500).regex(/^https:\/\/github\.com\/[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+(?:\.git)?$/, "Enter a GitHub HTTPS repository URL without credentials or query parameters.") }).strict().safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "validation_error", message: "Enter a GitHub HTTPS repository URL without credentials or query parameters." });
+    const url = parsed.data.url;
+    if (project.repoUrl) return reply.code(409).send({ error: "origin_configured", message: "This project already has a configured repository. Existing destinations cannot be replaced here." });
+    let addedOrigin = false;
+    try {
+      const repository = await inspectRepository(project.homeDir);
+      if (repository.originAvailable) return reply.code(409).send({ error: "origin_exists", message: "This checkout already has an origin. Inspect it before changing any destination." });
+      // Reject an existing origin even if its URL is unsafe and hidden by inspection.
+      await runPublishCommand("git", ["remote", "add", "origin", url], project.homeDir);
+      addedOrigin = true;
+      const current = await inspectRepository(project.homeDir);
+      const pushUrls = (await runPublishCommand("git", ["remote", "get-url", "--push", "--all", "origin"], project.homeDir)).trim().split("\n").filter(Boolean);
+      if (current.origin !== url || pushUrls.length !== 1 || pushUrls[0] !== url) throw new Error("Could not verify the new origin and push destination.");
+      await app.projectService.update(projectId, { repoUrl: url });
+      return reply.code(201).send({ origin: url, configuredRepository: url, originMatchesProject: true, pushMatchesProject: true });
+    } catch (error) {
+      if (addedOrigin) {
+        try {
+          const current = (await runPublishCommand("git", ["remote", "get-url", "origin"], project.homeDir)).trim();
+          const pushUrls = (await runPublishCommand("git", ["remote", "get-url", "--push", "--all", "origin"], project.homeDir)).trim().split("\n").filter(Boolean);
+          if (current === url && pushUrls.length === 1 && pushUrls[0] === url) {
+            await runPublishCommand("git", ["remote", "remove", "origin"], project.homeDir);
+          }
+        } catch (rollbackError) { request.log.error({ err: rollbackError }, "could not undo newly added origin"); }
+      }
+      request.log.error({ err: error }, "repository origin setup failed");
+      return reply.code(422).send({ error: "origin_setup_failed", message: "Could not connect this checkout. Inspect its origin and project settings before retrying." });
+    }
+  });
   app.get("/api/projects/:id/repository-origin", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const projectId = await resolveProjectParam(app, request.params.id, reply);
     if (!projectId) return reply;
