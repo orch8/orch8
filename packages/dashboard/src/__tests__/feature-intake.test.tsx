@@ -272,7 +272,7 @@ describe("feature intake", () => {
   localStorage.setItem("orch8:feature-draft:one", JSON.stringify({ feature: "Add usage" }));
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   expect(screen.getByLabelText("Plan agent")).toHaveValue("");
-  fireEvent.click(screen.getByRole("button", { name: "Use feature agents" }));
+  fireEvent.click(screen.getByRole("button", { name: "Use Codex feature agents" }));
   expect(screen.getByLabelText("Plan agent")).toHaveValue("feature-planner");
   expect(screen.getByLabelText("Implement agent")).toHaveValue("feature-implementer");
   expect(screen.getByLabelText("Review agent")).toHaveValue("feature-reviewer");
@@ -281,10 +281,32 @@ describe("feature intake", () => {
   expect(state.probe).not.toHaveBeenCalled();
   expect(state.create).not.toHaveBeenCalled();
  });
+ it("offers complete runtime teams separately and requires a fresh check after switching", async () => {
+  state.agents = ["codex_local", "claude_local"].flatMap(adapterType => ["planner", "implementer", "reviewer"].map(role => ({
+   id: `feature-${adapterType}-${role}`, name: `${adapterType} ${role}`, role, status: "active", adapterType,
+   adapterConfig: adapterType === "codex_local"
+    ? { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false }
+    : { dangerouslySkipPermissions: false },
+  })));
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Use Codex feature agents" }));
+  expect(screen.getByLabelText("Plan agent")).toHaveValue("feature-codex_local-planner");
+  await check();
+  expect(state.probe).toHaveBeenCalledWith("/adapter/codex_local/test-environment", expect.anything());
+  fireEvent.click(screen.getByRole("button", { name: "Use Claude feature agents" }));
+  expect(screen.getByLabelText("Plan agent")).toHaveValue("feature-claude_local-planner");
+  expect(screen.getByLabelText("Implement agent")).toHaveValue("feature-claude_local-implementer");
+  expect(screen.getByLabelText("Review agent")).toHaveValue("feature-claude_local-reviewer");
+  expect(screen.getByText("Runtime check required for this agent selection.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+  await check();
+  expect(state.probe).toHaveBeenCalledWith("/adapter/claude_local/test-environment", expect.objectContaining({ projectId: "canonical-id" }));
+  expect(state.create).not.toHaveBeenCalled();
+ });
  it("does not suggest missing or unsafe feature agents", () => {
   state.agents = state.agents.map(agent => ({ ...agent, role: agent.id, status: agent.id === "reviewer" ? "paused" : "active" }));
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
-  expect(screen.queryByRole("button", { name: "Use feature agents" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Use Codex feature agents" })).not.toBeInTheDocument();
  });
  it("does not select an agent with a role-mismatched feature ID", () => {
   state.agents = [
@@ -295,7 +317,7 @@ describe("feature intake", () => {
   ].map(agent => ({ ...agent, name: agent.id, status: "active", adapterType: "codex_local",
    adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
-  fireEvent.click(screen.getByRole("button", { name: "Use feature agents" }));
+  fireEvent.click(screen.getByRole("button", { name: "Use Codex feature agents" }));
   expect(screen.getByLabelText("Review agent")).toHaveValue("actual-reviewer");
  });
  it("adds a browsed file path to a saved feature draft and planning prompt without copying its contents", async () => {
@@ -424,7 +446,7 @@ describe("feature intake", () => {
   }
   state.agents = ["planner", "implementer", "reviewer"].map(role => ({ id: `feature-claude-${role}`, name: role, role, status: "active", adapterType: "claude_local", adapterConfig: { dangerouslySkipPermissions: false } }));
   view.rerender(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
-  fireEvent.click(screen.getByRole("button", { name: "Use feature agents" }));
+  fireEvent.click(screen.getByRole("button", { name: "Use Claude feature agents" }));
   fireEvent.change(screen.getByLabelText("What should change?"), { target: { value: "Add usage" } });
   await check();
   expect(state.probe).toHaveBeenCalledWith("/adapter/claude_local/test-environment", { config: { dangerouslySkipPermissions: false }, projectId: "canonical-id" });
@@ -434,7 +456,7 @@ describe("feature intake", () => {
   state.agents = ["planner", "implementer", "reviewer"].map(role => ({ id: `feature-claude-${role}`, name: role, role, status: "active", adapterType: "claude_local", adapterConfig: { dangerouslySkipPermissions: false } }));
   state.probe.mockResolvedValue({ ok: false, errorCode: "auth_required", message: "Claude authentication expired. Re-authenticate with the Claude CLI before retrying the runtime check." });
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
-  fireEvent.click(screen.getByRole("button", { name: "Use feature agents" }));
+  fireEvent.click(screen.getByRole("button", { name: "Use Claude feature agents" }));
   await check();
   expect(screen.getByLabelText("Claude authentication recovery")).toHaveTextContent("claude auth login");
   expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
@@ -444,7 +466,7 @@ describe("feature intake", () => {
   state.agents = ["planner", "implementer", "reviewer"].map(role => ({ id: `feature-claude-${role}`, name: role, role, status: "active", adapterType: "claude_local", adapterConfig: { dangerouslySkipPermissions: false } }));
   state.probe.mockResolvedValue({ ok: false, errorCode: "auth_required", message: "auth_required" });
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
-  fireEvent.click(screen.getByRole("button", { name: "Use feature agents" }));
+  fireEvent.click(screen.getByRole("button", { name: "Use Claude feature agents" }));
   await check();
   expect(screen.queryByLabelText("Claude authentication recovery")).not.toBeInTheDocument();
  });
@@ -482,7 +504,7 @@ describe("feature intake", () => {
   state.agents = ["alpha", "beta", "gamma"].map(id => ({ id, name: id, role: "custom", status: "active", adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   expect(screen.getByText("Feature agent setup (optional)").closest("details")).not.toHaveAttribute("open");
-  expect(screen.queryByRole("button", { name: "Use feature agents" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Use Codex feature agents" })).not.toBeInTheDocument();
   expect(screen.getByLabelText("Plan agent")).toHaveTextContent("alpha");
  });
  it("rejects Claude agents with override arguments or permission bypass", () => {
