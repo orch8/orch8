@@ -31,8 +31,7 @@ describe("repository chooser progress", () => {
   it("carries a feature request into the selected repository without starting an agent", async () => {
     localStorage.setItem("orch8:feature-draft:my-repo", JSON.stringify({ feature: "Old request", planner: "feature-planner", branchName: "feat/old", filePaths: ["old.ts"] }));
     const { user } = renderWithProviders(<RepositoryChooser />);
-    await user.click(screen.getByText("Describe a feature"));
-    const input = screen.getByRole("textbox", { name: "What should change in My repo?" });
+    const input = screen.getByRole("textbox", { name: "Describe a new feature for My repo" });
     expect(input).toHaveValue("Old request");
     await user.clear(input);
     await user.type(input, "Add a useful usage example");
@@ -46,16 +45,19 @@ describe("repository chooser progress", () => {
 
   it("keeps the request when leaving via the repository link rather than the continue button", async () => {
     const { user } = renderWithProviders(<RepositoryChooser />);
-    await user.click(screen.getByText("Describe a feature"));
-    await user.type(screen.getByRole("textbox", { name: "What should change in My repo?" }), "Add setup guide");
+    await user.type(screen.getByRole("textbox", { name: "Describe a new feature for My repo" }), "Add setup guide");
     expect(JSON.parse(localStorage.getItem("orch8:feature-draft:my-repo")!)).toMatchObject({ feature: "Add setup guide" });
     expect(screen.getByRole("link", { name: /My repo.*Open feature workflows/ })).toHaveAttribute("href", "/projects/my-repo/pipelines");
   });
 
-  it("does not offer plan setup for an empty request", async () => {
-    const { user } = renderWithProviders(<RepositoryChooser />);
-    await user.click(screen.getByText("Describe a feature"));
-    expect(within(screen.getByRole("listitem")).queryByRole("link", { name: "Continue to plan setup" })).not.toBeInTheDocument();
+  it("shows the new feature form without a disclosure and keeps existing work first", () => {
+    usePipelines.mockReturnValue({ data: [pipeline("plan-1", "running", "2026-11-08T01:00:00Z")], isError: false });
+    renderWithProviders(<RepositoryChooser />);
+    const card = within(screen.getByRole("list", { name: "Available repositories" })).getAllByRole("listitem")[0];
+    const form = within(card).getByRole("region", { name: "New feature for My repo" });
+    expect(within(form).getByRole("textbox", { name: "Describe a new feature for My repo" })).toBeVisible();
+    expect(within(card).getByRole("region", { name: "Unfinished workflows for My repo" }).compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(card).queryByRole("link", { name: "Continue to plan setup" })).not.toBeInTheDocument();
   });
   it("shows live checkout readiness before opening a repository", async () => {
     renderWithProviders(<RepositoryChooser />);
