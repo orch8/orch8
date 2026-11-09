@@ -32,6 +32,29 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("does not unlock planning when the early Claude check passes", async () => {
+  state.agents = [];
+  state.readiness.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
+  state.probe.mockResolvedValue({ ok: true, message: "Command and temporary write passed" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check Claude before setup" })); });
+  expect(screen.getByText(/Claude runtime passed/)).toHaveTextContent(/Command and temporary write passed/);
+  expect(screen.getByRole("button", { name: "Prepare feature branch" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+  expect(state.create).not.toHaveBeenCalled();
+ });
+ it("tests Claude in the selected repository without bypassing permissions", async () => {
+  state.agents = [];
+  state.probe.mockResolvedValue({ ok: false, message: "Claude authentication expired" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check Claude before setup" })); });
+  expect(state.probe).toHaveBeenCalledWith("/adapter/claude_local/test-environment", {
+   config: { dangerouslySkipPermissions: false }, projectId: "canonical-id",
+  });
+  expect(screen.getByText(/Claude runtime unavailable/)).toHaveTextContent(/authentication expired/);
+  expect(screen.getByLabelText("Claude authentication recovery")).toHaveTextContent("claude auth login");
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+ });
  it("recovers a previous slug-keyed request once under the project id", () => {
   localStorage.setItem("orch8:feature-draft:demo", JSON.stringify({ feature: "Restore legacy request" }));
   render(<FeatureIntake projectId="canonical-id" legacySlug="demo" onCreated={vi.fn()} />);

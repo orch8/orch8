@@ -62,6 +62,8 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
   const [reviewer, setReviewer] = useState(draft.reviewer);
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
+  const [earlyRuntime, setEarlyRuntime] = useState<"codex_local" | "claude_local" | null>(null);
+  const [earlyResult, setEarlyResult] = useState<{ adapter: string; ok: boolean; message: string } | null>(null);
   const [checkedKey, setCheckedKey] = useState("");
   const [checkMessage, setCheckMessage] = useState("");
   const [failedSelectionKey, setFailedSelectionKey] = useState("");
@@ -267,8 +269,25 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
     target?.focus({ preventScroll: true });
   }
 
+  async function checkClaudeBeforeSetup() {
+    if (!project?.id || earlyRuntime || checking) return;
+    setEarlyRuntime("claude_local");
+    setEarlyResult(null);
+    try {
+      const result = await api.post<{ ok: boolean; message?: string }>(
+        "/adapter/claude_local/test-environment", {
+          config: { dangerouslySkipPermissions: false }, projectId: project.id,
+        },
+      );
+      setEarlyResult({ adapter: "claude_local", ok: result.ok, message: result.message ?? (result.ok ? "Runtime command passed." : "Runtime command failed.") });
+    } catch (err) {
+      setEarlyResult({ adapter: "claude_local", ok: false, message: err instanceof Error ? err.message : "Runtime check failed." });
+    } finally {
+      setEarlyRuntime(null);
+    }
+  }
   async function checkRuntime() {
-    if (!validSelection) return;
+    if (!validSelection || earlyRuntime) return;
     setChecking(true);
     setCheckedKey("");
     setFailedSelectionKey("");
@@ -334,6 +353,13 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
   return <section id="new-feature" className="scroll-mt-6 rounded-lg border border-zinc-700 bg-zinc-900 p-5" aria-label="New feature">
     <h2 className="text-lg font-semibold text-zinc-100">Build a feature</h2>
     <p className="mt-1 text-sm text-zinc-400">Describe a change on a feature branch, approve the plan, then inspect implementation and independent review. If tests pass, the implementer commits its feature files locally. After accepting the review, inspect the diff and publish a draft PR explicitly.</p>
+    <section aria-label="Check Claude before setup" className="mt-4 space-y-2 rounded border border-zinc-700 bg-zinc-950/60 p-3 text-sm text-zinc-300">
+      <h3 className="font-medium text-zinc-100">Can Claude Code run here?</h3>
+      <p className="text-xs text-zinc-400">Check before setting up a team or preparing a branch. This invokes Claude's model and tests a real command and temporary write in this checkout using existing permissions, so it may incur model cost and respects the project budget. It does not create agents, start a feature, or change permissions. Codex checks its sandbox after agent selection below. You must still check all selected agents before starting.</p>
+      <button type="button" disabled={!project?.id || !!earlyRuntime || checking} onClick={() => void checkClaudeBeforeSetup()} className="rounded border border-blue-600 px-3 py-2 text-blue-200 disabled:opacity-40">{earlyRuntime ? "Checking Claude..." : "Check Claude before setup"}</button>
+      {earlyResult && <p role="status" className={earlyResult.ok ? "text-emerald-300" : "text-amber-300"}>Claude {earlyResult.ok ? "runtime passed" : "runtime unavailable"}: {earlyResult.message}</p>}
+      {earlyResult && !earlyResult.ok && <SandboxRecoveryGuidance message={earlyResult.message} adapterType="claude_local" />}
+    </section>
     {activeWorkflow && <p role="status" className="mt-3 rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200">Existing workflow work may still need attention. <a href="#active-feature-workflows" className="underline">Inspect existing workflows</a> and finish, retry or cancel them before starting another plan. Your draft stays here.</p>}
     <p className="mt-3 text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
     <div className="mt-2 rounded border border-zinc-700 p-3 text-xs text-zinc-300" aria-label="Pull request readiness">
