@@ -117,6 +117,7 @@ describe("feature progress summary", () => {
     expect(apiMock.get).not.toHaveBeenCalled();
     expect(within(progress()).getByText(/Plan.*awaiting approval/i)).toBeInTheDocument();
     expect(within(progress()).getByText(/Read the plan and approve it or request changes/i)).toBeInTheDocument();
+    expect(within(progress()).getByRole("link", { name: "Review plan and decide" })).toHaveAttribute("href", "#workflow-step-step_1");
     expect(within(progress()).getByText(/No run recorded for the current implementation task/i)).toBeInTheDocument();
   });
 
@@ -149,7 +150,16 @@ describe("feature progress summary", () => {
     state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "completed"), step("Independent review", 3, "awaiting_verification", { outputSummary: "Review ready", outputFilePath: "review.md" })];
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(within(progress()).getByText(/Read the independent review and accept or reject it/i)).toBeInTheDocument();
+    expect(within(progress()).getByRole("link", { name: "Review findings and decide" })).toHaveAttribute("href", "#workflow-step-step_3");
     expect(within(progress()).getByText(/Awaiting your decision/i)).toBeInTheDocument();
+  });
+
+  it("does not offer an approval shortcut for a cancelled workflow", () => {
+    state.status = "cancelled";
+    state.steps[0] = step("Plan", 1, "awaiting_verification", { outputSummary: "Plan ready" });
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(within(progress()).getByText(/No action; workflow cancelled/i)).toBeInTheDocument();
+    expect(within(progress()).queryByRole("link", { name: "Review plan and decide" })).not.toBeInTheDocument();
   });
 
   it("opens actual implementation output beside review without equating process exit with test success", () => {
@@ -195,6 +205,16 @@ describe("feature progress summary", () => {
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(within(progress()).getByText(/Inspect the failed step and its run log, then retry/i)).toBeInTheDocument();
     expect(within(progress()).getByText(/PR lookup unavailable/i)).toBeInTheDocument();
+  });
+
+  it("takes an accepted feature to the live diff and explicit PR action, never auto-publishing", () => {
+    state.status = "completed";
+    state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "completed", { agentId: "builder" }), step("Independent review", 3, "completed", { agentId: "reviewer", requiresVerification: true, outputSummary: "Approved" })];
+    state.diff = { available: true, prLookup: "none", branch: "feat/example", baseBranch: "v2", committedDiff: "diff --git a/file b/file", workingDiff: "", untrackedFiles: [] };
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(within(progress()).getByRole("link", { name: "Inspect changes and publish draft PR" })).toHaveAttribute("href", "#repository-changes");
+    expect(screen.getByRole("button", { name: "Create pull request" })).toBeInTheDocument();
+    expect(within(progress()).queryByRole("link", { name: /PR #/ })).not.toBeInTheDocument();
   });
 
   it("does not suggest inspecting a nonexistent PR when publication is blocked", () => {
