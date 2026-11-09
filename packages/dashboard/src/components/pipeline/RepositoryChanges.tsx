@@ -34,8 +34,8 @@ export function RepositoryChanges({ projectId, projectError = false }: { project
               : <p>PR lookup applies to named branches other than the configured base.</p>}
         </div>
         {!data.committedDiff && !data.workingDiff && !data.untrackedFiles?.length && !data.untrackedMore && <p role="status" className="text-xs text-zinc-400">No repository changes found in this snapshot.</p>}
-        <div><h3 className="mb-2 text-xs font-medium text-zinc-300">Committed changes since {data.baseBranch}</h3><GitDiffViewer diff={data.committedDiff ?? ""} /></div>
-        <div><h3 className="mb-2 text-xs font-medium text-zinc-300">Staged and unstaged changes</h3><GitDiffViewer diff={data.workingDiff ?? ""} /></div>
+        <div><h3 className="mb-2 text-xs font-medium text-zinc-300">Committed changes since {data.baseBranch}</h3><GitDiffViewer diff={data.committedDiff ?? ""} projectId={projectId} /></div>
+        <div><h3 className="mb-2 text-xs font-medium text-zinc-300">Staged and unstaged changes</h3><GitDiffViewer diff={data.workingDiff ?? ""} projectId={projectId} /></div>
         <div>
           <h3 className="mb-2 text-xs font-medium text-zinc-300">Untracked files (names only)</h3>
           {data.untrackedFiles?.length ? <ul className="space-y-1 font-mono text-xs text-zinc-400">{data.untrackedFiles.map(path => <li key={path} className="break-all">{path}</li>)}</ul> : <p className="text-xs text-zinc-500">None found</p>}

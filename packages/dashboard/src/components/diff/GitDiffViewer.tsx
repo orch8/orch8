@@ -1,5 +1,9 @@
+import { useState } from "react";
+import { api } from "../../api/client.js";
+
 interface DiffFile {
   path: string;
+  revision: number;
   hunks: DiffHunk[];
 }
 
@@ -21,8 +25,14 @@ function parseDiff(raw: string): DiffFile[] {
     const lines = chunk.split("\n");
 
     const header = lines[0];
-    const pathMatch = header.match(/b\/(.+)/);
-    const path = pathMatch?.[1] ?? "unknown";
+    // The +++ marker identifies the destination path without confusing " b/" inside a filename.
+    const marker = lines.find(line => line.startsWith("+++ ") && line !== "+++ /dev/null")
+      ?? lines.find(line => line.startsWith("--- ") && line !== "--- /dev/null");
+    const markedPath = marker?.slice(4);
+    const quoted = (markedPath ?? header).match(/"[ab]\/((?:\\.|[^"\\])*)"$/);
+    const plain = markedPath?.match(/^[ab]\/(.*)$/);
+    const headerPath = header.match(/ b\/(.+)$/);
+    const path = quoted ? decodeGitPath(quoted[1]) : plain?.[1] ?? headerPath?.[1] ?? "unknown";
 
     const hunks: DiffHunk[] = [];
     let currentHunk: DiffHunk | null = null;
@@ -51,14 +61,35 @@ function parseDiff(raw: string): DiffFile[] {
       }
     }
 
-    files.push({ path, hunks });
+    let revision = 2166136261;
+    for (let i = 0; i < chunk.length; i++) revision = Math.imul(revision ^ chunk.charCodeAt(i), 16777619);
+    files.push({ path, revision, hunks });
   }
 
   return files;
 }
 
+// Git quotes UTF-8 filename bytes as octal escapes when core.quotePath is on.
+function decodeGitPath(path: string): string {
+  const bytes: number[] = [];
+  const encoder = new TextEncoder();
+  for (let i = 0; i < path.length; i++) {
+    if (path[i] !== "\\") bytes.push(...encoder.encode(path[i]));
+    else if (/^[0-7]{3}$/.test(path.slice(i + 1, i + 4))) {
+      bytes.push(parseInt(path.slice(i + 1, i + 4), 8));
+      i += 3;
+    } else {
+      const escaped = path[++i];
+      if (escaped === undefined) break;
+      bytes.push(...encoder.encode(({ t: "\t", n: "\n", r: "\r", b: "\b", f: "\f", v: "\v" } as Record<string, string>)[escaped] ?? escaped));
+    }
+  }
+  return new TextDecoder().decode(new Uint8Array(bytes));
+}
+
 interface GitDiffViewerProps {
   diff: string;
+  projectId?: string;
   comments?: Array<{
     lineRef: string;
     body: string;
@@ -67,7 +98,39 @@ interface GitDiffViewerProps {
   prUrl?: string;
 }
 
-export function GitDiffViewer({ diff, comments, prUrl }: GitDiffViewerProps) {
+function CurrentFilePreview({ projectId, path }: { projectId: string; path: string }) {
+  const [content, setContent] = useState<string | null | undefined>(undefined);
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(false);
+  async function load() {
+    setContent(undefined);
+    setLoading(true);
+    setError(false);
+    try {
+      const result = await api.get<{ path: string; content: string | null }>(
+        `/projects/${encodeURIComponent(projectId)}/repository-files?path=${encodeURIComponent(path)}`,
+      );
+      if (result.path !== path) throw new Error("Unexpected file returned");
+      setContent(result.content);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+  return <details className="border-t border-zinc-800 px-4 py-2 text-xs text-zinc-300" onToggle={event => {
+    if (event.currentTarget.open && !loading) void load();
+  }}>
+    <summary className="cursor-pointer text-blue-300">Open current file</summary>
+    <p className="mt-2 text-zinc-400">Current checkout when opened, not a saved copy of the reviewed revision. Close and reopen to refresh. Read-only and limited to tracked files.</p>
+    {loading && <p className="mt-2">Loading file...</p>}
+    {error && <p role="alert" className="mt-2 text-amber-300">File unavailable in the current checkout. It may be deleted or untracked. <button type="button" className="underline" onClick={() => void load()}>Retry</button></p>}
+    {content === null && <p className="mt-2 text-amber-300">Preview unavailable for symlinks, binary files, or files over 32 KiB.</p>}
+    {content !== undefined && content !== null && <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-950 p-3 text-zinc-200">{content || "(Empty file)"}</pre>}
+  </details>;
+}
+
+export function GitDiffViewer({ diff, comments, prUrl, projectId }: GitDiffViewerProps) {
   if (!diff) {
     return <p className="text-sm text-zinc-600">No changes</p>;
   }
@@ -89,12 +152,14 @@ export function GitDiffViewer({ diff, comments, prUrl }: GitDiffViewerProps) {
 
       {files.map((file) => (
         <div
-          key={file.path}
+          key={`${file.path}:${file.revision}`}
           className="overflow-hidden rounded-lg border border-zinc-800"
         >
           <div className="border-b border-zinc-800 bg-zinc-900 px-4 py-2">
             <span className="font-mono text-sm text-zinc-300">{file.path}</span>
           </div>
+
+          {projectId && file.path !== "unknown" && <CurrentFilePreview key={`${projectId}:${file.path}`} projectId={projectId} path={file.path} />}
 
           {file.hunks.map((hunk, hi) => (
             <div key={hi}>
