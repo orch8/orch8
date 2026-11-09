@@ -352,7 +352,33 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
 
   return <section id="new-feature" className="scroll-mt-6 rounded-lg border border-zinc-700 bg-zinc-900 p-5" aria-label="New feature">
     <h2 className="text-lg font-semibold text-zinc-100">Build a feature</h2>
-    <p className="mt-1 text-sm text-zinc-400">Describe a change on a feature branch, approve the plan, then inspect implementation and independent review. If tests pass, the implementer commits its feature files locally. After accepting the review, inspect the diff and publish a draft PR explicitly.</p>
+    <p className="mt-1 text-sm text-zinc-400">Describe a change, approve the plan, then inspect the implementation, tests, independent review and diff before publishing a draft PR.</p>
+    <div className="mt-4 space-y-3">
+      <p className="text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+        <div className="min-w-0">
+          <label className="block text-sm text-zinc-300" htmlFor="feature-request">What should change?</label>
+          <textarea id="feature-request" rows={8} maxLength={2000} value={feature} onChange={e => setFeature(e.target.value)} placeholder="Describe the behavior users should gain and how to verify it" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-3 text-sm text-zinc-100" />
+        </div>
+        <aside className="min-w-0 rounded border border-zinc-700 bg-zinc-950 p-3" aria-label="Repository overview">
+          <h3 className="text-sm font-medium text-zinc-100">Repository overview</h3>
+          <p className="mt-1 text-xs text-zinc-400">Root README{overview?.filename ? ` · ${overview.filename}` : ""} · plain-text preview, up to 64 KiB</p>
+          {overviewError ? <p className="mt-3 text-sm text-amber-300">Could not load repository overview. You can still draft a feature.</p>
+            : !overview ? <p className="mt-3 text-sm text-zinc-400">Loading README...</p>
+              : overview.content === null ? <p className="mt-3 text-sm text-zinc-400">No root README available. You can still draft a feature.</p>
+                : <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-300">{overview.content}</pre>}
+        </aside>
+      </div>
+      {feature.trim() && <div className="rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Manual feature handoff">
+        <p className="text-xs text-zinc-400">Copy the request for a manual handoff. This does not prepare a branch, check agents, or start a workflow.</p>
+        <button type="button" onClick={() => { void copyHandoff(); }} disabled={!project?.homeDir || copying} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">Copy feature handoff</button>
+        {!project?.homeDir && <p className="mt-2 text-amber-300">Load the repository path before copying the handoff.</p>}
+        {handoffFeedback === "copied" && <p role="status" className="mt-2 text-emerald-300">Handoff copied to clipboard.</p>}
+        {handoffFeedback === "manual" && <div className="mt-2">
+          <label htmlFor="manual-feature-handoff" className="block text-amber-300">Clipboard unavailable. Select and copy the handoff below.</label>
+          <textarea id="manual-feature-handoff" aria-label="Feature handoff for manual copy" readOnly value={handoff} rows={12} onFocus={event => event.currentTarget.select()} className="mt-2 w-full rounded border border-zinc-600 bg-zinc-950 p-2 font-mono text-xs text-zinc-100" />
+        </div>}
+      </div>}
     <section aria-label="Check Claude before setup" className="mt-4 space-y-2 rounded border border-zinc-700 bg-zinc-950/60 p-3 text-sm text-zinc-300">
       <h3 className="font-medium text-zinc-100">Can Claude Code run here?</h3>
       <p className="text-xs text-zinc-400">Check before setting up a team or preparing a branch. This invokes Claude's model and tests a real command and temporary write in this checkout using existing permissions, so it may incur model cost and respects the project budget. It does not create agents, start a feature, or change permissions. Codex checks its sandbox after agent selection below. You must still check all selected agents before starting.</p>
@@ -361,7 +387,6 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
       {earlyResult && !earlyResult.ok && <SandboxRecoveryGuidance message={earlyResult.message} adapterType="claude_local" />}
     </section>
     {activeWorkflow && <p role="status" className="mt-3 rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200">Existing workflow work may still need attention. <a href="#active-feature-workflows" className="underline">Inspect existing workflows</a> and finish, retry or cancel them before starting another plan. Your draft stays here.</p>}
-    <p className="mt-3 text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
     <div className="mt-2 rounded border border-zinc-700 p-3 text-xs text-zinc-300" aria-label="Pull request readiness">
       <p className="font-medium text-zinc-100">GitHub PR setup</p>
       {originError ? <p role="status" className="mt-1 text-amber-300">Could not check this checkout's origin. Inspect it before expecting a PR.</p>
@@ -404,31 +429,8 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
         <p>Claude print mode cannot ask interactively. If the existing Claude permission settings deny Bash or Write, the check blocks the workflow; configure permissions deliberately in Claude settings, never via bypass flags.</p>
       </div>
     </details>
+    </div>
     <form onSubmit={submit} className="mt-4 space-y-3">
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-        <div className="min-w-0">
-          <label className="block text-sm text-zinc-300" htmlFor="feature-request">What should change?</label>
-          <textarea id="feature-request" rows={8} maxLength={2000} value={feature} onChange={e => setFeature(e.target.value)} placeholder="Describe the behavior users should gain and how to verify it" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-3 text-sm text-zinc-100" />
-        </div>
-        <aside className="min-w-0 rounded border border-zinc-700 bg-zinc-950 p-3" aria-label="Repository overview">
-          <h3 className="text-sm font-medium text-zinc-100">Repository overview</h3>
-          <p className="mt-1 text-xs text-zinc-400">Root README{overview?.filename ? ` · ${overview.filename}` : ""} · plain-text preview, up to 64 KiB</p>
-          {overviewError ? <p className="mt-3 text-sm text-amber-300">Could not load repository overview. You can still draft a feature.</p>
-            : !overview ? <p className="mt-3 text-sm text-zinc-400">Loading README...</p>
-              : overview.content === null ? <p className="mt-3 text-sm text-zinc-400">No root README available. You can still draft a feature.</p>
-                : <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-300">{overview.content}</pre>}
-        </aside>
-      </div>
-      {feature.trim() && <div className="rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Manual feature handoff">
-        <p className="text-xs text-zinc-400">Copy the request for a manual handoff. This does not prepare a branch, check agents, or start a workflow.</p>
-        <button type="button" onClick={() => { void copyHandoff(); }} disabled={!project?.homeDir || copying} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">Copy feature handoff</button>
-        {!project?.homeDir && <p className="mt-2 text-amber-300">Load the repository path before copying the handoff.</p>}
-        {handoffFeedback === "copied" && <p role="status" className="mt-2 text-emerald-300">Handoff copied to clipboard.</p>}
-        {handoffFeedback === "manual" && <div className="mt-2">
-          <label htmlFor="manual-feature-handoff" className="block text-amber-300">Clipboard unavailable. Select and copy the handoff below.</label>
-          <textarea id="manual-feature-handoff" aria-label="Feature handoff for manual copy" readOnly value={handoff} rows={12} onFocus={event => event.currentTarget.select()} className="mt-2 w-full rounded border border-zinc-600 bg-zinc-950 p-2 font-mono text-xs text-zinc-100" />
-        </div>}
-      </div>}
       {project?.id && <RepositoryExplorer key={`${project.id}:${branchState?.branch ?? "checking"}`} projectId={project.id} addedPaths={filePaths} onAddFile={path => { if (validPath(path)) setFilePaths(current => current.includes(path) || current.length >= 5 ? current : [...current, path]); }} />}
       {filePaths.length > 0 && <div aria-label="Selected feature files" className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
         <p>Starting files for the plan ({filePaths.length}/5). Only paths are sent to the planning agent; inspect the approved plan before implementation.</p>
