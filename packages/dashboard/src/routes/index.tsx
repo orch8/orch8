@@ -80,12 +80,6 @@ function RepositoryCard({ project }: { project: Project }) {
       <span className="mt-2 block text-xs text-blue-300">Open feature workflows →</span>
     </Link>
     <button type="button" onClick={() => void refreshCheckout()} className="mt-2 text-xs text-blue-300 underline">Refresh checkout status</button>
-    {!!unfinished?.length && <section className="mt-3 border-t border-zinc-700 pt-3" aria-label={`Unfinished workflows for ${project.name}`}>
-      <h2 className="text-sm font-medium text-zinc-200">Continue existing work</h2>
-      <ul className="space-y-3">
-        {unfinished.map(pipeline => <UnfinishedWorkflow key={pipeline.id} project={project} pipeline={pipeline} />)}
-      </ul>
-    </section>}
     <section className="mt-3 border-t border-zinc-700 pt-3 text-sm text-zinc-300" aria-label={`New feature for ${project.name}`}>
       <label htmlFor={`quick-feature-${project.id}`} className="block font-medium text-zinc-200">Describe a new feature for {project.name}</label>
       <textarea id={`quick-feature-${project.id}`} value={request} maxLength={2000} rows={3} onChange={event => { setRequest(event.target.value); saveRequest(event.target.value); }} placeholder="What should change in this repository?" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
@@ -93,6 +87,12 @@ function RepositoryCard({ project }: { project: Project }) {
       {request.trim() && <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} hash="new-feature" onClick={event => { if (!saveRequest(request)) event.preventDefault(); }} className="mt-2 inline-block rounded bg-blue-700 px-3 py-2 font-medium text-white hover:bg-blue-600">Continue to plan setup</Link>}
       {draftError && <p role="alert" className="mt-2 text-amber-300">Browser storage is unavailable. Copy your request into the feature form after opening the repository.</p>}
     </section>
+    {!!unfinished?.length && <section className="mt-3 border-t border-zinc-700 pt-3" aria-label={`Unfinished workflows for ${project.name}`}>
+      <h2 className="text-sm font-medium text-zinc-200">Continue existing work</h2>
+      <ul className="space-y-3">
+        {unfinished.map(pipeline => <UnfinishedWorkflow key={pipeline.id} project={project} pipeline={pipeline} />)}
+      </ul>
+    </section>}
     {!!completed?.length && <div className="mt-3 border-t border-zinc-700 pt-3 text-sm">
       <p className="text-zinc-300">Completed work: inspect PR status</p>
       <p className="mt-1 text-xs text-zinc-400">A completed workflow may or may not have a PR. Its diff reflects the current checkout; verify the branch before publishing.</p>

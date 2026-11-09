@@ -3,10 +3,11 @@ import { fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen } from "../test-utils.js";
 
 const useProjects = vi.fn();
+const usePipelines = vi.fn(() => ({ data: [] as Array<{ id: string; name: string; status: string; createdAt: string; updatedAt: string }>, isError: false }));
 vi.mock("../hooks/useProjects.js", () => ({ useProjects: () => useProjects() }));
 vi.mock("../api/client.js", () => ({ api: { get: vi.fn().mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" }) } }));
 vi.mock("../hooks/usePipelines.js", () => ({
-  usePipelines: () => ({ data: [], isError: false }),
+  usePipelines: () => usePipelines(),
   usePipeline: () => ({ data: undefined, isError: false }),
 }));
 vi.mock("@tanstack/react-router", () => ({
@@ -45,6 +46,20 @@ describe("repository chooser", () => {
     expect(screen.queryByRole("button", { name: /Demo \/work\/demo/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox", { name: "Find a repository" }), { target: { value: "missing" } });
     expect(screen.getByRole("status")).toHaveTextContent("No repositories match your search.");
+  });
+
+  it("keeps new feature entry ahead of unfinished work without hiding older decisions", () => {
+    useProjects.mockReturnValue({ data: [{ id: "1", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true }], isLoading: false, isError: false });
+    usePipelines.mockReturnValueOnce({ data: [
+      { id: "old", name: "Older task", status: "pending", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+      { id: "new", name: "Current task", status: "running", createdAt: "2026-01-02", updatedAt: "2026-01-02" },
+    ], isError: false });
+    renderWithProviders(<Chooser />);
+    const entry = screen.getByRole("region", { name: "New feature for Demo" });
+    const existing = screen.getByRole("region", { name: "Unfinished workflows for Demo" });
+    expect(entry.compareDocumentPosition(existing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Continue Current task" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Continue Older task" })).toBeVisible();
   });
 
   it("offers recovery if repositories cannot load", () => {

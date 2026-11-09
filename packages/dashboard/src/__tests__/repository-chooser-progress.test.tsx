@@ -50,13 +50,13 @@ describe("repository chooser progress", () => {
     expect(screen.getByRole("link", { name: /My repo.*Open feature workflows/ })).toHaveAttribute("href", "/projects/my-repo/pipelines");
   });
 
-  it("shows the new feature form without a disclosure and keeps existing work first", () => {
+  it("shows the new feature form before existing work without a disclosure", () => {
     usePipelines.mockReturnValue({ data: [pipeline("plan-1", "running", "2026-11-08T01:00:00Z")], isError: false });
     renderWithProviders(<RepositoryChooser />);
     const card = within(screen.getByRole("list", { name: "Selected repository details" })).getAllByRole("listitem")[0];
     const form = within(card).getByRole("region", { name: "New feature for My repo" });
     expect(within(form).getByRole("textbox", { name: "Describe a new feature for My repo" })).toBeVisible();
-    expect(within(card).getByRole("region", { name: "Unfinished workflows for My repo" }).compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(form.compareDocumentPosition(within(card).getByRole("region", { name: "Unfinished workflows for My repo" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(card).queryByRole("link", { name: "Continue to plan setup" })).not.toBeInTheDocument();
   });
   it("shows live checkout readiness before opening a repository", async () => {
