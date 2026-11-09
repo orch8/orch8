@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAgents, useCreateAgent } from "../../hooks/useAgents.js";
 import { useProject } from "../../hooks/useProjects.js";
@@ -83,12 +83,16 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
     setCheckedKey(""); setCheckMessage(""); setFailedSelectionKey("");
   }
   const handoff = featureHandoff(project?.homeDir, feature, filePaths, branchName);
+  const currentHandoff = useRef(handoff);
+  currentHandoff.current = handoff;
+  useEffect(() => { setHandoffFeedback(null); }, [handoff]);
   async function copyHandoff() {
+    if (!project?.homeDir || !feature.trim()) return;
     try {
       await navigator.clipboard.writeText(handoff);
-      setHandoffFeedback("copied");
+      if (currentHandoff.current === handoff) setHandoffFeedback("copied");
     } catch {
-      setHandoffFeedback("manual");
+      if (currentHandoff.current === handoff) setHandoffFeedback("manual");
     }
   }
   useEffect(() => {
@@ -320,7 +324,8 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
       </div>
       {feature.trim() && <div className="rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Manual feature handoff">
         <p className="text-xs text-zinc-400">Copy the request for a manual handoff. This does not prepare a branch, check agents, or start a workflow.</p>
-        <button type="button" onClick={() => { void copyHandoff(); }} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200">Copy feature handoff</button>
+        <button type="button" onClick={() => { void copyHandoff(); }} disabled={!project?.homeDir} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">Copy feature handoff</button>
+        {!project?.homeDir && <p className="mt-2 text-amber-300">Load the repository path before copying the handoff.</p>}
         {handoffFeedback === "copied" && <p role="status" className="mt-2 text-emerald-300">Handoff copied to clipboard.</p>}
         {handoffFeedback === "manual" && <div className="mt-2">
           <label htmlFor="manual-feature-handoff" className="block text-amber-300">Clipboard unavailable. Select and copy the handoff below.</label>

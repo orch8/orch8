@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { FeatureIntake } from "../components/pipeline/FeatureIntake.js";
 import { RepositoryExplorer } from "../components/pipeline/RepositoryExplorer.js";
-const state = vi.hoisted(() => ({ agents: [] as any[], requestedAgents: vi.fn(), create: vi.fn(), createAgent: vi.fn(), probe: vi.fn(), readiness: vi.fn(), invalidate: vi.fn() }));
+const state = vi.hoisted(() => ({ agents: [] as any[], project: { id: "canonical-id", homeDir: "/repo" } as { id: string; homeDir: string } | undefined, requestedAgents: vi.fn(), create: vi.fn(), createAgent: vi.fn(), probe: vi.fn(), readiness: vi.fn(), invalidate: vi.fn() }));
 const originalScrollIntoView = Element.prototype.scrollIntoView;
 const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 afterEach(() => {
@@ -17,10 +17,11 @@ function mockClipboard(writeText: (text: string) => Promise<void>) {
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock("../api/client.js", () => ({ api: { post: state.probe, get: state.readiness } }));
 vi.mock("../hooks/useAgents.js", () => ({ useAgents: (id: string) => { state.requestedAgents(id); return { data: state.agents, isLoading: false }; }, useCreateAgent: () => ({ mutateAsync: state.createAgent }) }));
-vi.mock("../hooks/useProjects.js", () => ({ useProject: () => ({ data: { id: "canonical-id", homeDir: "/repo" } }) }));
+vi.mock("../hooks/useProjects.js", () => ({ useProject: () => ({ data: state.project }) }));
 vi.mock("../hooks/usePipelines.js", () => ({ useCreatePipeline: () => ({ mutateAsync: state.create, isPending: false }) }));
 beforeEach(() => {
  localStorage.clear();
+ state.project = { id: "canonical-id", homeDir: "/repo" };
  state.requestedAgents.mockReset(); state.create.mockReset(); state.createAgent.mockReset(); state.createAgent.mockResolvedValue({ id: "created" }); state.probe.mockReset(); state.probe.mockResolvedValue({ ok: true }); state.invalidate.mockReset(); state.invalidate.mockResolvedValue(undefined);
  state.readiness.mockReset(); state.readiness.mockResolvedValue({ ready: false, branch: "feat/usage", baseBranch: "main" });
  state.agents = ["planner", "implementer", "reviewer"].map(id => ({ id, name: id, status: "active", adapterType: "codex_local", adapterConfig: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false } }));
@@ -54,6 +55,78 @@ describe("feature intake", () => {
   expect(screen.getByText("Handoff copied to clipboard.")).toBeInTheDocument();
   expect(state.create).not.toHaveBeenCalled();
   expect(state.probe).not.toHaveBeenCalled();
+ });
+ it("clears copied feedback when the request, branch, or selected paths change", async () => {
+  mockClipboard(vi.fn().mockResolvedValue(undefined));
+  localStorage.setItem("orch8:feature-draft:one", JSON.stringify({ feature: "Add usage", branchName: "feat/usage", filePaths: ["src/app.ts"] }));
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  const copy = async () => {
+   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy feature handoff" })); });
+   expect(screen.getByText("Handoff copied to clipboard.")).toBeInTheDocument();
+  };
+  await copy();
+  fireEvent.change(screen.getByLabelText("What should change?"), { target: { value: "Add analytics" } });
+  expect(screen.queryByText("Handoff copied to clipboard.")).not.toBeInTheDocument();
+  await copy();
+  fireEvent.change(screen.getByLabelText("New feature branch name"), { target: { value: "feat/analytics" } });
+  expect(screen.queryByText("Handoff copied to clipboard.")).not.toBeInTheDocument();
+  await copy();
+  fireEvent.click(screen.getByRole("button", { name: "Remove src/app.ts" }));
+  expect(screen.queryByText("Handoff copied to clipboard.")).not.toBeInTheDocument();
+ });
+ it("ignores pending clipboard success or failure after the handoff changes", async () => {
+  let resolve!: () => void;
+  let reject!: (reason: Error) => void;
+  const success = new Promise<void>(res => { resolve = res; });
+  const failure = new Promise<void>((_, rej) => { reject = rej; });
+  const writeText = vi.fn().mockReturnValueOnce(success).mockReturnValueOnce(failure);
+  mockClipboard(writeText);
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("What should change?"), { target: { value: "Add usage" } });
+  fireEvent.click(screen.getByRole("button", { name: "Copy feature handoff" }));
+  fireEvent.change(screen.getByLabelText("What should change?"), { target: { value: "Add analytics" } });
+  await act(async () => { resolve(); await success; });
+  expect(screen.queryByText("Handoff copied to clipboard.")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Copy feature handoff" }));
+  fireEvent.change(screen.getByLabelText("New feature branch name"), { target: { value: "feat/new" } });
+  await act(async () => { reject(new Error("denied")); await failure.catch(() => undefined); });
+  expect(screen.queryByText(/Clipboard unavailable/)).not.toBeInTheDocument();
+  expect(writeText).toHaveBeenCalledTimes(2);
+ });
+ it("does not copy while the repository path is loading", () => {
+  state.project = undefined;
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  mockClipboard(writeText);
+  localStorage.setItem("orch8:feature-draft:one", JSON.stringify({ feature: "Add usage" }));
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "Copy feature handoff" })).toBeDisabled();
+  expect(screen.getByText(/Load the repository path before copying/)).toBeInTheDocument();
+  expect(writeText).not.toHaveBeenCalled();
+ });
+ it("copies only after repository loading and clears feedback when its path changes", async () => {
+  state.project = undefined;
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  mockClipboard(writeText);
+  localStorage.setItem("orch8:feature-draft:one", JSON.stringify({ feature: "Add usage" }));
+  const view = render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  state.project = { id: "canonical-id", homeDir: "/repo" };
+  view.rerender(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "Copy feature handoff" })).toBeEnabled();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy feature handoff" })); });
+  expect(writeText.mock.calls[0][0]).toContain("Repository path: /repo");
+  expect(screen.getByText("Handoff copied to clipboard.")).toBeInTheDocument();
+  state.project = { id: "canonical-id", homeDir: "/other-repo" };
+  view.rerender(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(screen.queryByText("Handoff copied to clipboard.")).not.toBeInTheDocument();
+ });
+ it("hides an outdated manual-copy fallback after editing the request", async () => {
+  mockClipboard(vi.fn().mockRejectedValue(new Error("denied")));
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("What should change?"), { target: { value: "Add usage" } });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy feature handoff" })); });
+  expect(screen.getByRole("textbox", { name: "Feature handoff for manual copy" })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("What should change?"), { target: { value: "Add analytics" } });
+  expect(screen.queryByRole("textbox", { name: "Feature handoff for manual copy" })).not.toBeInTheDocument();
  });
  it("does not offer a handoff for an empty or whitespace-only request", () => {
   const writeText = vi.fn().mockResolvedValue(undefined);
