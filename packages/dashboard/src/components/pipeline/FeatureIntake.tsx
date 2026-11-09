@@ -73,6 +73,8 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
   const [returning, setReturning] = useState(false);
   const [overview, setOverview] = useState<{ filename: string | null; content: string | null } | null>(null);
   const [overviewError, setOverviewError] = useState(false);
+  const [repositoryOrigin, setRepositoryOrigin] = useState<{ origin: string; originAvailable: boolean; configuredRepository: string | null; originMatchesProject: boolean; pushMatchesProject: boolean } | null>(null);
+  const [originError, setOriginError] = useState(false);
   useEffect(() => {
     try {
       if (feature || branchName || planner || implementer || reviewer || filePaths.length) localStorage.setItem(draftKey(projectId), JSON.stringify({ feature, branchName, planner, implementer, reviewer, filePaths }));
@@ -121,6 +123,17 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
       api.get<{ filename: string | null; content: string | null }>(`/projects/${encodeURIComponent(project.id)}/repository-overview`)
         .then(result => { if (active) setOverview(result); })
         .catch(() => { if (active) setOverviewError(true); });
+    }
+    return () => { active = false; };
+  }, [project?.id]);
+  useEffect(() => {
+    let active = true;
+    setRepositoryOrigin(null);
+    setOriginError(false);
+    if (project?.id) {
+      api.get<{ origin: string; originAvailable: boolean; configuredRepository: string | null; originMatchesProject: boolean; pushMatchesProject: boolean }>(`/projects/${encodeURIComponent(project.id)}/repository-origin`)
+        .then(result => { if (active) setRepositoryOrigin(result); })
+        .catch(() => { if (active) setOriginError(true); });
     }
     return () => { active = false; };
   }, [project?.id]);
@@ -292,6 +305,15 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
     <p className="mt-1 text-sm text-zinc-400">Describe a change on a feature branch, approve the plan, then inspect implementation and independent review. If tests pass, the implementer commits its feature files locally. After accepting the review, inspect the diff and publish a draft PR explicitly.</p>
     {activeWorkflow && <p role="status" className="mt-3 rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200">Existing workflow work may still need attention. <a href="#active-feature-workflows" className="underline">Inspect existing workflows</a> and finish, retry or cancel them before starting another plan. Your draft stays here.</p>}
     <p className="mt-3 text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
+    <div className="mt-2 rounded border border-zinc-700 p-3 text-xs text-zinc-300" aria-label="Pull request readiness">
+      <p className="font-medium text-zinc-100">GitHub PR setup</p>
+      {originError ? <p role="status" className="mt-1 text-amber-300">Could not check this checkout's origin. Inspect it before expecting a PR.</p>
+        : !repositoryOrigin ? <p className="mt-1">Checking repository origin...</p>
+          : !repositoryOrigin.origin ? <p role="status" className="mt-1 text-amber-300">{repositoryOrigin.originAvailable ? "This checkout's origin is not a supported GitHub URL." : "This checkout has no origin."} You can build locally, but Orch8 cannot publish a PR from it. Configure a GitHub origin before starting if a PR is the goal. No remote is changed here.</p>
+            : !repositoryOrigin.configuredRepository ? <p role="status" className="mt-1 text-amber-300">Origin: {repositoryOrigin.origin}. This project has no supported GitHub repository URL in Settings. You can build locally, but Orch8 cannot publish a PR until you configure it.</p>
+              : !repositoryOrigin.originMatchesProject || !repositoryOrigin.pushMatchesProject ? <p role="status" className="mt-1 text-amber-300">Origin: {repositoryOrigin.origin}. Project URL: {repositoryOrigin.configuredRepository}. {repositoryOrigin.originMatchesProject ? "The origin push URL does not match the project URL." : "The origin does not match the project URL."} Fix this before expecting Orch8 to publish a PR. No remote is changed here.</p>
+                : <p className="mt-1 break-all">Origin and push destination match {repositoryOrigin.configuredRepository}. Publishing still requires push access, a clean feature commit, and an accepted review.</p>}
+    </div>
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-blue-800 bg-blue-950/40 p-3 text-sm" aria-label="Next feature step">
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-blue-300">Next step</p>

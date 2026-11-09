@@ -32,6 +32,36 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("discloses the real PR destination before planning, without claiming push access", async () => {
+  state.readiness.mockImplementation(async path => path.endsWith("/repository-origin")
+   ? { origin: "https://github.com/orch8/orch8.git", originAvailable: true, configuredRepository: "https://github.com/orch8/orch8", originMatchesProject: true, pushMatchesProject: true }
+   : { ready: true, branch: "main", baseBranch: "main" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(await screen.findByText(/Origin and push destination match/)).toHaveTextContent(/requires push access/);
+  expect(state.readiness).toHaveBeenCalledWith("/projects/canonical-id/repository-origin");
+ });
+ it("warns when a local-only checkout cannot publish a PR", async () => {
+  state.readiness.mockImplementation(async path => path.endsWith("/repository-origin")
+   ? { origin: "", originAvailable: false }
+   : { ready: true, branch: "main", baseBranch: "main" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(await screen.findByText(/This checkout has no origin/)).toHaveTextContent(/cannot publish a PR/);
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+ });
+ it("warns when the origin matches but the push URL does not", async () => {
+  state.readiness.mockImplementation(async path => path.endsWith("/repository-origin")
+   ? { origin: "https://github.com/orch8/orch8.git", originAvailable: true, configuredRepository: "https://github.com/orch8/orch8", originMatchesProject: true, pushMatchesProject: false }
+   : { ready: true, branch: "main", baseBranch: "main" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(await screen.findByText(/The origin push URL does not match/)).toHaveTextContent(/before expecting Orch8 to publish a PR/);
+ });
+ it("warns when project settings lack a GitHub URL despite a valid origin", async () => {
+  state.readiness.mockImplementation(async path => path.endsWith("/repository-origin")
+   ? { origin: "https://github.com/orch8/orch8.git", originAvailable: true, configuredRepository: null, originMatchesProject: false, pushMatchesProject: false }
+   : { ready: true, branch: "main", baseBranch: "main" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(await screen.findByText(/no supported GitHub repository URL in Settings/)).toHaveTextContent(/cannot publish a PR/);
+ });
  it("copies a manual handoff before agent setup with the exact request, paths, and only a proposed branch", async () => {
   state.agents = [];
   const writeText = vi.fn().mockResolvedValue(undefined);
