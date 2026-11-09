@@ -26,10 +26,10 @@ function featureHandoff(repository: string | undefined, request: string, filePat
     "This handoff only copies text. No agents have run as part of this handoff and no branch has been prepared by this action.",
   ].join("\n");
 }
-function readDraft(projectId: string): FeatureDraft {
+function readDraft(projectId: string, legacySlug?: string): FeatureDraft {
   const empty = { feature: "", branchName: "", planner: "", implementer: "", reviewer: "", filePaths: [] as string[] };
   try {
-    const value = JSON.parse(localStorage.getItem(draftKey(projectId)) ?? "null");
+    const value = JSON.parse((localStorage.getItem(draftKey(projectId)) ?? (legacySlug ? localStorage.getItem(draftKey(legacySlug)) : null)) ?? "null");
     if (!value || typeof value !== "object") return empty;
     const filePaths: string[] = Array.isArray(value.filePaths) ? [...new Set((value.filePaths as unknown[]).filter(validPath))].slice(0, 5) : [];
     return { feature: typeof value.feature === "string" ? value.feature : "", branchName: typeof value.branchName === "string" ? value.branchName : "", planner: typeof value.planner === "string" ? value.planner : "", implementer: typeof value.implementer === "string" ? value.implementer : "", reviewer: typeof value.reviewer === "string" ? value.reviewer : "", filePaths };
@@ -37,12 +37,12 @@ function readDraft(projectId: string): FeatureDraft {
 }
 
 /** An opinionated entry point to the existing pipeline runner, not a second executor. */
-export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: { projectId: string; onCreated: (id: string) => void; activeWorkflow?: boolean }) {
+export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow = false }: { projectId: string; legacySlug?: string; onCreated: (id: string) => void; activeWorkflow?: boolean }) {
   const queryClient = useQueryClient();
   useEffect(() => {
     if (window.location.hash === "#new-feature") document.getElementById("new-feature")?.scrollIntoView();
   }, []);
-  const [draft] = useState(() => readDraft(projectId));
+  const [draft] = useState(() => readDraft(projectId, legacySlug));
   const { data: project } = useProject(projectId);
   const { data: agents, isLoading } = useAgents(project?.id ?? projectId);
   const createAgent = useCreateAgent();
@@ -82,8 +82,9 @@ export function FeatureIntake({ projectId, onCreated, activeWorkflow = false }: 
     try {
       if (feature || branchName || planner || implementer || reviewer || filePaths.length) localStorage.setItem(draftKey(projectId), JSON.stringify({ feature, branchName, planner, implementer, reviewer, filePaths }));
       else localStorage.removeItem(draftKey(projectId));
+      if (legacySlug && legacySlug !== projectId) localStorage.removeItem(draftKey(legacySlug));
     } catch { /* Private mode or disabled storage: intake remains usable. */ }
-  }, [projectId, feature, branchName, planner, implementer, reviewer, filePaths]);
+  }, [projectId, legacySlug, feature, branchName, planner, implementer, reviewer, filePaths]);
   function clearDraft() {
     setFeature(""); setBranchName(""); setPlanner(""); setImplementer(""); setReviewer(""); setFilePaths([]);
     setHandoffFeedback(null);

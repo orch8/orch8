@@ -32,20 +32,22 @@ function RepositoryCard({ project }: { project: Project }) {
   const queryClient = useQueryClient();
   const [returning, setReturning] = useState(false);
   const [returnError, setReturnError] = useState("");
-  const draftKey = `orch8:feature-draft:${project.slug}`;
+  // FeatureIntake reads drafts by project id; the URL slug is only for navigation.
+  const draftKey = `orch8:feature-draft:${project.id}`;
   const [request, setRequest] = useState(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(draftKey) ?? "null");
+      const saved = JSON.parse((localStorage.getItem(draftKey) ?? localStorage.getItem(`orch8:feature-draft:${project.slug}`)) ?? "null");
       return typeof saved?.feature === "string" ? saved.feature : "";
     } catch { return ""; }
   });
   const [draftError, setDraftError] = useState(false);
   function saveRequest(nextRequest: string) {
     try {
-      const saved = JSON.parse(localStorage.getItem(draftKey) ?? "null");
+      const saved = JSON.parse((localStorage.getItem(draftKey) ?? localStorage.getItem(`orch8:feature-draft:${project.slug}`)) ?? "null");
       const previous = saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
       const changed = previous.feature !== nextRequest;
       localStorage.setItem(draftKey, JSON.stringify({ ...previous, feature: nextRequest, ...(changed ? { branchName: "", filePaths: [] } : {}) }));
+      if (project.slug !== project.id) localStorage.removeItem(`orch8:feature-draft:${project.slug}`);
       setDraftError(false);
       return true;
     } catch { setDraftError(true); return false; }

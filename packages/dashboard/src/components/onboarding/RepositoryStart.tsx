@@ -115,7 +115,7 @@ export function RepositoryStart({ onComplete }: { onComplete: (slug: string) => 
       });
       if (feature.trim()) {
         try {
-          localStorage.setItem(`orch8:feature-draft:${project.slug}`, JSON.stringify({ feature: feature.trim(), branchName: "", planner: "", implementer: "", reviewer: "" }));
+          localStorage.setItem(`orch8:feature-draft:${project.id}`, JSON.stringify({ feature: feature.trim(), branchName: "", planner: "", implementer: "", reviewer: "", filePaths: [] }));
         } catch { /* Browser storage may be unavailable; repository creation still succeeded. */ }
       }
       onComplete(project.slug);

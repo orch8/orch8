@@ -19,6 +19,16 @@ import { Route } from "../routes/index.js";
 const Chooser = (Route as unknown as { component: React.ComponentType }).component;
 
 describe("repository chooser", () => {
+  it("hands the request to the feature intake under the repository id, not its URL slug", () => {
+    localStorage.clear();
+    useProjects.mockReturnValue({ data: [{ id: "proj_abc", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true }], isLoading: false, isError: false });
+    renderWithProviders(<Chooser />);
+    fireEvent.change(screen.getByRole("textbox", { name: "Describe a new feature for Demo" }), { target: { value: "Add usage instructions" } });
+    expect(JSON.parse(localStorage.getItem("orch8:feature-draft:proj_abc") ?? "null")).toMatchObject({ feature: "Add usage instructions" });
+    expect(localStorage.getItem("orch8:feature-draft:demo")).toBeNull();
+    expect(screen.getByRole("link", { name: "Continue to plan setup" })).toHaveAttribute("href", "/projects/demo/pipelines");
+    localStorage.clear();
+  });
   it("lets the operator select an active checkout directly for feature work", () => {
     useProjects.mockReturnValue({ data: [
       { id: "1", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true },
