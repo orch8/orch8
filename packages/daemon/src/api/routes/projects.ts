@@ -102,7 +102,9 @@ export async function projectRoutes(app: FastifyInstance) {
           const current = (await runPublishCommand("git", ["remote", "get-url", "origin"], project.homeDir)).trim();
           const pushUrls = (await runPublishCommand("git", ["remote", "get-url", "--push", "--all", "origin"], project.homeDir)).trim().split("\n").filter(Boolean);
           if (current === url && pushUrls.length === 1 && pushUrls[0] === url) {
-            await runPublishCommand("git", ["remote", "remove", "origin"], project.homeDir);
+            // `git remote remove` also deletes refs/remotes/origin/*, which may
+            // predate this request even when no origin remote was configured.
+            await runPublishCommand("git", ["config", "--local", "--remove-section", "remote.origin"], project.homeDir);
           }
         } catch (rollbackError) { request.log.error({ err: rollbackError }, "could not undo newly added origin"); }
       }

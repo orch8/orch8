@@ -82,6 +82,23 @@ it("connects an existing checkout to GitHub once, without pushing or replacing a
   } finally { await app.close(); }
 });
 
+it("preserves pre-existing origin tracking refs when project update fails", async () => {
+  const root = await mkdtemp(join(tmpdir(), "orch8-connect-origin-rollback-")); dirs.push(root);
+  execFileSync("git", ["init", "-q", "-b", "main", root]);
+  execFileSync("git", ["-C", root, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "seed"]);
+  execFileSync("git", ["-C", root, "update-ref", "refs/remotes/origin/old", "HEAD"], { stdio: "ignore" });
+  const app = Fastify();
+  app.decorate("projectService", { resolveProjectId: async () => "project-a", getById: async () => ({ id: "project-a", homeDir: root, repoUrl: null }), update: async () => { throw new Error("database unavailable"); } } as never);
+  app.addHook("onRequest", async request => { request.isAdmin = true; });
+  await app.register(projectRoutes);
+  try {
+    const result = await app.inject({ method: "POST", url: "/api/projects/project-a/repository-origin", payload: { url: "https://github.com/orch8/orch8.git" } });
+    expect(result.statusCode).toBe(422);
+    expect(execFileSync("git", ["-C", root, "for-each-ref", "--format=%(refname)", "refs/remotes/origin"], { encoding: "utf8" })).toContain("refs/remotes/origin/old");
+    expect(execFileSync("git", ["-C", root, "remote"], { encoding: "utf8" }).trim()).toBe("");
+  } finally { await app.close(); }
+});
+
 it("returns no README for a missing file, symlink, or oversized file", async () => {
   const { root, other, app, read } = await fixture();
   try {
