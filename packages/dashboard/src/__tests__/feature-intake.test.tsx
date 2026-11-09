@@ -32,6 +32,20 @@ function select() {
 }
 async function check() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check agent runtime" })); }); }
 describe("feature intake", () => {
+ it("puts the repository request ahead of runtime and PR setup while retaining the plan gate", () => {
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  const request = screen.getByLabelText("What should change?");
+  const runtime = screen.getByRole("button", { name: "Check Claude before setup" });
+  const prSetup = screen.getByLabelText("Pull request readiness");
+  expect(screen.getByText("Repository: /repo")).toBeInTheDocument();
+  expect(request.compareDocumentPosition(runtime) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(request.compareDocumentPosition(prSetup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(request.closest("form")).toBeNull();
+  expect(prSetup.closest("form")).toBeNull();
+  fireEvent.change(request, { target: { value: "Add a visible usage note" } });
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+  expect(state.create).not.toHaveBeenCalled();
+ });
  it("does not unlock planning when the early Claude check passes", async () => {
   state.agents = [];
   state.readiness.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
