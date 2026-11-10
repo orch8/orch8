@@ -86,6 +86,7 @@ describe("repository chooser progress", () => {
   it("checks the real Codex sandbox without a model run or changing the checkout", async () => {
     post.mockResolvedValue({ ok: false, message: "Codex sandbox cannot run commands: bubblewrap could not initialize its network namespace (Failed RTM_NEWADDR: Operation not permitted)" });
     const { user } = renderWithProviders(<RepositoryChooser />);
+    await user.click(screen.getByText("Optional early runtime checks"));
     await user.click(screen.getByRole("button", { name: "Check Codex sandbox" }));
     expect(post).toHaveBeenCalledWith("/adapter/codex_local/test-environment", {
       config: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false, sandboxOnly: true },
@@ -98,6 +99,7 @@ describe("repository chooser progress", () => {
   it("checks Claude in the selected checkout without preparing a branch or approving runtime", async () => {
     post.mockResolvedValue({ ok: false, message: "Claude authentication expired. Re-authenticate with the Claude CLI before retrying the runtime check." });
     const { user } = renderWithProviders(<RepositoryChooser />);
+    await user.click(screen.getByText("Optional early runtime checks"));
     await user.click(screen.getByRole("button", { name: "Check Claude in this repository" }));
     expect(post).toHaveBeenCalledWith("/adapter/claude_local/test-environment", {
       projectId: project.id, config: { dangerouslySkipPermissions: false },

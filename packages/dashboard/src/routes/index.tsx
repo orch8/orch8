@@ -153,11 +153,14 @@ function RepositoryCard({ project }: { project: Project }) {
       <label htmlFor={`quick-feature-${project.id}`} className="block font-medium text-zinc-200">Describe a new feature for {project.name}</label>
       <textarea id={`quick-feature-${project.id}`} value={request} maxLength={2000} rows={3} onChange={event => { setRequest(event.target.value); saveRequest(event.target.value); }} placeholder="What should change in this repository?" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
       <p className="mt-1 text-xs text-zinc-400">Your request stays in this browser. Next you will choose agents, check the runtime, and review the plan before implementation.</p>
-      {request.trim() && <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} hash="new-feature" onClick={event => { if (!saveRequest(request)) event.preventDefault(); }} className="mt-2 inline-block rounded bg-blue-700 px-3 py-2 font-medium text-white hover:bg-blue-600">Continue to plan setup</Link>}
+      {request.trim() ? <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} hash="new-feature" onClick={event => { if (!saveRequest(request)) event.preventDefault(); }} className="mt-2 inline-block rounded bg-blue-700 px-3 py-2 font-medium text-white hover:bg-blue-600">Continue to plan setup</Link>
+        : <p className="mt-2 text-xs text-zinc-400">Enter a feature request to continue to plan setup.</p>}
       {draftError && <p role="alert" className="mt-2 text-amber-300">Browser storage is unavailable. Copy your request into the feature form after opening the repository.</p>}
     </section>
-    <section className="mt-3 border-t border-zinc-700 pt-3 text-sm" aria-label={`Runtime readiness for ${project.name}`}>
-      <p className="text-zinc-300">Using Codex? Check its sandbox before setup</p>
+    <details className="mt-3 border-t border-zinc-700 pt-3 text-sm" aria-label={`Optional runtime checks for ${project.name}`}>
+      <summary className="cursor-pointer text-blue-300">Optional early runtime checks</summary>
+      <p className="mt-1 text-xs text-zinc-400">You will check the selected agents before starting a plan. Use these checks to find host or sign-in problems earlier.</p>
+      <p className="mt-3 text-zinc-300">Using Codex? Check its sandbox before setup</p>
       <p className="mt-1 text-xs text-zinc-400">Optional free check in a temporary directory, not this checkout. Runs a real Linux sandbox command without invoking a model. A pass does not verify Codex authentication or approve any agent; check the selected agents during setup.</p>
       <button type="button" onClick={() => void checkCodex()} disabled={checkingCodex} className="mt-2 rounded border border-zinc-600 px-2 py-1 text-blue-300 disabled:opacity-40">{checkingCodex ? "Checking Codex..." : "Check Codex sandbox"}</button>
       {codexResult && <p role="status" className={`mt-2 text-xs ${codexResult.ok ? "text-emerald-300" : "text-amber-300"}`}>{codexResult.message} {codexResult.ok && "Check all selected agents again in the feature workflow."}</p>}
@@ -167,7 +170,7 @@ function RepositoryCard({ project }: { project: Project }) {
       <button type="button" onClick={() => void checkClaude()} disabled={checkingClaude} className="mt-2 rounded border border-zinc-600 px-2 py-1 text-blue-300 disabled:opacity-40">{checkingClaude ? "Checking Claude..." : "Check Claude in this repository"}</button>
       {claudeResult && <p role="status" className={`mt-2 text-xs ${claudeResult.ok ? "text-emerald-300" : "text-amber-300"}`}>{claudeResult.message} {claudeResult.ok && "Check all selected agents again in the feature workflow."}</p>}
       {claudeResult && !claudeResult.ok && <div className="mt-2"><SandboxRecoveryGuidance adapterType="claude_local" message={claudeResult.message} /></div>}
-    </section>
+    </details>
     {unfinished && unfinished.length > 1 && <section id="remaining-workflows" className="mt-3 scroll-mt-6 border-t border-zinc-700 pt-3" aria-label={`Other unfinished workflows for ${project.name}`}>
       <h2 className="text-sm font-medium text-zinc-200">Other unfinished work</h2>
       <ul className="space-y-3">
@@ -190,7 +193,9 @@ function RepositoryCard({ project }: { project: Project }) {
 function RepositoryChooser() {
   const { data: projects, isLoading, isError, refetch } = useProjects();
   const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    try { return localStorage.getItem("orch8:selected-repository"); } catch { return null; }
+  });
   const active = projects?.filter(project => project.active) ?? [];
   const matching = active.filter(project =>
     `${project.name} ${project.homeDir}`.toLowerCase().includes(search.trim().toLowerCase()),
@@ -218,7 +223,10 @@ function RepositoryChooser() {
         <div className="grid min-w-0 items-start gap-4 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]" aria-label="Repository selection and feature entry">
           <ul className="grid min-w-0 max-h-32 grid-cols-[minmax(0,1fr)] gap-2 overflow-y-auto overflow-x-hidden pr-1 sm:sticky sm:top-4 sm:max-h-[calc(100vh-15rem)]" aria-label="Available repositories">
             {matching.map(project => <li key={project.id} className="min-w-0">
-              <button type="button" onClick={() => setSelectedId(project.id)} aria-pressed={selected.id === project.id}
+              <button type="button" onClick={() => {
+                setSelectedId(project.id);
+                try { localStorage.setItem("orch8:selected-repository", project.id); } catch { /* Selection still works without storage. */ }
+              }} aria-pressed={selected.id === project.id}
                 className={`w-full rounded border p-3 text-left text-sm hover:border-blue-500 ${selected.id === project.id ? "border-blue-500 bg-blue-950/40 text-white" : "border-zinc-700 bg-zinc-900 text-zinc-300"}`}>
                 <span className="block font-medium">{project.name}</span>
                 <span className="mt-1 block truncate font-mono text-xs text-zinc-400" title={project.homeDir}>{project.homeDir}</span>
