@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen } from "../test-utils.js";
 
@@ -17,6 +17,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 import { Route } from "../routes/index.js";
 const Chooser = (Route as unknown as { component: React.ComponentType }).component;
+beforeEach(() => localStorage.clear());
 
 describe("repository chooser", () => {
   it("hands the request to the feature intake under the repository id, not its URL slug", () => {
@@ -49,6 +50,7 @@ describe("repository chooser", () => {
     expect(screen.getByRole("link", { name: /Factory/ })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Demo/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Demo \/work\/demo/ }));
+    expect(localStorage.getItem("orch8:selected-repository")).toBe("2");
     expect(screen.getByRole("link", { name: /Demo/ })).toHaveAttribute("href", "/projects/demo/pipelines");
     expect(screen.queryByRole("link", { name: /Factory/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox", { name: "Find a repository" }), { target: { value: "/tmp/factory" } });
@@ -56,6 +58,18 @@ describe("repository chooser", () => {
     expect(screen.queryByRole("button", { name: /Demo \/work\/demo/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox", { name: "Find a repository" }), { target: { value: "missing" } });
     expect(screen.getByRole("status")).toHaveTextContent("No repositories match your search.");
+  });
+
+  it("restores the last selected repository without showing another repository's feature form", () => {
+    localStorage.setItem("orch8:selected-repository", "2");
+    useProjects.mockReturnValue({ data: [
+      { id: "1", name: "Factory", slug: "factory", homeDir: "/tmp/factory", active: true },
+      { id: "2", name: "Demo", slug: "demo", homeDir: "/work/demo", active: true },
+    ], isLoading: false, isError: false });
+    renderWithProviders(<Chooser />);
+    expect(screen.getByRole("button", { name: /Demo \/work\/demo/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("textbox", { name: "Describe a new feature for Demo" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Describe a new feature for Factory" })).not.toBeInTheDocument();
   });
 
   it("shows the active workflow before new feature entry and keeps older work accessible", () => {
@@ -66,13 +80,14 @@ describe("repository chooser", () => {
     ], isError: false });
     renderWithProviders(<Chooser />);
     const entry = screen.getByRole("region", { name: "New feature for Demo" });
-    const runtime = screen.getByRole("region", { name: "Runtime readiness for Demo" });
+    const runtime = screen.getByRole("group", { name: "Optional runtime checks for Demo" });
     const active = screen.getByRole("region", { name: "Unfinished workflow for Demo" });
     const older = screen.getByRole("region", { name: "Other unfinished workflows for Demo" });
     expect(active.compareDocumentPosition(entry) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(entry.compareDocumentPosition(runtime) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(runtime.compareDocumentPosition(older) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(runtime).toHaveTextContent("Optional early check");
+    expect(runtime).not.toHaveAttribute("open");
     expect(screen.getByRole("link", { name: "Continue Current task" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Continue Older task" })).toBeVisible();
   });
