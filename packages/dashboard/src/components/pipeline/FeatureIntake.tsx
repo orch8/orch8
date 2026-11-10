@@ -408,7 +408,7 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
     </details>
     {activeWorkflow && <p role="status" className="mt-3 rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200">Existing workflow work may still need attention. <a href="#active-feature-workflows" className="underline">Inspect existing workflows</a> and finish, retry or cancel them before starting another plan. Your draft stays here.</p>}
     <details className="mt-2 rounded border border-zinc-700 p-3 text-xs text-zinc-300" aria-label="Pull request readiness">
-      <summary className="cursor-pointer font-medium text-blue-200">GitHub PR setup (optional until publishing){originError ? " · origin check failed" : repositoryOrigin && !repositoryOrigin.origin ? " · no origin connected" : repositoryOrigin && (!repositoryOrigin.configuredRepository || !repositoryOrigin.originMatchesProject || !repositoryOrigin.pushMatchesProject) ? " · needs attention" : ""}</summary>
+      <summary className="cursor-pointer font-medium text-blue-200">GitHub PR setup (optional until publishing){originError ? " · origin check failed" : repositoryOrigin && !repositoryOrigin.origin ? repositoryOrigin.originAvailable ? " · unsupported origin" : " · no origin connected" : repositoryOrigin && (!repositoryOrigin.configuredRepository || !repositoryOrigin.originMatchesProject || !repositoryOrigin.pushMatchesProject) ? " · needs attention" : ""}</summary>
       <div className="mt-2">
       {originError ? <p role="status" className="mt-1 text-amber-300">Could not check this checkout's origin. Inspect it before expecting a PR.</p>
         : !repositoryOrigin ? <p className="mt-1">Checking repository origin...</p>

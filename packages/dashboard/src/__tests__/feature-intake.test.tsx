@@ -92,6 +92,13 @@ describe("feature intake", () => {
   expect(await screen.findByText(/This checkout has no origin/)).toHaveTextContent(/cannot publish a PR/);
   expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
  });
+ it("labels an unsupported existing origin without claiming it is absent", async () => {
+  state.readiness.mockImplementation(async path => path.endsWith("/repository-origin")
+   ? { origin: "", originAvailable: true, configuredRepository: null, originMatchesProject: false, pushMatchesProject: false }
+   : { ready: true, branch: "main", baseBranch: "main" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(await screen.findByText(/GitHub PR setup .*unsupported origin/)).toBeInTheDocument();
+ });
  it("warns when the origin matches but the push URL does not", async () => {
   state.readiness.mockImplementation(async path => path.endsWith("/repository-origin")
    ? { origin: "https://github.com/orch8/orch8.git", originAvailable: true, configuredRepository: "https://github.com/orch8/orch8", originMatchesProject: true, pushMatchesProject: false }
