@@ -188,16 +188,18 @@ function RepositoryChooser() {
           placeholder="Search name or checkout path" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
       </div>
       {matching.length === 0 ? <p role="status" className="text-sm text-zinc-400">No repositories match your search.</p> : <>
-        <ul className="grid gap-2 sm:grid-cols-2" aria-label="Available repositories">
-          {matching.map(project => <li key={project.id}>
-            <button type="button" onClick={() => setSelectedId(project.id)} aria-pressed={selected.id === project.id}
-              className={`w-full rounded border p-3 text-left text-sm hover:border-blue-500 ${selected.id === project.id ? "border-blue-500 bg-blue-950/40 text-white" : "border-zinc-700 bg-zinc-900 text-zinc-300"}`}>
-              <span className="block font-medium">{project.name}</span>
-              <span className="mt-1 block truncate font-mono text-xs text-zinc-400" title={project.homeDir}>{project.homeDir}</span>
-            </button>
-          </li>)}
-        </ul>
-        <ul aria-label="Selected repository details"><RepositoryCard key={selected.id} project={selected} /></ul>
+        <div className="grid min-w-0 items-start gap-4 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]" aria-label="Repository selection and feature entry">
+          <ul className="grid min-w-0 max-h-32 grid-cols-[minmax(0,1fr)] gap-2 overflow-y-auto overflow-x-hidden pr-1 sm:sticky sm:top-4 sm:max-h-[calc(100vh-15rem)]" aria-label="Available repositories">
+            {matching.map(project => <li key={project.id} className="min-w-0">
+              <button type="button" onClick={() => setSelectedId(project.id)} aria-pressed={selected.id === project.id}
+                className={`w-full rounded border p-3 text-left text-sm hover:border-blue-500 ${selected.id === project.id ? "border-blue-500 bg-blue-950/40 text-white" : "border-zinc-700 bg-zinc-900 text-zinc-300"}`}>
+                <span className="block font-medium">{project.name}</span>
+                <span className="mt-1 block truncate font-mono text-xs text-zinc-400" title={project.homeDir}>{project.homeDir}</span>
+              </button>
+            </li>)}
+          </ul>
+          <ul className="min-w-0" aria-label="Selected repository details"><RepositoryCard key={selected.id} project={selected} /></ul>
+        </div>
       </>}
     </>}
   </div>;
