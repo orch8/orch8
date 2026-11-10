@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import Fastify from "fastify";
-import { mkdir, writeFile, rm, chmod } from "node:fs/promises";
+import { mkdir, writeFile, appendFile, rm, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -56,7 +56,7 @@ describe("GET /api/runs/:id/log — path safety and IO error handling", () => {
     await rm(projectHome, { recursive: true, force: true });
   });
 
-  async function insertRun(logRef: string | null): Promise<string> {
+  async function insertRun(logRef: string | null, status: "running" | "succeeded" = "succeeded"): Promise<string> {
     await testDb.db.insert(agents).values({
       id: "eng-1",
       projectId,
@@ -69,7 +69,7 @@ describe("GET /api/runs/:id/log — path safety and IO error handling", () => {
         agentId: "eng-1",
         projectId,
         invocationSource: "on_demand",
-        status: "succeeded",
+        status,
         logStore: "local",
         logRef,
       })
@@ -92,6 +92,35 @@ describe("GET /api/runs/:id/log — path safety and IO error handling", () => {
     const body = res.json();
     expect(body.content).toBe("line1\nline2\n");
     expect(body.store).toBe("local");
+  });
+
+  it("returns new output from a running agent without waiting for completion", async () => {
+    const logPath = path.join(logDir, "live.log");
+    await writeFile(logPath, "agent started\n");
+    const runId = await insertRun(logPath, "running");
+    const read = () => app.inject({ method: "GET", url: `/api/runs/${runId}/log`, headers: { "x-project-id": projectId } });
+    expect((await read()).json().content).toBe("agent started\n");
+    await appendFile(logPath, "tests failed\n");
+    const updated = await read();
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().content).toBe("agent started\ntests failed\n");
+  });
+
+  it("serves a bounded suffix for live polling without changing full log reads", async () => {
+    const logPath = path.join(logDir, "long.log");
+    const content = "a".repeat(300_000) + "tests passed\n";
+    await writeFile(logPath, content);
+    const runId = await insertRun(logPath, "running");
+    const headers = { "x-project-id": projectId };
+    const tail = await app.inject({ method: "GET", url: `/api/runs/${runId}/log?tailBytes=100`, headers });
+    expect(tail.statusCode).toBe(200);
+    expect(tail.json()).toEqual({ content: content.slice(-100), store: "local", bytes: Buffer.byteLength(content) });
+    const capped = await app.inject({ method: "GET", url: `/api/runs/${runId}/log?tailBytes=999999999`, headers });
+    expect(Buffer.byteLength(capped.json().content)).toBe(262144);
+    const full = await app.inject({ method: "GET", url: `/api/runs/${runId}/log`, headers });
+    expect(full.json().content).toBe(content);
+    const invalid = await app.inject({ method: "GET", url: `/api/runs/${runId}/log?tailBytes=-1`, headers });
+    expect(invalid.statusCode).toBe(400);
   });
 
   it("refuses to serve a log path outside the project logDir (403)", async () => {

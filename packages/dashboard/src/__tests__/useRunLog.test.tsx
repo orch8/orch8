@@ -57,8 +57,8 @@ describe("useRunLog", () => {
     });
 
     // Direct cache-level assertion: both keys must exist independently.
-    const entryA = qc.getQueryData(["run-log", "run_1", "proj_a"]);
-    const entryB = qc.getQueryData(["run-log", "run_1", "proj_b"]);
+    const entryA = qc.getQueryData(["run-log", "run_1", "proj_a", false]);
+    const entryB = qc.getQueryData(["run-log", "run_1", "proj_b", false]);
     expect(entryA).not.toBeUndefined();
     expect(entryB).not.toBeUndefined();
     expect(entryA).not.toEqual(entryB);

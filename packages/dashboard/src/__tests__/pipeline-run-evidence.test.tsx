@@ -95,6 +95,8 @@ describe("pipeline step run evidence", () => {
     await waitFor(() => expect(within(evidence).getByText(/Run status: running/)).toBeInTheDocument());
     fireEvent.click(within(evidence).getByText("Raw log"));
     expect(within(evidence).getByText("Loading run log...")).toBeInTheDocument();
+    expect(within(evidence).getByText(/Recent output refreshes every 3 seconds while open/)).toBeInTheDocument();
+    expect(within(evidence).getByRole("button", { name: "Refresh log now" })).toBeInTheDocument();
     finishLog(ok({ content: "", bytes: 0, store: "file" }));
     expect(await within(evidence).findByText(/Log is empty/)).toBeInTheDocument();
     expect(within(evidence).getByRole("button", { name: "Refresh log" })).toBeInTheDocument();

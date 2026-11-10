@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { eq, and, desc, inArray, asc } from "drizzle-orm";
 import { heartbeatRuns, runEvents, projects } from "@orch/shared/db";
-import { readFile } from "node:fs/promises";
+import { readFile, open } from "node:fs/promises";
 import path from "node:path";
 import { getRunLogDir } from "../../services/run-logger.js";
 import "../../types.js";
@@ -238,11 +238,31 @@ export async function runRoutes(app: FastifyInstance) {
       });
     }
 
-    const params = request.query as { tail?: string };
+    const params = request.query as { tail?: string; tailBytes?: string };
+    if (params.tailBytes !== undefined && !/^[1-9]\d*$/.test(params.tailBytes)) {
+      return reply.code(400).send({ error: "validation_error", message: "tailBytes must be a positive integer" });
+    }
 
     let raw: string;
+    let bytes: number;
     try {
-      raw = await readFile(resolvedRef, "utf-8");
+      if (params.tailBytes !== undefined) {
+        const handle = await open(resolvedRef, "r");
+        try {
+          const stats = await handle.stat();
+          if (!stats.isFile()) throw new Error("Run log is not a file");
+          bytes = stats.size;
+          const length = Math.min(bytes, Number(params.tailBytes), 262144);
+          const buffer = Buffer.alloc(length);
+          const { bytesRead } = await handle.read(buffer, 0, length, bytes - length);
+          raw = buffer.subarray(0, bytesRead).toString("utf-8");
+        } finally {
+          await handle.close();
+        }
+      } else {
+        raw = await readFile(resolvedRef, "utf-8");
+        bytes = Buffer.byteLength(raw);
+      }
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === "ENOENT") {
@@ -259,6 +279,6 @@ export async function runRoutes(app: FastifyInstance) {
       content = lines.slice(-n).join("\n");
     }
 
-    return { content, store: run.logStore, bytes: Buffer.byteLength(raw) };
+    return { content, store: run.logStore, bytes };
   });
 }
