@@ -66,7 +66,10 @@ describe("repository chooser", () => {
     ], isError: false });
     renderWithProviders(<Chooser />);
     const entry = screen.getByRole("region", { name: "New feature for Demo" });
+    const runtime = screen.getByRole("region", { name: "Runtime readiness for Demo" });
     const existing = screen.getByRole("region", { name: "Unfinished workflows for Demo" });
+    expect(entry.compareDocumentPosition(runtime) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(runtime).toHaveTextContent("Optional early check");
     expect(entry.compareDocumentPosition(existing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("link", { name: "Continue Current task" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Continue Older task" })).toBeVisible();
