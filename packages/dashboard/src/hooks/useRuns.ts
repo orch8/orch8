@@ -34,8 +34,10 @@ export function useRunLog(runId: string | null, projectId: string, live = false)
     // projectId MUST be part of the key. Otherwise two different projects
     // that happen to share a runId (e.g. in tests or after a seed) would
     // collide in the React Query cache and serve each other's logs.
-    queryKey: ["run-log", runId, projectId],
-    queryFn: () => api.get(`/runs/${runId}/log`, { projectId }),
+    queryKey: ["run-log", runId, projectId, live],
+    // While running, show recent output without transferring an ever-growing
+    // log on every poll. Once finalized, fetch the complete log separately.
+    queryFn: () => api.get(`/runs/${runId}/log`, { projectId, ...(live ? { tailBytes: 262144 } : {}) }),
     enabled: !!runId,
     refetchInterval: live && runId ? 3000 : false,
   });

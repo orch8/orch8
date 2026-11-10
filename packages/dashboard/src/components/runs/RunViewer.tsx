@@ -40,10 +40,11 @@ export function RunViewer({ runId, projectId, onClose }: RunViewerProps) {
 
   const isLive = run?.status === "running" || run?.status === "queued";
 
-  // The log endpoint can be empty until the runner closes its log stream.
+  // A terminal status can precede stream finalization. Refresh when the
+  // finalized byte count arrives, not only when the status changes.
   useEffect(() => {
     if (run?.status && !isLive) void refetchLog();
-  }, [run?.status, runId, projectId, isLive, refetchLog]);
+  }, [run?.status, run?.logBytes, runId, projectId, isLive, refetchLog]);
 
   // Auto-scroll to bottom for live runs
   useEffect(() => {

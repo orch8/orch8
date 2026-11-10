@@ -106,6 +106,23 @@ describe("GET /api/runs/:id/log — path safety and IO error handling", () => {
     expect(updated.json().content).toBe("agent started\ntests failed\n");
   });
 
+  it("serves a bounded suffix for live polling without changing full log reads", async () => {
+    const logPath = path.join(logDir, "long.log");
+    const content = "a".repeat(300_000) + "tests passed\n";
+    await writeFile(logPath, content);
+    const runId = await insertRun(logPath, "running");
+    const headers = { "x-project-id": projectId };
+    const tail = await app.inject({ method: "GET", url: `/api/runs/${runId}/log?tailBytes=100`, headers });
+    expect(tail.statusCode).toBe(200);
+    expect(tail.json()).toEqual({ content: content.slice(-100), store: "local", bytes: Buffer.byteLength(content) });
+    const capped = await app.inject({ method: "GET", url: `/api/runs/${runId}/log?tailBytes=999999999`, headers });
+    expect(Buffer.byteLength(capped.json().content)).toBe(262144);
+    const full = await app.inject({ method: "GET", url: `/api/runs/${runId}/log`, headers });
+    expect(full.json().content).toBe(content);
+    const invalid = await app.inject({ method: "GET", url: `/api/runs/${runId}/log?tailBytes=-1`, headers });
+    expect(invalid.statusCode).toBe(400);
+  });
+
   it("refuses to serve a log path outside the project logDir (403)", async () => {
     const attacker = path.join(tmpdir(), `orch8-escape-${randomUUID()}.txt`);
     await writeFile(attacker, "secrets\n", "utf-8");
