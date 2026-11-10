@@ -408,15 +408,24 @@ describe("feature intake", () => {
   await waitFor(() => expect(state.readiness.mock.calls.filter(([path]) => path.includes("?path=")).length).toBe(2));
   expect(await screen.findByText("Actual README")).toBeInTheDocument();
  });
- it("shows the selected repository README beside the feature request as safe text", async () => {
+ it("keeps the selected repository README available on demand as safe text", async () => {
   state.readiness.mockImplementation(async path => path.endsWith("/repository-overview")
     ? { filename: "README.md", content: "# Project A\n<img src=x onerror=alert(1)>" }
     : { ready: false, branch: "feat/usage", baseBranch: "main" });
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
-  expect(await screen.findByText(/# Project A/)).toHaveTextContent("<img src=x onerror=alert(1)>");
+  const readme = await screen.findByText(/# Project A/);
+  expect(readme).not.toBeVisible();
+  fireEvent.click(screen.getByText("Read root README"));
+  expect(readme).toBeVisible();
+  expect(readme).toHaveTextContent("<img src=x onerror=alert(1)>");
   expect(document.querySelector("img")).toBeNull();
   expect(state.readiness).toHaveBeenCalledWith("/projects/canonical-id/repository-overview");
   expect(screen.getByRole("heading", { name: "Repository overview" })).toBeInTheDocument();
+  const feature = screen.getByLabelText("What should change?");
+  const team = screen.getByLabelText("Feature agents");
+  const runtime = screen.getByRole("region", { name: "Check Claude before setup" });
+  expect(feature.compareDocumentPosition(team) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(team.compareDocumentPosition(runtime) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
  });
  it("explains missing README without blocking intake", async () => {
   state.readiness.mockImplementation(async path => path.endsWith("/repository-overview")
