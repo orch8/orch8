@@ -164,12 +164,11 @@ function RunEvidence({ run, projectId, onOpen }: { run: Run; projectId: string; 
     return () => window.removeEventListener("hashchange", openLinkedRun);
   }, [anchor]);
   const live = run.status === "running";
-  const { data: log, isLoading, isError, error, refetch } = useRunLog(open ? run.id : null, projectId, live);
-  const wasLive = useRef(live);
-  useEffect(() => {
-    if (wasLive.current && !live && open) void refetch();
-    wasLive.current = live;
-  }, [live, open, refetch]);
+  // The run becomes terminal before its write stream is finalized. Continue
+  // refreshing until the finalized byte count appears in the run list.
+  const finalizing = !live && run.logRef != null && run.logBytes == null &&
+    run.finishedAt != null && Date.now() - new Date(run.finishedAt).getTime() < 30_000;
+  const { data: log, isLoading, isError, error, refetch } = useRunLog(open ? run.id : null, projectId, live || finalizing);
   return <div id={anchor} className="scroll-mt-6 rounded border border-zinc-700 bg-zinc-950/60 p-2 space-y-2">
     <div className="flex flex-wrap items-center gap-2 text-zinc-300">
       <span className="font-mono">{run.id}</span>
