@@ -102,6 +102,26 @@ describe("adapter environment route", () => {
       }
     } finally { await app.close(); }
   });
+  it("offers only an admin a fixed, non-bypassing Codex sandbox-only check", async () => {
+    const app = Fastify();
+    const map = makeAdapters();
+    app.decorate("adapters", map);
+    let admin = false;
+    app.addHook("onRequest", async request => { request.isAdmin = admin; });
+    await app.register(adapterTestRoutes);
+    const url = "/api/adapter/codex_local/test-environment";
+    const config = { sandboxOnly: true, sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false };
+    try {
+      expect((await app.inject({ method: "POST", url, payload: { config } })).statusCode).toBe(403);
+      admin = true;
+      for (const invalid of [{ ...config, command: "/bin/true" }, { ...config, dangerouslyBypassApprovalsAndSandbox: true }, { ...config, sandbox: "danger-full-access" }, { ...config, sandboxOnly: false }]) {
+        expect((await app.inject({ method: "POST", url, payload: { config: invalid } })).statusCode).toBe(400);
+      }
+      expect(map.codex_local.testEnvironment).not.toHaveBeenCalled();
+      expect((await app.inject({ method: "POST", url, payload: { config } })).statusCode).toBe(200);
+      expect(map.codex_local.testEnvironment).toHaveBeenCalledWith(config);
+    } finally { await app.close(); }
+  });
   it("binds Claude probe to the selected admin project and rejects caller paths and bypass flags", async () => {
     const testDb = await setupTestDb();
     const [project] = await testDb.db.insert(projects).values({ name: "Selected", slug: "selected-probe", homeDir: "/repo/selected", budgetLimitUsd: 1 }).returning();

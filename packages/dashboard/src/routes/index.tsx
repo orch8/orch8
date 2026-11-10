@@ -35,6 +35,8 @@ function RepositoryCard({ project }: { project: Project }) {
   const [returnError, setReturnError] = useState("");
   const [checkingClaude, setCheckingClaude] = useState(false);
   const [claudeResult, setClaudeResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [checkingCodex, setCheckingCodex] = useState(false);
+  const [codexResult, setCodexResult] = useState<{ ok: boolean; message: string } | null>(null);
   // FeatureIntake reads drafts by project id; the URL slug is only for navigation.
   const draftKey = `orch8:feature-draft:${project.id}`;
   const [request, setRequest] = useState(() => {
@@ -106,6 +108,21 @@ function RepositoryCard({ project }: { project: Project }) {
       catch { setClaudeResult({ ok: false, message }); }
     } finally { setCheckingClaude(false); }
   }
+  async function checkCodex() {
+    if (checkingCodex) return;
+    setCheckingCodex(true);
+    setCodexResult(null);
+    try {
+      const result = await api.post<{ ok: boolean; message?: string }>("/adapter/codex_local/test-environment", {
+        config: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false, sandboxOnly: true },
+      });
+      setCodexResult({ ok: result.ok, message: result.message ?? (result.ok ? "Codex sandbox check passed." : "Codex sandbox check failed.") });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Codex runtime check failed.";
+      try { setCodexResult({ ok: false, message: JSON.parse(message).message ?? message }); }
+      catch { setCodexResult({ ok: false, message }); }
+    } finally { setCheckingCodex(false); }
+  }
   return <li className="rounded border border-zinc-700 bg-zinc-900 p-4">
     <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} className="block hover:text-blue-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400">
       <span className="block font-medium text-zinc-100">{project.name}</span>
@@ -140,7 +157,12 @@ function RepositoryCard({ project }: { project: Project }) {
       {draftError && <p role="alert" className="mt-2 text-amber-300">Browser storage is unavailable. Copy your request into the feature form after opening the repository.</p>}
     </section>
     <section className="mt-3 border-t border-zinc-700 pt-3 text-sm" aria-label={`Runtime readiness for ${project.name}`}>
-      <p className="text-zinc-300">Using Claude Code? Check it before setup</p>
+      <p className="text-zinc-300">Using Codex? Check its sandbox before setup</p>
+      <p className="mt-1 text-xs text-zinc-400">Optional free check in a temporary directory, not this checkout. Runs a real Linux sandbox command without invoking a model. A pass does not verify Codex authentication or approve any agent; check the selected agents during setup.</p>
+      <button type="button" onClick={() => void checkCodex()} disabled={checkingCodex} className="mt-2 rounded border border-zinc-600 px-2 py-1 text-blue-300 disabled:opacity-40">{checkingCodex ? "Checking Codex..." : "Check Codex sandbox"}</button>
+      {codexResult && <p role="status" className={`mt-2 text-xs ${codexResult.ok ? "text-emerald-300" : "text-amber-300"}`}>{codexResult.message} {codexResult.ok && "Check all selected agents again in the feature workflow."}</p>}
+      {codexResult && !codexResult.ok && <div className="mt-2"><SandboxRecoveryGuidance adapterType="codex_local" message={codexResult.message} /></div>}
+      <p className="mt-4 text-zinc-300">Using Claude Code? Check it before setup</p>
       <p className="mt-1 text-xs text-zinc-400">Optional early check. Runs a real model and temporary write in this checkout with existing permissions, and may incur cost against the project budget. The selected agents still need a runtime check during setup.</p>
       <button type="button" onClick={() => void checkClaude()} disabled={checkingClaude} className="mt-2 rounded border border-zinc-600 px-2 py-1 text-blue-300 disabled:opacity-40">{checkingClaude ? "Checking Claude..." : "Check Claude in this repository"}</button>
       {claudeResult && <p role="status" className={`mt-2 text-xs ${claudeResult.ok ? "text-emerald-300" : "text-amber-300"}`}>{claudeResult.message} {claudeResult.ok && "Check all selected agents again in the feature workflow."}</p>}
