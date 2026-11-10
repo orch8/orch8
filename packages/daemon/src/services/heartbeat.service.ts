@@ -556,6 +556,12 @@ export class HeartbeatService {
       await mkdir(logDir, { recursive: true });
       runLogger = new RunLogger(logDir);
       logHandle = runLogger.create(runId);
+      // Expose the growing log before the adapter completes. The log route
+      // still enforces the project's log directory boundary.
+      await this.db.update(heartbeatRuns).set({
+        logStore: "local",
+        logRef: logHandle.logRef,
+      }).where(eq(heartbeatRuns.id, runId));
 
       const adapterConfig = this.buildAdapterConfig(agent, cwd, adapter.type);
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import Fastify from "fastify";
-import { mkdir, writeFile, rm, chmod } from "node:fs/promises";
+import { mkdir, writeFile, appendFile, rm, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -56,7 +56,7 @@ describe("GET /api/runs/:id/log — path safety and IO error handling", () => {
     await rm(projectHome, { recursive: true, force: true });
   });
 
-  async function insertRun(logRef: string | null): Promise<string> {
+  async function insertRun(logRef: string | null, status: "running" | "succeeded" = "succeeded"): Promise<string> {
     await testDb.db.insert(agents).values({
       id: "eng-1",
       projectId,
@@ -69,7 +69,7 @@ describe("GET /api/runs/:id/log — path safety and IO error handling", () => {
         agentId: "eng-1",
         projectId,
         invocationSource: "on_demand",
-        status: "succeeded",
+        status,
         logStore: "local",
         logRef,
       })
@@ -92,6 +92,18 @@ describe("GET /api/runs/:id/log — path safety and IO error handling", () => {
     const body = res.json();
     expect(body.content).toBe("line1\nline2\n");
     expect(body.store).toBe("local");
+  });
+
+  it("returns new output from a running agent without waiting for completion", async () => {
+    const logPath = path.join(logDir, "live.log");
+    await writeFile(logPath, "agent started\n");
+    const runId = await insertRun(logPath, "running");
+    const read = () => app.inject({ method: "GET", url: `/api/runs/${runId}/log`, headers: { "x-project-id": projectId } });
+    expect((await read()).json().content).toBe("agent started\n");
+    await appendFile(logPath, "tests failed\n");
+    const updated = await read();
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().content).toBe("agent started\ntests failed\n");
   });
 
   it("refuses to serve a log path outside the project logDir (403)", async () => {

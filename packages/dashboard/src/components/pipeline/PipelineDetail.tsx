@@ -163,7 +163,13 @@ function RunEvidence({ run, projectId, onOpen }: { run: Run; projectId: string; 
     window.addEventListener("hashchange", openLinkedRun);
     return () => window.removeEventListener("hashchange", openLinkedRun);
   }, [anchor]);
-  const { data: log, isLoading, isError, error, refetch } = useRunLog(open ? run.id : null, projectId);
+  const live = run.status === "running";
+  const { data: log, isLoading, isError, error, refetch } = useRunLog(open ? run.id : null, projectId, live);
+  const wasLive = useRef(live);
+  useEffect(() => {
+    if (wasLive.current && !live && open) void refetch();
+    wasLive.current = live;
+  }, [live, open, refetch]);
   return <div id={anchor} className="scroll-mt-6 rounded border border-zinc-700 bg-zinc-950/60 p-2 space-y-2">
     <div className="flex flex-wrap items-center gap-2 text-zinc-300">
       <span className="font-mono">{run.id}</span>
@@ -174,6 +180,8 @@ function RunEvidence({ run, projectId, onOpen }: { run: Run; projectId: string; 
     <details open={open} onToggle={event => setOpen(event.currentTarget.open)}>
       <summary className="cursor-pointer text-blue-300">Raw log</summary>
       {open && <div className="mt-2">
+        {live && <p className="mb-2 text-zinc-400">Run in progress. Log refreshes every 3 seconds while open.</p>}
+        <button type="button" onClick={() => void refetch()} className="mb-2 text-blue-300 underline">Refresh log now</button>
         {isLoading && <p role="status" className="text-zinc-400">Loading run log...</p>}
         {isError && (error instanceof ApiError && error.status === 404
           ? <p className="text-zinc-400">No stored log found for this run. It may not have been written or may be missing. <button type="button" onClick={() => void refetch()} className="text-blue-300 underline">Retry</button></p>
