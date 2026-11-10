@@ -129,7 +129,7 @@ export class CodexLocalAdapter implements AgentAdapter {
   }
 
   async testEnvironment(config: unknown): Promise<TestEnvironmentResult> {
-    const codexConfig = config as CodexLocalAdapterConfig;
+    const codexConfig = config as CodexLocalAdapterConfig & { sandboxOnly?: boolean };
     const cwd = await mkdtemp(join(tmpdir(), "orch8-codex-probe-"));
     const codexHome = await mkdtemp(join(tmpdir(), "orch8-codex-home-"));
 
@@ -159,6 +159,11 @@ export class CodexLocalAdapter implements AgentAdapter {
           return { ok: false, errorCode: "process_error",
             message: `Codex sandbox cannot run commands: ${detail}. Keep approvals and sandbox enabled; repair the host sandbox before starting a feature.` };
         }
+      }
+      if (codexConfig.sandboxOnly) {
+        // This early check proves only that the Linux command sandbox starts.
+        // It deliberately avoids the billable model invocation below.
+        return { ok: true, message: "Codex sandbox ran a command in a temporary directory. Agent authentication and model access are not checked." };
       }
       const result = await runCodexProcess(
         {
@@ -194,6 +199,7 @@ export class CodexLocalAdapter implements AgentAdapter {
       if (result.errorCode) {
         return {
           ok: false,
+          costUsd: result.costUsd,
           errorCode: result.errorCode,
           message: result.error ?? "Codex environment test failed",
           sessionId: result.sessionId ?? undefined,
@@ -202,6 +208,7 @@ export class CodexLocalAdapter implements AgentAdapter {
 
       return {
         ok: true,
+        costUsd: result.costUsd,
         sessionId: result.sessionId ?? undefined,
         message: result.result ?? undefined,
       };

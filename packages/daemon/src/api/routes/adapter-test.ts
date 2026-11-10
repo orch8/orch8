@@ -31,6 +31,18 @@ export async function adapterTestRoutes(app: FastifyInstance) {
       }
 
       const adapter = resolveAdapter(request.params.type, app.adapters, request.log);
+      if (request.params.type === "codex_local" &&
+          typeof parsed.data.config === "object" && parsed.data.config !== null &&
+          "sandboxOnly" in parsed.data.config) {
+        if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+        const settings = parsed.data.config as Record<string, unknown>;
+        if (settings.sandboxOnly !== true || settings.sandbox !== "workspace-write" ||
+            settings.dangerouslyBypassApprovalsAndSandbox !== false ||
+            Object.keys(settings).some(key => !["sandboxOnly", "sandbox", "dangerouslyBypassApprovalsAndSandbox"].includes(key))) {
+          return reply.code(400).send({ error: "validation_error", message: "Unsafe Codex sandbox check configuration" });
+        }
+        return adapter.testEnvironment(settings);
+      }
       if (request.params.type === "claude_local") {
         if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
         if (!parsed.data.projectId) return reply.code(400).send({ error: "validation_error", message: "Project required" });
