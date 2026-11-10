@@ -92,6 +92,13 @@ describe("feature intake", () => {
   expect(await screen.findByText(/This checkout has no origin/)).toHaveTextContent(/cannot publish a PR/);
   expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
  });
+ it("labels an unsupported existing origin without claiming it is absent", async () => {
+  state.readiness.mockImplementation(async path => path.endsWith("/repository-origin")
+   ? { origin: "", originAvailable: true, configuredRepository: null, originMatchesProject: false, pushMatchesProject: false }
+   : { ready: true, branch: "main", baseBranch: "main" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(await screen.findByText(/GitHub PR setup .*unsupported origin/)).toBeInTheDocument();
+ });
  it("warns when the origin matches but the push URL does not", async () => {
   state.readiness.mockImplementation(async path => path.endsWith("/repository-origin")
    ? { origin: "https://github.com/orch8/orch8.git", originAvailable: true, configuredRepository: "https://github.com/orch8/orch8", originMatchesProject: true, pushMatchesProject: false }
@@ -105,6 +112,17 @@ describe("feature intake", () => {
    : { ready: true, branch: "main", baseBranch: "main" });
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   expect(await screen.findByText(/no supported GitHub repository URL in Settings/)).toHaveTextContent(/cannot publish a PR/);
+ });
+ it("shows origin-check failure in the collapsed summary", async () => {
+  state.readiness.mockImplementation(async path => {
+   if (path.endsWith("/repository-origin")) throw new Error("origin unavailable");
+   return { ready: true, branch: "main", baseBranch: "main" };
+  });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  expect(await screen.findByText(/GitHub PR setup .*origin check failed/)).toBeInTheDocument();
+  expect(screen.getByRole("group", { name: "Pull request readiness" })).not.toHaveAttribute("open");
+  fireEvent.click(screen.getByText(/GitHub PR setup .*origin check failed/));
+  expect(screen.getByText(/Could not check this checkout's origin/)).toBeVisible();
  });
  it("copies a manual handoff before agent setup with the exact request, paths, and only a proposed branch", async () => {
   state.agents = [];
@@ -423,9 +441,13 @@ describe("feature intake", () => {
   expect(screen.getByRole("heading", { name: "Repository overview" })).toBeInTheDocument();
   const feature = screen.getByLabelText("What should change?");
   const team = screen.getByLabelText("Feature agents");
-  const runtime = screen.getByRole("region", { name: "Check Claude before setup" });
+  const runtime = screen.getByRole("group", { name: "Check Claude before setup" });
+  expect(runtime).not.toHaveAttribute("open");
+  expect(screen.getByRole("group", { name: "Pull request readiness" })).not.toHaveAttribute("open");
   expect(feature.compareDocumentPosition(team) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(team.compareDocumentPosition(runtime) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  fireEvent.click(screen.getByText("Check Claude Code early (optional)"));
+  expect(runtime).toHaveAttribute("open");
  });
  it("explains missing README without blocking intake", async () => {
   state.readiness.mockImplementation(async path => path.endsWith("/repository-overview")
