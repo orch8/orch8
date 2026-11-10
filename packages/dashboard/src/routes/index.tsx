@@ -21,7 +21,7 @@ function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline:
   const workflowUrl = `/projects/${encodeURIComponent(project.slug)}/pipelines/${encodeURIComponent(pipeline.id)}`;
   return <li className="border-t border-zinc-700 pt-3 text-sm">
     <p className={detailError || step?.status === "awaiting_verification" || pipeline.status === "failed" ? "text-amber-300" : "text-zinc-300"}>{action}</p>
-    <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className="mt-1 inline-block text-blue-300 underline">Continue {pipeline.name}</Link>
+    <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className="mt-1 line-clamp-2 break-words text-blue-300 underline">Continue {pipeline.name}</Link>
     {step?.id && (step.status === "awaiting_verification" || step.status === "failed") &&
       <a href={`${workflowUrl}#workflow-step-${encodeURIComponent(step.id)}`} className="ml-3 inline-block rounded border border-amber-700 px-2 py-1 text-amber-200 hover:bg-amber-950/50">
         {step.status === "awaiting_verification" ? `Review ${step.label.toLowerCase()} now` : `Inspect failed ${step.label.toLowerCase()}`}
@@ -127,6 +127,11 @@ function RepositoryCard({ project }: { project: Project }) {
       <p className="mt-1">Only a clean, idle checkout can switch branches. This does not reset or delete feature work.</p>
     </div>}
     {returnError && <p role="alert" className="mt-2 text-xs text-amber-300">{returnError}</p>}
+    {!!unfinished?.length && <section className="mt-3 border-t border-zinc-700 pt-3" aria-label={`Unfinished workflow for ${project.name}`}>
+      <h2 className="text-sm font-medium text-zinc-200">Continue unfinished work</h2>
+      <ul><UnfinishedWorkflow project={project} pipeline={unfinished[0]} /></ul>
+      {unfinished.length > 1 && <a href="#remaining-workflows" className="mt-2 inline-block text-xs text-blue-300 underline">See {unfinished.length - 1} other unfinished {unfinished.length === 2 ? "workflow" : "workflows"}</a>}
+    </section>}
     <section className="mt-3 border-t border-zinc-700 pt-3 text-sm text-zinc-300" aria-label={`New feature for ${project.name}`}>
       <label htmlFor={`quick-feature-${project.id}`} className="block font-medium text-zinc-200">Describe a new feature for {project.name}</label>
       <textarea id={`quick-feature-${project.id}`} value={request} maxLength={2000} rows={3} onChange={event => { setRequest(event.target.value); saveRequest(event.target.value); }} placeholder="What should change in this repository?" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
@@ -141,10 +146,10 @@ function RepositoryCard({ project }: { project: Project }) {
       {claudeResult && <p role="status" className={`mt-2 text-xs ${claudeResult.ok ? "text-emerald-300" : "text-amber-300"}`}>{claudeResult.message} {claudeResult.ok && "Check all selected agents again in the feature workflow."}</p>}
       {claudeResult && !claudeResult.ok && <div className="mt-2"><SandboxRecoveryGuidance adapterType="claude_local" message={claudeResult.message} /></div>}
     </section>
-    {!!unfinished?.length && <section className="mt-3 border-t border-zinc-700 pt-3" aria-label={`Unfinished workflows for ${project.name}`}>
-      <h2 className="text-sm font-medium text-zinc-200">Continue existing work</h2>
+    {unfinished && unfinished.length > 1 && <section id="remaining-workflows" className="mt-3 scroll-mt-6 border-t border-zinc-700 pt-3" aria-label={`Other unfinished workflows for ${project.name}`}>
+      <h2 className="text-sm font-medium text-zinc-200">Other unfinished work</h2>
       <ul className="space-y-3">
-        {unfinished.map(pipeline => <UnfinishedWorkflow key={pipeline.id} project={project} pipeline={pipeline} />)}
+        {unfinished.slice(1).map(pipeline => <UnfinishedWorkflow key={pipeline.id} project={project} pipeline={pipeline} />)}
       </ul>
     </section>}
     {!!completed?.length && <div className="mt-3 border-t border-zinc-700 pt-3 text-sm">

@@ -51,14 +51,24 @@ describe("repository chooser progress", () => {
     expect(screen.getByRole("link", { name: /My repo.*Open feature workflows/ })).toHaveAttribute("href", "/projects/my-repo/pipelines");
   });
 
-  it("shows the new feature form before existing work without a disclosure", () => {
+  it("puts the current workflow decision before new feature setup, while keeping the feature form visible", () => {
     usePipelines.mockReturnValue({ data: [pipeline("plan-1", "running", "2026-11-08T01:00:00Z")], isError: false });
+    usePipeline.mockReturnValue({ data: { steps: [{ id: "plan-step", label: "Plan", status: "awaiting_verification" }] } });
     renderWithProviders(<RepositoryChooser />);
     const card = within(screen.getByRole("list", { name: "Selected repository details" })).getAllByRole("listitem")[0];
+    const current = within(card).getByRole("region", { name: "Unfinished workflow for My repo" });
     const form = within(card).getByRole("region", { name: "New feature for My repo" });
+    expect(current.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(current).getByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/my-repo/pipelines/plan-1#workflow-step-plan-step");
     expect(within(form).getByRole("textbox", { name: "Describe a new feature for My repo" })).toBeVisible();
-    expect(form.compareDocumentPosition(within(card).getByRole("region", { name: "Unfinished workflows for My repo" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(card).queryByRole("link", { name: "Continue to plan setup" })).not.toBeInTheDocument();
+  });
+  it("links to every remaining workflow without duplicating the current one", () => {
+    usePipelines.mockReturnValue({ data: [pipeline("newer", "running", "2026-11-08T02:00:00Z"), pipeline("older", "failed", "2026-11-08T01:00:00Z")], isError: false });
+    renderWithProviders(<RepositoryChooser />);
+    expect(within(screen.getByRole("region", { name: "Unfinished workflow for My repo" })).getByRole("link", { name: "Continue newer" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See 1 other unfinished workflow" })).toHaveAttribute("href", "#remaining-workflows");
+    expect(within(screen.getByRole("region", { name: "Other unfinished workflows for My repo" })).getByRole("link", { name: "Continue older" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Continue newer" })).toHaveLength(1);
   });
   it("shows live checkout readiness before opening a repository", async () => {
     renderWithProviders(<RepositoryChooser />);
