@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import Fastify from "fastify";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { projects } from "@orch/shared/db";
@@ -34,6 +34,29 @@ describe("Project Routes", () => {
     app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(projectRoutes);
     await app.ready();
+  });
+
+  describe("GET /api/projects/:id/test-instructions", () => {
+    it("previews a root test script without running it and refuses a symlink", async () => {
+      const homeDir = await mkdtemp(join(tmpdir(), "orch8-test-instructions-"));
+      const outside = await mkdtemp(join(tmpdir(), "orch8-test-instructions-outside-"));
+      try {
+        const [project] = await testDb.db.insert(projects).values({ name: "Instructions", slug: "instructions", homeDir }).returning();
+        await writeFile(join(homeDir, "package.json"), JSON.stringify({ scripts: { test: "node --test test.mjs" } }));
+        const response = await app.inject({ method: "GET", url: `/api/projects/${project.id}/test-instructions` });
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toEqual({ repository: homeDir, script: "node --test test.mjs" });
+        await rm(join(homeDir, "package.json"));
+        await writeFile(join(outside, "package.json"), JSON.stringify({ scripts: { test: "secret command" } }));
+        await symlink(join(outside, "package.json"), join(homeDir, "package.json"));
+        const linked = await app.inject({ method: "GET", url: `/api/projects/${project.id}/test-instructions` });
+        expect(linked.statusCode).toBe(200);
+        expect(linked.json().script).toBeNull();
+      } finally {
+        await rm(homeDir, { recursive: true, force: true });
+        await rm(outside, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("POST /api/projects/repository-clone", () => {

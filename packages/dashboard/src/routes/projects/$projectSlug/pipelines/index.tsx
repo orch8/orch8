@@ -4,6 +4,7 @@ import { usePipelines } from "../../../../hooks/usePipelines.js";
 import { PipelineList } from "../../../../components/pipeline/PipelineList.js";
 import { FeatureIntake } from "../../../../components/pipeline/FeatureIntake.js";
 import { RepositoryChanges } from "../../../../components/pipeline/RepositoryChanges.js";
+import { TestInstructions } from "../../../../components/pipeline/TestInstructions.js";
 import { useProject } from "../../../../hooks/useProjects.js";
 
 // Pipelines tabs are built from runtime paths like
@@ -80,6 +81,7 @@ function PipelinesActivePage() {
       </section>}
       {project && <FeatureIntake key={project.id} projectId={project.id} legacySlug={project.slug} activeWorkflow={isLoading || isError || activePipelines.length > 0} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />}
       {projectError && <p role="alert" className="text-sm text-amber-300">Could not load this repository. Refresh before planning a feature.</p>}
+      {project && <TestInstructions key={project.id} projectId={project.id} />}
       <RepositoryChanges projectId={project?.id} projectError={projectError} />
     </div>
   );
