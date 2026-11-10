@@ -386,8 +386,9 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
         {canUsePreferred && <button type="button" onClick={() => selectTeam(preferred)} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use Codex feature agents</button>}
         {canUseClaude && <button type="button" onClick={() => selectTeam(preferredClaude)} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use Claude feature agents</button>}
       </div>}
-      {feature.trim() && <div className="rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Manual feature handoff">
-        <p className="text-xs text-zinc-400">Copy the request for a manual handoff. This does not prepare a branch, check agents, or start a workflow.</p>
+      {feature.trim() && <details className="rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Manual feature handoff">
+        <summary className="cursor-pointer text-blue-200">Copy request for manual use (optional)</summary>
+        <p className="mt-2 text-xs text-zinc-400">This does not prepare a branch, check agents, or start a workflow.</p>
         <button type="button" onClick={() => { void copyHandoff(); }} disabled={!project?.homeDir || copying} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">Copy feature handoff</button>
         {!project?.homeDir && <p className="mt-2 text-amber-300">Load the repository path before copying the handoff.</p>}
         {handoffFeedback === "copied" && <p role="status" className="mt-2 text-emerald-300">Handoff copied to clipboard.</p>}
@@ -395,17 +396,20 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
           <label htmlFor="manual-feature-handoff" className="block text-amber-300">Clipboard unavailable. Select and copy the handoff below.</label>
           <textarea id="manual-feature-handoff" aria-label="Feature handoff for manual copy" readOnly value={handoff} rows={12} onFocus={event => event.currentTarget.select()} className="mt-2 w-full rounded border border-zinc-600 bg-zinc-950 p-2 font-mono text-xs text-zinc-100" />
         </div>}
-      </div>}
-    <section aria-label="Check Claude before setup" className="mt-4 space-y-2 rounded border border-zinc-700 bg-zinc-950/60 p-3 text-sm text-zinc-300">
-      <h3 className="font-medium text-zinc-100">Can Claude Code run here?</h3>
+      </details>}
+    <details aria-label="Check Claude before setup" className="mt-4 rounded border border-zinc-700 bg-zinc-950/60 p-3 text-sm text-zinc-300">
+      <summary className="cursor-pointer font-medium text-blue-200">Check Claude Code early (optional)</summary>
+      <div className="mt-2 space-y-2">
       <p className="text-xs text-zinc-400">Check before setting up a team or preparing a branch. This invokes Claude's model and tests a real command and temporary write in this checkout using existing permissions, so it may incur model cost and respects the project budget. It does not create agents, start a feature, or change permissions. Codex checks its sandbox after agent selection below. You must still check all selected agents before starting.</p>
       <button type="button" disabled={!project?.id || !!earlyRuntime || checking} onClick={() => void checkClaudeBeforeSetup()} className="rounded border border-blue-600 px-3 py-2 text-blue-200 disabled:opacity-40">{earlyRuntime ? "Checking Claude..." : "Check Claude before setup"}</button>
       {earlyResult && <p role="status" className={earlyResult.ok ? "text-emerald-300" : "text-amber-300"}>Claude {earlyResult.ok ? "runtime passed" : "runtime unavailable"}: {earlyResult.message}</p>}
       {earlyResult && !earlyResult.ok && <SandboxRecoveryGuidance message={earlyResult.message} adapterType="claude_local" />}
-    </section>
+      </div>
+    </details>
     {activeWorkflow && <p role="status" className="mt-3 rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200">Existing workflow work may still need attention. <a href="#active-feature-workflows" className="underline">Inspect existing workflows</a> and finish, retry or cancel them before starting another plan. Your draft stays here.</p>}
-    <div className="mt-2 rounded border border-zinc-700 p-3 text-xs text-zinc-300" aria-label="Pull request readiness">
-      <p className="font-medium text-zinc-100">GitHub PR setup</p>
+    <details className="mt-2 rounded border border-zinc-700 p-3 text-xs text-zinc-300" aria-label="Pull request readiness">
+      <summary className="cursor-pointer font-medium text-blue-200">GitHub PR setup (optional until publishing){originError ? " · origin check failed" : repositoryOrigin && !repositoryOrigin.origin ? " · no origin connected" : repositoryOrigin && (!repositoryOrigin.configuredRepository || !repositoryOrigin.originMatchesProject || !repositoryOrigin.pushMatchesProject) ? " · needs attention" : ""}</summary>
+      <div className="mt-2">
       {originError ? <p role="status" className="mt-1 text-amber-300">Could not check this checkout's origin. Inspect it before expecting a PR.</p>
         : !repositoryOrigin ? <p className="mt-1">Checking repository origin...</p>
           : !repositoryOrigin.origin ? <>
@@ -423,7 +427,8 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
             : !repositoryOrigin.configuredRepository ? <p role="status" className="mt-1 text-amber-300">Origin: {repositoryOrigin.origin}. This project has no supported GitHub repository URL in Settings. You can build locally, but Orch8 cannot publish a PR until you configure it.</p>
               : !repositoryOrigin.originMatchesProject || !repositoryOrigin.pushMatchesProject ? <p role="status" className="mt-1 text-amber-300">Origin: {repositoryOrigin.origin}. Project URL: {repositoryOrigin.configuredRepository}. {repositoryOrigin.originMatchesProject ? "The origin push URL does not match the project URL." : "The origin does not match the project URL."} Fix this before expecting Orch8 to publish a PR. No remote is changed here.</p>
                 : <p className="mt-1 break-all">Origin and push destination match {repositoryOrigin.configuredRepository}. Publishing still requires push access, a clean feature commit, and an accepted review.</p>}
-    </div>
+      </div>
+    </details>
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-blue-800 bg-blue-950/40 p-3 text-sm" aria-label="Next feature step">
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-blue-300">Next step</p>
