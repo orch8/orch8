@@ -13,6 +13,7 @@ import { constants } from "node:fs";
 import { join, relative, isAbsolute } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { repositoryTestScript, runRepositoryTests, RepositoryTestBusy } from "../../services/repository-tests.service.js";
 
 const execFileAsync = promisify(execFile);
 const FILE_MAX_BYTES = 32 * 1024;
@@ -73,6 +74,31 @@ async function rootReadme(homeDir: string): Promise<{ filename: string | null; c
 }
 
 export async function projectRoutes(app: FastifyInstance) {
+  // Manual verification only: this does not run an agent or approve a workflow.
+  app.get("/api/projects/:id/repository-tests", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const projectId = await resolveProjectParam(app, request.params.id, reply);
+    if (!projectId) return reply;
+    if (!requireProjectScope(request, reply, projectId)) return reply;
+    const project = await app.projectService.getById(projectId);
+    if (!project) return reply.code(404).send({ error: "not_found" });
+    try { return { available: true, ...await repositoryTestScript(project.homeDir) }; }
+    catch { return { available: false, repository: project.homeDir, reason: "No usable root package.json test script." }; }
+  });
+  app.post("/api/projects/:id/repository-tests", async (request: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply: FastifyReply) => {
+    if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+    const projectId = await resolveProjectParam(app, request.params.id, reply);
+    if (!projectId) return reply;
+    if (!requireProjectScope(request, reply, projectId)) return reply;
+    if (request.body !== undefined && (request.body === null || typeof request.body !== "object" || Array.isArray(request.body) || Object.keys(request.body).length))
+      return reply.code(400).send({ error: "validation_error", message: "This action accepts no command or options." });
+    const project = await app.projectService.getById(projectId);
+    if (!project) return reply.code(404).send({ error: "not_found" });
+    try { return await runRepositoryTests(project.homeDir); }
+    catch (error) {
+      if (error instanceof RepositoryTestBusy) return reply.code(409).send({ error: "conflict", message: error.message });
+      return reply.code(422).send({ error: "test_unavailable", message: "Could not run the root package.json test script. Check the repository and npm installation." });
+    }
+  });
   // Connect an existing local checkout without replacing an origin or credentials.
   app.post("/api/projects/:id/repository-origin", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
