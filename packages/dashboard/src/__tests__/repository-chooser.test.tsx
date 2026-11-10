@@ -58,7 +58,7 @@ describe("repository chooser", () => {
     expect(screen.getByRole("status")).toHaveTextContent("No repositories match your search.");
   });
 
-  it("keeps new feature entry ahead of unfinished work without hiding older decisions", () => {
+  it("shows the active workflow before new feature entry and keeps older work accessible", () => {
     useProjects.mockReturnValue({ data: [{ id: "1", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true }], isLoading: false, isError: false });
     usePipelines.mockReturnValueOnce({ data: [
       { id: "old", name: "Older task", status: "pending", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
@@ -67,10 +67,12 @@ describe("repository chooser", () => {
     renderWithProviders(<Chooser />);
     const entry = screen.getByRole("region", { name: "New feature for Demo" });
     const runtime = screen.getByRole("region", { name: "Runtime readiness for Demo" });
-    const existing = screen.getByRole("region", { name: "Unfinished workflows for Demo" });
+    const active = screen.getByRole("region", { name: "Unfinished workflow for Demo" });
+    const older = screen.getByRole("region", { name: "Other unfinished workflows for Demo" });
+    expect(active.compareDocumentPosition(entry) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(entry.compareDocumentPosition(runtime) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(runtime.compareDocumentPosition(older) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(runtime).toHaveTextContent("Optional early check");
-    expect(entry.compareDocumentPosition(existing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("link", { name: "Continue Current task" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Continue Older task" })).toBeVisible();
   });
