@@ -360,15 +360,32 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
           <label className="block text-sm text-zinc-300" htmlFor="feature-request">What should change?</label>
           <textarea id="feature-request" rows={8} maxLength={2000} value={feature} onChange={e => setFeature(e.target.value)} placeholder="Describe the behavior users should gain and how to verify it" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-3 text-sm text-zinc-100" />
         </div>
-        <aside className="min-w-0 rounded border border-zinc-700 bg-zinc-950 p-3" aria-label="Repository overview">
+        <aside className="min-w-0 rounded border border-zinc-700 bg-zinc-950 p-3 self-start" aria-label="Repository overview">
           <h3 className="text-sm font-medium text-zinc-100">Repository overview</h3>
-          <p className="mt-1 text-xs text-zinc-400">Root README{overview?.filename ? ` · ${overview.filename}` : ""} · plain-text preview, up to 64 KiB</p>
-          {overviewError ? <p className="mt-3 text-sm text-amber-300">Could not load repository overview. You can still draft a feature.</p>
-            : !overview ? <p className="mt-3 text-sm text-zinc-400">Loading README...</p>
-              : overview.content === null ? <p className="mt-3 text-sm text-zinc-400">No root README available. You can still draft a feature.</p>
-                : <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-300">{overview.content}</pre>}
+          <details>
+            <summary className="mt-2 cursor-pointer text-sm text-blue-200">Read root README</summary>
+            <p className="mt-2 text-xs text-zinc-400">Root README{overview?.filename ? ` · ${overview.filename}` : ""} · plain-text preview, up to 64 KiB</p>
+            {overviewError ? <p className="mt-3 text-sm text-amber-300">Could not load repository overview. You can still draft a feature.</p>
+              : !overview ? <p className="mt-3 text-sm text-zinc-400">Loading README...</p>
+                : overview.content === null ? <p className="mt-3 text-sm text-zinc-400">No root README available. You can still draft a feature.</p>
+                  : <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-300">{overview.content}</pre>}
+          </details>
+          <p className="mt-2 text-xs text-zinc-400">Open for context without leaving your feature request.</p>
         </aside>
       </div>
+      <div className="grid gap-3 sm:grid-cols-3" aria-label="Feature agents">
+        {([ ["Plan agent", planner, setPlanner], ["Implement agent", implementer, setImplementer], ["Review agent", reviewer, setReviewer] ] as const).map(([label, value, setter]) =>
+          <label key={label} className="text-sm text-zinc-300">{label}
+            <select id={label === "Plan agent" ? "feature-plan-agent" : undefined} aria-label={label} value={value} onChange={e => setter(e.target.value)} className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100">
+              <option value="">Select agent</option>
+              {available.map(a => <option key={a.id} value={a.id}>{a.name} ({a.adapterType})</option>)}
+            </select>
+          </label>) }
+      </div>
+      {(canUsePreferred || canUseClaude) && <div className="flex flex-wrap gap-2" aria-label="Choose a feature team">
+        {canUsePreferred && <button type="button" onClick={() => selectTeam(preferred)} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use Codex feature agents</button>}
+        {canUseClaude && <button type="button" onClick={() => selectTeam(preferredClaude)} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use Claude feature agents</button>}
+      </div>}
       {feature.trim() && <div className="rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Manual feature handoff">
         <p className="text-xs text-zinc-400">Copy the request for a manual handoff. This does not prepare a branch, check agents, or start a workflow.</p>
         <button type="button" onClick={() => { void copyHandoff(); }} disabled={!project?.homeDir || copying} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">Copy feature handoff</button>
@@ -436,19 +453,7 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
         <p>Starting files for the plan ({filePaths.length}/5). Only paths are sent to the planning agent; inspect the approved plan before implementation.</p>
         <ul className="mt-2 space-y-1">{filePaths.map(path => <li key={path} className="flex items-center gap-2"><span className="min-w-0 break-all font-mono text-xs">{path}</span><button type="button" aria-label={`Remove ${path}`} onClick={() => setFilePaths(current => current.filter(value => value !== path))} className="shrink-0 text-blue-300 underline">Remove</button></li>)}</ul>
       </div>}
-      <div className="grid gap-3 sm:grid-cols-3">
-        {([ ["Plan agent", planner, setPlanner], ["Implement agent", implementer, setImplementer], ["Review agent", reviewer, setReviewer] ] as const).map(([label, value, setter]) =>
-          <label key={label} className="text-sm text-zinc-300">{label}
-            <select id={label === "Plan agent" ? "feature-plan-agent" : undefined} aria-label={label} value={value} onChange={e => setter(e.target.value)} className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100">
-              <option value="">Select agent</option>
-              {available.map(a => <option key={a.id} value={a.id}>{a.name} ({a.adapterType})</option>)}
-            </select>
-          </label>) }
-      </div>
-      {(canUsePreferred || canUseClaude) && <div className="flex flex-wrap gap-2" aria-label="Choose a feature team">
-        {canUsePreferred && <button type="button" onClick={() => selectTeam(preferred)} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use Codex feature agents</button>}
-        {canUseClaude && <button type="button" onClick={() => selectTeam(preferredClaude)} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use Claude feature agents</button>}
-      </div>}
+
       {!isLoading && <details open={setupExpanded ?? available.length < 3} className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
         <summary id="feature-agent-setup" className="cursor-pointer font-medium text-blue-200" onClick={event => {
           event.preventDefault();
