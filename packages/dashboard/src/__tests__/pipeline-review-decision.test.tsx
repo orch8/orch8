@@ -59,7 +59,7 @@ describe("independent review decision", () => {
   });
   it("shows the full report and requires explicit acceptance", async () => {
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
-    expect(screen.getByText(/No blocking findings/)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Independent review decision" }).querySelector(".prose p")).toHaveTextContent("No blocking findings.");
     expect(screen.getByText(/does not verify the tests or publish a PR/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     const accept = screen.getByRole("button", { name: "Accept review" });
