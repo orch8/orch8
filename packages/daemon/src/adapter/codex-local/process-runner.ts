@@ -1,7 +1,7 @@
 import type { ChildProcess } from "node:child_process";
 import type { Writable } from "node:stream";
 import type { RuntimeStreamEvent, RunErrorCode, RunResult, SpawnFn } from "../types.js";
-import { parseCodexJsonl, detectCodexError } from "./parse.js";
+import { parseCodexJsonl, detectCodexError, codexSandboxStartupFailed } from "./parse.js";
 import { resolveCodexBillingType } from "./env-builder.js";
 
 export interface CodexProcessRunInput {
@@ -97,10 +97,13 @@ export async function runCodexProcess(
   } else {
     const combinedText = [stderrText, ...parsedOutput.unparsedLines].join("\n");
     errorCode = detectCodexError(combinedText)
+      ?? (codexSandboxStartupFailed(parsedOutput) ? "process_error" : null)
       ?? parsedOutput.events.find((event) => event.kind === "error")?.errorCode
       ?? null;
     if (errorCode) {
-      error = combinedText.trim()
+      error = (codexSandboxStartupFailed(parsedOutput)
+        ? "Codex sandbox could not initialize (bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted). No repository command ran."
+        : combinedText.trim())
         || parsedOutput.events.find((event) => event.kind === "error")?.message
         || null;
     } else if (exit.exitCode !== 0 && exit.exitCode !== null) {

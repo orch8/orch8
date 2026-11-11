@@ -72,6 +72,20 @@ export const CODEX_AUTH_REQUIRED_RE =
   /not signed in|please run.*codex login|OPENAI_API_KEY/i;
 export const CODEX_TRANSIENT_UPSTREAM_RE =
   /upstream|502|503|504|timed out|timeout|connection reset|temporarily unavailable/i;
+// Codex can exit zero after its shell sandbox fails to start, reporting the
+// failure only in an assistant message. Such a run did not inspect the repo.
+export const CODEX_SANDBOX_STARTUP_RE =
+  /bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted/i;
+
+export function codexSandboxStartupFailed(output: CodexParsedOutput): boolean {
+  // Do not mistake a text-only explanation quoting an error for an attempted
+  // command. Codex must report that this turn's command failed to start.
+  const result = output.result ?? "";
+  return !output.rawEvents.some(event =>
+    (event as { item?: { type?: string } }).item?.type === "command_execution") &&
+    /(?:`[^`]+`|\b(?:command|shell|sandbox|pwd)\b)\s+(?:failed|could not run)\b/i.test(result) &&
+    CODEX_SANDBOX_STARTUP_RE.test(result);
+}
 
 export function isCodexUnknownSessionError(text: string): boolean {
   return CODEX_UNKNOWN_SESSION_RE.test(text);
