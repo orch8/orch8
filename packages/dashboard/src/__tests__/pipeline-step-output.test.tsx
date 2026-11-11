@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { fireEvent } from "@testing-library/react";
-import { renderWithProviders, screen } from "../test-utils.js";
+import { renderWithProviders, screen, waitFor } from "../test-utils.js";
 import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
 
 const state = vi.hoisted(() => ({ content: "# Real plan\nImplement a feature.", enabled: false, error: false, label: "Plan", status: "awaiting_verification", attempts: [] as Array<{ taskId: string; path: string; content: string | null }>, changes: vi.fn(), changeError: null as Error | null, approve: vi.fn() }));
@@ -12,7 +12,7 @@ vi.mock("../hooks/usePipelines.js", () => ({
   usePipelineDiff: () => ({ data: { available: false, reason: "No repository" }, isLoading: false, isError: false, refetch: vi.fn() }),
   usePipelineStepOutput: (_pipelineId: string, _stepId: string, _revision: string, enabled: boolean) => {
     state.enabled = enabled;
-    return { data: enabled && state.content ? { path: ".orch8/pipelines/pipe_1/Plan.md", content: state.content } : undefined, isLoading: false, isError: enabled && (state.error || !state.content), refetch: vi.fn() };
+    return { data: enabled && state.content ? { path: ".orch8/pipelines/pipe_1/Plan.md", content: state.content } : undefined, isLoading: false, isError: enabled && (state.error || !state.content), refetch: async () => state.error ? { isError: true, data: undefined } : { isError: false, data: { path: ".orch8/pipelines/pipe_1/Plan.md", content: state.content } } };
   },
   useCancelPipeline: () => ({ isPending: false }),
   useRetryPipeline: () => ({ isPending: false }),
@@ -50,7 +50,7 @@ describe("pipeline plan decision", () => {
     state.changeError = null;
   });
 
-  it("shows the complete recorded plan before allowing approval", () => {
+  it("shows the complete recorded plan before allowing approval", async () => {
     state.content = "# Real plan\nImplement a feature.";
     state.approve.mockClear();
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
@@ -61,7 +61,33 @@ describe("pipeline plan decision", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /I have reviewed the full plan/ }));
     expect(approve).toBeEnabled();
     fireEvent.click(approve);
-    expect(state.approve).toHaveBeenCalledWith({ pipelineId: "pipe_1", stepId: "step_1" });
+    await waitFor(() => expect(state.approve).toHaveBeenCalledWith({ pipelineId: "pipe_1", stepId: "step_1" }));
+  });
+
+  it("does not start implementation when the plan changes after acknowledgement", async () => {
+    state.content = "# Plan reviewed by operator";
+    state.error = false;
+    state.approve.mockClear();
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /I have reviewed the full plan/ }));
+    state.content = "# A different plan replaced it";
+    fireEvent.click(screen.getByRole("button", { name: "Approve plan" }));
+    await waitFor(() => expect(screen.getByText(/plan changed or could not be refreshed/i)).toBeInTheDocument());
+    expect(state.approve).not.toHaveBeenCalled();
+    expect(screen.getByRole("checkbox", { name: /I have reviewed the full plan/ })).not.toBeChecked();
+  });
+
+  it("does not start implementation when a fresh read fails", async () => {
+    state.content = "# Plan reviewed by operator";
+    state.error = false;
+    state.approve.mockClear();
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /I have reviewed the full plan/ }));
+    state.error = true;
+    fireEvent.click(screen.getByRole("button", { name: "Approve plan" }));
+    await waitFor(() => expect(screen.getByText(/plan changed or could not be refreshed/i)).toBeInTheDocument());
+    expect(state.approve).not.toHaveBeenCalled();
+    state.error = false;
   });
 
   it("does not offer approval when the recorded plan cannot be read", () => {
