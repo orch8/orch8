@@ -8,6 +8,8 @@ interface MarkdownRendererProps {
   content: string;
   className?: string;
   projectSlug?: string;
+  /** Agent-authored evidence must not fetch remote images when viewed. */
+  disableImages?: boolean;
 }
 
 const TASK_REF_REGEX = /TASK-(\d+)/g;
@@ -42,13 +44,13 @@ const components: Components = {
   },
 };
 
-export function MarkdownRenderer({ content, className, projectSlug }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, className, projectSlug, disableImages = false }: MarkdownRendererProps) {
   return (
     <div className={`prose prose-invert prose-zinc max-w-none text-sm ${className ?? ""}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
-        components={components}
+        components={disableImages ? { ...components, img: ({ alt }) => <span>[Image omitted{alt ? `: ${alt}` : ""}]</span> } : components}
       >
         {preprocess(content, projectSlug)}
       </ReactMarkdown>

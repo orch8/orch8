@@ -55,7 +55,7 @@ describe("pipeline plan decision", () => {
     state.approve.mockClear();
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(state.enabled).toBe(true);
-    expect(screen.getByText(/Implement a feature/)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Plan approval" }).querySelector(".prose p")).toHaveTextContent("Implement a feature.");
     const approve = screen.getByRole("button", { name: "Approve plan" });
     expect(approve).toBeDisabled();
     fireEvent.click(screen.getByRole("checkbox", { name: /I have reviewed the full plan/ }));
