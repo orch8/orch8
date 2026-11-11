@@ -6,7 +6,7 @@ export function SandboxRecoveryGuidance({ message, adapterType }: { message: str
     return <aside aria-label="Claude authentication recovery" className="space-y-2 rounded border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-100">
       <h3 className="font-semibold">Claude Code needs a fresh sign-in</h3>
       <p>Claude Code's saved account may still appear logged in even after its access token expires. Sign in from a terminal as the same user running Orch8, then retry Check agent runtime. No feature run was started.</p>
-      <pre className="overflow-auto rounded bg-zinc-950 p-2 text-zinc-200">claude auth login</pre>
+      <pre className="max-w-full overflow-auto whitespace-pre-wrap break-all rounded bg-zinc-950 p-2 text-zinc-200">claude auth login</pre>
       <p>If sign-in needs a browser, complete it interactively; Orch8 cannot approve it for you. Do not bypass agent permissions or the runtime check.</p>
     </aside>;
   }
@@ -15,9 +15,9 @@ export function SandboxRecoveryGuidance({ message, adapterType }: { message: str
   return <aside aria-label="Codex sandbox recovery" className="space-y-2 rounded border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-100">
     <h3 className="font-semibold">Codex sandbox needs host setup</h3>
     <p>The agent could not run a shell command, so planning cannot inspect this repository. On Ubuntu or Debian, a host administrator should install the distribution bubblewrap package:</p>
-    <pre className="overflow-auto rounded bg-zinc-950 p-2 text-zinc-200">sudo apt install bubblewrap</pre>
+    <pre className="max-w-full overflow-auto whitespace-pre-wrap break-all rounded bg-zinc-950 p-2 text-zinc-200">sudo apt install bubblewrap</pre>
     <p>On Ubuntu 24.04, if the sandbox still fails, install and load the scoped AppArmor profile:</p>
-    <pre className="overflow-auto rounded bg-zinc-950 p-2 text-zinc-200">{`sudo apt update
+    <pre className="max-w-full overflow-auto whitespace-pre-wrap break-all rounded bg-zinc-950 p-2 text-zinc-200">{`sudo apt update
 sudo apt install apparmor-profiles apparmor-utils
 sudo install -m 0644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/bwrap-userns-restrict
 sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict`}</pre>
