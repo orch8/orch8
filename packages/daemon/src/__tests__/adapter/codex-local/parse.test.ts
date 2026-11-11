@@ -62,5 +62,9 @@ describe("parseCodexJsonl", () => {
     expect(codexSandboxStartupFailed(output)).toBe(false);
     output.result = "`pwd` could not run: the shell sandbox failed with bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted is an example of an error; I did not run a command.";
     expect(codexSandboxStartupFailed(output)).toBe(false);
+    output.result = "I’ll inspect the repository. FAC-3 is blocked by the execution environment: shell commands fail with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.\n\nI couldn’t read the skill or inspect the repository. No files were changed, no plan was written, and the pipeline completion endpoint was not called.\n\nPlease restore shell execution and rerun FAC-3.";
+    expect(codexSandboxStartupFailed(output)).toBe(true);
+    output.result = "An example follows. FAC-3 is blocked by the execution environment: shell commands fail with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`. This is sample text, not a failure.";
+    expect(codexSandboxStartupFailed(output)).toBe(false);
   });
 });

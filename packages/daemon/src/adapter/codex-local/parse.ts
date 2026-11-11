@@ -75,15 +75,20 @@ export const CODEX_TRANSIENT_UPSTREAM_RE =
 // Codex can exit zero after its shell sandbox fails to start, reporting the
 // failure only in an assistant message. Such a run did not inspect the repo.
 export const CODEX_SANDBOX_STARTUP_RE =
-  /bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted\.?$/i;
+  /bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted/i;
 
 export function codexSandboxStartupFailed(output: CodexParsedOutput): boolean {
-  // Only classify a direct failure report, not an explanation that quotes it.
   const result = (output.result ?? "").trim();
+  // The live planner reports a blocked environment after an introductory
+  // message, without ever emitting a command event or a nonzero exit code.
+  const directFailure = /^(?:`[^`\n]+`|(?:the )?(?:command|shell|sandbox))\s+(?:failed|could not run)\b/i.test(result) &&
+    /bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted\.?$/i.test(result);
+  const blockedRun = /(?:^|[.!?]\s*)(?:[A-Z]+-\d+|(?:the )?(?:task|run)) is blocked by the execution environment:\s*shell commands fail with\b/i.test(result) &&
+    /I couldn.t (?:read|run|inspect)\b/i.test(result) &&
+    /No files were changed, no plan was written, and the pipeline completion endpoint was not called\./i.test(result);
   return !output.rawEvents.some(event =>
     (event as { item?: { type?: string } }).item?.type === "command_execution") &&
-    /^(?:`[^`\n]+`|(?:the )?(?:command|shell|sandbox))\s+(?:failed|could not run)\b/i.test(result) &&
-    CODEX_SANDBOX_STARTUP_RE.test(result);
+    CODEX_SANDBOX_STARTUP_RE.test(result) && (directFailure || blockedRun);
 }
 
 export function isCodexUnknownSessionError(text: string): boolean {
