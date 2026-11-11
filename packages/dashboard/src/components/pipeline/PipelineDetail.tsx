@@ -439,9 +439,15 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
     review.order > implement.order && review.order === steps.length &&
     !!review.outputSummary?.trim() && !review.outputSummary.startsWith("[REJECTED]") &&
     repositoryDiff?.available && repositoryDiff.branch && repositoryDiff.branch !== repositoryDiff.baseBranch &&
+    !!repositoryDiff.approvedRevision && repositoryDiff.approvedRevision.branch === repositoryDiff.branch &&
+    repositoryDiff.approvedRevision.commit === repositoryDiff.commit &&
     repositoryDiff.prLookup === "none" && !!repositoryDiff.committedDiff &&
     !repositoryDiff.workingDiff && !repositoryDiff.untrackedFiles?.some(path => !outputPaths.has(path)) && !repositoryDiff.untrackedMore;
+  const revisionMismatch = pipeline.status === "completed" && repositoryDiff?.available && repositoryDiff.approvedRevision &&
+    (repositoryDiff.approvedRevision.branch !== repositoryDiff.branch || repositoryDiff.approvedRevision.commit !== repositoryDiff.commit);
   const publicationBlockers = pipeline.status === "completed" && repositoryDiff?.available && repositoryDiff.prLookup === "none" ? [
+    !repositoryDiff.approvedRevision && "No revision recorded at review acceptance. Inspect this diff and the independent review, then start a new feature workflow and accept its review before publishing.",
+    revisionMismatch && "The branch or commit changed since review acceptance. Return to the accepted branch and commit, or inspect this diff and start a new reviewed feature workflow before publishing.",
     !repositoryDiff.committedDiff && "No committed feature changes. The implementer must commit the reviewed feature files on the prepared branch.",
     !!repositoryDiff.workingDiff && "Staged or unstaged changes remain. Inspect them before publishing; only committed changes go into the PR.",
     (repositoryDiff.untrackedFiles?.some(path => !outputPaths.has(path)) || repositoryDiff.untrackedMore) && "Untracked files remain outside recorded pipeline output. Inspect them before publishing.",
@@ -529,6 +535,10 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
         {repositoryDiff?.available && !diffError && <div className="space-y-4">
           <div className="rounded border border-zinc-700 bg-zinc-950 p-3 text-xs text-zinc-300 space-y-1">
             <p>Checked-out branch: <span className="font-mono">{repositoryDiff.branch ?? "detached HEAD"}</span></p>
+            <p>Current HEAD: <span className="break-all font-mono">{repositoryDiff.commit ?? "unavailable"}</span></p>
+            <p>Accepted review revision: {repositoryDiff.approvedRevision ? <span className="break-all font-mono">{repositoryDiff.approvedRevision.branch} @ {repositoryDiff.approvedRevision.commit}</span> : <span className="text-amber-300">No revision recorded at review acceptance (legacy or unbound review).</span>}</p>
+            {revisionMismatch && repositoryDiff.prLookup !== "none" && <p role="alert" className="text-amber-300">The branch or commit changed since review acceptance. The current PR or checkout may not match that revision. Compare the exact commits on GitHub before continuing.</p>}
+            <p className="text-zinc-500">This snapshot records HEAD when you accepted the review. It does not prove which code or tests the reviewer inspected.</p>
             {repositoryDiff.pullRequest ? <p>
               GitHub PR for this exact branch commit: <a className="text-blue-300 underline" href={repositoryDiff.pullRequest.url} target="_blank" rel="noopener noreferrer">
                 #{repositoryDiff.pullRequest.number} {repositoryDiff.pullRequest.title}
@@ -548,7 +558,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
             <p className="text-zinc-500">This is a repository-wide snapshot, not proof that the pipeline created the PR. Refresh to check again.</p>
           </div>
           {canPublish && <div className="rounded border border-blue-800/60 bg-blue-950/20 p-3 space-y-2 text-xs">
-            <p className="text-zinc-300">Independent review completed. Create a draft PR from the current committed branch to {repositoryDiff.baseBranch}. Review the exact diff and tests on GitHub: this branch commit is not cryptographically tied to the pipeline review. This does not commit files, run checks, or merge.</p>
+            <p className="text-zinc-300">The branch and HEAD match the accepted review revision. Create a draft PR from the current committed branch to {repositoryDiff.baseBranch}. Inspect the diff and tests on GitHub; the snapshot does not prove what the reviewer inspected. This does not commit files, run checks, or merge.</p>
             {!confirmPublish ? <button type="button" onClick={() => setConfirmPublish(true)} className="rounded bg-blue-800 px-3 py-1 text-blue-100">Create pull request</button> : <div className="space-y-2">
               <p>Confirm: this publishes the committed branch {repositoryDiff.branch} to {repositoryDiff.baseBranch} on GitHub. The PR includes the current commit and your notes. Do not include secrets. Verify the review and diff first.</p>
               <label className="block text-zinc-200">Summary for PR reviewers

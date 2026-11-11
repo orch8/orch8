@@ -233,7 +233,7 @@ export class PipelineService {
     return result;
   }
 
-  async approveStep(pipelineId: string, stepId: string): Promise<ApproveStepResult> {
+  async approveStep(pipelineId: string, stepId: string, approvedRevision?: { branch: string; commit: string }): Promise<ApproveStepResult> {
     return this.db.transaction(async (tx) => {
       // Serialize decisions before reading state, including competing rejection.
       const pipeline = await lockPipeline(tx, pipelineId);
@@ -255,7 +255,10 @@ export class PipelineService {
 
       const [approvedStep] = await tx
         .update(pipelineSteps)
-        .set({ status: "completed", updatedAt: new Date() })
+        .set({ status: "completed", updatedAt: new Date(),
+          ...(["review", "independent review"].includes(step.label.toLowerCase()) && step.requiresVerification && approvedRevision
+            ? { approvedBranch: approvedRevision.branch, approvedCommit: approvedRevision.commit } : {}),
+        })
         .where(eq(pipelineSteps.id, stepId))
         .returning();
 

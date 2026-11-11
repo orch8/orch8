@@ -36,6 +36,13 @@
       "when": 1779580800000,
       "tag": "0004_mention_wake",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794355200000,
+      "tag": "0005_reviewed_revision",
+      "breakpoints": true
     }
   ]
 }

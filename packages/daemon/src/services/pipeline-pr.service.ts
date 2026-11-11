@@ -29,10 +29,11 @@ export async function publishPipelinePr(
   outputPaths: string[],
   run: PublishCommand = runPublishCommand,
   handoff?: PrHandoff,
+  approvedRevision?: { branch: string; commit: string },
 ): Promise<{ url: string }> {
+  if (!approvedRevision) throw new Error("This review has no recorded revision. Start a new feature workflow and accept the review before publishing.");
   const { homeDir, defaultBranch } = project;
   const intended = project.repoUrl && githubSlug(project.repoUrl);
-  if (!intended) throw new Error("Configure a GitHub repository URL on the project before publishing.");
   const git = (args: string[]) => run("git", args, homeDir);
   const gh = (args: string[]) => run("gh", args, homeDir);
   // Command injection is avoided by argv, but git refs and CLI flags must still be validated.
@@ -44,6 +45,10 @@ export async function publishPipelinePr(
   if (await realpath(top) !== await realpath(homeDir)) throw new Error("Project directory must be the repository root.");
   const branch = (await git(["symbolic-ref", "--quiet", "--short", "HEAD"])).trim();
   if (!branch || branch.startsWith("-") || branch === defaultBranch || branch.length > 200) throw new Error("Check out a feature branch distinct from the project default branch.");
+  if (branch !== approvedRevision.branch) throw new Error("The branch or commit changed since review acceptance. Inspect the current diff and start a new reviewed feature workflow before publishing.");
+  const sha = (await git(["rev-parse", "HEAD"])).trim();
+  if (sha !== approvedRevision.commit) throw new Error("The branch or commit changed since review acceptance. Inspect the current diff and start a new reviewed feature workflow before publishing.");
+  if (!intended) throw new Error("Configure a GitHub repository URL on the project before publishing.");
   await git(["check-ref-format", "--branch", branch]);
   await git(["check-ref-format", "--branch", defaultBranch]);
   const allowedOutputs = new Set(outputPaths.filter(path => /^\.orch8\/pipelines\/[\w-]+\/[^/]+\.md$/.test(path)));
@@ -53,7 +58,6 @@ export async function publishPipelinePr(
   if (githubSlug(await git(["remote", "get-url", "origin"])) !== intended) throw new Error("Git origin does not match the project repository URL.");
   const pushUrls = (await git(["remote", "get-url", "--push", "--all", "origin"])).trim().split("\n").filter(Boolean);
   if (!pushUrls.length || pushUrls.some(url => githubSlug(url) !== intended)) throw new Error("Git origin push URLs do not all match the project repository URL.");
-  const sha = (await git(["rev-parse", "HEAD"])).trim();
   const count = (await git(["rev-list", "--count", `refs/remotes/origin/${defaultBranch}..HEAD`])).trim();
   if (!/^\d+$/.test(count) || Number(count) < 1) throw new Error("No committed branch changes ahead of the locally fetched default branch.");
   const listArgs = ["pr", "list", "--repo", intended, "--head", branch, "--state", "all", "--json", "number,url,headRefOid", "--limit", "100"];
@@ -62,10 +66,17 @@ export async function publishPipelinePr(
   if (existing.length) throw new Error("A PR already exists for this branch. Inspect it on GitHub instead of creating another.");
   await gh(["auth", "status"]);
   // Recheck after network calls so changes made while the user was reviewing cannot be pushed.
-  if ((await git(["rev-parse", "HEAD"])).trim() !== sha || !await clean()) {
+  if ((await git(["symbolic-ref", "--quiet", "--short", "HEAD"])).trim() !== branch ||
+      (await git(["rev-parse", "HEAD"])).trim() !== sha || !await clean()) {
     throw new Error("The repository changed during preflight; refresh and try again.");
   }
-  await git(["push", "--set-upstream", "origin", branch]);
+  // Push the approved object, not the mutable local branch name. Another
+  // process must not advance the branch between preflight and publication.
+  await git(["push", "--set-upstream", "origin", `${sha}:refs/heads/${branch}`]);
+  const remoteHead = (await git(["ls-remote", "--heads", "origin", `refs/heads/${branch}`])).trim();
+  if (remoteHead !== `${sha}\trefs/heads/${branch}`) {
+    throw new Error("The remote branch changed after push. Inspect it on GitHub before creating a PR.");
+  }
   const title = name.replace(/[\r\n]/g, " ").trim().slice(0, 200) || "Reviewed pipeline changes";
   const quote = (value: string) => value.trim().replace(/\r\n?/g, "\n").split("\n").map(line => `> ${line}`).join("\n");
   const code = (value: string) => value.replace(/`/g, "\\`");
@@ -73,7 +84,7 @@ export async function publishPipelinePr(
     "## Review handoff",
     `Branch: \`${code(branch)}\` into \`${code(defaultBranch)}\`. Commit: \`${sha}\`.`,
     `Inspect the [exact committed comparison](https://github.com/${intended}/compare/${encodeURIComponent(defaultBranch)}...${sha}) and GitHub checks before merging.`,
-    "Orch8 recorded an independent review decision, but does not bind that review or its test log to this commit. Check the local workflow evidence against this commit before merging.",
+    `Accepted review revision: branch \`${code(approvedRevision.branch)}\`, commit \`${approvedRevision.commit}\`. This records the repository HEAD when the human accepted the independent review; it does not prove which code or tests the reviewer inspected. Check the local workflow evidence before merging.`,
     handoff?.summary.trim() ? `## Operator summary (not independently verified)\n${quote(handoff.summary)}` : "",
     handoff?.tests.trim() ? `## Test notes (operator supplied, not verified by Orch8)\n${quote(handoff.tests)}` : "## Tests\nNo test results were supplied with this PR. Inspect the local implementation run log and GitHub checks.",
   ].filter(Boolean).join("\n\n");

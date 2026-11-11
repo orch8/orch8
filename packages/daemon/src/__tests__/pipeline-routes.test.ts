@@ -492,7 +492,56 @@ describe("Pipeline API routes", () => {
       const response = await app.inject({ method: "POST", url: `/api/pipelines/${created.pipeline.id}/pull-request` });
       // The review guard passed; the fixture deliberately has no GitHub repo configured.
       expect(response.statusCode).toBe(409);
-      expect(response.json().message).toMatch(/Configure a GitHub repository URL/);
+      expect(response.json().message).toMatch(/no recorded revision/i);
+    });
+
+    it("records the branch and HEAD only when accepting the independent review; legacy approvals stay unbound", async () => {
+      const root = await mkdtemp(join(tmpdir(), "orch-reviewed-revision-"));
+      const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" } }).trim();
+      try {
+        git("init", "-q", "-b", "main");
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "base");
+        git("switch", "-qc", "feature/reviewed");
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "feature");
+        const head = git("rev-parse", "HEAD");
+        await testDb.db.update(projects).set({ homeDir: root, repoUrl: "https://github.com/orch8/orch8.git" }).where(eq(projects.id, projectId));
+        const [reviewer] = await testDb.db.insert(agents).values({ projectId, id: `reviewer-${Date.now()}`, name: "Independent reviewer", role: "reviewer" }).returning();
+        const create = async () => {
+          const created = await app.pipelineService.create({ projectId, name: "Revision", steps: [
+            { label: "Implement", agentId: "route-agent-a" },
+            { label: "Independent review", agentId: reviewer.id, requiresVerification: true },
+          ] });
+          const done = await app.pipelineService.completeStep(created.pipeline.id, created.steps[0].id, created.firstTask.id, "Implemented");
+          await app.pipelineService.completeStep(created.pipeline.id, created.steps[1].id, done.nextTask!.id, "Review complete");
+          return created;
+        };
+        const created = await create();
+        const url = `/api/pipelines/${created.pipeline.id}/steps/${created.steps[1].id}/approve`;
+        const accepted = await app.inject({ method: "POST", url });
+        expect(accepted.statusCode).toBe(200);
+        expect(accepted.json().approvedStep).toMatchObject({ approvedBranch: "feature/reviewed", approvedCommit: head });
+        expect((await app.inject({ method: "GET", url: `/api/pipelines/${created.pipeline.id}/diff` })).json()).toMatchObject({
+          branch: "feature/reviewed", commit: head, approvedRevision: { branch: "feature/reviewed", commit: head },
+        });
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "later");
+        const changed = await app.inject({ method: "POST", url: `/api/pipelines/${created.pipeline.id}/pull-request` });
+        expect(changed.statusCode).toBe(409);
+        expect(changed.json().message).toMatch(/changed since review acceptance/i);
+        git("reset", "--hard", head);
+        git("switch", "-qc", "feature/other");
+        const switched = await app.inject({ method: "POST", url: `/api/pipelines/${created.pipeline.id}/pull-request` });
+        expect(switched.statusCode).toBe(409);
+        expect(switched.json().message).toMatch(/changed since review acceptance/i);
+        git("switch", "feature/reviewed");
+        const legacy = await create();
+        await app.pipelineService.approveStep(legacy.pipeline.id, legacy.steps[1].id);
+        const old = await app.inject({ method: "POST", url: `/api/pipelines/${legacy.pipeline.id}/pull-request` });
+        expect(old.statusCode).toBe(409);
+        expect(old.json().message).toMatch(/no recorded revision/i);
+      } finally {
+        await testDb.db.update(projects).set({ homeDir: "/tmp/route", repoUrl: null }).where(eq(projects.id, projectId));
+        await rm(root, { recursive: true, force: true });
+      }
     });
 
     it("shows committed branch, staged and unstaged changes separately and lists untracked paths", async () => {
