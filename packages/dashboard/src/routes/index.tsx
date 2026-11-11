@@ -123,6 +123,7 @@ function RepositoryCard({ project }: { project: Project }) {
       catch { setCodexResult({ ok: false, message }); }
     } finally { setCheckingCodex(false); }
   }
+  const canStartFeature = !!checkout?.ready && !checkoutError && !checkingCheckout && !isError && !!pipelines && !unfinished?.length;
   const featureEntry = <section className="border-t border-zinc-700 pt-3 text-sm text-zinc-300" aria-label={`New feature for ${project.name}`}>
       <label htmlFor={`quick-feature-${project.id}`} className="block font-medium text-zinc-200">Describe a new feature for {project.name}</label>
       <textarea id={`quick-feature-${project.id}`} value={request} maxLength={2000} rows={3} onChange={event => { setRequest(event.target.value); saveRequest(event.target.value); }} placeholder="What should change in this repository?" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
@@ -131,8 +132,10 @@ function RepositoryCard({ project }: { project: Project }) {
         <p>New feature setup is paused while this checkout is not ready. {draftError ? "Copy your request before leaving this page." : "Your request is saved here."}</p>
         {unfinished?.[0] ? <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: unfinished[0].id }} className="inline-block underline">Resume unfinished workflow</Link>
           : <p>Inspect the checkout and restore a clean base branch before continuing.</p>}
-      </div> : checkout?.ready && !checkoutError && !checkingCheckout && request.trim() ? <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} hash="new-feature" onClick={(event: MouseEvent<HTMLAnchorElement>) => { if (!saveRequest(request)) event.preventDefault(); }} className="mt-2 inline-block rounded bg-blue-700 px-3 py-2 font-medium text-white hover:bg-blue-600">Continue to plan setup</Link>
-        : <p className="mt-2 text-xs text-zinc-400">{request.trim() ? "Confirm checkout readiness to continue to plan setup." : "Enter a feature request to continue to plan setup."}</p>}
+      </div> : checkout?.ready && request.trim() ? <div className="mt-2">
+        <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} hash="new-feature" aria-disabled={!canStartFeature} tabIndex={canStartFeature ? undefined : -1} onClick={(event: MouseEvent<HTMLAnchorElement>) => { if (!canStartFeature || !saveRequest(request)) event.preventDefault(); }} className={`inline-block rounded px-3 py-2 font-medium ${canStartFeature ? "bg-blue-700 text-white hover:bg-blue-600" : "cursor-not-allowed bg-zinc-700 text-zinc-300"}`}>Continue to plan setup</Link>
+        {!canStartFeature && <p role="status" className="mt-1 text-xs text-amber-300">{unfinished?.length ? "Finish or inspect the unfinished workflow before starting another feature." : isError || !pipelines ? "Confirm workflow status before starting another feature." : "Checking checkout before plan setup."}</p>}
+      </div> : <p className="mt-2 text-xs text-zinc-400">{request.trim() ? "Confirm checkout readiness to continue to plan setup." : "Enter a feature request to continue to plan setup."}</p>}
       {draftError && <p role="alert" className="mt-2 text-amber-300">Browser storage is unavailable. Copy your request into the feature form after opening the repository.</p>}
     </section>;
   return <li className="rounded border border-zinc-700 bg-zinc-900 p-4">

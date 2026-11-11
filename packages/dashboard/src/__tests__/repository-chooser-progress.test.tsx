@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithProviders, screen, waitFor, within } from "../test-utils.js";
+import { fireEvent } from "@testing-library/react";
 
 const { useProjects, usePipelines, usePipeline, get, post } = vi.hoisted(() => ({
   useProjects: vi.fn(), usePipelines: vi.fn(), usePipeline: vi.fn(), get: vi.fn(), post: vi.fn(),
@@ -76,6 +77,29 @@ describe("repository chooser progress", () => {
     expect(within(form).getByRole("textbox", { name: "Describe a new feature for My repo" })).toHaveValue("Add usage instructions");
     expect(await within(form).findByRole("link", { name: "Continue to plan setup" })).toHaveAttribute("href", "/projects/my-repo/pipelines#new-feature");
     expect(screen.getByText("Checkout clean on base · main")).toBeInTheDocument();
+  });
+  it("blocks new setup while another workflow is unfinished, even on a clean checkout", async () => {
+    localStorage.setItem("orch8:feature-draft:proj-1", JSON.stringify({ feature: "Add setup guide" }));
+    usePipelines.mockReturnValue({ data: [pipeline("plan-1", "running", "2026-11-08T01:00:00Z")], isError: false });
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    const link = await screen.findByText("Continue to plan setup");
+    expect(link).toHaveAttribute("aria-disabled", "true");
+    await user.click(link);
+    expect(screen.getByText("Finish or inspect the unfinished workflow before starting another feature.")).toBeInTheDocument();
+  });
+  it("retains focus on plan setup while checkout readiness refreshes", async () => {
+    localStorage.setItem("orch8:feature-draft:proj-1", JSON.stringify({ feature: "Add setup guide" }));
+    renderWithProviders(<RepositoryChooser />);
+    const link = await screen.findByRole("link", { name: "Continue to plan setup" });
+    link.focus();
+    expect(link).toHaveFocus();
+    let resolveCheckout!: (result: { ready: boolean; branch: string; baseBranch: string }) => void;
+    get.mockReturnValueOnce(new Promise(resolve => { resolveCheckout = resolve; }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh checkout status" }));
+    await waitFor(() => expect(link).toHaveAttribute("aria-disabled", "true"));
+    expect(link).toHaveFocus();
+    resolveCheckout({ ready: true, branch: "main", baseBranch: "main" });
+    await waitFor(() => expect(link).toHaveAttribute("aria-disabled", "false"));
   });
   it("keeps the feature input focused when an unfinished workflow appears", async () => {
     const { rerender, user } = renderWithProviders(<RepositoryChooser />);
