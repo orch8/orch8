@@ -57,8 +57,10 @@ describe("repository chooser progress", () => {
     renderWithProviders(<RepositoryChooser />);
     const card = within(screen.getByRole("list", { name: "Selected repository details" })).getAllByRole("listitem")[0];
     const current = within(card).getByRole("region", { name: "Unfinished workflow for My repo" });
+    const readiness = within(card).getByRole("region", { name: "Runtime readiness for My repo" });
     const form = within(card).getByRole("region", { name: "New feature for My repo" });
-    expect(current.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(current.compareDocumentPosition(readiness) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(readiness.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(current).getByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/my-repo/pipelines/plan-1#workflow-step-plan-step");
     expect(within(form).getByRole("textbox", { name: "Describe a new feature for My repo" })).toBeVisible();
   });
@@ -86,8 +88,9 @@ describe("repository chooser progress", () => {
   it("checks the real Codex sandbox without a model run or changing the checkout", async () => {
     post.mockResolvedValue({ ok: false, message: "Codex sandbox cannot run commands: bubblewrap could not initialize its network namespace (Failed RTM_NEWADDR: Operation not permitted)" });
     const { user } = renderWithProviders(<RepositoryChooser />);
-    await user.click(screen.getByText("Optional early runtime checks"));
-    await user.click(screen.getByRole("button", { name: "Check Codex sandbox" }));
+    const readiness = within(screen.getByRole("region", { name: "Runtime readiness for My repo" }));
+    expect(readiness.getByRole("button", { name: "Check Codex sandbox (free)" })).toBeVisible();
+    await user.click(readiness.getByRole("button", { name: "Check Codex sandbox (free)" }));
     expect(post).toHaveBeenCalledWith("/adapter/codex_local/test-environment", {
       config: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false, sandboxOnly: true },
     });
@@ -99,8 +102,9 @@ describe("repository chooser progress", () => {
   it("checks Claude in the selected checkout without preparing a branch or approving runtime", async () => {
     post.mockResolvedValue({ ok: false, message: "Claude authentication expired. Re-authenticate with the Claude CLI before retrying the runtime check." });
     const { user } = renderWithProviders(<RepositoryChooser />);
-    await user.click(screen.getByText("Optional early runtime checks"));
-    await user.click(screen.getByRole("button", { name: "Check Claude in this repository" }));
+    const readiness = within(screen.getByRole("region", { name: "Runtime readiness for My repo" }));
+    expect(readiness.getByRole("button", { name: "Check Claude in this repository (may cost)" })).toBeVisible();
+    await user.click(readiness.getByRole("button", { name: "Check Claude in this repository (may cost)" }));
     expect(post).toHaveBeenCalledWith("/adapter/claude_local/test-environment", {
       projectId: project.id, config: { dangerouslySkipPermissions: false },
     });
