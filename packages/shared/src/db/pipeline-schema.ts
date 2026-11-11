@@ -63,6 +63,8 @@ export const pipelineSteps = pgTable("pipeline_steps", {
   requiresVerification: boolean("requires_verification").notNull().default(false),
   outputFilePath: text("output_file_path"),
   outputSummary: text("output_summary"),
+  approvedBranch: text("approved_branch"),
+  approvedCommit: text("approved_commit"),
   status: pipelineStepStatusEnum("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

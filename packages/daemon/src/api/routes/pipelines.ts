@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { PipelineConflict } from "../../services/pipeline.service.js";
-import { publishPipelinePr } from "../../services/pipeline-pr.service.js";
+import { publishPipelinePr, runPublishCommand } from "../../services/pipeline-pr.service.js";
 import { featureBranchReadiness, prepareFeatureBranch, returnToBaseBranch } from "../../services/feature-branch.service.js";
 import { withExclusiveRepositoryCheckout } from "../../services/repository-checkout-gate.js";
 import { heartbeatRuns, pipelines } from "@orch/shared/db";
@@ -65,7 +65,7 @@ async function stepArtifact(homeDir: string, pipelineId: string, outputFilePath:
 async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
   available: boolean; diff: string; reason?: string; baseBranch?: string;
   committedDiff?: string; workingDiff?: string; untrackedFiles?: string[]; untrackedMore?: boolean;
-  branch?: string; pullRequest?: { number: number; url: string; title: string; state: string; checks: PrCheck[] } | null;
+  branch?: string; commit?: string; pullRequest?: { number: number; url: string; title: string; state: string; checks: PrCheck[] } | null;
   prLookup?: "found" | "none" | "unavailable" | "not_applicable";
 }> {
   // Ignore inherited Git environment overrides and global configuration. No hooks,
@@ -147,7 +147,7 @@ async function repositoryDiff(homeDir: string, baseBranch: string): Promise<{
     return {
       available: true, diff, baseBranch, committedDiff, workingDiff,
       untrackedFiles: paths.slice(0, UNTRACKED_PREVIEW_LIMIT), untrackedMore: paths.length > UNTRACKED_PREVIEW_LIMIT,
-      branch: branch || undefined, pullRequest, prLookup,
+      branch: branch || undefined, commit: (await git(["rev-parse", "HEAD"])).stdout.trim(), pullRequest, prLookup,
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
@@ -252,17 +252,21 @@ export async function pipelineRoutes(app: FastifyInstance) {
     }
     const project = await app.projectService.getById(pipeline.projectId);
     if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    if (!review.approvedBranch || !review.approvedCommit) {
+      return reply.code(409).send({ error: "conflict", message: "This review has no recorded revision. Inspect the current diff and independent review, then start a new feature workflow and accept its review before creating a draft PR." });
+    }
     const key = await realpath(project.homeDir).catch(() => project.homeDir);
     if (publishing.has(key) || preparing.has(key)) return reply.code(409).send({ error: "conflict", message: "A repository operation is already running." });
     publishing.add(key);
     try {
       const published = await publishPipelinePr(project, pipeline.name, await app.pipelineService.getPublicationOutputPaths(pipeline.id), undefined,
-        { summary: notes.summary as string ?? "", tests: notes.tests as string ?? "" });
+        { summary: notes.summary as string ?? "", tests: notes.tests as string ?? "" },
+        { branch: review.approvedBranch, commit: review.approvedCommit });
       return reply.code(201).send(published);
     } catch (error) {
       // Expected preflight failures are actionable; never expose raw git/gh stderr or credentials.
       const message = (error as Error).message;
-      const safe = /^(Configure a GitHub|Configured default branch|Project directory must|Check out a feature|Commit or remove|Git origin|No committed branch|PR lookup incomplete|A PR already exists|The repository changed)/.test(message);
+      const safe = /^(Configure a GitHub|Configured default branch|Project directory must|Check out a feature|Commit or remove|Git origin|No committed branch|PR lookup incomplete|A PR already exists|The repository changed|The branch or commit changed|The remote branch changed)/.test(message);
       return reply.code(safe ? 409 : 502).send({ error: safe ? "conflict" : "publication_failed",
         message: safe ? message : "PR publication or verification failed. Inspect GitHub and the branch before retrying; no merge was attempted." });
     } finally {
@@ -329,7 +333,9 @@ export async function pipelineRoutes(app: FastifyInstance) {
     if (!requireProjectScope(request, reply, pipeline.projectId)) return reply;
     const project = await app.projectService.getById(pipeline.projectId);
     if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+    const review = (await app.pipelineService.getWithSteps(pipeline.id))?.steps.find(step => ["review", "independent review"].includes(step.label.toLowerCase()));
     return { ...await repositoryDiff(project.homeDir, project.defaultBranch),
+      approvedRevision: review?.approvedBranch && review.approvedCommit ? { branch: review.approvedBranch, commit: review.approvedCommit } : null,
       publicationOutputPaths: await app.pipelineService.getPublicationOutputPaths(pipeline.id) };
   });
 
@@ -507,9 +513,29 @@ export async function pipelineRoutes(app: FastifyInstance) {
         return reply.code(403).send({ error: "forbidden", message: "Admin only" });
       }
       try {
+        const state = await app.pipelineService.getWithSteps(request.params.id);
+        const candidate = state?.steps.find(step => step.id === request.params.stepId);
+        let approvedRevision: { branch: string; commit: string } | undefined;
+        if (candidate?.requiresVerification && ["review", "independent review"].includes(candidate.label.toLowerCase()) &&
+            state?.steps.some(step => step.label.toLowerCase() === "implement" && step.order < candidate.order) &&
+            candidate.order === state.steps.length) {
+          const project = await app.projectService.getById(state!.pipeline.projectId);
+          if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
+          try {
+            const top = (await runPublishCommand("git", ["rev-parse", "--show-toplevel"], project.homeDir)).trim();
+            if (await realpath(top) !== await realpath(project.homeDir)) throw new Error("Wrong repository root");
+            const branch = (await runPublishCommand("git", ["symbolic-ref", "--quiet", "--short", "HEAD"], project.homeDir)).trim();
+            const commit = (await runPublishCommand("git", ["rev-parse", "HEAD"], project.homeDir)).trim();
+            if (!branch || branch === project.defaultBranch || !/^[a-f0-9]{40,64}$/.test(commit)) throw new Error("No feature branch commit");
+            approvedRevision = { branch, commit };
+          } catch {
+            return reply.code(409).send({ error: "conflict", message: "Cannot record the reviewed revision. Check out the committed feature branch in the project repository, then inspect the diff and accept the review again." });
+          }
+        }
         const result = await app.pipelineService.approveStep(
           request.params.id,
           request.params.stepId,
+          approvedRevision,
         );
 
         // Wake the next step's agent if there is one

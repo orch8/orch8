@@ -210,7 +210,7 @@ describe("feature progress summary", () => {
   it("takes an accepted feature to the live diff and explicit PR action, never auto-publishing", () => {
     state.status = "completed";
     state.steps = [step("Plan", 1, "completed"), step("Implement", 2, "completed", { agentId: "builder" }), step("Independent review", 3, "completed", { agentId: "reviewer", requiresVerification: true, outputSummary: "Approved" })];
-    state.diff = { available: true, prLookup: "none", branch: "feat/example", baseBranch: "v2", committedDiff: "diff --git a/file b/file", workingDiff: "", untrackedFiles: [] };
+    state.diff = { available: true, prLookup: "none", branch: "feat/example", commit: "abc123", approvedRevision: { branch: "feat/example", commit: "abc123" }, baseBranch: "v2", committedDiff: "diff --git a/file b/file", workingDiff: "", untrackedFiles: [] };
     renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
     expect(within(progress()).getByRole("link", { name: "Inspect changes and publish draft PR" })).toHaveAttribute("href", "#repository-changes");
     expect(screen.getByRole("button", { name: "Create pull request" })).toBeInTheDocument();
