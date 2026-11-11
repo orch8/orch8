@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { api } from "../api/client.js";
 import { useProjects } from "../hooks/useProjects.js";
 import { usePipeline, usePipelines } from "../hooks/usePipelines.js";
@@ -123,7 +123,26 @@ function RepositoryCard({ project }: { project: Project }) {
       catch { setCodexResult({ ok: false, message }); }
     } finally { setCheckingCodex(false); }
   }
+  const featureEntry = <section className="border-t border-zinc-700 pt-3 text-sm text-zinc-300" aria-label={`New feature for ${project.name}`}>
+      <label htmlFor={`quick-feature-${project.id}`} className="block font-medium text-zinc-200">Describe a new feature for {project.name}</label>
+      <textarea id={`quick-feature-${project.id}`} value={request} maxLength={2000} rows={3} onChange={event => { setRequest(event.target.value); saveRequest(event.target.value); }} placeholder="What should change in this repository?" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
+      <p className="mt-1 text-xs text-zinc-400">Your request stays in this browser. Next you will choose agents, check the runtime, and review the plan before implementation.</p>
+      {checkout && !checkout.ready && !checkoutError && !checkingCheckout ? <div role="status" className="mt-2 space-y-2 rounded border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-200">
+        <p>New feature setup is paused while this checkout is not ready. {draftError ? "Copy your request before leaving this page." : "Your request is saved here."}</p>
+        {unfinished?.[0] ? <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: unfinished[0].id }} className="inline-block underline">Resume unfinished workflow</Link>
+          : <p>Inspect the checkout and restore a clean base branch before continuing.</p>}
+      </div> : checkout?.ready && !checkoutError && !checkingCheckout && request.trim() ? <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} hash="new-feature" onClick={(event: MouseEvent<HTMLAnchorElement>) => { if (!saveRequest(request)) event.preventDefault(); }} className="mt-2 inline-block rounded bg-blue-700 px-3 py-2 font-medium text-white hover:bg-blue-600">Continue to plan setup</Link>
+        : <p className="mt-2 text-xs text-zinc-400">{request.trim() ? "Confirm checkout readiness to continue to plan setup." : "Enter a feature request to continue to plan setup."}</p>}
+      {draftError && <p role="alert" className="mt-2 text-amber-300">Browser storage is unavailable. Copy your request into the feature form after opening the repository.</p>}
+    </section>;
   return <li className="rounded border border-zinc-700 bg-zinc-900 p-4">
+    {isError && <p role="status" className="mb-3 text-xs text-amber-300">Workflow status unavailable. Open the repository to check it.</p>}
+    {unfinished?.length ? <section className="border-t border-zinc-700 pt-3" aria-label={`Unfinished workflow for ${project.name}`}>
+      <h2 className="text-sm font-medium text-zinc-200">Continue unfinished work in {project.name}</h2>
+      <ul><UnfinishedWorkflow project={project} pipeline={unfinished[0]} /></ul>
+      {unfinished.length > 1 && <a href="#remaining-workflows" className="mt-2 inline-block text-xs text-blue-300 underline">See {unfinished.length - 1} other unfinished {unfinished.length === 2 ? "workflow" : "workflows"}</a>}
+    </section> : null}
+    {featureEntry}
     <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} className="block hover:text-blue-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400">
       <span className="block font-medium text-zinc-100">{project.name}</span>
       <span className="mt-1 block break-all font-mono text-xs text-zinc-400">{project.homeDir}</span>
@@ -144,23 +163,6 @@ function RepositoryCard({ project }: { project: Project }) {
       <p className="mt-1">Only a clean, idle checkout can switch branches. This does not reset or delete feature work.</p>
     </div>}
     {returnError && <p role="alert" className="mt-2 text-xs text-amber-300">{returnError}</p>}
-    {!!unfinished?.length && <section className="mt-3 border-t border-zinc-700 pt-3" aria-label={`Unfinished workflow for ${project.name}`}>
-      <h2 className="text-sm font-medium text-zinc-200">Continue unfinished work</h2>
-      <ul><UnfinishedWorkflow project={project} pipeline={unfinished[0]} /></ul>
-      {unfinished.length > 1 && <a href="#remaining-workflows" className="mt-2 inline-block text-xs text-blue-300 underline">See {unfinished.length - 1} other unfinished {unfinished.length === 2 ? "workflow" : "workflows"}</a>}
-    </section>}
-    <section className="mt-3 border-t border-zinc-700 pt-3 text-sm text-zinc-300" aria-label={`New feature for ${project.name}`}>
-      <label htmlFor={`quick-feature-${project.id}`} className="block font-medium text-zinc-200">Describe a new feature for {project.name}</label>
-      <textarea id={`quick-feature-${project.id}`} value={request} maxLength={2000} rows={3} onChange={event => { setRequest(event.target.value); saveRequest(event.target.value); }} placeholder="What should change in this repository?" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
-      <p className="mt-1 text-xs text-zinc-400">Your request stays in this browser. Next you will choose agents, check the runtime, and review the plan before implementation.</p>
-      {checkout && !checkout.ready && !checkoutError ? <div role="status" className="mt-2 space-y-2 rounded border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-200">
-        <p>New feature setup is paused while this checkout is not ready. {draftError ? "Copy your request before leaving this page." : "Your request is saved here."}</p>
-        {unfinished?.[0] ? <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: unfinished[0].id }} className="inline-block underline">Resume unfinished workflow</Link>
-          : <p>Inspect the checkout and restore a clean base branch before continuing.</p>}
-      </div> : request.trim() ? <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} hash="new-feature" onClick={event => { if (!saveRequest(request)) event.preventDefault(); }} className="mt-2 inline-block rounded bg-blue-700 px-3 py-2 font-medium text-white hover:bg-blue-600">Continue to plan setup</Link>
-        : <p className="mt-2 text-xs text-zinc-400">Enter a feature request to continue to plan setup.</p>}
-      {draftError && <p role="alert" className="mt-2 text-amber-300">Browser storage is unavailable. Copy your request into the feature form after opening the repository.</p>}
-    </section>
     <section className="mt-3 border-t border-zinc-700 pt-3 text-sm" aria-label={`Runtime readiness for ${project.name}`}>
       <h2 className="font-medium text-zinc-200">Check your agent runtime</h2>
       <p className="mt-1 text-xs text-zinc-400">Check before starting a workflow or preparing a branch. These checks do not start a workflow or approve the selected agents.</p>
@@ -189,7 +191,6 @@ function RepositoryCard({ project }: { project: Project }) {
         </li>)}
       </ul>
     </div>}
-    {isError && <p role="status" className="mt-3 text-xs text-amber-300">Workflow status unavailable. Open the repository to check it.</p>}
   </li>;
 }
 
