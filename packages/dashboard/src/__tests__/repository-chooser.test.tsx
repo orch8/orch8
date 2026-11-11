@@ -83,10 +83,10 @@ describe("repository chooser", () => {
     const runtime = screen.getByRole("region", { name: "Runtime readiness for Demo" });
     const active = screen.getByRole("region", { name: "Unfinished workflow for Demo" });
     const older = screen.getByRole("region", { name: "Other unfinished workflows for Demo" });
-    expect(active.compareDocumentPosition(runtime) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(runtime.compareDocumentPosition(entry) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(entry.compareDocumentPosition(older) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(runtime).toHaveTextContent("Check before drafting a feature");
+    expect(active.compareDocumentPosition(entry) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(entry.compareDocumentPosition(runtime) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(runtime.compareDocumentPosition(older) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(runtime).toHaveTextContent("Check before starting a workflow");
     expect(runtime.getElementsByTagName("button")).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Continue Current task" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Continue Older task" })).toBeVisible();

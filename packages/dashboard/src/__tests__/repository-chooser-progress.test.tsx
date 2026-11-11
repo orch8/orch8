@@ -59,8 +59,8 @@ describe("repository chooser progress", () => {
     const current = within(card).getByRole("region", { name: "Unfinished workflow for My repo" });
     const readiness = within(card).getByRole("region", { name: "Runtime readiness for My repo" });
     const form = within(card).getByRole("region", { name: "New feature for My repo" });
-    expect(current.compareDocumentPosition(readiness) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(readiness.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(current.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(form.compareDocumentPosition(readiness) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(current).getByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/my-repo/pipelines/plan-1#workflow-step-plan-step");
     expect(within(form).getByRole("textbox", { name: "Describe a new feature for My repo" })).toBeVisible();
   });
