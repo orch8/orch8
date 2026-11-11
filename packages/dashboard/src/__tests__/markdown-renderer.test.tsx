@@ -60,6 +60,16 @@ describe("MarkdownRenderer", () => {
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
+  it("does not load agent-authored image URLs in evidence mode", () => {
+    const { container } = renderWithProviders(
+      <MarkdownRenderer content={"## Plan\n\n![secret](https://example.com/collect?token=abc)"} disableImages />
+    );
+    expect(screen.getByRole("heading", { name: "Plan" })).toBeInTheDocument();
+    expect(screen.getByText("[Image omitted: secret]")).toBeInTheDocument();
+    expect(container.querySelector("img, source, link[rel=preload]")).toBeNull();
+    expect(container.innerHTML).not.toContain("example.com/collect");
+  });
+
   it("applies prose styling classes", () => {
     const { container } = renderWithProviders(
       <MarkdownRenderer content="# Heading" />,

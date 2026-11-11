@@ -12,6 +12,7 @@ import {
   usePipelineStepOutput,
 } from "../../hooks/usePipelines.js";
 import { DownloadEvidence } from "./DownloadEvidence.js";
+import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
 import { LogSearch } from "./LogSearch.js";
 import { PipelineStepper } from "./PipelineStepper.js";
 import { StalledRunDiagnosis } from "./StalledRunDiagnosis.js";
@@ -237,7 +238,7 @@ function PlanHistory({ pipelineId, projectId, poll }: { pipelineId: string; proj
       <a href={`/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(attempt.taskId)}`} className="underline text-blue-300">Open planning task and run</a>
       <p className="break-all font-mono text-zinc-500">{attempt.path}</p>
       {attempt.content === null ? <p className="text-amber-300">Plan file unavailable. Inspect the task run.</p>
-        : <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words bg-zinc-950 p-3 text-zinc-200">{attempt.content || "(Empty file)"}</pre>}
+        : <div className="max-h-[32rem] overflow-auto break-words bg-zinc-950 p-3 text-zinc-200"><MarkdownRenderer content={attempt.content || "(Empty file)"} disableImages /><details className="mt-3"><summary className="cursor-pointer text-blue-300">Show original plan text</summary><pre className="mt-2 whitespace-pre-wrap break-words">{attempt.content}</pre></details></div>}
     </details>)}
   </section>;
 }
@@ -255,7 +256,7 @@ function PlanDecision({ pipelineId, stepId, revision, outputFilePath }: { pipeli
     {isLoading && <p className="text-xs text-zinc-400">Loading the recorded plan...</p>}
     {isError && <p role="alert" className="text-xs text-amber-300">File unavailable or too large. Check the run log or repository. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>}
     {data && <><p className="break-all font-mono text-xs text-zinc-500">{data.path}</p>
-      <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-950 p-3 text-xs text-zinc-200">{data.content || "(Empty file)"}</pre></>}
+      <div className="max-h-[32rem] overflow-auto break-words rounded bg-zinc-950 p-3 text-zinc-200"><MarkdownRenderer content={data.content || "(Empty file)"} disableImages /><details className="mt-3 text-xs"><summary className="cursor-pointer text-blue-300">Show original file text</summary><pre className="mt-2 whitespace-pre-wrap break-words">{data.content}</pre></details></div></>}
     {data && !data.content.trim() && <p role="alert" className="text-xs text-amber-300">The plan file is empty. Do not approve this step.</p>}
     <label className="flex items-start gap-2 text-xs text-zinc-200">
       <input type="checkbox" checked={hasPlan && reviewedContent === data?.content} disabled={!hasPlan} onChange={event => setReviewedContent(event.target.checked ? data?.content ?? null : null)} />
@@ -333,7 +334,7 @@ function ReviewDecision({ pipelineId, stepId, revision, outputFilePath, prEligib
     {isLoading && <p className="text-xs text-zinc-400">Loading the recorded review...</p>}
     {isError && <p role="alert" className="text-xs text-amber-300">Review file unavailable or too large. Check the run log or repository. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>}
     {data && <><p className="break-all font-mono text-xs text-zinc-500">{data.path}</p>
-      <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-950 p-3 text-xs text-zinc-200">{data.content || "(Empty file)"}</pre></>}
+      <div className="max-h-[32rem] overflow-auto break-words rounded bg-zinc-950 p-3 text-zinc-200"><MarkdownRenderer content={data.content || "(Empty file)"} disableImages /><details className="mt-3 text-xs"><summary className="cursor-pointer text-blue-300">Show original file text</summary><pre className="mt-2 whitespace-pre-wrap break-words">{data.content}</pre></details></div></>}
     {data && !data.content.trim() && <p role="alert" className="text-xs text-amber-300">The review file is empty. Reject this step.</p>}
     <section aria-label="Changes to inspect for review" className="space-y-2 rounded border border-zinc-700 bg-zinc-950/60 p-3 text-xs">
       <h5 className="font-semibold text-zinc-200">Changes to inspect before deciding</h5>
