@@ -153,7 +153,11 @@ function RepositoryCard({ project }: { project: Project }) {
       <label htmlFor={`quick-feature-${project.id}`} className="block font-medium text-zinc-200">Describe a new feature for {project.name}</label>
       <textarea id={`quick-feature-${project.id}`} value={request} maxLength={2000} rows={3} onChange={event => { setRequest(event.target.value); saveRequest(event.target.value); }} placeholder="What should change in this repository?" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
       <p className="mt-1 text-xs text-zinc-400">Your request stays in this browser. Next you will choose agents, check the runtime, and review the plan before implementation.</p>
-      {request.trim() ? <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} hash="new-feature" onClick={event => { if (!saveRequest(request)) event.preventDefault(); }} className="mt-2 inline-block rounded bg-blue-700 px-3 py-2 font-medium text-white hover:bg-blue-600">Continue to plan setup</Link>
+      {checkout && !checkout.ready && !checkoutError ? <div role="status" className="mt-2 space-y-2 rounded border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-200">
+        <p>New feature setup is paused while this checkout is not ready. {draftError ? "Copy your request before leaving this page." : "Your request is saved here."}</p>
+        {unfinished?.[0] ? <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: unfinished[0].id }} className="inline-block underline">Resume unfinished workflow</Link>
+          : <p>Inspect the checkout and restore a clean base branch before continuing.</p>}
+      </div> : request.trim() ? <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} hash="new-feature" onClick={event => { if (!saveRequest(request)) event.preventDefault(); }} className="mt-2 inline-block rounded bg-blue-700 px-3 py-2 font-medium text-white hover:bg-blue-600">Continue to plan setup</Link>
         : <p className="mt-2 text-xs text-zinc-400">Enter a feature request to continue to plan setup.</p>}
       {draftError && <p role="alert" className="mt-2 text-amber-300">Browser storage is unavailable. Copy your request into the feature form after opening the repository.</p>}
     </section>

@@ -1,6 +1,7 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { fireEvent } from "@testing-library/react";
+import { fireEvent, waitFor } from "@testing-library/react";
 import { renderWithProviders, screen } from "../test-utils.js";
+import { api } from "../api/client.js";
 
 const useProjects = vi.fn();
 const usePipelines = vi.fn(() => ({ data: [] as Array<{ id: string; name: string; status: string; createdAt: string; updatedAt: string }>, isError: false }));
@@ -12,12 +13,16 @@ vi.mock("../hooks/usePipelines.js", () => ({
 }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => options,
-  Link: ({ to, params, children, ...props }: { to: string; params?: { projectSlug: string }; children: React.ReactNode }) =>
-    <a href={params ? to.replace("$projectSlug", params.projectSlug) : to} {...props}>{children}</a>,
+  Link: ({ to, params, children, ...props }: { to: string; params?: { projectSlug: string; pipelineId?: string }; children: React.ReactNode }) =>
+    <a href={params ? to.replace("$projectSlug", params.projectSlug).replace("$pipelineId", params.pipelineId ?? "") : to} {...props}>{children}</a>,
 }));
 import { Route } from "../routes/index.js";
 const Chooser = (Route as unknown as { component: React.ComponentType }).component;
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  usePipelines.mockReset().mockReturnValue({ data: [], isError: false });
+  vi.mocked(api.get).mockReset().mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
+});
 
 describe("repository chooser", () => {
   it("hands the request to the feature intake under the repository id, not its URL slug", () => {
@@ -30,6 +35,32 @@ describe("repository chooser", () => {
     expect(screen.getByRole("link", { name: "Continue to plan setup" })).toHaveAttribute("href", "/projects/demo/pipelines");
     localStorage.clear();
   });
+  it("keeps a new request in draft and routes the operator to unfinished work when checkout is not ready", async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ ready: false, branch: "feat/existing", baseBranch: "main", reason: "Finish existing work" });
+    useProjects.mockReturnValue({ data: [{ id: "proj_abc", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true }], isLoading: false, isError: false });
+    usePipelines.mockReturnValue({ data: [
+      { id: "work", name: "Existing feature", status: "pending", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+    ], isError: false });
+    renderWithProviders(<Chooser />);
+    fireEvent.change(screen.getByRole("textbox", { name: "Describe a new feature for Demo" }), { target: { value: "Add usage instructions" } });
+    await waitFor(() => expect(screen.getByText(/New feature setup is paused/)).toBeInTheDocument());
+    expect(screen.queryByRole("link", { name: "Continue to plan setup" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Resume unfinished workflow" })).toHaveAttribute("href", "/projects/demo/pipelines/work");
+    expect(JSON.parse(localStorage.getItem("orch8:feature-draft:proj_abc") ?? "null")).toMatchObject({ feature: "Add usage instructions" });
+  });
+
+  it("restores plan setup after a blocked checkout becomes ready", async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ ready: false, branch: "feat/existing", baseBranch: "main" });
+    useProjects.mockReturnValue({ data: [{ id: "proj_abc", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true }], isLoading: false, isError: false });
+    renderWithProviders(<Chooser />);
+    fireEvent.change(screen.getByRole("textbox", { name: "Describe a new feature for Demo" }), { target: { value: "Add usage instructions" } });
+    await waitFor(() => expect(screen.getByText(/New feature setup is paused/)).toBeInTheDocument());
+    vi.mocked(api.get).mockResolvedValueOnce({ ready: true, branch: "main", baseBranch: "main" });
+    fireEvent.click(screen.getByRole("button", { name: "Refresh checkout status" }));
+    await waitFor(() => expect(screen.getByRole("link", { name: "Continue to plan setup" })).toBeInTheDocument());
+    expect(screen.getByRole("textbox", { name: "Describe a new feature for Demo" })).toHaveValue("Add usage instructions");
+  });
+
   it("lets the operator select an active checkout directly for feature work", () => {
     useProjects.mockReturnValue({ data: [
       { id: "1", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true },
