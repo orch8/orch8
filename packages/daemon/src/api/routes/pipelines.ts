@@ -516,7 +516,9 @@ export async function pipelineRoutes(app: FastifyInstance) {
         const state = await app.pipelineService.getWithSteps(request.params.id);
         const candidate = state?.steps.find(step => step.id === request.params.stepId);
         let approvedRevision: { branch: string; commit: string } | undefined;
-        if (candidate?.requiresVerification && ["review", "independent review"].includes(candidate.label.toLowerCase())) {
+        if (candidate?.requiresVerification && ["review", "independent review"].includes(candidate.label.toLowerCase()) &&
+            state?.steps.some(step => step.label.toLowerCase() === "implement" && step.order < candidate.order) &&
+            candidate.order === state.steps.length) {
           const project = await app.projectService.getById(state!.pipeline.projectId);
           if (!project) return reply.code(404).send({ error: "not_found", message: "Project not found" });
           try {
