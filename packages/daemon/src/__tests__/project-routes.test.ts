@@ -42,16 +42,17 @@ describe("Project Routes", () => {
       const outside = await mkdtemp(join(tmpdir(), "orch8-test-instructions-outside-"));
       try {
         const [project] = await testDb.db.insert(projects).values({ name: "Instructions", slug: "instructions", homeDir }).returning();
-        await writeFile(join(homeDir, "package.json"), JSON.stringify({ scripts: { test: "node --test test.mjs" } }));
+        await writeFile(join(homeDir, "package.json"), JSON.stringify({ packageManager: "pnpm@9.15.0", scripts: { test: "node --test test.mjs" } }));
         const response = await app.inject({ method: "GET", url: `/api/projects/${project.id}/test-instructions` });
         expect(response.statusCode).toBe(200);
-        expect(response.json()).toEqual({ repository: homeDir, script: "node --test test.mjs" });
+        expect(response.json()).toEqual({ repository: homeDir, script: "node --test test.mjs", packageManager: "pnpm@9.15.0" });
         await rm(join(homeDir, "package.json"));
         await writeFile(join(outside, "package.json"), JSON.stringify({ scripts: { test: "secret command" } }));
         await symlink(join(outside, "package.json"), join(homeDir, "package.json"));
         const linked = await app.inject({ method: "GET", url: `/api/projects/${project.id}/test-instructions` });
         expect(linked.statusCode).toBe(200);
         expect(linked.json().script).toBeNull();
+        expect(linked.json().packageManager).toBeNull();
       } finally {
         await rm(homeDir, { recursive: true, force: true });
         await rm(outside, { recursive: true, force: true });

@@ -72,22 +72,26 @@ async function rootReadme(homeDir: string): Promise<{ filename: string | null; c
   return { filename: null, content: null };
 }
 
-async function rootTestScript(homeDir: string): Promise<string | null> {
+async function rootTestScript(homeDir: string): Promise<{ script: string | null; packageManager: string | null }> {
+  const unavailable = { script: null, packageManager: null };
   let handle;
   try {
     // Read a fixed root file only. Never execute repository code in the daemon.
     handle = await open(join(homeDir, "package.json"), constants.O_RDONLY | constants.O_NOFOLLOW);
     const stat = await handle.stat();
-    if (!stat.isFile() || stat.size > README_MAX_BYTES) return null;
+    if (!stat.isFile() || stat.size > README_MAX_BYTES) return unavailable;
     const buffer = Buffer.alloc(stat.size);
     const { bytesRead } = await handle.read(buffer, 0, stat.size, 0);
-    if (bytesRead !== stat.size || buffer.includes(0)) return null;
+    if (bytesRead !== stat.size || buffer.includes(0)) return unavailable;
     const manifest: unknown = JSON.parse(buffer.toString("utf8"));
-    if (!manifest || typeof manifest !== "object" || !("scripts" in manifest)) return null;
+    if (!manifest || typeof manifest !== "object") return unavailable;
+    const packageManager = "packageManager" in manifest && typeof manifest.packageManager === "string"
+      ? manifest.packageManager : null;
+    if (!("scripts" in manifest)) return { script: null, packageManager };
     const scripts = manifest.scripts;
-    if (!scripts || typeof scripts !== "object" || !("test" in scripts)) return null;
-    return typeof scripts.test === "string" && scripts.test.trim() && scripts.test.length <= 4096 ? scripts.test : null;
-  } catch { return null; }
+    if (!scripts || typeof scripts !== "object" || !("test" in scripts)) return { script: null, packageManager };
+    return { script: typeof scripts.test === "string" && scripts.test.trim() && scripts.test.length <= 4096 ? scripts.test : null, packageManager };
+  } catch { return unavailable; }
   finally { await handle?.close(); }
 }
 
@@ -98,7 +102,7 @@ export async function projectRoutes(app: FastifyInstance) {
     if (!requireProjectScope(request, reply, projectId)) return reply;
     const project = await app.projectService.getById(projectId);
     if (!project) return reply.code(404).send({ error: "not_found" });
-    return { repository: project.homeDir, script: await rootTestScript(project.homeDir) };
+    return { repository: project.homeDir, ...await rootTestScript(project.homeDir) };
   });
   // Connect an existing local checkout without replacing an origin or credentials.
   app.post("/api/projects/:id/repository-origin", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
