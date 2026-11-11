@@ -33,8 +33,10 @@ describe("operator-supplied repository test output", () => {
     expect(screen.getByLabelText("Operator-supplied raw test output")).toHaveTextContent("test failure: expected 2");
     expect(result).toHaveTextContent("not verified by Orch8");
     expect(result).toHaveTextContent("not agent-run evidence, independent review, or CI");
+    expect(screen.getByRole("button", { name: "Download test result" })).toBeEnabled();
     fireEvent.change(screen.getByRole("textbox", { name: "Terminal test output" }), { target: { value: "different output" } });
     expect(screen.queryByRole("region", { name: "Operator-supplied test result" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Download test result" })).not.toBeInTheDocument();
   });
   it("loads a small local output file and rejects an oversized file", async () => {
     await ready();

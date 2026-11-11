@@ -14,6 +14,27 @@ export function TestInstructions({ projectId }: { projectId: string }) {
   const [recorded, setRecorded] = useState<{ output: string; exitCode: string; repository: string; script: string } | null>(null);
   const maxOutputBytes = 128 * 1024;
   const selection = useRef(0);
+  function downloadResult() {
+    if (!recorded) return;
+    const content = [
+      "Orch8 operator-supplied test result (not verified by Orch8)",
+      "This is not agent-run evidence, independent review, or CI.",
+      `Checkout: ${recorded.repository}`,
+      `Root package.json test script: ${recorded.script}`,
+      `Reported process exit code: ${recorded.exitCode}`,
+      "",
+      "Operator-supplied raw test output:",
+      recorded.output,
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "orch8-operator-test-result.txt";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
   async function readOutput(file: File) {
     const selected = ++selection.current;
     setOutputError("");
@@ -84,7 +105,8 @@ export function TestInstructions({ projectId }: { projectId: string }) {
           <p>Checkout: <code className="break-all">{recorded.repository}</code> · test script: <code className="break-all">{recorded.script}</code></p>
           <p className={recorded.exitCode === "0" ? "text-emerald-300" : "text-amber-300"}>Reported process exit code: {recorded.exitCode}{recorded.exitCode === "0" ? " (reported success)" : " (reported failure)"}</p>
           <pre aria-label="Operator-supplied raw test output" className="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-zinc-950 p-2 font-mono">{recorded.output}</pre>
-          <p>This is not agent-run evidence, independent review, or CI. It disappears when the tab reloads. Inspect the current repository checkout and command yourself.</p>
+          <p>This is not agent-run evidence, independent review, or CI. It disappears when the tab reloads unless you download it. Inspect the current repository checkout and command yourself.</p>
+          <button type="button" onClick={downloadResult} className="rounded border border-blue-600 px-3 py-2 text-blue-200">Download test result</button>
         </section>}
       </> : <p role="status" className="text-amber-300">No usable root package.json test script found. Check the test instructions for this repository.</p>}
     </>}
