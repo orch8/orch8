@@ -248,11 +248,31 @@ function PlanHistory({ pipelineId, projectId, poll }: { pipelineId: string; proj
 
 function PlanDecision({ pipelineId, stepId, revision, outputFilePath }: { pipelineId: string; stepId: string; revision: string; outputFilePath: string | null }) {
   const [reviewedContent, setReviewedContent] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [changed, setChanged] = useState(false);
   const { data, isLoading, isError, isFetching, refetch } = usePipelineStepOutput(pipelineId, stepId, revision, !!outputFilePath);
   const approve = useApprovePipelineStep();
   const changes = useRequestPlanChanges();
   const [feedback, setFeedback] = useState("");
   const hasPlan = !isError && !isLoading && !isFetching && !!data?.content.trim();
+  async function acceptPlan() {
+    if (!hasPlan || reviewedContent !== data?.content || checking) return;
+    setChecking(true);
+    try {
+      const current = await refetch();
+      if (current.isError || !current.data?.content.trim() || current.data.content !== reviewedContent) {
+        setReviewedContent(null);
+        setChanged(true);
+        return;
+      }
+      approve.mutate({ pipelineId, stepId });
+    } catch {
+      setReviewedContent(null);
+      setChanged(true);
+    } finally {
+      setChecking(false);
+    }
+  }
   return <section aria-label="Plan approval" className="mt-3 space-y-3 rounded border border-amber-700/60 bg-amber-950/20 p-3">
     <h4 className="text-sm font-semibold text-amber-200">Review the plan before implementation</h4>
     {!outputFilePath && <p role="alert" className="text-xs text-amber-300">No plan file was recorded. Do not approve this step.</p>}
@@ -261,12 +281,13 @@ function PlanDecision({ pipelineId, stepId, revision, outputFilePath }: { pipeli
     {data && <><p className="break-all font-mono text-xs text-zinc-500">{data.path}</p>
       <div className="max-h-[32rem] overflow-auto break-words rounded bg-zinc-950 p-3 text-zinc-200"><MarkdownRenderer content={data.content || "(Empty file)"} disableImages /><details className="mt-3 text-xs"><summary className="cursor-pointer text-blue-300">Show original file text</summary><pre className="mt-2 whitespace-pre-wrap break-words">{data.content}</pre></details></div></>}
     {data && !data.content.trim() && <p role="alert" className="text-xs text-amber-300">The plan file is empty. Do not approve this step.</p>}
+    {changed && <p role="alert" className="text-xs text-amber-300">The plan changed or could not be refreshed. Read the current plan and confirm again before implementation.</p>}
     <label className="flex items-start gap-2 text-xs text-zinc-200">
-      <input type="checkbox" checked={hasPlan && reviewedContent === data?.content} disabled={!hasPlan} onChange={event => setReviewedContent(event.target.checked ? data?.content ?? null : null)} />
+      <input type="checkbox" checked={hasPlan && reviewedContent === data?.content} disabled={!hasPlan} onChange={event => { setReviewedContent(event.target.checked ? data?.content ?? null : null); setChanged(false); }} />
       I have reviewed the full plan and want implementation to start.
     </label>
-    <button type="button" onClick={() => approve.mutate({ pipelineId, stepId })} disabled={!hasPlan || reviewedContent !== data?.content || approve.isPending || changes.isPending}
-      className="rounded bg-emerald-800 px-3 py-1 text-xs text-emerald-200 disabled:opacity-50">{approve.isPending ? "Approving..." : "Approve plan"}</button>
+    <button type="button" onClick={() => { void acceptPlan(); }} disabled={!hasPlan || reviewedContent !== data?.content || checking || approve.isPending || changes.isPending}
+      className="rounded bg-emerald-800 px-3 py-1 text-xs text-emerald-200 disabled:opacity-50">{checking ? "Checking plan..." : approve.isPending ? "Approving..." : "Approve plan"}</button>
     <form onSubmit={event => { event.preventDefault(); if (feedback.trim()) changes.mutate({ pipelineId, stepId, feedback: feedback.trim() }); }} className="space-y-2">
       <label className="block text-xs text-zinc-200">Plan feedback
         <textarea value={feedback} onChange={event => setFeedback(event.target.value)} maxLength={10000} disabled={changes.isPending || approve.isPending} className="mt-1 block w-full rounded bg-zinc-950 p-2" />
