@@ -6,12 +6,23 @@ const get = vi.hoisted(() => vi.fn());
 vi.mock("../api/client.js", () => ({ api: { get } }));
 
 async function ready() {
-  get.mockResolvedValue({ repository: "/tmp/my-repo", script: "node --test test.mjs" });
+  get.mockResolvedValue({ repository: "/tmp/my-repo", script: "node --test test.mjs", packageManager: "pnpm@9.15.0" });
   render(<TestInstructions projectId="project-1" />);
   await screen.findByText(/node --test test.mjs/);
 }
 
 describe("operator-supplied repository test output", () => {
+  it("offers the declared pnpm command rather than an npm command", async () => {
+    await ready();
+    expect(screen.getByText("pnpm --config.enable-pre-post-scripts=false run test")).toBeInTheDocument();
+    expect(screen.queryByText("npm run test --ignore-scripts")).not.toBeInTheDocument();
+  });
+  it("does not guess a command for an unsupported package manager", async () => {
+    get.mockResolvedValue({ repository: "/tmp/my-repo", script: "node --test test.mjs", packageManager: "yarn@4.1.0" });
+    render(<TestInstructions projectId="project-1" />);
+    await screen.findByText(/cannot suggest a safe copyable command/);
+    expect(screen.queryByRole("button", { name: "Copy command" })).not.toBeInTheDocument();
+  });
   it("shows actual supplied text and exit code without presenting it as verified agent or CI evidence", async () => {
     await ready();
     fireEvent.change(screen.getByRole("textbox", { name: "Terminal test output" }), { target: { value: "test failure: expected 2" } });

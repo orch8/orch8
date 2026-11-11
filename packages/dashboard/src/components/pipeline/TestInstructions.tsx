@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api/client.js";
 
-type TestInstructionsResult = { repository: string; script: string | null };
+type TestInstructionsResult = { repository: string; script: string | null; packageManager: string | null };
 
 /** Operator-run test instructions. Repository code never runs in the daemon. */
 export function TestInstructions({ projectId }: { projectId: string }) {
@@ -40,7 +40,9 @@ export function TestInstructions({ projectId }: { projectId: string }) {
       .catch(() => { if (active) setError(true); });
     return () => { active = false; };
   }, [projectId]);
-  const command = "npm run test --ignore-scripts";
+  const manager = result?.packageManager?.split("@")[0];
+  const command = manager === "pnpm" ? "pnpm --config.enable-pre-post-scripts=false run test"
+    : manager === "npm" || !result?.packageManager ? "npm run test --ignore-scripts" : null;
   return <section aria-label="Run repository tests yourself" className="space-y-3 rounded border border-zinc-700 bg-zinc-950/60 p-4 text-xs text-zinc-300">
     <h2 className="text-sm font-semibold text-zinc-100">Run repository tests yourself</h2>
     <p>Orch8 will not execute a checkout&apos;s test script as the daemon user. Inspect the script below, then run it in your own terminal from this checkout only if you trust its code. This action is separate from agent implementation, independent review, and CI checks.</p>
@@ -50,14 +52,14 @@ export function TestInstructions({ projectId }: { projectId: string }) {
       <p>Checkout: <code className="break-all text-zinc-100">{result.repository}</code></p>
       {result.script ? <>
         <p>Root package.json test script: <code className="break-all text-zinc-100">{result.script}</code></p>
-        <div className="flex flex-wrap items-center gap-3">
+        {command ? <div className="flex flex-wrap items-center gap-3">
           <code className="break-all rounded bg-zinc-900 p-2 text-zinc-100">{command}</code>
           <button type="button" className="rounded border border-blue-600 px-3 py-2 text-blue-200" onClick={() => {
             void navigator.clipboard.writeText(command).then(() => setCopied(true)).catch(() => setCopied(false));
           }}>Copy command</button>
           {copied && <span role="status">Copied. Open your terminal in the checkout before pasting.</span>}
-        </div>
-        <p>The command runs the test script, even with npm lifecycle hooks disabled. No output is uploaded or counted as a passing test by Orch8. Read the exit status and output in your terminal.</p>
+        </div> : <p role="alert" className="text-amber-300">This repository declares {result.packageManager} as its package manager. Orch8 cannot suggest a safe copyable command for it. Inspect its documentation and run the test script in your terminal.</p>}
+        <p>{command ? "The command runs the test script, even with package-manager lifecycle hooks disabled. " : ""}No output is uploaded or counted as a passing test by Orch8. Read the exit status and output in your terminal.</p>
         <form className="space-y-3 rounded border border-zinc-700 p-3" onSubmit={event => {
           event.preventDefault();
           if (!testOutput.trim() || !/^(0|[1-9]\d*)$/.test(exitCode) || new TextEncoder().encode(testOutput).length > maxOutputBytes) return;
