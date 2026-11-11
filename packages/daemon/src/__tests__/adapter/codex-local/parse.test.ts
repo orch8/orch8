@@ -58,5 +58,9 @@ describe("parseCodexJsonl", () => {
     output.rawEvents.pop();
     output.result = "The error string bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted can occur on some hosts.";
     expect(codexSandboxStartupFailed(output)).toBe(false);
+    output.result = "For example, `pwd` could not run: the shell sandbox failed with bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted.";
+    expect(codexSandboxStartupFailed(output)).toBe(false);
+    output.result = "`pwd` could not run: the shell sandbox failed with bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted is an example of an error; I did not run a command.";
+    expect(codexSandboxStartupFailed(output)).toBe(false);
   });
 });

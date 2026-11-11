@@ -75,15 +75,14 @@ export const CODEX_TRANSIENT_UPSTREAM_RE =
 // Codex can exit zero after its shell sandbox fails to start, reporting the
 // failure only in an assistant message. Such a run did not inspect the repo.
 export const CODEX_SANDBOX_STARTUP_RE =
-  /bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted/i;
+  /bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted\.?$/i;
 
 export function codexSandboxStartupFailed(output: CodexParsedOutput): boolean {
-  // Do not mistake a text-only explanation quoting an error for an attempted
-  // command. Codex must report that this turn's command failed to start.
-  const result = output.result ?? "";
+  // Only classify a direct failure report, not an explanation that quotes it.
+  const result = (output.result ?? "").trim();
   return !output.rawEvents.some(event =>
     (event as { item?: { type?: string } }).item?.type === "command_execution") &&
-    /(?:`[^`]+`|\b(?:command|shell|sandbox|pwd)\b)\s+(?:failed|could not run)\b/i.test(result) &&
+    /^(?:`[^`\n]+`|(?:the )?(?:command|shell|sandbox))\s+(?:failed|could not run)\b/i.test(result) &&
     CODEX_SANDBOX_STARTUP_RE.test(result);
 }
 
