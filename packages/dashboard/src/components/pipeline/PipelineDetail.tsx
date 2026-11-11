@@ -211,19 +211,22 @@ function StepEvidence({ taskId, projectId, stepStatus, label }: { taskId: string
 }
 
 function StepOutput({ pipelineId, stepId, label, revision }: { pipelineId: string; stepId: string; label: string; revision: string }) {
-  const [open, setOpen] = useState(false);
+  const implementation = label.toLowerCase() === "implement";
+  const [open, setOpen] = useState(implementation);
   const { data, isLoading, isError, refetch } = usePipelineStepOutput(pipelineId, stepId, revision, open);
-  return <div className="mt-2">
+  return <section aria-label={implementation ? "Implementation report" : `${label} file`} className="mt-2">
     <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-xs text-blue-300 underline">
-      {open ? "Hide" : "Inspect"} full {label.toLowerCase()} file
+      {open ? "Hide" : "Inspect"} {implementation ? "implementation report" : `full ${label.toLowerCase()} file`}
     </button>
     {open && <div className="mt-2 rounded border border-zinc-700 bg-zinc-950 p-3">
+      {implementation && <p className="mb-2 text-xs text-zinc-400">Agent-written report. Test claims are not verified here; inspect the implementation run's raw log for actual commands and output.</p>}
       {isLoading && <p className="text-xs text-zinc-400">Loading file...</p>}
       {isError && <p role="alert" className="text-xs text-amber-300">File unavailable or too large. Check the run log or repository. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></p>}
       {data && <><p className="mb-2 break-all font-mono text-xs text-zinc-500">{data.path}</p>
-        <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words text-xs text-zinc-200">{data.content || "(Empty file)"}</pre></>}
+        {implementation ? <><div className="max-h-[32rem] overflow-auto break-words text-zinc-200"><MarkdownRenderer content={data.content || "(Empty file)"} disableImages /></div><details className="mt-3 text-xs"><summary className="cursor-pointer text-blue-300">Show original report text</summary><pre className="mt-2 whitespace-pre-wrap break-words text-zinc-200">{data.content}</pre></details></>
+          : <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words text-xs text-zinc-200">{data.content || "(Empty file)"}</pre>}</>}
     </div>}
-  </div>;
+  </section>;
 }
 
 function PlanHistory({ pipelineId, projectId, poll }: { pipelineId: string; projectId: string; poll: boolean }) {

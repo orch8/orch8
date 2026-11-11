@@ -3,10 +3,10 @@ import { fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen } from "../test-utils.js";
 import { PipelineDetail } from "../components/pipeline/PipelineDetail.js";
 
-const state = vi.hoisted(() => ({ content: "# Real plan\nImplement a feature.", enabled: false, error: false, label: "Plan", attempts: [] as Array<{ taskId: string; path: string; content: string | null }>, changes: vi.fn(), changeError: null as Error | null, approve: vi.fn() }));
+const state = vi.hoisted(() => ({ content: "# Real plan\nImplement a feature.", enabled: false, error: false, label: "Plan", status: "awaiting_verification", attempts: [] as Array<{ taskId: string; path: string; content: string | null }>, changes: vi.fn(), changeError: null as Error | null, approve: vi.fn() }));
 vi.mock("../hooks/usePipelines.js", () => ({
   usePipeline: () => ({ data: { pipeline: { id: "pipe_1", name: "Build feature", projectId: "proj_1", status: "running", currentStep: 1 }, steps: [
-    { id: "step_1", order: 1, label: state.label, status: "awaiting_verification", outputSummary: "Plan ready", outputFilePath: ".orch8/pipelines/pipe_1/Plan.md", taskId: null },
+    { id: "step_1", order: 1, label: state.label, status: state.status, outputSummary: "Plan ready", outputFilePath: ".orch8/pipelines/pipe_1/Plan.md", taskId: null },
   ] }, isLoading: false, refetch: vi.fn() }),
   usePlanAttempts: () => ({ data: state.attempts, isLoading: false, isError: false, refetch: vi.fn() }),
   usePipelineDiff: () => ({ data: { available: false, reason: "No repository" }, isLoading: false, isError: false, refetch: vi.fn() }),
@@ -91,5 +91,42 @@ describe("pipeline plan decision", () => {
     view.rerender(<PipelineDetail pipelineId="pipe_1" />);
     expect(screen.getByRole("button", { name: "Approve plan" })).toBeDisabled();
     state.error = false;
+  });
+});
+
+describe("implementation report", () => {
+  it("opens the recorded implementation report as readable evidence without treating test claims as verified", () => {
+    state.label = "Implement";
+    state.status = "completed";
+    state.content = "# Implementation\n\nRan `pnpm test`.\n\n![tracking](https://example.com/collect?token=abc)";
+    try {
+      const { container } = renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+      const report = screen.getByRole("region", { name: "Implementation report" });
+      expect(state.enabled).toBe(true);
+      expect(report).toHaveTextContent("Test claims are not verified here");
+      expect(report.querySelector(".prose h1")).toHaveTextContent("Implementation");
+      expect(report.querySelector(".prose code")).toHaveTextContent("pnpm test");
+      expect(report).toHaveTextContent("[Image omitted: tracking]");
+      expect(container.querySelector("img")).toBeNull();
+      expect(report.querySelector(".prose")).not.toHaveTextContent("example.com/collect");
+      expect(screen.getByText("Show original report text")).toBeInTheDocument();
+    } finally {
+      state.label = "Plan";
+      state.status = "awaiting_verification";
+    }
+  });
+
+  it("shows a missing report without asserting test success", () => {
+    state.label = "Implement";
+    state.status = "completed";
+    state.content = "";
+    try {
+      renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+      expect(screen.getByRole("region", { name: "Implementation report" })).toHaveTextContent("File unavailable or too large");
+      expect(screen.queryByText(/tests passed/i)).not.toBeInTheDocument();
+    } finally {
+      state.label = "Plan";
+      state.status = "awaiting_verification";
+    }
   });
 });
