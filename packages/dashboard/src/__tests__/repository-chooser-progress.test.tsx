@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithProviders, screen, waitFor, within } from "../test-utils.js";
+import { fireEvent } from "@testing-library/react";
 
 const { useProjects, usePipelines, usePipeline, get, post } = vi.hoisted(() => ({
   useProjects: vi.fn(), usePipelines: vi.fn(), usePipeline: vi.fn(), get: vi.fn(), post: vi.fn(),
@@ -59,10 +60,67 @@ describe("repository chooser progress", () => {
     const current = within(card).getByRole("region", { name: "Unfinished workflow for My repo" });
     const readiness = within(card).getByRole("region", { name: "Runtime readiness for My repo" });
     const form = within(card).getByRole("region", { name: "New feature for My repo" });
+    const repositoryLink = within(card).getByRole("link", { name: /My repo.*Open feature workflows/ });
+    expect(current.compareDocumentPosition(repositoryLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(current.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(form.compareDocumentPosition(readiness) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(current).getByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/my-repo/pipelines/plan-1#workflow-step-plan-step");
     expect(within(form).getByRole("textbox", { name: "Describe a new feature for My repo" })).toBeVisible();
+  });
+  it("leads with the request and plan setup on a ready checkout with no unfinished work", async () => {
+    localStorage.setItem("orch8:feature-draft:proj-1", JSON.stringify({ feature: "Add usage instructions" }));
+    renderWithProviders(<RepositoryChooser />);
+    const card = within(screen.getByRole("list", { name: "Selected repository details" })).getAllByRole("listitem")[0];
+    const form = within(card).getByRole("region", { name: "New feature for My repo" });
+    const repositoryLink = within(card).getByRole("link", { name: /My repo.*Open feature workflows/ });
+    expect(form.compareDocumentPosition(repositoryLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(form).getByRole("textbox", { name: "Describe a new feature for My repo" })).toHaveValue("Add usage instructions");
+    expect(await within(form).findByRole("link", { name: "Continue to plan setup" })).toHaveAttribute("href", "/projects/my-repo/pipelines#new-feature");
+    expect(screen.getByText("Checkout clean on base · main")).toBeInTheDocument();
+  });
+  it("blocks new setup while another workflow is unfinished, even on a clean checkout", async () => {
+    localStorage.setItem("orch8:feature-draft:proj-1", JSON.stringify({ feature: "Add setup guide" }));
+    usePipelines.mockReturnValue({ data: [pipeline("plan-1", "running", "2026-11-08T01:00:00Z")], isError: false });
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    const link = await screen.findByText("Continue to plan setup");
+    expect(link).toHaveAttribute("aria-disabled", "true");
+    await user.click(link);
+    expect(screen.getByText("Finish or inspect the unfinished workflow before starting another feature.")).toBeInTheDocument();
+  });
+  it("retains focus on plan setup while checkout readiness refreshes", async () => {
+    localStorage.setItem("orch8:feature-draft:proj-1", JSON.stringify({ feature: "Add setup guide" }));
+    renderWithProviders(<RepositoryChooser />);
+    const link = await screen.findByRole("link", { name: "Continue to plan setup" });
+    link.focus();
+    expect(link).toHaveFocus();
+    let resolveCheckout!: (result: { ready: boolean; branch: string; baseBranch: string }) => void;
+    get.mockReturnValueOnce(new Promise(resolve => { resolveCheckout = resolve; }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh checkout status" }));
+    await waitFor(() => expect(link).toHaveAttribute("aria-disabled", "true"));
+    expect(link).toHaveFocus();
+    resolveCheckout({ ready: true, branch: "main", baseBranch: "main" });
+    await waitFor(() => expect(link).toHaveAttribute("aria-disabled", "false"));
+  });
+  it("keeps the feature input focused when an unfinished workflow appears", async () => {
+    const { rerender, user } = renderWithProviders(<RepositoryChooser />);
+    const input = screen.getByRole("textbox", { name: "Describe a new feature for My repo" });
+    await user.type(input, "Add setup guide");
+    expect(input).toHaveFocus();
+    usePipelines.mockReturnValue({ data: [pipeline("plan-1", "running", "2026-11-08T01:00:00Z")], isError: false });
+    rerender(<RepositoryChooser />);
+    expect(screen.getByRole("textbox", { name: "Describe a new feature for My repo" })).toBe(input);
+    expect(input).toHaveFocus();
+    expect(screen.getByRole("region", { name: "Unfinished workflow for My repo" })).toBeInTheDocument();
+  });
+  it("does not offer plan setup until checkout readiness has been confirmed", async () => {
+    let resolveCheckout!: (result: { ready: boolean; branch: string; baseBranch: string }) => void;
+    get.mockReturnValue(new Promise(resolve => { resolveCheckout = resolve; }));
+    localStorage.setItem("orch8:feature-draft:proj-1", JSON.stringify({ feature: "Add usage instructions" }));
+    renderWithProviders(<RepositoryChooser />);
+    expect(screen.queryByRole("link", { name: "Continue to plan setup" })).not.toBeInTheDocument();
+    expect(screen.getByText("Checking checkout...")).toBeInTheDocument();
+    resolveCheckout({ ready: true, branch: "main", baseBranch: "main" });
+    expect(await screen.findByRole("link", { name: "Continue to plan setup" })).toBeInTheDocument();
   });
   it("links to every remaining workflow without duplicating the current one", () => {
     usePipelines.mockReturnValue({ data: [pipeline("newer", "running", "2026-11-08T02:00:00Z"), pipeline("older", "failed", "2026-11-08T01:00:00Z")], isError: false });
@@ -142,9 +200,12 @@ describe("repository chooser progress", () => {
 
   it("does not claim readiness when the checkout cannot be checked", async () => {
     get.mockRejectedValue(new Error("Unavailable"));
+    localStorage.setItem("orch8:feature-draft:proj-1", JSON.stringify({ feature: "Keep my request" }));
     renderWithProviders(<RepositoryChooser />);
     await waitFor(() => expect(screen.getByText(/Checkout status unavailable/)).toBeInTheDocument());
     expect(screen.queryByText(/Checkout clean on base/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Continue to plan setup" })).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Describe a new feature for My repo" })).toHaveValue("Keep my request");
   });
 
   it("removes a previous ready claim when a manual refresh fails", async () => {
@@ -252,7 +313,9 @@ describe("repository chooser progress", () => {
   it("does not claim there is no work when workflow status cannot load", () => {
     usePipelines.mockReturnValue({ data: undefined, isError: true });
     renderWithProviders(<RepositoryChooser />);
-    expect(screen.getByText("Workflow status unavailable. Open the repository to check it.")).toBeInTheDocument();
+    const error = screen.getByText("Workflow status unavailable. Open the repository to check it.");
+    const form = screen.getByRole("region", { name: "New feature for My repo" });
+    expect(error.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(usePipeline).not.toHaveBeenCalled();
   });
 });

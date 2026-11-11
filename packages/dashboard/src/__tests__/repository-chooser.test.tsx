@@ -25,14 +25,14 @@ beforeEach(() => {
 });
 
 describe("repository chooser", () => {
-  it("hands the request to the feature intake under the repository id, not its URL slug", () => {
+  it("hands the request to the feature intake under the repository id, not its URL slug", async () => {
     localStorage.clear();
     useProjects.mockReturnValue({ data: [{ id: "proj_abc", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true }], isLoading: false, isError: false });
     renderWithProviders(<Chooser />);
     fireEvent.change(screen.getByRole("textbox", { name: "Describe a new feature for Demo" }), { target: { value: "Add usage instructions" } });
     expect(JSON.parse(localStorage.getItem("orch8:feature-draft:proj_abc") ?? "null")).toMatchObject({ feature: "Add usage instructions" });
     expect(localStorage.getItem("orch8:feature-draft:demo")).toBeNull();
-    expect(screen.getByRole("link", { name: "Continue to plan setup" })).toHaveAttribute("href", "/projects/demo/pipelines");
+    expect(await screen.findByRole("link", { name: "Continue to plan setup" })).toHaveAttribute("href", "/projects/demo/pipelines");
     localStorage.clear();
   });
   it("keeps a new request in draft and routes the operator to unfinished work when checkout is not ready", async () => {
