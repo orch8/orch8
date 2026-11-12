@@ -24,7 +24,7 @@ import { mapStreamEvent } from "../adapter/tool-mapper.js";
 import { SessionManager } from "../adapter/session-manager.js";
 import { resolveAdapter, type AdapterMap } from "../adapter/registry.js";
 import { readAgentToken } from "./agent-token-store.js";
-import { withRepositoryWriter } from "./repository-checkout-gate.js";
+import { reserveRepositoryWriter, withRepositoryWriter } from "./repository-checkout-gate.js";
 
 type Agent = typeof agents.$inferSelect;
 type HeartbeatRun = typeof heartbeatRuns.$inferSelect;
@@ -1182,26 +1182,39 @@ export class HeartbeatService {
         .orderBy(heartbeatRuns.createdAt)
         .limit(availableSlots);
 
-      // 6. Claim each run
-      const claimed: HeartbeatRun[] = [];
-      for (const run of queuedRuns) {
-        const result = await this.claimQueuedRun(run.id);
-        if (result) {
-          claimed.push(result);
+      if (queuedRuns.length === 0) return [];
+      // Hold the checkout's writer reservation through execution, not just
+      // enqueue. Scheduler retries can reach this method without enqueueWakeup.
+      // If an operator is running tests, leave the runs queued for the next tick.
+      let release: () => void;
+      try {
+        release = await reserveRepositoryWriter(this.db, projectId);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("Repository checkout is in progress")) return [];
+        throw error;
+      }
+      try {
+        // 6. Claim each run only after reserving the checkout.
+        const claimed: HeartbeatRun[] = [];
+        for (const run of queuedRuns) {
+          const result = await this.claimQueuedRun(run.id);
+          if (result) claimed.push(result);
         }
-      }
 
-      // 7. Execute claimed runs (fire-and-forget)
-      for (const run of claimed) {
-        this.executeRun(run.id).catch((err) => {
-          this.logger?.error(
-            { err, runId: run.id, agentId, projectId },
-            "Unhandled error in executeRun",
-          );
-        });
+        // 7. Execution stays fire-and-forget, but the reservation remains until
+        // all processes finish, including adapter teardown.
+        if (claimed.length === 0) release();
+        else {
+          const executions = claimed.map(run => this.executeRun(run.id).catch(err => {
+            this.logger?.error({ err, runId: run.id, agentId, projectId }, "Unhandled error in executeRun");
+          }));
+          void Promise.allSettled(executions).then(release);
+        }
+        return claimed;
+      } catch (error) {
+        release();
+        throw error;
       }
-
-      return claimed;
     });
   }
 

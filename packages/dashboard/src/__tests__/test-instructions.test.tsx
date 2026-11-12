@@ -3,7 +3,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TestInstructions } from "../components/pipeline/TestInstructions.js";
 
 const get = vi.hoisted(() => vi.fn());
-vi.mock("../api/client.js", () => ({ api: { get } }));
+const post = vi.hoisted(() => vi.fn());
+vi.mock("../api/client.js", () => ({ api: { get, post } }));
 
 async function ready() {
   get.mockResolvedValue({ repository: "/tmp/my-repo", script: "node --test test.mjs", packageManager: "pnpm@9.15.0" });
@@ -12,6 +13,27 @@ async function ready() {
 }
 
 describe("operator-supplied repository test output", () => {
+  it("runs only after clicking and renders command, exit status, stdout and stderr as local operator execution", async () => {
+    post.mockResolvedValue({ command: ["npm", "run", "test", "--ignore-scripts"], script: "node --test test.mjs", exitCode: 1,
+      signal: null, timedOut: false, outputTruncated: false, stdout: "test failed", stderr: "assertion error" });
+    await ready();
+    expect(post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Run test script in checkout" }));
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/projects/project-1/run-tests", {}));
+    const result = await screen.findByRole("region", { name: "Local repository test run" });
+    expect(result).toHaveTextContent("npm run test --ignore-scripts");
+    expect(result).toHaveTextContent("Exit code: 1");
+    expect(screen.getByLabelText("Local test stdout")).toHaveTextContent("test failed");
+    expect(screen.getByLabelText("Local test stderr")).toHaveTextContent("assertion error");
+    expect(result).toHaveTextContent("not agent-reviewed or CI evidence");
+  });
+  it("shows a checkout-busy failure without claiming a test result", async () => {
+    post.mockRejectedValue(new Error("repository_busy"));
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Run test script in checkout" }));
+    await screen.findByText(/Could not run tests/);
+    expect(screen.queryByRole("region", { name: "Local repository test run" })).not.toBeInTheDocument();
+  });
   it("offers the declared pnpm command rather than an npm command", async () => {
     await ready();
     expect(screen.getByText("pnpm --config.enable-pre-post-scripts=false run test")).toBeInTheDocument();

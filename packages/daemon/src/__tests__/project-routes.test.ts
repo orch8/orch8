@@ -3,7 +3,9 @@ import Fastify from "fastify";
 import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { projects } from "@orch/shared/db";
+import { agents, heartbeatRuns, pipelines, projects } from "@orch/shared/db";
+import { hashAgentToken } from "../api/middleware/agent-token.js";
+import { withRepositoryWriter } from "../services/repository-checkout-gate.js";
 import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { authPlugin } from "../api/middleware/auth.js";
 import { projectRoutes } from "../api/routes/projects.js";
@@ -30,6 +32,7 @@ describe("Project Routes", () => {
 
     const projectService = new ProjectService(testDb.db);
     app.decorate("projectService", projectService);
+    app.decorate("heartbeatService", { isRunActive: () => false, isProcessTracked: () => false } as never);
 
     app.register(authPlugin, { allowLocalhostAdmin: true });
     app.register(projectRoutes);
@@ -57,6 +60,57 @@ describe("Project Routes", () => {
         await rm(homeDir, { recursive: true, force: true });
         await rm(outside, { recursive: true, force: true });
       }
+    });
+  });
+
+  describe("POST /api/projects/:id/run-tests", () => {
+    it("executes the root npm test only on explicit admin action and returns actual output", async () => {
+      const homeDir = await mkdtemp(join(tmpdir(), "orch8-route-run-tests-"));
+      try {
+        const [project] = await testDb.db.insert(projects).values({ name: "Run", slug: "run", homeDir }).returning();
+        await writeFile(join(homeDir, "package.json"), JSON.stringify({ scripts: { test: "node test.cjs" } }));
+        await writeFile(join(homeDir, "test.cjs"), "console.log('actually executed'); process.exitCode = 7;");
+        const res = await app.inject({ method: "POST", url: `/api/projects/${project.id}/run-tests`, payload: {} });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({ command: ["npm", "run", "test", "--ignore-scripts"], exitCode: 7, timedOut: false });
+        expect(res.json().stdout).toContain("actually executed");
+        expect(res.json().script).toBe("node test.cjs");
+      } finally { await rm(homeDir, { recursive: true, force: true }); }
+    });
+    it("rejects agent credentials and caller-supplied commands", async () => {
+      const homeDir = await mkdtemp(join(tmpdir(), "orch8-route-run-tests-"));
+      try {
+        const [project] = await testDb.db.insert(projects).values({ name: "Run", slug: "run", homeDir }).returning();
+        await testDb.db.insert(agents).values({ id: "fixture-agent", name: "Agent", projectId: project.id, role: "engineer", agentTokenHash: hashAgentToken("fixture-agent") });
+        await writeFile(join(homeDir, "package.json"), JSON.stringify({ scripts: { test: "node -e \"console.log('safe')\"" } }));
+        const url = `/api/projects/${project.id}/run-tests`;
+        expect((await app.inject({ method: "POST", url, payload: {}, headers: { authorization: "Bearer fixture-agent" } })).statusCode).toBe(403);
+        expect((await app.inject({ method: "POST", url, payload: { command: "touch /tmp/forbidden" } })).statusCode).toBe(400);
+      } finally { await rm(homeDir, { recursive: true, force: true }); }
+    });
+    it("blocks active pipelines in aliases, queued runs, and checkout writers", async () => {
+      const homeDir = await mkdtemp(join(tmpdir(), "orch8-route-run-tests-"));
+      try {
+        const [project, alias] = await testDb.db.insert(projects).values([
+          { name: "Run", slug: "run", homeDir }, { name: "Alias", slug: "alias", homeDir },
+        ]).returning();
+        await writeFile(join(homeDir, "package.json"), JSON.stringify({ scripts: { test: "node -e \"console.log('should not execute')\"" } }));
+        const url = `/api/projects/${project.id}/run-tests`;
+        await testDb.db.insert(pipelines).values({ projectId: alias.id, name: "Active", status: "running" });
+        expect((await app.inject({ method: "POST", url, payload: {} })).statusCode).toBe(409);
+        await testDb.db.delete(pipelines);
+        await testDb.db.insert(heartbeatRuns).values({ projectId: alias.id, agentId: "agent", invocationSource: "on_demand", status: "queued" });
+        expect((await app.inject({ method: "POST", url, payload: {} })).statusCode).toBe(409);
+        await testDb.db.delete(heartbeatRuns);
+        let release!: () => void;
+        let entered!: () => void;
+        const held = new Promise<void>(resolve => { release = resolve; });
+        const ready = new Promise<void>(resolve => { entered = resolve; });
+        const writer = withRepositoryWriter(testDb.db, alias.id, async () => { entered(); await held; });
+        await ready;
+        try { expect((await app.inject({ method: "POST", url, payload: {} })).statusCode).toBe(409); }
+        finally { release(); await writer; }
+      } finally { await rm(homeDir, { recursive: true, force: true }); }
     });
   });
 

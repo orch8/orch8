@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../api/client.js";
 
 type TestInstructionsResult = { repository: string; script: string | null; packageManager: string | null };
+type LocalTestRun = { command: string[]; script: string; exitCode: number | null; signal: string | null;
+  timedOut: boolean; outputTruncated: boolean; stdout: string; stderr: string };
 
-/** Operator-run test instructions. Repository code never runs in the daemon. */
+/** Explicit operator execution and separately supplied terminal results. */
 export function TestInstructions({ projectId }: { projectId: string }) {
   const [result, setResult] = useState<TestInstructionsResult | null>(null);
   const [error, setError] = useState(false);
@@ -12,6 +14,9 @@ export function TestInstructions({ projectId }: { projectId: string }) {
   const [exitCode, setExitCode] = useState("");
   const [outputError, setOutputError] = useState("");
   const [recorded, setRecorded] = useState<{ output: string; exitCode: string; repository: string; script: string } | null>(null);
+  const [localRun, setLocalRun] = useState<LocalTestRun | null>(null);
+  const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState("");
   const maxOutputBytes = 128 * 1024;
   const selection = useRef(0);
   function downloadResult() {
@@ -64,9 +69,18 @@ export function TestInstructions({ projectId }: { projectId: string }) {
   const manager = result?.packageManager?.split("@")[0];
   const command = manager === "pnpm" ? "pnpm --config.enable-pre-post-scripts=false run test"
     : manager === "npm" || !result?.packageManager ? "npm run test --ignore-scripts" : null;
+  async function runTests() {
+    if (running) return;
+    setRunning(true);
+    setLocalRun(null);
+    setRunError("");
+    try { setLocalRun(await api.post<LocalTestRun>(`/projects/${encodeURIComponent(projectId)}/run-tests`, {})); }
+    catch { setRunError("Could not run tests. The checkout may be busy, the package manager may be unavailable, or the test script may have changed. Retry after checking the repository."); }
+    finally { setRunning(false); }
+  }
   return <section aria-label="Run repository tests yourself" className="space-y-3 rounded border border-zinc-700 bg-zinc-950/60 p-4 text-xs text-zinc-300">
     <h2 className="text-sm font-semibold text-zinc-100">Run repository tests yourself</h2>
-    <p>Orch8 will not execute a checkout&apos;s test script as the daemon user. Inspect the script below, then run it in your own terminal from this checkout only if you trust its code. This action is separate from agent implementation, independent review, and CI checks.</p>
+    <p>Inspect the script before running it. Clicking Run executes repository code as the daemon user, with access to the daemon&apos;s files and network. Only run trusted checkouts. You can also run it in your own terminal. Neither result is agent review or CI.</p>
     {!result && !error && <p role="status">Inspecting root package.json...</p>}
     {error && <p role="alert" className="text-amber-300">Could not inspect the test script. Refresh the page to retry.</p>}
     {result && <>
@@ -80,7 +94,24 @@ export function TestInstructions({ projectId }: { projectId: string }) {
           }}>Copy command</button>
           {copied && <span role="status">Copied. Open your terminal in the checkout before pasting.</span>}
         </div> : <p role="alert" className="text-amber-300">This repository declares {result.packageManager} as its package manager. Orch8 cannot suggest a safe copyable command for it. Inspect its documentation and run the test script in your terminal.</p>}
-        <p>{command ? "The command runs the test script, even with package-manager lifecycle hooks disabled. " : ""}No output is uploaded or counted as a passing test by Orch8. Read the exit status and output in your terminal.</p>
+        {command && <div className="space-y-2 rounded border border-zinc-700 p-3">
+          <button type="button" disabled={running} className="rounded border border-blue-600 px-3 py-2 text-blue-200 disabled:opacity-50" onClick={() => void runTests()}>Run test script in checkout</button>
+          <p>Runs the root test script with a 60-second timeout and 64 KB combined output limit. No package-manager lifecycle hooks. A test can spawn detached children that survive the timeout. If it times out, inspect and stop those processes before another feature run. The result stays in this tab and does not affect pipeline approval or review.</p>
+          {running && <p role="status">Running tests in the checkout...</p>}
+          {runError && <p role="alert" className="text-amber-300">{runError}</p>}
+          {localRun && <section aria-label="Local repository test run" className="space-y-2 rounded bg-zinc-900 p-3">
+            <h3 className="font-semibold text-zinc-100">Local repository test run</h3>
+            <p>Command: <code>{localRun.command.join(" ")}</code></p>
+            <p>Script: <code className="break-all">{localRun.script}</code></p>
+            <p className={localRun.exitCode === 0 && !localRun.timedOut ? "text-emerald-300" : "text-amber-300"}>Exit code: {localRun.exitCode ?? "none"}{localRun.signal ? `, signal: ${localRun.signal}` : ""}{localRun.timedOut ? " (timed out)" : ""}</p>
+            {localRun.timedOut && <p role="alert" className="text-amber-300">Timed out. Detached child processes may still be writing to this checkout. Inspect and stop them before starting another feature run.</p>}
+            {localRun.outputTruncated && <p>Output truncated at 64 KB.</p>}
+            <p>stdout</p><pre aria-label="Local test stdout" className="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-zinc-950 p-2 font-mono">{localRun.stdout}</pre>
+            <p>stderr</p><pre aria-label="Local test stderr" className="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-zinc-950 p-2 font-mono">{localRun.stderr}</pre>
+            <p>This is local operator execution, not agent-reviewed or CI evidence. Output may contain secrets; it is not saved by Orch8.</p>
+          </section>}
+        </div>}
+        <p>{command ? "The command runs the test script even with package-manager lifecycle hooks disabled. " : ""}If you run it in your terminal, read the exit status and output there; the form below is only for your own reference.</p>
         <form className="space-y-3 rounded border border-zinc-700 p-3" onSubmit={event => {
           event.preventDefault();
           if (!testOutput.trim() || !/^(0|[1-9]\d*)$/.test(exitCode) || new TextEncoder().encode(testOutput).length > maxOutputBytes) return;

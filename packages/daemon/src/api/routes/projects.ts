@@ -13,6 +13,10 @@ import { constants } from "node:fs";
 import { join, relative, isAbsolute } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { heartbeatRuns, pipelines } from "@orch/shared/db";
+import { and, inArray } from "drizzle-orm";
+import { withExclusiveRepositoryCheckout } from "../../services/repository-checkout-gate.js";
+import { runRepositoryTests } from "../../services/repository-tests.js";
 
 const execFileAsync = promisify(execFile);
 const FILE_MAX_BYTES = 32 * 1024;
@@ -96,6 +100,43 @@ async function rootTestScript(homeDir: string): Promise<{ script: string | null;
 }
 
 export async function projectRoutes(app: FastifyInstance) {
+  app.post("/api/projects/:id/run-tests", async (request: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply: FastifyReply) => {
+    // Executing repository code is an operator action, never an agent capability.
+    if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+    const projectId = await resolveProjectParam(app, request.params.id, reply);
+    if (!projectId) return reply;
+    if (!requireProjectScope(request, reply, projectId)) return reply;
+    if (!request.body || typeof request.body !== "object" || Array.isArray(request.body) || Object.keys(request.body).length)
+      return reply.code(400).send({ error: "validation_error", message: "This action accepts no command or arguments." });
+    const project = await app.projectService.getById(projectId);
+    if (!project) return reply.code(404).send({ error: "not_found" });
+    try {
+      return await withExclusiveRepositoryCheckout(app.db, project.id, async () => {
+        const root = await realpath(project.homeDir);
+        const candidates = await app.projectService.list();
+        const shared = (await Promise.all(candidates.map(async candidate => ({
+          id: candidate.id, root: await realpath(candidate.homeDir).catch(() => candidate.homeDir),
+        })))).filter(candidate => candidate.root === root).map(candidate => candidate.id);
+        const active = await app.db.select({ id: pipelines.id }).from(pipelines).where(and(
+          inArray(pipelines.projectId, shared), inArray(pipelines.status, ["pending", "running"]),
+        )).limit(1);
+        if (active.length) return reply.code(409).send({ error: "repository_busy", message: "An active pipeline must finish before running tests." });
+        const runs = await app.db.select({ id: heartbeatRuns.id, status: heartbeatRuns.status }).from(heartbeatRuns).where(inArray(heartbeatRuns.projectId, shared));
+        if (runs.some(run => ["queued", "running"].includes(run.status) ||
+          app.heartbeatService.isRunActive(run.id) || app.heartbeatService.isProcessTracked(run.id)))
+          return reply.code(409).send({ error: "repository_busy", message: "An agent run is queued or executing in this checkout." });
+        return runRepositoryTests(root);
+      });
+    } catch (error) {
+      const message = (error as Error).message;
+      if (message.includes("Repository work is starting") || message.includes("checkout is already in progress"))
+        return reply.code(409).send({ error: "repository_busy", message: "Repository work is in progress; retry after it finishes." });
+      if (message.includes("test script") || message.includes("package manager"))
+        return reply.code(422).send({ error: "test_unavailable", message });
+      request.log.error({ err: error }, "repository test run failed");
+      return reply.code(422).send({ error: "test_unavailable", message: "Could not run the repository test script." });
+    }
+  });
   app.get("/api/projects/:id/test-instructions", async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const projectId = await resolveProjectParam(app, request.params.id, reply);
     if (!projectId) return reply;
