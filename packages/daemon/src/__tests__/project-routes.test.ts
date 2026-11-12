@@ -64,6 +64,35 @@ describe("Project Routes", () => {
   });
 
   describe("POST /api/projects/:id/run-tests", () => {
+    it("stores operator execution against the selected workflow and reads it back with project isolation", async () => {
+      const homeDir = await mkdtemp(join(tmpdir(), "orch8-persistent-test-"));
+      try {
+        const [project, other] = await testDb.db.insert(projects).values([
+          { name: "Run", slug: "run", homeDir }, { name: "Other", slug: "other", homeDir },
+        ]).returning();
+        const [workflow] = await testDb.db.insert(pipelines).values({ projectId: project.id, name: "Feature", status: "completed" }).returning();
+        await testDb.db.insert(agents).values({ id: "fixture-agent", name: "Agent", projectId: project.id, role: "engineer", agentTokenHash: hashAgentToken("fixture-agent") });
+        await writeFile(join(homeDir, "package.json"), JSON.stringify({ scripts: { test: "node test.cjs" } }));
+        await writeFile(join(homeDir, "test.cjs"), "console.log('persistent output'); process.exitCode = 3;");
+        const url = `/api/projects/${project.id}/test-runs/latest?pipelineId=${workflow.id}`;
+        expect((await app.inject({ method: "GET", url })).json()).toEqual({ run: null });
+        expect((await app.inject({ method: "POST", url: `/api/projects/${other.id}/run-tests`, payload: { pipelineId: workflow.id } })).statusCode).toBe(404);
+        const executed = await app.inject({ method: "POST", url: `/api/projects/${project.id}/run-tests`, payload: { pipelineId: workflow.id } });
+        expect(executed.statusCode).toBe(200);
+        expect(executed.json()).toMatchObject({ pipelineId: workflow.id, projectId: project.id, repository: homeDir, exitCode: 3, stdout: expect.stringContaining("persistent output") });
+        const stored = await app.inject({ method: "GET", url });
+        expect(stored.json().run).toMatchObject({ id: executed.json().id, pipelineId: workflow.id, projectId: project.id,
+          repository: homeDir, command: executed.json().command, script: "node test.cjs", stdout: executed.json().stdout,
+          exitCode: 3, revisionBefore: executed.json().revisionBefore, revisionAfter: executed.json().revisionAfter,
+          triggeredBy: "operator", createdAt: expect.any(String) });
+        await writeFile(join(homeDir, "test.cjs"), "console.log('newer output');");
+        const newer = await app.inject({ method: "POST", url: `/api/projects/${project.id}/run-tests`, payload: { pipelineId: workflow.id } });
+        expect(newer.statusCode).toBe(200);
+        expect((await app.inject({ method: "GET", url })).json().run).toMatchObject({ id: newer.json().id, exitCode: 0, stdout: expect.stringContaining("newer output") });
+        expect((await app.inject({ method: "GET", url: `/api/projects/${other.id}/test-runs/latest?pipelineId=${workflow.id}` })).statusCode).toBe(404);
+        expect((await app.inject({ method: "GET", url: `/api/projects/${project.id}/test-runs/latest?pipelineId=${workflow.id}`, headers: { authorization: "Bearer fixture-agent" } })).statusCode).toBe(403);
+      } finally { await rm(homeDir, { recursive: true, force: true }); }
+    });
     it("executes the root npm test only on explicit admin action and returns actual output", async () => {
       const homeDir = await mkdtemp(join(tmpdir(), "orch8-route-run-tests-"));
       try {

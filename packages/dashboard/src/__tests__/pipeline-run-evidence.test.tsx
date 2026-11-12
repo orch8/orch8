@@ -16,6 +16,8 @@ vi.mock("../hooks/usePipelines.js", () => ({
   usePublishPipelinePr: () => ({ isPending: false, isError: false }),
 }));
 vi.mock("../components/runs/RunViewer.js", () => ({ RunViewer: ({ runId }: { runId: string }) => <div role="dialog">Run viewer {runId}</div> }));
+vi.mock("../components/pipeline/TestInstructions.js", () => ({ TestInstructions: ({ projectId, pipelineId }: { projectId: string; pipelineId: string }) =>
+  <section aria-label="Operator repository test evidence">Project {projectId} workflow {pipelineId}</section> }));
 
 const fetchMock = vi.fn();
 const ok = (body: unknown) => ({ ok: true, json: async () => body, headers: { get: () => null } });
@@ -34,6 +36,13 @@ beforeEach(() => {
 });
 
 describe("pipeline step run evidence", () => {
+  it("places workflow-bound operator tests alongside plan, implementation and review evidence", () => {
+    state.steps = [step("step_1", "Plan"), step("step_2", "Implement"), step("step_3", "Independent review")];
+    renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+    expect(screen.getByRole("region", { name: "Operator repository test evidence" })).toHaveTextContent("Project proj_1 workflow pipe_1");
+    expect(screen.getByRole("region", { name: "Implement run evidence" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Independent review run evidence" })).toBeInTheDocument();
+  });
   it("scrolls and focuses a deep-linked step after it renders", async () => {
     state.steps = [step("step_1", "Plan", null), step("step_2", "Independent review", null)];
     window.history.replaceState(null, "", "#workflow-step-step_2");

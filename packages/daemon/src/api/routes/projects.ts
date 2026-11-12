@@ -13,8 +13,8 @@ import { constants } from "node:fs";
 import { join, relative, isAbsolute } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { heartbeatRuns, pipelines } from "@orch/shared/db";
-import { and, inArray } from "drizzle-orm";
+import { heartbeatRuns, pipelines, pipelineTestRuns } from "@orch/shared/db";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { withExclusiveRepositoryCheckout } from "../../services/repository-checkout-gate.js";
 import { runRepositoryTests } from "../../services/repository-tests.js";
 
@@ -100,16 +100,36 @@ async function rootTestScript(homeDir: string): Promise<{ script: string | null;
 }
 
 export async function projectRoutes(app: FastifyInstance) {
+  app.get("/api/projects/:id/test-runs/latest", async (request: FastifyRequest<{ Params: { id: string }; Querystring: { pipelineId?: string } }>, reply: FastifyReply) => {
+    if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
+    const projectId = await resolveProjectParam(app, request.params.id, reply);
+    if (!projectId) return reply;
+    if (!requireProjectScope(request, reply, projectId)) return reply;
+    const parsed = z.object({ pipelineId: z.string().min(1) }).strict().safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ error: "validation_error" });
+    const [workflow] = await app.db.select({ id: pipelines.id }).from(pipelines).where(and(eq(pipelines.id, parsed.data.pipelineId), eq(pipelines.projectId, projectId))).limit(1);
+    if (!workflow) return reply.code(404).send({ error: "not_found" });
+    const [record] = await app.db.select().from(pipelineTestRuns).where(and(eq(pipelineTestRuns.pipelineId, workflow.id), eq(pipelineTestRuns.projectId, projectId)))
+      .orderBy(desc(pipelineTestRuns.createdAt), desc(pipelineTestRuns.id)).limit(1);
+    return { run: record ? { id: record.id, projectId: record.projectId, pipelineId: record.pipelineId,
+      repository: record.repository, triggeredBy: record.triggeredBy, createdAt: record.createdAt, ...record.result } : null };
+  });
   app.post("/api/projects/:id/run-tests", async (request: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply: FastifyReply) => {
     // Executing repository code is an operator action, never an agent capability.
     if (!request.isAdmin) return reply.code(403).send({ error: "forbidden", message: "Admin only" });
     const projectId = await resolveProjectParam(app, request.params.id, reply);
     if (!projectId) return reply;
     if (!requireProjectScope(request, reply, projectId)) return reply;
-    if (!request.body || typeof request.body !== "object" || Array.isArray(request.body) || Object.keys(request.body).length)
+    const parsed = z.union([z.object({}).strict(), z.object({ pipelineId: z.string().min(1) }).strict()]).safeParse(request.body);
+    if (!parsed.success)
       return reply.code(400).send({ error: "validation_error", message: "This action accepts no command or arguments." });
     const project = await app.projectService.getById(projectId);
     if (!project) return reply.code(404).send({ error: "not_found" });
+    const pipelineId = "pipelineId" in parsed.data ? parsed.data.pipelineId : undefined;
+    if (pipelineId) {
+      const [workflow] = await app.db.select({ id: pipelines.id }).from(pipelines).where(and(eq(pipelines.id, pipelineId), eq(pipelines.projectId, projectId))).limit(1);
+      if (!workflow) return reply.code(404).send({ error: "not_found" });
+    }
     try {
       return await withExclusiveRepositoryCheckout(app.db, project.id, async () => {
         const root = await realpath(project.homeDir);
@@ -125,7 +145,11 @@ export async function projectRoutes(app: FastifyInstance) {
         if (runs.some(run => ["queued", "running"].includes(run.status) ||
           app.heartbeatService.isRunActive(run.id) || app.heartbeatService.isProcessTracked(run.id)))
           return reply.code(409).send({ error: "repository_busy", message: "An agent run is queued or executing in this checkout." });
-        return runRepositoryTests(root);
+        const result = await runRepositoryTests(root);
+        if (!pipelineId) return result;
+        // Save the bounded process result before replying; a failed write must not masquerade as persisted evidence.
+        const [record] = await app.db.insert(pipelineTestRuns).values({ projectId, pipelineId, repository: root, result }).returning();
+        return { id: record.id, projectId, pipelineId, repository: root, triggeredBy: record.triggeredBy, createdAt: record.createdAt, ...result };
       });
     } catch (error) {
       const message = (error as Error).message;
