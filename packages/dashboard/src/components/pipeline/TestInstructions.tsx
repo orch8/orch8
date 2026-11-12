@@ -96,7 +96,7 @@ export function TestInstructions({ projectId }: { projectId: string }) {
         </div> : <p role="alert" className="text-amber-300">This repository declares {result.packageManager} as its package manager. Orch8 cannot suggest a safe copyable command for it. Inspect its documentation and run the test script in your terminal.</p>}
         {command && <div className="space-y-2 rounded border border-zinc-700 p-3">
           <button type="button" disabled={running} className="rounded border border-blue-600 px-3 py-2 text-blue-200 disabled:opacity-50" onClick={() => void runTests()}>Run test script in checkout</button>
-          <p>Runs the root test script with a 60-second timeout and 64 KB combined output limit. No lifecycle hooks. The result stays in this tab and does not affect pipeline approval or review.</p>
+          <p>Runs the root test script with a 60-second timeout and 64 KB combined output limit. No package-manager lifecycle hooks. A test can spawn detached children that survive the timeout. If it times out, inspect and stop those processes before another feature run. The result stays in this tab and does not affect pipeline approval or review.</p>
           {running && <p role="status">Running tests in the checkout...</p>}
           {runError && <p role="alert" className="text-amber-300">{runError}</p>}
           {localRun && <section aria-label="Local repository test run" className="space-y-2 rounded bg-zinc-900 p-3">
@@ -104,6 +104,7 @@ export function TestInstructions({ projectId }: { projectId: string }) {
             <p>Command: <code>{localRun.command.join(" ")}</code></p>
             <p>Script: <code className="break-all">{localRun.script}</code></p>
             <p className={localRun.exitCode === 0 && !localRun.timedOut ? "text-emerald-300" : "text-amber-300"}>Exit code: {localRun.exitCode ?? "none"}{localRun.signal ? `, signal: ${localRun.signal}` : ""}{localRun.timedOut ? " (timed out)" : ""}</p>
+            {localRun.timedOut && <p role="alert" className="text-amber-300">Timed out. Detached child processes may still be writing to this checkout. Inspect and stop them before starting another feature run.</p>}
             {localRun.outputTruncated && <p>Output truncated at 64 KB.</p>}
             <p>stdout</p><pre aria-label="Local test stdout" className="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-zinc-950 p-2 font-mono">{localRun.stdout}</pre>
             <p>stderr</p><pre aria-label="Local test stderr" className="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-zinc-950 p-2 font-mono">{localRun.stderr}</pre>

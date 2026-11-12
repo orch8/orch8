@@ -1,4 +1,4 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, isNotNull } from "drizzle-orm";
 import { heartbeatRuns, projects, agents, tasks } from "@orch/shared/db";
 import type { SchemaDb } from "../db/client.js";
 import type { HeartbeatService } from "./heartbeat.service.js";
@@ -105,8 +105,18 @@ export class SchedulerService {
     // 1. Timer-based wakeups
     await this.tickTimers();
 
-    // 2. Orphan detection
+    // 2. Orphan detection and deferred retries. An operator test can hold
+    // the checkout when a stale run is reaped; keep its retry queued until
+    // a later tick can acquire the repository writer reservation.
     await this.reapOrphanedRuns();
+    const pendingRetries = await this.db.selectDistinct({
+      agentId: heartbeatRuns.agentId, projectId: heartbeatRuns.projectId,
+    }).from(heartbeatRuns).where(and(
+      eq(heartbeatRuns.status, "queued"), isNotNull(heartbeatRuns.retryOfRunId),
+    ));
+    for (const retry of pendingRetries) {
+      await this.heartbeatService.startNextQueuedRunForAgent(retry.agentId, retry.projectId);
+    }
 
     // 3. Per-project maintenance
     const activeProjects = await this.db

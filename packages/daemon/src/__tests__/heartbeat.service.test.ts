@@ -6,6 +6,7 @@ import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { makeFailingTxDb } from "./helpers/failing-tx.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
+import { withExclusiveRepositoryCheckout } from "../services/repository-checkout-gate.js";
 
 describe("HeartbeatService", () => {
   let testDb: TestDb;
@@ -462,6 +463,31 @@ describe("HeartbeatService", () => {
   });
 
   describe("startNextQueuedRunForAgent", () => {
+    it("does not claim a scheduler retry during operator tests, and holds checkout until execution settles", async () => {
+      await testDb.db.insert(agents).values({ id: "eng-1", projectId, name: "Eng", role: "engineer" });
+      const [run] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1", projectId, invocationSource: "on_demand", status: "queued",
+      }).returning();
+      let releaseExecution!: () => void;
+      let executionStarted!: () => void;
+      const held = new Promise<void>(resolve => { releaseExecution = resolve; });
+      const started = new Promise<void>(resolve => { executionStarted = resolve; });
+      vi.spyOn(service, "executeRun").mockImplementation(async () => { executionStarted(); await held; });
+      try {
+        await withExclusiveRepositoryCheckout(testDb.db, projectId, async () => {
+          expect(await service.startNextQueuedRunForAgent("eng-1", projectId)).toEqual([]);
+          const [stillQueued] = await testDb.db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, run.id));
+          expect(stillQueued.status).toBe("queued");
+        });
+        expect(await service.startNextQueuedRunForAgent("eng-1", projectId)).toHaveLength(1);
+        await started;
+        await expect(withExclusiveRepositoryCheckout(testDb.db, projectId, async () => {}))
+          .rejects.toThrow(/Repository work is starting/);
+      } finally { releaseExecution(); }
+      await vi.waitFor(async () => {
+        await expect(withExclusiveRepositoryCheckout(testDb.db, projectId, async () => {})).resolves.toBeUndefined();
+      });
+    });
     it("promotes a queued run to running", async () => {
       await testDb.db.insert(agents).values({
         id: "eng-1", projectId, name: "Eng", role: "engineer",

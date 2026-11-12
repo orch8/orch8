@@ -5,6 +5,7 @@ import { setupTestDb, teardownTestDb, type TestDb } from "./helpers/test-db.js";
 import { SchedulerService } from "../services/scheduler.service.js";
 import { HeartbeatService } from "../services/heartbeat.service.js";
 import { BroadcastService } from "../services/broadcast.service.js";
+import { withExclusiveRepositoryCheckout } from "../services/repository-checkout-gate.js";
 
 describe("SchedulerService", () => {
   let testDb: TestDb;
@@ -43,6 +44,25 @@ describe("SchedulerService", () => {
   });
 
   describe("reapOrphanedRuns", () => {
+    it("starts a deferred orphan retry on the next tick after operator tests finish", async () => {
+      await testDb.db.insert(agents).values({ id: "eng-1", projectId, name: "Eng", role: "engineer" });
+      const [original] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1", projectId, invocationSource: "on_demand", status: "failed",
+      }).returning();
+      const [retry] = await testDb.db.insert(heartbeatRuns).values({
+        agentId: "eng-1", projectId, invocationSource: "on_demand", status: "queued", retryOfRunId: original.id,
+      }).returning();
+      const executed = vi.spyOn(heartbeatService, "executeRun").mockResolvedValue();
+      await withExclusiveRepositoryCheckout(testDb.db, projectId, async () => {
+        await scheduler.tick();
+        const [blocked] = await testDb.db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, retry.id));
+        expect(blocked.status).toBe("queued");
+      });
+      await scheduler.tick();
+      const [started] = await testDb.db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, retry.id));
+      expect(started.status).toBe("running");
+      expect(executed).toHaveBeenCalledWith(retry.id);
+    });
     it("fails a stale running run with no tracked process", async () => {
       await testDb.db.insert(agents).values({
         id: "eng-1", projectId, name: "Eng", role: "engineer",
