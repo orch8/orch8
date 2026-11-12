@@ -2,8 +2,22 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../api/client.js";
 
 type TestInstructionsResult = { repository: string; script: string | null; packageManager: string | null };
+type RevisionSnapshot = { branch: string | null; commit: string | null; workingTree: "clean" | "dirty" | "unavailable" };
 type LocalTestRun = { command: string[]; script: string; exitCode: number | null; signal: string | null;
-  timedOut: boolean; outputTruncated: boolean; stdout: string; stderr: string };
+  timedOut: boolean; outputTruncated: boolean; stdout: string; stderr: string;
+  revisionBefore: RevisionSnapshot; revisionAfter: RevisionSnapshot; checkoutChanged: boolean };
+
+function revisionLine(label: string, snapshot: RevisionSnapshot) {
+  return `${label}: branch ${snapshot.branch ?? "unavailable"}, commit ${snapshot.commit ?? "unavailable"}, working tree ${snapshot.workingTree}`;
+}
+function revisionWarning(run: LocalTestRun) {
+  if (run.checkoutChanged) return "Checkout changed during the test; result cannot be attributed unchanged to one revision.";
+  if (!run.revisionBefore.branch || !run.revisionBefore.commit || run.revisionBefore.workingTree === "unavailable" ||
+      !run.revisionAfter.branch || !run.revisionAfter.commit || run.revisionAfter.workingTree === "unavailable")
+    return "Revision information unavailable; this result cannot be attributed to a revision.";
+  if (run.revisionBefore.workingTree === "dirty") return "Working tree was dirty; unchanged checkout cannot be established and the result is not solely attributable to the recorded commit.";
+  return "Checkout snapshots match, but they cannot rule out changes made and reverted during the test.";
+}
 
 /** Explicit operator execution and separately supplied terminal results. */
 export function TestInstructions({ projectId }: { projectId: string }) {
@@ -34,7 +48,9 @@ export function TestInstructions({ projectId }: { projectId: string }) {
     downloadText([
       "Orch8 local repository test run (operator-triggered, not agent review or CI)",
       `Checkout path: ${result.repository}`,
-      "Branch and commit were not captured by this test run; verify the checkout before attributing this result to a revision.",
+      revisionLine("Before", localRun.revisionBefore),
+      revisionLine("After", localRun.revisionAfter),
+      revisionWarning(localRun),
       `Command: ${localRun.command.join(" ")}`,
       `Root test script at execution: ${localRun.script}`,
       `Exit code: ${localRun.exitCode ?? "none"}`,
@@ -121,6 +137,9 @@ export function TestInstructions({ projectId }: { projectId: string }) {
             <h3 className="font-semibold text-zinc-100">Local repository test run</h3>
             <p>Command: <code>{localRun.command.join(" ")}</code></p>
             <p>Script: <code className="break-all">{localRun.script}</code></p>
+            <p className="break-all">{revisionLine("Before", localRun.revisionBefore)}</p>
+            <p className="break-all">{revisionLine("After", localRun.revisionAfter)}</p>
+            <p role={localRun.checkoutChanged ? "alert" : undefined} className="text-amber-300">{revisionWarning(localRun)}</p>
             <p className={localRun.exitCode === 0 && !localRun.timedOut ? "text-emerald-300" : "text-amber-300"}>Exit code: {localRun.exitCode ?? "none"}{localRun.signal ? `, signal: ${localRun.signal}` : ""}{localRun.timedOut ? " (timed out)" : ""}</p>
             {localRun.timedOut && <p role="alert" className="text-amber-300">Timed out. Detached child processes may still be writing to this checkout. Inspect and stop them before starting another feature run.</p>}
             {localRun.outputTruncated && <p>Output truncated at 64 KB.</p>}

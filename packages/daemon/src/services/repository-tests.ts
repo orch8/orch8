@@ -1,13 +1,32 @@
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { mkdtemp, open, rm } from "node:fs/promises";
+import { mkdtemp, open, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_OUTPUT_BYTES = 64 * 1024;
 
 type RunOptions = { timeoutMs?: number; maxOutputBytes?: number };
+type RevisionSnapshot = { branch: string | null; commit: string | null; workingTree: "clean" | "dirty" | "unavailable" };
+const runGit = promisify(execFile);
+
+async function checkoutRevision(root: string): Promise<RevisionSnapshot> {
+  const unavailable: RevisionSnapshot = { branch: null, commit: null, workingTree: "unavailable" };
+  const git = async (...args: string[]) => (await runGit("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", ...args], {
+    cwd: root, timeout: 2000, maxBuffer: 1024 * 1024,
+  })).stdout.trim();
+  try {
+    // Don't attribute a nested, non-repository directory to an unrelated parent checkout.
+    if (await realpath(await git("rev-parse", "--show-toplevel")) !== await realpath(root)) return unavailable;
+  } catch { return unavailable; }
+  const branch = await git("rev-parse", "--abbrev-ref", "HEAD").then(value => value === "HEAD" ? "(detached)" : value).catch(() => null);
+  const commit = await git("rev-parse", "--verify", "HEAD").catch(() => null);
+  const workingTree = await git("status", "--porcelain", "--untracked-files=normal")
+    .then(value => value ? "dirty" as const : "clean" as const).catch(() => "unavailable" as const);
+  return { branch, commit, workingTree };
+}
 
 /** Executes only the root package.json test entry, never a command supplied by the request. */
 export async function runRepositoryTests(root: string, options: RunOptions = {}) {
@@ -32,7 +51,8 @@ export async function runRepositoryTests(root: string, options: RunOptions = {})
   const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_OUTPUT_BYTES;
   const scratch = await mkdtemp(join(tmpdir(), "orch8-test-home-"));
   try {
-    return await new Promise<{ command: string[]; script: string; exitCode: number | null; signal: string | null; timedOut: boolean; outputTruncated: boolean; stdout: string; stderr: string }>((resolve, reject) => {
+    const revisionBefore = await checkoutRevision(root);
+    const result = await new Promise<{ command: string[]; script: string; exitCode: number | null; signal: string | null; timedOut: boolean; outputTruncated: boolean; stdout: string; stderr: string }>((resolve, reject) => {
       // The package manager runs the declared script through its normal shell. No
       // request string enters the argv or shell; this is still untrusted code.
       const child = spawn(command[0], command.slice(1), {
@@ -74,5 +94,9 @@ export async function runRepositoryTests(root: string, options: RunOptions = {})
       child.on("error", error => { if (!settled) { settled = true; clearTimeout(timer); reject(error); } });
       child.on("close", finish);
     });
+    const revisionAfter = await checkoutRevision(root);
+    const checkoutChanged = revisionBefore.branch !== revisionAfter.branch || revisionBefore.commit !== revisionAfter.commit ||
+      revisionBefore.workingTree !== revisionAfter.workingTree;
+    return { ...result, revisionBefore, revisionAfter, checkoutChanged };
   } finally { await rm(scratch, { recursive: true, force: true }); }
 }

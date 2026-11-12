@@ -15,7 +15,9 @@ async function ready() {
 describe("operator-supplied repository test output", () => {
   it("runs only after clicking and renders command, exit status, stdout and stderr as local operator execution", async () => {
     post.mockResolvedValue({ command: ["npm", "run", "test", "--ignore-scripts"], script: "node --test test.mjs", exitCode: 1,
-      signal: null, timedOut: false, outputTruncated: false, stdout: "test failed", stderr: "assertion error" });
+      signal: null, timedOut: false, outputTruncated: false, stdout: "test failed", stderr: "assertion error",
+      revisionBefore: { branch: "feature", commit: "abc123", workingTree: "clean" },
+      revisionAfter: { branch: "feature", commit: "abc123", workingTree: "clean" }, checkoutChanged: false });
     await ready();
     expect(post).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Run test script in checkout" }));
@@ -26,11 +28,14 @@ describe("operator-supplied repository test output", () => {
     expect(screen.getByLabelText("Local test stdout")).toHaveTextContent("test failed");
     expect(screen.getByLabelText("Local test stderr")).toHaveTextContent("assertion error");
     expect(result).toHaveTextContent("not agent-reviewed or CI evidence");
+    expect(result).toHaveTextContent("snapshots match, but they cannot rule out changes made and reverted");
     expect(screen.getByRole("button", { name: "Download local test run" })).toBeEnabled();
   });
   it("downloads the exact local process output with a truthful scope and failure status", async () => {
     post.mockResolvedValue({ command: ["pnpm", "run", "test"], script: "node --test test.mjs", exitCode: 1,
-      signal: null, timedOut: false, outputTruncated: true, stdout: "failed assertion", stderr: "stack trace" });
+      signal: null, timedOut: false, outputTruncated: true, stdout: "failed assertion", stderr: "stack trace",
+      revisionBefore: { branch: "feature", commit: "abc123", workingTree: "clean" },
+      revisionAfter: { branch: "other", commit: "def456", workingTree: "dirty" }, checkoutChanged: true });
     const create = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:local-test");
     const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
@@ -42,13 +47,37 @@ describe("operator-supplied repository test output", () => {
       const blob = create.mock.calls[0][0] as Blob;
       const text = await new Response(blob).text();
       expect(text).toContain("operator-triggered, not agent review or CI");
-      expect(text).toContain("Branch and commit were not captured");
+      expect(text).toContain("Before: branch feature, commit abc123, working tree clean");
+      expect(text).toContain("After: branch other, commit def456, working tree dirty");
+      expect(text).toContain("Checkout changed during the test; result cannot be attributed unchanged to one revision.");
+      expect(screen.getByRole("region", { name: "Local repository test run" })).toHaveTextContent("Checkout changed during the test; result cannot be attributed unchanged to one revision.");
       expect(text).toContain("Checkout path: /tmp/my-repo");
       expect(text).toContain("Exit code: 1");
       expect(text).toContain("Output truncated: true");
       expect(text).toContain("stdout:\nfailed assertion\n\nstderr:\nstack trace");
       expect(click).toHaveBeenCalledOnce();
     } finally { create.mockRestore(); revoke.mockRestore(); click.mockRestore(); }
+  });
+  it("shows unavailable revision metadata without inventing attribution", async () => {
+    post.mockResolvedValue({ command: ["npm", "run", "test", "--ignore-scripts"], script: "node test.cjs", exitCode: 0,
+      signal: null, timedOut: false, outputTruncated: false, stdout: "ok", stderr: "",
+      revisionBefore: { branch: null, commit: null, workingTree: "unavailable" },
+      revisionAfter: { branch: null, commit: null, workingTree: "unavailable" }, checkoutChanged: false });
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Run test script in checkout" }));
+    const result = await screen.findByRole("region", { name: "Local repository test run" });
+    expect(result).toHaveTextContent("Before: branch unavailable, commit unavailable, working tree unavailable");
+    expect(result).toHaveTextContent("Revision information unavailable; this result cannot be attributed to a revision.");
+  });
+  it("does not treat matching dirty snapshots as proof of an unchanged checkout", async () => {
+    post.mockResolvedValue({ command: ["npm", "run", "test", "--ignore-scripts"], script: "node test.cjs", exitCode: 0,
+      signal: null, timedOut: false, outputTruncated: false, stdout: "ok", stderr: "",
+      revisionBefore: { branch: "feature", commit: "abc123", workingTree: "dirty" },
+      revisionAfter: { branch: "feature", commit: "abc123", workingTree: "dirty" }, checkoutChanged: false });
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Run test script in checkout" }));
+    const result = await screen.findByRole("region", { name: "Local repository test run" });
+    expect(result).toHaveTextContent("Working tree was dirty; unchanged checkout cannot be established and the result is not solely attributable to the recorded commit.");
   });
   it("shows a checkout-busy failure without claiming a test result", async () => {
     post.mockRejectedValue(new Error("repository_busy"));
