@@ -42,6 +42,13 @@ describe("feature intake", () => {
   expect(request.compareDocumentPosition(prSetup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(request.closest("form")).toBeNull();
   expect(prSetup.closest("form")).toBeNull();
+  const setup = screen.getByText(/Feature agent setup/);
+  const team = screen.getByLabelText("Feature agents");
+  const nextStep = screen.getByLabelText("Next feature step");
+  expect(request.compareDocumentPosition(setup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(setup.compareDocumentPosition(team) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(team.compareDocumentPosition(nextStep) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(document.body.innerHTML.indexOf('aria-label="Next feature step"')).toBeLessThan(document.body.innerHTML.indexOf('id="feature-runtime-check"'));
   fireEvent.change(request, { target: { value: "Add a visible usage note" } });
   expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
   expect(state.create).not.toHaveBeenCalled();

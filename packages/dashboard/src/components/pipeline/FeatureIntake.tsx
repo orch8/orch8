@@ -373,6 +373,26 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
           <p className="mt-2 text-xs text-zinc-400">Open for context without leaving your feature request.</p>
         </aside>
       </div>
+      {!isLoading && <details open={setupExpanded ?? available.length < 3} className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
+        <summary id="feature-agent-setup" className="cursor-pointer font-medium text-blue-200" onClick={event => {
+          event.preventDefault();
+          setSetupExpanded(!(setupExpanded ?? available.length < 3));
+        }}>Feature agent setup{available.length >= 3 ? " (optional)" : ""}</summary>
+        <p className="mt-3">Feature workflows need three eligible agents, with a separate reviewer. Set them up here instead of configuring each by hand.</p>
+        <label className="mt-2 block text-xs text-zinc-300" htmlFor="feature-agent-runtime">Feature agent runtime</label>
+        <select id="feature-agent-runtime" value={agentRuntime} onChange={event => { setAgentRuntime(event.target.value as "codex_local" | "claude_local"); setSetupExpanded(true); }} className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100">
+          <option value="codex_local">Codex (workspace-write sandbox)</option>
+          <option value="claude_local">Claude Code (existing permissions)</option>
+        </select>
+        <p className="mt-1 text-xs text-zinc-400">Creates missing agents without running them or changing existing agents. Codex keeps workspace-write and approval bypass off. Claude uses default permission mode; headless runs cannot grant new permissions. Check the runtime before preparing a branch, then approve the plan.</p>
+        {agentRuntime === "codex_local" && <>
+          <label className="mt-2 block text-xs text-zinc-300" htmlFor="feature-codex-model">Codex model for new agents</label>
+          <input id="feature-codex-model" value={codexModel} onChange={event => setCodexModel(event.target.value)} placeholder="Model available to your Codex account" className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
+          <p className="mt-1 text-xs text-zinc-400">Use a model supported by your Codex account. Existing agents keep their model; change it in Agents if needed. The runtime check may report a host sandbox failure before it can check model access.</p>
+        </>}
+        <button type="button" onClick={() => { void setupAgents(); }} disabled={settingUpAgents || !project?.id || (agentRuntime === "codex_local" && !codexModel.trim())} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:opacity-40">{settingUpAgents ? "Setting up agents..." : "Set up feature agents"}</button>
+        {setupError && <p role="alert" className="mt-2 text-red-300">{setupError}</p>}
+      </details>}
       <div className="grid gap-3 sm:grid-cols-3" aria-label="Feature agents">
         {([ ["Plan agent", planner, setPlanner], ["Implement agent", implementer, setImplementer], ["Review agent", reviewer, setReviewer] ] as const).map(([label, value, setter]) =>
           <label key={label} className="text-sm text-zinc-300">{label}
@@ -386,6 +406,19 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
         {canUsePreferred && <button type="button" onClick={() => selectTeam(preferred)} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use Codex feature agents</button>}
         {canUseClaude && <button type="button" onClick={() => selectTeam(preferredClaude)} className="rounded border border-blue-500 px-3 py-2 text-sm text-blue-200">Use Claude feature agents</button>}
       </div>}
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-blue-800 bg-blue-950/40 p-3 text-sm" aria-label="Next feature step">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-blue-300">Next step</p>
+        <p className="mt-1 text-zinc-100">{nextStep.label}</p>
+        {failedSelectionKey === selectionKey && <p className="mt-1 text-xs text-amber-300">The runtime check failed. Read the result below before retrying.</p>}
+      </div>
+      <button type="button" onClick={goToNextStep} className="rounded border border-blue-500 px-3 py-2 text-blue-200">Go to step</button>
+    </div>
+    <div className="mt-2 flex items-center gap-3 text-xs text-zinc-400">
+      <span>Feature request and agent choices are saved in this browser for this project until you start a plan or clear them. Runtime approval is never saved.</span>
+      {(feature || branchName || planner || implementer || reviewer || filePaths.length > 0) && <button type="button" onClick={clearDraft} className="shrink-0 text-blue-300 underline">Clear draft</button>}
+    </div>
+
       {feature.trim() && <details className="rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Manual feature handoff">
         <summary className="cursor-pointer text-blue-200">Copy request for manual use (optional)</summary>
         <p className="mt-2 text-xs text-zinc-400">This does not prepare a branch, check agents, or start a workflow.</p>
@@ -429,19 +462,6 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
                 : <p className="mt-1 break-all">Origin and push destination match {repositoryOrigin.configuredRepository}. Publishing still requires push access, a clean feature commit, and an accepted review.</p>}
       </div>
     </details>
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-blue-800 bg-blue-950/40 p-3 text-sm" aria-label="Next feature step">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-blue-300">Next step</p>
-        <p className="mt-1 text-zinc-100">{nextStep.label}</p>
-        {failedSelectionKey === selectionKey && <p className="mt-1 text-xs text-amber-300">The runtime check failed. Read the result below before retrying.</p>}
-      </div>
-      <button type="button" onClick={goToNextStep} className="rounded border border-blue-500 px-3 py-2 text-blue-200">Go to step</button>
-    </div>
-    <div className="mt-2 flex items-center gap-3 text-xs text-zinc-400">
-      <span>Feature request and agent choices are saved in this browser for this project until you start a plan or clear them. Runtime approval is never saved.</span>
-      {(feature || branchName || planner || implementer || reviewer || filePaths.length > 0) && <button type="button" onClick={clearDraft} className="shrink-0 text-blue-300 underline">Clear draft</button>}
-    </div>
-
     <details className="mt-2 text-xs text-zinc-500">
       <summary className="cursor-pointer">Current runtime limits</summary>
       <div className="mt-2 space-y-1 pl-3">
@@ -459,26 +479,6 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
         <ul className="mt-2 space-y-1">{filePaths.map(path => <li key={path} className="flex items-center gap-2"><span className="min-w-0 break-all font-mono text-xs">{path}</span><button type="button" aria-label={`Remove ${path}`} onClick={() => setFilePaths(current => current.filter(value => value !== path))} className="shrink-0 text-blue-300 underline">Remove</button></li>)}</ul>
       </div>}
 
-      {!isLoading && <details open={setupExpanded ?? available.length < 3} className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
-        <summary id="feature-agent-setup" className="cursor-pointer font-medium text-blue-200" onClick={event => {
-          event.preventDefault();
-          setSetupExpanded(!(setupExpanded ?? available.length < 3));
-        }}>Feature agent setup{available.length >= 3 ? " (optional)" : ""}</summary>
-        <p className="mt-3">Feature workflows need three eligible agents, with a separate reviewer. Set them up here instead of configuring each by hand.</p>
-        <label className="mt-2 block text-xs text-zinc-300" htmlFor="feature-agent-runtime">Feature agent runtime</label>
-        <select id="feature-agent-runtime" value={agentRuntime} onChange={event => { setAgentRuntime(event.target.value as "codex_local" | "claude_local"); setSetupExpanded(true); }} className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100">
-          <option value="codex_local">Codex (workspace-write sandbox)</option>
-          <option value="claude_local">Claude Code (existing permissions)</option>
-        </select>
-        <p className="mt-1 text-xs text-zinc-400">Creates missing agents without running them or changing existing agents. Codex keeps workspace-write and approval bypass off. Claude uses default permission mode; headless runs cannot grant new permissions. Check the runtime before preparing a branch, then approve the plan.</p>
-        {agentRuntime === "codex_local" && <>
-          <label className="mt-2 block text-xs text-zinc-300" htmlFor="feature-codex-model">Codex model for new agents</label>
-          <input id="feature-codex-model" value={codexModel} onChange={event => setCodexModel(event.target.value)} placeholder="Model available to your Codex account" className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
-          <p className="mt-1 text-xs text-zinc-400">Use a model supported by your Codex account. Existing agents keep their model; change it in Agents if needed. The runtime check may report a host sandbox failure before it can check model access.</p>
-        </>}
-        <button type="button" onClick={() => { void setupAgents(); }} disabled={settingUpAgents || !project?.id || (agentRuntime === "codex_local" && !codexModel.trim())} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:opacity-40">{settingUpAgents ? "Setting up agents..." : "Set up feature agents"}</button>
-        {setupError && <p role="alert" className="mt-2 text-red-300">{setupError}</p>}
-      </details>}
       {!isLoading && !available.length && <p role="status" className="text-sm text-amber-300">No eligible feature agents yet. Set up feature agents above or configure active agents in Agents.</p>}
       {reviewer && implementer && reviewer === implementer && <p role="alert" className="text-sm text-amber-300">Choose a different agent for independent review.</p>}
       <button id="feature-runtime-check" type="button" onClick={() => { void checkRuntime(); }} disabled={!validSelection || checking} className="rounded border border-zinc-600 px-4 py-2 text-sm text-zinc-200 disabled:opacity-40">{checking ? "Checking agents..." : "Check agent runtime"}</button>
