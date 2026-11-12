@@ -107,6 +107,17 @@ describe("ClaudeLocalAdapter", () => {
     expect(result.message).toMatch(/re-authenticate/i);
   });
 
+  it("explains a real Claude CLI not-logged-in result instead of showing the exit code", async () => {
+    const spawnFn = vi.fn(() => createMockProcess([
+      JSON.stringify({ type: "result", is_error: true, result: "Not logged in · Please run /login", session_id: "probe" }),
+    ], 1) as unknown as ReturnType<SpawnFn>);
+    const adapter = new ClaudeLocalAdapter(testDb.db, spawnFn as unknown as SpawnFn);
+    const result = await adapter.testEnvironment({ cwd: tempRoot, dangerouslySkipPermissions: false });
+    expect(result).toMatchObject({ ok: false, errorCode: "auth_required" });
+    expect(result.message).toMatch(/claude auth login/i);
+    expect(result.message).not.toMatch(/process exited/i);
+  });
+
   it("does not call a generic authentication failure an expired token", async () => {
     const spawnFn = vi.fn(() => createMockProcess([
       JSON.stringify({ type: "result", is_error: true, result: "Failed to authenticate. Check your account settings." }),
