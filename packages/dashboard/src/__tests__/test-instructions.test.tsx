@@ -26,6 +26,29 @@ describe("operator-supplied repository test output", () => {
     expect(screen.getByLabelText("Local test stdout")).toHaveTextContent("test failed");
     expect(screen.getByLabelText("Local test stderr")).toHaveTextContent("assertion error");
     expect(result).toHaveTextContent("not agent-reviewed or CI evidence");
+    expect(screen.getByRole("button", { name: "Download local test run" })).toBeEnabled();
+  });
+  it("downloads the exact local process output with a truthful scope and failure status", async () => {
+    post.mockResolvedValue({ command: ["pnpm", "run", "test"], script: "node --test test.mjs", exitCode: 1,
+      signal: null, timedOut: false, outputTruncated: true, stdout: "failed assertion", stderr: "stack trace" });
+    const create = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:local-test");
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    try {
+      await ready();
+      fireEvent.click(screen.getByRole("button", { name: "Run test script in checkout" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Download local test run" }));
+      expect(create).toHaveBeenCalledOnce();
+      const blob = create.mock.calls[0][0] as Blob;
+      const text = await new Response(blob).text();
+      expect(text).toContain("operator-triggered, not agent review or CI");
+      expect(text).toContain("Branch and commit were not captured");
+      expect(text).toContain("Checkout path: /tmp/my-repo");
+      expect(text).toContain("Exit code: 1");
+      expect(text).toContain("Output truncated: true");
+      expect(text).toContain("stdout:\nfailed assertion\n\nstderr:\nstack trace");
+      expect(click).toHaveBeenCalledOnce();
+    } finally { create.mockRestore(); revoke.mockRestore(); click.mockRestore(); }
   });
   it("shows a checkout-busy failure without claiming a test result", async () => {
     post.mockRejectedValue(new Error("repository_busy"));
