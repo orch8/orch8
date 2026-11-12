@@ -14,6 +14,9 @@ vi.mock("../hooks/usePipelines.js", () => ({
 vi.mock("../components/pipeline/RepositoryChanges.js", () => ({
   RepositoryChanges: ({ projectId }: { projectId: string }) => <section aria-label="Repository changes">Changes for {projectId}</section>,
 }));
+vi.mock("../components/pipeline/TestInstructions.js", () => ({
+  TestInstructions: ({ projectId }: { projectId: string }) => <section aria-label="Repository test runner">Tests for {projectId}</section>,
+}));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => options,
   Link: ({ to, params, children, ...props }: { to: string; params?: { projectSlug: string; pipelineId?: string }; children: React.ReactNode }) =>
@@ -87,6 +90,21 @@ describe("repository chooser", () => {
     expect(await screen.findByRole("region", { name: "Repository changes" })).toHaveTextContent("Changes for 1");
     fireEvent.click(screen.getByRole("button", { name: /Demo \/tmp\/demo/ }));
     expect(screen.queryByRole("region", { name: "Repository changes" })).not.toBeInTheDocument();
+  });
+
+  it("runs tests only for the selected checkout after the operator opens its test panel", async () => {
+    useProjects.mockReturnValue({ data: [
+      { id: "1", name: "Factory", slug: "factory", homeDir: "/tmp/factory", active: true },
+      { id: "2", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true },
+    ], isLoading: false, isError: false });
+    renderWithProviders(<Chooser />);
+    expect(screen.queryByRole("region", { name: "Repository test runner" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Run repository tests"));
+    expect(await screen.findByRole("region", { name: "Repository test runner" })).toHaveTextContent("Tests for 1");
+    fireEvent.click(screen.getByRole("button", { name: /Demo \/tmp\/demo/ }));
+    expect(screen.queryByRole("region", { name: "Repository test runner" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Run repository tests"));
+    expect(await screen.findByRole("region", { name: "Repository test runner" })).toHaveTextContent("Tests for 2");
   });
 
   it("selects one checkout and searches names and paths without showing other workflow details", () => {
