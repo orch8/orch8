@@ -2,9 +2,72 @@ import { describe, expect, it } from "vitest";
 import { mkdtemp, rm, writeFile, symlink, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { runRepositoryTests } from "../services/repository-tests.js";
 
+function git(root: string, ...args: string[]) {
+  return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+}
+
 describe("explicit repository test execution", () => {
+  it("captures branch, HEAD and working tree on both sides of a real git test run", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orch8-run-tests-"));
+    try {
+      git(root, "init", "-q", "-b", "test-branch");
+      await writeFile(join(root, "package.json"), JSON.stringify({ scripts: { test: "node test.cjs" } }));
+      await writeFile(join(root, "test.cjs"), "require('node:fs').writeFileSync('generated.txt', 'written');");
+      git(root, "add", ".");
+      git(root, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "initial");
+      const commit = git(root, "rev-parse", "HEAD");
+      const result = await runRepositoryTests(root);
+      expect(result.exitCode).toBe(0);
+      expect(result.revisionBefore).toEqual({ branch: "test-branch", commit, workingTree: "clean" });
+      expect(result.revisionAfter).toEqual({ branch: "test-branch", commit, workingTree: "dirty" });
+      expect(result.checkoutChanged).toBe(true);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+  it("keeps a clean unchanged revision when the script does not write", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orch8-run-tests-"));
+    try {
+      git(root, "init", "-q", "-b", "stable");
+      await writeFile(join(root, "package.json"), JSON.stringify({ scripts: { test: "node test.cjs" } }));
+      await writeFile(join(root, "test.cjs"), "process.stdout.write('ok');");
+      git(root, "add", ".");
+      git(root, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "initial");
+      const result = await runRepositoryTests(root);
+      expect(result.exitCode).toBe(0);
+      expect(result.revisionBefore).toEqual({ branch: "stable", commit: git(root, "rev-parse", "HEAD"), workingTree: "clean" });
+      expect(result.revisionAfter).toEqual(result.revisionBefore);
+      expect(result.checkoutChanged).toBe(false);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+  it("flags a commit change during execution even if the tree ends clean", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orch8-run-tests-"));
+    try {
+      git(root, "init", "-q", "-b", "test-branch");
+      await writeFile(join(root, "package.json"), JSON.stringify({ scripts: { test: "node test.cjs" } }));
+      await writeFile(join(root, "test.cjs"), "require('node:child_process').execFileSync('git', ['-c','user.name=Test','-c','user.email=test@example.com','commit','--allow-empty','-qm','next']);");
+      git(root, "add", ".");
+      git(root, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "initial");
+      const before = git(root, "rev-parse", "HEAD");
+      const result = await runRepositoryTests(root);
+      expect(result.exitCode).toBe(0);
+      expect(result.revisionBefore.commit).toBe(before);
+      expect(result.revisionAfter.commit).toBe(git(root, "rev-parse", "HEAD"));
+      expect(result.revisionAfter.commit).not.toBe(before);
+      expect(result.checkoutChanged).toBe(true);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+  it("reports unavailable git metadata outside a repository instead of borrowing a parent checkout", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orch8-run-tests-"));
+    try {
+      await writeFile(join(root, "package.json"), JSON.stringify({ scripts: { test: "node -e \"process.stdout.write('ok')\"" } }));
+      const result = await runRepositoryTests(root);
+      expect(result.revisionBefore).toEqual({ branch: null, commit: null, workingTree: "unavailable" });
+      expect(result.revisionAfter).toEqual(result.revisionBefore);
+      expect(result.checkoutChanged).toBe(false);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
   it("runs the declared npm test and returns the real exit status and separate output", async () => {
     const root = await mkdtemp(join(tmpdir(), "orch8-run-tests-"));
     try {
