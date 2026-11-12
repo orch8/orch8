@@ -23,7 +23,7 @@ vi.mock("../hooks/usePipelines.js", () => ({
   usePlanAttempts: () => ({ data: [], isLoading: false, isError: false }),
   usePipelineDiff: () => ({ data: state.diff, isLoading: false, isError: state.diffError, refetch: vi.fn() }),
   usePipelineStepOutput: () => ({ data: null, isLoading: false, isError: false, refetch: vi.fn() }),
-  useCancelPipeline: () => ({ isPending: false, mutateAsync: apiMock.cancel }),
+  useCancelPipeline: () => ({ isPending: false, isError: false, mutate: apiMock.cancel, mutateAsync: apiMock.cancel }),
   useRetryPipeline: () => ({ isPending: false }),
   useRejectPipelineStep: () => ({ isPending: false }),
   useApprovePipelineStep: () => ({ isPending: false }),
@@ -59,6 +59,22 @@ beforeEach(() => {
 });
 
 describe("feature progress summary", () => {
+  it("requires confirmation to cancel a failed workflow while preserving its inspectable history", () => {
+    state.status = "failed";
+    state.steps[0] = step("Plan", 1, "failed");
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    try {
+      renderWithProviders(<PipelineDetail pipelineId="pipe_1" />);
+      expect(screen.getByText(/keep its record in History/)).toBeInTheDocument();
+      const cancel = screen.getByRole("button", { name: "Cancel failed workflow" });
+      fireEvent.click(cancel);
+      expect(apiMock.cancel).not.toHaveBeenCalled();
+      fireEvent.click(cancel);
+      expect(confirm).toHaveBeenCalledTimes(2);
+      expect(apiMock.cancel).toHaveBeenCalledWith("pipe_1");
+    } finally { confirm.mockRestore(); }
+  });
+
   it("reveals the complete saved feature request when the workflow title is truncated", () => {
     const request = "Add a Usage section to README.md. Preserve existing content and check the actual diff before reporting completion.";
     state.steps[1] = step("Implement", 2, "pending", {

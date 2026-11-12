@@ -789,14 +789,17 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
       </div>
 
       {/* Actions */}
+      {pipeline.status === "failed" && <p className="mb-2 text-xs text-zinc-400">Done with this attempt? Cancel it to keep its record in History and unlock a new feature after returning to a clean base branch. You cannot retry a cancelled workflow.</p>}
       <div className="flex gap-2">
-        {(pipeline.status === "pending" || pipeline.status === "running") && (
+        {(pipeline.status === "pending" || pipeline.status === "running" || pipeline.status === "failed") && (
           <button
-            onClick={() => cancelMutation.mutate(pipeline.id)}
+            onClick={() => {
+              if (pipeline.status !== "failed" || window.confirm("Cancel this failed workflow? Its record stays in History, but it cannot be retried.")) cancelMutation.mutate(pipeline.id);
+            }}
             disabled={cancelMutation.isPending}
             className="rounded border border-zinc-700 px-3 py-1 text-xs text-zinc-400 hover:bg-zinc-800"
           >
-            Cancel
+            {pipeline.status === "failed" ? "Cancel failed workflow" : "Cancel"}
           </button>
         )}
         {pipeline.status === "failed" && (
@@ -809,6 +812,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
           </button>
         )}
       </div>
+      {cancelMutation.isError && <p role="alert" className="mt-2 text-xs text-red-300">Could not cancel the workflow. Refresh and inspect its status before starting another feature.</p>}
     </div>
   );
 }
