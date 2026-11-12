@@ -7,6 +7,7 @@ import { usePipeline, usePipelines } from "../hooks/usePipelines.js";
 import type { Pipeline, Project } from "../types.js";
 import { SandboxRecoveryGuidance } from "../components/pipeline/SandboxRecoveryGuidance.js";
 import { RepositoryChanges } from "../components/pipeline/RepositoryChanges.js";
+import { TestInstructions } from "../components/pipeline/TestInstructions.js";
 
 function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline: Pipeline }) {
   const { data: detail, isError: detailError } = usePipeline(pipeline.id, true);
@@ -39,6 +40,7 @@ function RepositoryCard({ project }: { project: Project }) {
   const [checkingCodex, setCheckingCodex] = useState(false);
   const [codexResult, setCodexResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [inspectingChanges, setInspectingChanges] = useState(false);
+  const [inspectingTests, setInspectingTests] = useState(false);
   // FeatureIntake reads drafts by project id; the URL slug is only for navigation.
   const draftKey = `orch8:feature-draft:${project.id}`;
   const [request, setRequest] = useState(() => {
@@ -171,6 +173,10 @@ function RepositoryCard({ project }: { project: Project }) {
     <details className="mt-3 border-t border-zinc-700 pt-3" onToggle={event => setInspectingChanges(event.currentTarget.open)}>
       <summary className="cursor-pointer text-sm font-medium text-blue-300">Inspect checkout diff and PR</summary>
       {inspectingChanges && <div className="mt-3"><RepositoryChanges projectId={project.id} /></div>}
+    </details>
+    <details className="mt-3 border-t border-zinc-700 pt-3" onToggle={event => setInspectingTests(event.currentTarget.open)}>
+      <summary className="cursor-pointer text-sm font-medium text-blue-300">Run repository tests</summary>
+      {inspectingTests && <div className="mt-3"><TestInstructions projectId={project.id} /></div>}
     </details>
     <section className="mt-3 border-t border-zinc-700 pt-3 text-sm" aria-label={`Runtime readiness for ${project.name}`}>
       <h2 className="font-medium text-zinc-200">Check your agent runtime</h2>
