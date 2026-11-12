@@ -249,8 +249,8 @@ export class ClaudeLocalAdapter implements AgentAdapter {
           ok: false,
           costUsd: result.costUsd,
           errorCode: expired || notLoggedIn || authFailed ? "auth_required" : result.errorCode ?? "process_error",
-          message: expired ? "Claude authentication expired. Re-authenticate with claude login in your terminal, then retry the runtime check."
-            : notLoggedIn ? "Claude is not logged in. Run claude login in your terminal, then retry the runtime check."
+          message: expired ? "Claude authentication expired. Re-authenticate with claude auth login in your terminal, then retry the runtime check."
+            : notLoggedIn ? "Claude is not logged in. Run claude auth login in your terminal, then retry the runtime check."
             : authFailed ? "Claude authentication failed. Check the Claude CLI sign-in and retry the runtime check."
             : (result.error ?? response.slice(0, 400)) || "Claude environment test failed",
           sessionId: result.sessionId ?? undefined,

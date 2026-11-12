@@ -114,7 +114,7 @@ describe("ClaudeLocalAdapter", () => {
     const adapter = new ClaudeLocalAdapter(testDb.db, spawnFn as unknown as SpawnFn);
     const result = await adapter.testEnvironment({ cwd: tempRoot, dangerouslySkipPermissions: false });
     expect(result).toMatchObject({ ok: false, errorCode: "auth_required" });
-    expect(result.message).toMatch(/claude login/i);
+    expect(result.message).toMatch(/claude auth login/i);
     expect(result.message).not.toMatch(/process exited/i);
   });
 
