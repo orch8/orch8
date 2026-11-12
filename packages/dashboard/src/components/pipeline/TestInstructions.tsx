@@ -19,6 +19,31 @@ export function TestInstructions({ projectId }: { projectId: string }) {
   const [runError, setRunError] = useState("");
   const maxOutputBytes = 128 * 1024;
   const selection = useRef(0);
+  function downloadText(content: string, filename: string) {
+    const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function downloadLocalRun() {
+    if (!localRun || !result) return;
+    downloadText([
+      "Orch8 local repository test run (operator-triggered, not agent review or CI)",
+      `Checkout path: ${result.repository}`,
+      "Branch and commit were not captured by this test run; verify the checkout before attributing this result to a revision.",
+      `Command: ${localRun.command.join(" ")}`,
+      `Root test script at execution: ${localRun.script}`,
+      `Exit code: ${localRun.exitCode ?? "none"}`,
+      `Signal: ${localRun.signal ?? "none"}`,
+      `Timed out: ${localRun.timedOut}`,
+      `Output truncated: ${localRun.outputTruncated}`,
+      "", "stdout:", localRun.stdout, "", "stderr:", localRun.stderr,
+    ].join("\n"), "orch8-local-test-run.txt");
+  }
   function downloadResult() {
     if (!recorded) return;
     const content = [
@@ -31,14 +56,7 @@ export function TestInstructions({ projectId }: { projectId: string }) {
       "Operator-supplied raw test output:",
       recorded.output,
     ].join("\n");
-    const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "orch8-operator-test-result.txt";
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadText(content, "orch8-operator-test-result.txt");
   }
   async function readOutput(file: File) {
     const selected = ++selection.current;
@@ -108,7 +126,8 @@ export function TestInstructions({ projectId }: { projectId: string }) {
             {localRun.outputTruncated && <p>Output truncated at 64 KB.</p>}
             <p>stdout</p><pre aria-label="Local test stdout" className="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-zinc-950 p-2 font-mono">{localRun.stdout}</pre>
             <p>stderr</p><pre aria-label="Local test stderr" className="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-zinc-950 p-2 font-mono">{localRun.stderr}</pre>
-            <p>This is local operator execution, not agent-reviewed or CI evidence. Output may contain secrets; it is not saved by Orch8.</p>
+            <p>This is local operator execution, not agent-reviewed or CI evidence. Output may contain secrets; it is not saved by Orch8. Download it before leaving this page if you need to keep it.</p>
+            <button type="button" onClick={downloadLocalRun} className="rounded border border-blue-600 px-3 py-2 text-blue-200">Download local test run</button>
           </section>}
         </div>}
         <p>{command ? "The command runs the test script even with package-manager lifecycle hooks disabled. " : ""}If you run it in your terminal, read the exit status and output there; the form below is only for your own reference.</p>
