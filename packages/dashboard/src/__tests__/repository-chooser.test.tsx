@@ -11,6 +11,9 @@ vi.mock("../hooks/usePipelines.js", () => ({
   usePipelines: () => usePipelines(),
   usePipeline: () => ({ data: undefined, isError: false }),
 }));
+vi.mock("../components/pipeline/RepositoryChanges.js", () => ({
+  RepositoryChanges: ({ projectId }: { projectId: string }) => <section aria-label="Repository changes">Changes for {projectId}</section>,
+}));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => options,
   Link: ({ to, params, children, ...props }: { to: string; params?: { projectSlug: string; pipelineId?: string }; children: React.ReactNode }) =>
@@ -70,6 +73,20 @@ describe("repository chooser", () => {
     expect(screen.getByRole("link", { name: /Demo/ })).toHaveAttribute("href", "/projects/demo/pipelines");
     expect(screen.queryByRole("link", { name: /Archived/ })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add repository" })).toHaveAttribute("href", "/projects/new");
+  });
+
+  it("inspects selected checkout changes only when opened and resets on selection", async () => {
+    useProjects.mockReturnValue({ data: [
+      { id: "1", name: "Factory", slug: "factory", homeDir: "/tmp/factory", active: true },
+      { id: "2", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true },
+    ], isLoading: false, isError: false });
+    renderWithProviders(<Chooser />);
+    expect(screen.queryByRole("region", { name: "Repository changes" })).not.toBeInTheDocument();
+    const summary = screen.getByText("Inspect checkout diff and PR");
+    fireEvent.click(summary);
+    expect(await screen.findByRole("region", { name: "Repository changes" })).toHaveTextContent("Changes for 1");
+    fireEvent.click(screen.getByRole("button", { name: /Demo \/tmp\/demo/ }));
+    expect(screen.queryByRole("region", { name: "Repository changes" })).not.toBeInTheDocument();
   });
 
   it("selects one checkout and searches names and paths without showing other workflow details", () => {

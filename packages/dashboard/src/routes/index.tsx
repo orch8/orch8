@@ -6,6 +6,7 @@ import { useProjects } from "../hooks/useProjects.js";
 import { usePipeline, usePipelines } from "../hooks/usePipelines.js";
 import type { Pipeline, Project } from "../types.js";
 import { SandboxRecoveryGuidance } from "../components/pipeline/SandboxRecoveryGuidance.js";
+import { RepositoryChanges } from "../components/pipeline/RepositoryChanges.js";
 
 function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline: Pipeline }) {
   const { data: detail, isError: detailError } = usePipeline(pipeline.id, true);
@@ -37,6 +38,7 @@ function RepositoryCard({ project }: { project: Project }) {
   const [claudeResult, setClaudeResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [checkingCodex, setCheckingCodex] = useState(false);
   const [codexResult, setCodexResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [inspectingChanges, setInspectingChanges] = useState(false);
   // FeatureIntake reads drafts by project id; the URL slug is only for navigation.
   const draftKey = `orch8:feature-draft:${project.id}`;
   const [request, setRequest] = useState(() => {
@@ -166,6 +168,10 @@ function RepositoryCard({ project }: { project: Project }) {
       <p className="mt-1">Only a clean, idle checkout can switch branches. This does not reset or delete feature work.</p>
     </div>}
     {returnError && <p role="alert" className="mt-2 text-xs text-amber-300">{returnError}</p>}
+    <details className="mt-3 border-t border-zinc-700 pt-3" onToggle={event => setInspectingChanges(event.currentTarget.open)}>
+      <summary className="cursor-pointer text-sm font-medium text-blue-300">Inspect checkout diff and PR</summary>
+      {inspectingChanges && <div className="mt-3"><RepositoryChanges projectId={project.id} /></div>}
+    </details>
     <section className="mt-3 border-t border-zinc-700 pt-3 text-sm" aria-label={`Runtime readiness for ${project.name}`}>
       <h2 className="font-medium text-zinc-200">Check your agent runtime</h2>
       <p className="mt-1 text-xs text-zinc-400">Check before starting a workflow or preparing a branch. These checks do not start a workflow or approve the selected agents.</p>
