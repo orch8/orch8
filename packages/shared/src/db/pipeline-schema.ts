@@ -73,3 +73,20 @@ export const pipelineSteps = pgTable("pipeline_steps", {
   uniqueIndex("pipeline_steps_pipeline_order_idx").on(table.pipelineId, table.order),
   index("pipeline_steps_task_id_idx").on(table.taskId),
 ]);
+
+// Operator-triggered repository execution; separate from agent runs and review.
+export const pipelineTestRuns = pgTable("pipeline_test_runs", {
+  id: text("id").primaryKey().$defaultFn(() => `ptest_${randomUUID()}`),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  pipelineId: text("pipeline_id").notNull().references(() => pipelines.id, { onDelete: "cascade" }),
+  repository: text("repository").notNull(),
+  triggeredBy: text("triggered_by").notNull().default("operator"),
+  result: jsonb("result").notNull().$type<{
+    command: string[]; script: string; exitCode: number | null; signal: string | null;
+    timedOut: boolean; outputTruncated: boolean; stdout: string; stderr: string;
+    revisionBefore: { branch: string | null; commit: string | null; workingTree: "clean" | "dirty" | "unavailable" };
+    revisionAfter: { branch: string | null; commit: string | null; workingTree: "clean" | "dirty" | "unavailable" };
+    checkoutChanged: boolean;
+  }>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [index("pipeline_test_runs_latest_idx").on(table.pipelineId, table.createdAt)]);

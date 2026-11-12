@@ -5,7 +5,8 @@ type TestInstructionsResult = { repository: string; script: string | null; packa
 type RevisionSnapshot = { branch: string | null; commit: string | null; workingTree: "clean" | "dirty" | "unavailable" };
 type LocalTestRun = { command: string[]; script: string; exitCode: number | null; signal: string | null;
   timedOut: boolean; outputTruncated: boolean; stdout: string; stderr: string;
-  revisionBefore: RevisionSnapshot; revisionAfter: RevisionSnapshot; checkoutChanged: boolean };
+  revisionBefore: RevisionSnapshot; revisionAfter: RevisionSnapshot; checkoutChanged: boolean;
+  id?: string; pipelineId?: string; projectId?: string; repository?: string; triggeredBy?: string; createdAt?: string };
 
 function revisionLine(label: string, snapshot: RevisionSnapshot) {
   return `${label}: branch ${snapshot.branch ?? "unavailable"}, commit ${snapshot.commit ?? "unavailable"}, working tree ${snapshot.workingTree}`;
@@ -20,7 +21,7 @@ function revisionWarning(run: LocalTestRun) {
 }
 
 /** Explicit operator execution and separately supplied terminal results. */
-export function TestInstructions({ projectId }: { projectId: string }) {
+export function TestInstructions({ projectId, pipelineId }: { projectId: string; pipelineId?: string }) {
   const [result, setResult] = useState<TestInstructionsResult | null>(null);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -31,6 +32,8 @@ export function TestInstructions({ projectId }: { projectId: string }) {
   const [localRun, setLocalRun] = useState<LocalTestRun | null>(null);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState("");
+  const [historyError, setHistoryError] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(!!pipelineId);
   const maxOutputBytes = 128 * 1024;
   const selection = useRef(0);
   function downloadText(content: string, filename: string) {
@@ -44,10 +47,11 @@ export function TestInstructions({ projectId }: { projectId: string }) {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   function downloadLocalRun() {
-    if (!localRun || !result) return;
+    if (!localRun || (!result && !localRun.repository)) return;
     downloadText([
       "Orch8 local repository test run (operator-triggered, not agent review or CI)",
-      `Checkout path: ${result.repository}`,
+      `Checkout path: ${localRun.repository ?? result?.repository}`,
+      ...(localRun.pipelineId ? [`Workflow: ${localRun.pipelineId}`, `Run: ${localRun.id}`, `Recorded: ${localRun.createdAt}`] : []),
       revisionLine("Before", localRun.revisionBefore),
       revisionLine("After", localRun.revisionAfter),
       revisionWarning(localRun),
@@ -100,23 +104,37 @@ export function TestInstructions({ projectId }: { projectId: string }) {
       .catch(() => { if (active) setError(true); });
     return () => { active = false; };
   }, [projectId]);
+  useEffect(() => {
+    if (!pipelineId) return;
+    let active = true;
+    setLocalRun(null);
+    setHistoryError(false);
+    setHistoryLoading(true);
+    api.get<{ run: LocalTestRun | null }>(`/projects/${encodeURIComponent(projectId)}/test-runs/latest?pipelineId=${encodeURIComponent(pipelineId)}`)
+      .then(value => { if (active) setLocalRun(value.run); })
+      .catch(() => { if (active) setHistoryError(true); })
+      .finally(() => { if (active) setHistoryLoading(false); });
+    return () => { active = false; };
+  }, [projectId, pipelineId]);
   const manager = result?.packageManager?.split("@")[0];
   const command = manager === "pnpm" ? "pnpm --config.enable-pre-post-scripts=false run test"
     : manager === "npm" || !result?.packageManager ? "npm run test --ignore-scripts" : null;
   async function runTests() {
     if (running) return;
     setRunning(true);
-    setLocalRun(null);
     setRunError("");
-    try { setLocalRun(await api.post<LocalTestRun>(`/projects/${encodeURIComponent(projectId)}/run-tests`, {})); }
+    try { setLocalRun(await api.post<LocalTestRun>(`/projects/${encodeURIComponent(projectId)}/run-tests`, pipelineId ? { pipelineId } : {})); }
     catch { setRunError("Could not run tests. The checkout may be busy, the package manager may be unavailable, or the test script may have changed. Retry after checking the repository."); }
     finally { setRunning(false); }
   }
   return <section aria-label="Run repository tests yourself" className="space-y-3 rounded border border-zinc-700 bg-zinc-950/60 p-4 text-xs text-zinc-300">
-    <h2 className="text-sm font-semibold text-zinc-100">Run repository tests yourself</h2>
+    <h2 className="text-sm font-semibold text-zinc-100">{pipelineId ? "Operator repository test evidence" : "Run repository tests yourself"}</h2>
     <p>Inspect the script before running it. Clicking Run executes repository code as the daemon user, with access to the daemon&apos;s files and network. Only run trusted checkouts. You can also run it in your own terminal. Neither result is agent review or CI.</p>
     {!result && !error && <p role="status">Inspecting root package.json...</p>}
     {error && <p role="alert" className="text-amber-300">Could not inspect the test script. Refresh the page to retry.</p>}
+    {pipelineId && historyLoading && <p role="status">Loading saved workflow test run...</p>}
+    {pipelineId && historyError && <p role="alert" className="text-amber-300">Could not load saved test evidence. Refresh to retry.</p>}
+    {pipelineId && !historyLoading && !historyError && !localRun && <p>No operator test run recorded for this workflow yet.</p>}
     {result && <>
       <p>Checkout: <code className="break-all text-zinc-100">{result.repository}</code></p>
       {result.script ? <>
@@ -129,12 +147,14 @@ export function TestInstructions({ projectId }: { projectId: string }) {
           {copied && <span role="status">Copied. Open your terminal in the checkout before pasting.</span>}
         </div> : <p role="alert" className="text-amber-300">This repository declares {result.packageManager} as its package manager. Orch8 cannot suggest a safe copyable command for it. Inspect its documentation and run the test script in your terminal.</p>}
         {command && <div className="space-y-2 rounded border border-zinc-700 p-3">
-          <button type="button" disabled={running} className="rounded border border-blue-600 px-3 py-2 text-blue-200 disabled:opacity-50" onClick={() => void runTests()}>Run test script in checkout</button>
-          <p>Runs the root test script with a 60-second timeout and 64 KB combined output limit. No package-manager lifecycle hooks. A test can spawn detached children that survive the timeout. If it times out, inspect and stop those processes before another feature run. The result stays in this tab and does not affect pipeline approval or review.</p>
+          <button type="button" disabled={running || historyLoading} className="rounded border border-blue-600 px-3 py-2 text-blue-200 disabled:opacity-50" onClick={() => void runTests()}>Run test script in checkout</button>
+          <p>Runs the root test script with a 60-second timeout and 64 KB combined output limit. No package-manager lifecycle hooks. A test can spawn detached children that survive the timeout. If it times out, inspect and stop those processes before another feature run. {pipelineId ? "The result is saved for this workflow, but does not affect pipeline approval or review. Runs are blocked while a pipeline or agent is active in this checkout." : "The result stays in this tab and does not affect pipeline approval or review."}</p>
           {running && <p role="status">Running tests in the checkout...</p>}
           {runError && <p role="alert" className="text-amber-300">{runError}</p>}
           {localRun && <section aria-label="Local repository test run" className="space-y-2 rounded bg-zinc-900 p-3">
             <h3 className="font-semibold text-zinc-100">Local repository test run</h3>
+            {localRun.pipelineId && <p>Saved for workflow <code>{localRun.pipelineId}</code> in project <code>{localRun.projectId}</code>. Triggered by {localRun.triggeredBy}; recorded {localRun.createdAt}. Run <code>{localRun.id}</code>.</p>}
+            {localRun.repository && <p>Checkout at execution: <code className="break-all">{localRun.repository}</code></p>}
             <p>Command: <code>{localRun.command.join(" ")}</code></p>
             <p>Script: <code className="break-all">{localRun.script}</code></p>
             <p className="break-all">{revisionLine("Before", localRun.revisionBefore)}</p>
@@ -145,7 +165,7 @@ export function TestInstructions({ projectId }: { projectId: string }) {
             {localRun.outputTruncated && <p>Output truncated at 64 KB.</p>}
             <p>stdout</p><pre aria-label="Local test stdout" className="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-zinc-950 p-2 font-mono">{localRun.stdout}</pre>
             <p>stderr</p><pre aria-label="Local test stderr" className="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-zinc-950 p-2 font-mono">{localRun.stderr}</pre>
-            <p>This is local operator execution, not agent-reviewed or CI evidence. Output may contain secrets; it is not saved by Orch8. Download it before leaving this page if you need to keep it.</p>
+            <p>This is local operator execution, not agent-reviewed or CI evidence. Output may contain secrets; {localRun.id ? "Orch8 stores this bounded output for the workflow. Only run trusted scripts and inspect output before sharing it." : "it is not saved by Orch8. Download it before leaving this page if you need to keep it."}</p>
             <button type="button" onClick={downloadLocalRun} className="rounded border border-blue-600 px-3 py-2 text-blue-200">Download local test run</button>
           </section>}
         </div>}

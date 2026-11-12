@@ -12,6 +12,7 @@ import {
   usePipelineStepOutput,
 } from "../../hooks/usePipelines.js";
 import { DownloadEvidence } from "./DownloadEvidence.js";
+import { TestInstructions } from "./TestInstructions.js";
 import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
 import { LogSearch } from "./LogSearch.js";
 import { PipelineStepper } from "./PipelineStepper.js";
@@ -541,6 +542,8 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
       {steps[0]?.label.toLowerCase() === "plan" && implement && review &&
         <DownloadEvidence key={pipeline.id} pipelineId={pipeline.id} />}
       <PipelineStepper steps={steps} currentStep={pipeline.currentStep} />
+      {steps[0]?.label.toLowerCase() === "plan" && implement && review &&
+        <TestInstructions key={`${pipeline.projectId}:${pipeline.id}`} projectId={pipeline.projectId} pipelineId={pipeline.id} />}
 
       <section id="repository-changes" aria-label="Repository changes" className="scroll-mt-6 rounded border border-zinc-800 p-3 space-y-2">
         <div className="flex items-center justify-between gap-3">
@@ -548,7 +551,7 @@ export function PipelineDetail({ pipelineId, projectId }: PipelineDetailProps) {
           <button type="button" onClick={() => { void refreshDiff(); }} className="text-xs text-blue-300 underline">Refresh diff</button>
         </div>
         <p className="text-xs text-zinc-400">
-          Live snapshot of committed branch changes and staged/unstaged edits. Untracked file names are listed, but their contents are not shown; submodule changes are excluded. This is not a per-step diff. Test results are available only in run logs, not verified by this view.
+          Live snapshot of committed branch changes and staged/unstaged edits. Untracked file names are listed, but their contents are not shown; submodule changes are excluded. This is not a per-step diff. Operator repository tests appear separately from agent run logs and review above.
         </p>
         {diffLoading && <p className="text-xs text-zinc-500">Loading repository diff...</p>}
         {diffError && <p role="alert" className="text-xs text-amber-300">Could not load repository diff. Try refreshing.</p>}

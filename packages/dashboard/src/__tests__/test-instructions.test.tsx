@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { TestInstructions } from "../components/pipeline/TestInstructions.js";
 
 const get = vi.hoisted(() => vi.fn());
 const post = vi.hoisted(() => vi.fn());
 vi.mock("../api/client.js", () => ({ api: { get, post } }));
+beforeEach(() => { get.mockReset(); post.mockReset(); });
 
 async function ready() {
   get.mockResolvedValue({ repository: "/tmp/my-repo", script: "node --test test.mjs", packageManager: "pnpm@9.15.0" });
@@ -13,6 +14,29 @@ async function ready() {
 }
 
 describe("operator-supplied repository test output", () => {
+  it("reloads the selected workflow's latest stored output and replaces it after an explicit run", async () => {
+    const previous = { id: "ptest_old", projectId: "project-1", pipelineId: "pipe_1", repository: "/tmp/my-repo", triggeredBy: "operator", createdAt: "2026-11-12T12:00:00Z",
+      command: ["npm", "run", "test"], script: "node test.cjs", exitCode: 1, signal: null,
+      timedOut: false, outputTruncated: false, stdout: "old failure", stderr: "old trace",
+      revisionBefore: { branch: "feature", commit: "abc", workingTree: "clean" },
+      revisionAfter: { branch: "feature", commit: "abc", workingTree: "clean" }, checkoutChanged: false };
+    get.mockImplementation((url: string) => url.includes("test-runs/latest") ? Promise.resolve({ run: previous }) :
+      Promise.resolve({ repository: "/tmp/my-repo", script: "node test.cjs", packageManager: "npm@10" }));
+    post.mockResolvedValue({ ...previous, id: "ptest_new", stdout: "new actual output", exitCode: 0 });
+    const view = render(<TestInstructions projectId="project-1" pipelineId="pipe_1" />);
+    const evidence = await screen.findByRole("region", { name: "Local repository test run" });
+    expect(within(evidence).getByLabelText("Local test stdout")).toHaveTextContent("old failure");
+    expect(evidence).toHaveTextContent("pipe_1");
+    expect(evidence).toHaveTextContent("operator");
+    expect(post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Run test script in checkout" }));
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/projects/project-1/run-tests", { pipelineId: "pipe_1" }));
+    expect(await screen.findByLabelText("Local test stdout")).toHaveTextContent("new actual output");
+    view.unmount();
+    render(<TestInstructions projectId="project-1" pipelineId="pipe_1" />);
+    expect(await screen.findByLabelText("Local test stdout")).toHaveTextContent("old failure");
+    expect(get).toHaveBeenCalledWith("/projects/project-1/test-runs/latest?pipelineId=pipe_1");
+  });
   it("runs only after clicking and renders command, exit status, stdout and stderr as local operator execution", async () => {
     post.mockResolvedValue({ command: ["npm", "run", "test", "--ignore-scripts"], script: "node --test test.mjs", exitCode: 1,
       signal: null, timedOut: false, outputTruncated: false, stdout: "test failed", stderr: "assertion error",
