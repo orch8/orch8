@@ -66,12 +66,9 @@ function RepositoryWork({ project, pipelines, isError }: { project: Project; pip
   </li>;
 }
 
-function RepositoryActivity({ projects }: { projects: Project[] }) {
-  const results = useQueries({ queries: projects.map(project => ({
-    queryKey: ["pipelines", project.id],
-    queryFn: () => api.get<Pipeline[]>("/pipelines", { projectId: project.id }),
-    refetchInterval: 10000,
-  })) });
+type RepositoryActivityResult = { data?: Pipeline[]; isLoading: boolean; isError: boolean };
+
+function RepositoryActivity({ projects, results }: { projects: Project[]; results: RepositoryActivityResult[] }) {
   const anyActivity = results.some(result => result.isError || result.data?.some(pipeline => ["pending", "running", "failed", "cancelled"].includes(pipeline.status)));
   return <>
     {results.some(result => result.isLoading) && <p role="status" className="mt-2 text-xs text-zinc-400">Checking feature work...</p>}
@@ -266,6 +263,12 @@ function RepositoryChooser() {
     try { return localStorage.getItem("orch8:selected-repository"); } catch { return null; }
   });
   const active = projects?.filter(project => project.active) ?? [];
+  const activityResults = useQueries({ queries: active.map(project => ({
+    queryKey: ["pipelines", project.id],
+    queryFn: () => api.get<Pipeline[]>("/pipelines", { projectId: project.id }),
+    refetchInterval: 10000,
+  })) });
+  const needsAttention = activityResults.some(result => result.isError || result.data?.some(pipeline => ["pending", "running", "failed"].includes(pipeline.status)));
   const matching = active.filter(project =>
     `${project.name} ${project.homeDir}`.toLowerCase().includes(search.trim().toLowerCase()),
   );
@@ -283,18 +286,14 @@ function RepositoryChooser() {
     {isError && <div role="alert" className="rounded border border-amber-700 p-4 text-amber-200">Could not load repositories. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></div>}
     {!isLoading && !isError && active.length === 0 && <p className="rounded border border-zinc-700 p-5 text-zinc-300">No active repositories yet. Add a local checkout to start a feature.</p>}
     {active.length > 0 && <>
-      <section className="rounded border border-zinc-700 bg-zinc-900/50 p-4" aria-label="Feature work across repositories">
-        <h2 className="font-medium text-zinc-100">Continue feature work across repositories</h2>
-        <p className="mt-2 text-xs text-zinc-400">Plans and reviews waiting for a decision stay visible here even when another repository is selected or the search below excludes them.</p>
-        <RepositoryActivity projects={active} />
-      </section>
+      {needsAttention && <a href="#feature-work-across-repositories" className="rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200 underline">Feature work needs attention in a repository. Review plans, runs, or errors below.</a>}
       <div>
         <label htmlFor="repository-search" className="block text-sm font-medium text-zinc-200">Find a repository</label>
         <input id="repository-search" type="search" value={search} onChange={event => setSearch(event.target.value)}
           placeholder="Search name or checkout path" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
       </div>
       {matching.length === 0 ? <p role="status" className="text-sm text-zinc-400">No repositories match your search.</p> : <>
-        <div className="grid min-w-0 items-start gap-4 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]" aria-label="Repository selection and feature entry">
+        <div key="selection" className="grid min-w-0 items-start gap-4 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]" aria-label="Repository selection and feature entry">
           <ul className="grid min-w-0 max-h-32 grid-cols-[minmax(0,1fr)] gap-2 overflow-y-auto overflow-x-hidden pr-1 sm:sticky sm:top-4 sm:max-h-[calc(100vh-15rem)]" aria-label="Available repositories">
             {matching.map(project => <li key={project.id} className="min-w-0">
               <button type="button" onClick={() => {
@@ -310,6 +309,11 @@ function RepositoryChooser() {
           <ul className="min-w-0" aria-label="Selected repository details"><RepositoryCard key={selected.id} project={selected} /></ul>
         </div>
       </>}
+      <section id="feature-work-across-repositories" className="rounded border border-zinc-700 bg-zinc-900/50 p-4" aria-label="Feature work across repositories">
+        <h2 className="font-medium text-zinc-100">Continue feature work across repositories</h2>
+        <p className="mt-2 text-xs text-zinc-400">Plans and reviews waiting for a decision stay visible here even when another repository is selected or the search excludes them.</p>
+        <RepositoryActivity projects={active} results={activityResults} />
+      </section>
     </>}
   </div>;
 }
