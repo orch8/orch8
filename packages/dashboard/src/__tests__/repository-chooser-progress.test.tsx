@@ -292,21 +292,36 @@ describe("repository chooser progress", () => {
     ["changed", { available: true, prLookup: "found", pullRequest: { number: 99 }, branch: "feat/b", commit: "abc", approvedRevision: { branch: "feat/a", commit: "abc" } }, "Checkout differs from this review. Inspect the workflow before publishing or attributing a PR."],
     ["unavailable", { available: true, prLookup: "unavailable", branch: "feat/a", commit: "abc", approvedRevision: { branch: "feat/a", commit: "abc" } }, "PR status unavailable. Inspect the workflow and check GitHub."],
     ["legacy", { available: true, prLookup: "none", branch: "feat/a", commit: "abc", approvedRevision: null }, "Checkout differs from this review. Inspect the workflow before publishing or attributing a PR."],
-  ])("gives an honest next step for the latest completed run when PR is %s", (_case, diff, message) => {
+  ])("gives an honest next step for the latest completed run when PR is %s", async (_case, diff, message) => {
+    get.mockResolvedValue({ ready: false, branch: diff.branch, baseBranch: "main" });
     usePipelines.mockReturnValue({ data: [{ ...pipeline("done", "completed", "2026-11-08T01:00:00Z"), updatedAt: "2026-11-08T01:00:00Z" }], isError: false });
     usePipelineDiff.mockReturnValue({ data: diff, isLoading: false, isError: false });
     renderWithProviders(<RepositoryChooser />);
-    expect(screen.getByText(message)).toBeInTheDocument();
+    expect(await screen.findByText(message)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Inspect done" })).toHaveAttribute("href", "/projects/my-repo/pipelines/done");
     if (_case === "found") expect(screen.getByRole("link", { name: "Open PR #42" })).toHaveAttribute("href", "https://github.com/example/repo/pull/42");
     else expect(screen.queryByRole("link", { name: /Open PR #/ })).not.toBeInTheDocument();
   });
 
-  it("does not recommend publishing when checkout has uncommitted edits", () => {
+  it("removes a stale reviewed PR link immediately after returning to base", async () => {
+    get.mockResolvedValue({ ready: false, branch: "feat/a", baseBranch: "main" });
+    post.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
+    usePipelines.mockReturnValue({ data: [{ ...pipeline("done", "completed", "2026-11-08T01:00:00Z"), updatedAt: "2026-11-08T01:00:00Z" }], isError: false });
+    usePipelineDiff.mockReturnValue({ data: { available: true, prLookup: "found", pullRequest: { number: 42, url: "https://github.com/example/repo/pull/42" }, branch: "feat/a", commit: "abc", approvedRevision: { branch: "feat/a", commit: "abc" } }, isLoading: false, isError: false });
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    expect(await screen.findByRole("link", { name: "Open PR #42" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Return to main" }));
+    expect(await screen.findByText("Checkout clean on base · main")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open PR #42" })).not.toBeInTheDocument();
+    expect(screen.getByText("Checkout differs from this review. Inspect the workflow before publishing or attributing a PR.")).toBeInTheDocument();
+  });
+
+  it("does not recommend publishing when checkout has uncommitted edits", async () => {
+    get.mockResolvedValue({ ready: false, branch: "feat/a", baseBranch: "main" });
     usePipelines.mockReturnValue({ data: [{ ...pipeline("done", "completed", "2026-11-08T01:00:00Z"), updatedAt: "2026-11-08T01:00:00Z" }], isError: false });
     usePipelineDiff.mockReturnValue({ data: { available: true, prLookup: "none", branch: "feat/a", commit: "abc", approvedRevision: { branch: "feat/a", commit: "abc" }, committedDiff: "diff", workingDiff: "edit" }, isLoading: false, isError: false });
     renderWithProviders(<RepositoryChooser />);
-    expect(screen.getByText("No PR found for this reviewed revision. Inspect changes and publication requirements.")).toBeInTheDocument();
+    expect(await screen.findByText("No PR found for this reviewed revision. Inspect changes and publication requirements.")).toBeInTheDocument();
   });
 
   it("shows implementation rework instead of a prior rejected review", () => {
