@@ -96,10 +96,11 @@ describe("repository chooser progress", () => {
     renderWithProviders(<RepositoryChooser />);
     const card = within(screen.getByRole("list", { name: "Selected repository details" })).getAllByRole("listitem")[0];
     const current = within(card).getByRole("region", { name: "Unfinished workflow for My repo" });
+    fireEvent.click(screen.getByText("Repository tools: checkout diff, manual tests, and runtime diagnostics"));
     const readiness = within(card).getByRole("region", { name: "Runtime readiness for My repo" });
     const form = within(card).getByRole("region", { name: "New feature for My repo" });
     const repositoryLink = within(card).getByRole("link", { name: /My repo.*Open feature workflows/ });
-    expect(current.compareDocumentPosition(repositoryLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(repositoryLink.compareDocumentPosition(current) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(current.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(form.compareDocumentPosition(readiness) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(current).getByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/my-repo/pipelines/plan-1#workflow-step-plan-step");
@@ -111,7 +112,7 @@ describe("repository chooser progress", () => {
     const card = within(screen.getByRole("list", { name: "Selected repository details" })).getAllByRole("listitem")[0];
     const form = within(card).getByRole("region", { name: "New feature for My repo" });
     const repositoryLink = within(card).getByRole("link", { name: /My repo.*Open feature workflows/ });
-    expect(form.compareDocumentPosition(repositoryLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(repositoryLink.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(form).getByRole("textbox", { name: "Describe a new feature for My repo" })).toHaveValue("Add usage instructions");
     expect(await within(form).findByRole("link", { name: "Continue to plan setup" })).toHaveAttribute("href", "/projects/my-repo/pipelines#new-feature");
     expect(screen.getByText("Checkout clean on base · main")).toBeInTheDocument();
@@ -184,6 +185,7 @@ describe("repository chooser progress", () => {
   it("checks the real Codex sandbox without a model run or changing the checkout", async () => {
     post.mockResolvedValue({ ok: false, message: "Codex sandbox cannot run commands: bubblewrap could not initialize its network namespace (Failed RTM_NEWADDR: Operation not permitted)" });
     const { user } = renderWithProviders(<RepositoryChooser />);
+    fireEvent.click(screen.getByText("Repository tools: checkout diff, manual tests, and runtime diagnostics"));
     const readiness = within(screen.getByRole("region", { name: "Runtime readiness for My repo" }));
     expect(readiness.getByRole("button", { name: "Check Codex sandbox (free)" })).toBeVisible();
     await user.click(readiness.getByRole("button", { name: "Check Codex sandbox (free)" }));
@@ -198,6 +200,7 @@ describe("repository chooser progress", () => {
   it("checks Claude in the selected checkout without preparing a branch or approving runtime", async () => {
     post.mockResolvedValue({ ok: false, message: "Claude authentication expired. Re-authenticate with the Claude CLI before retrying the runtime check." });
     const { user } = renderWithProviders(<RepositoryChooser />);
+    fireEvent.click(screen.getByText("Repository tools: checkout diff, manual tests, and runtime diagnostics"));
     const readiness = within(screen.getByRole("region", { name: "Runtime readiness for My repo" }));
     expect(readiness.getByRole("button", { name: "Check Claude in this repository (may cost)" })).toBeVisible();
     await user.click(readiness.getByRole("button", { name: "Check Claude in this repository (may cost)" }));
