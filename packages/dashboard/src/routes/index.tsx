@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type MouseEvent } from "react";
 import { api } from "../api/client.js";
 import { useProjects } from "../hooks/useProjects.js";
-import { usePipeline, usePipelines } from "../hooks/usePipelines.js";
+import { usePipeline, usePipelineDiff, usePipelines } from "../hooks/usePipelines.js";
 import type { Pipeline, Project } from "../types.js";
 import { SandboxRecoveryGuidance } from "../components/pipeline/SandboxRecoveryGuidance.js";
 import { RepositoryChanges } from "../components/pipeline/RepositoryChanges.js";
@@ -28,6 +28,22 @@ function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline:
       <a href={`${workflowUrl}#workflow-step-${encodeURIComponent(step.id)}`} className="ml-3 inline-block rounded border border-amber-700 px-2 py-1 text-amber-200 hover:bg-amber-950/50">
         {step.status === "awaiting_verification" ? `Review ${step.label.toLowerCase()} now` : `Inspect failed ${step.label.toLowerCase()}`}
       </a>}
+  </li>;
+}
+
+function LatestCompletedWorkflow({ project, pipeline }: { project: Project; pipeline: Pipeline }) {
+  const { data: diff, isLoading, isError } = usePipelineDiff(pipeline.id);
+  const sameRevision = !!diff?.approvedRevision && diff.approvedRevision.branch === diff.branch && diff.approvedRevision.commit === diff.commit;
+  const status = isLoading ? "Checking PR and checkout..."
+    : isError || !diff?.available ? "Checkout status unavailable. Inspect the workflow."
+    : !sameRevision ? "Checkout differs from this review. Inspect the workflow before publishing or attributing a PR."
+    : diff.prLookup === "found" && diff.pullRequest ? `PR #${diff.pullRequest.number} for this reviewed revision. Inspect its diff and checks.`
+    : diff.prLookup === "none" ? "No PR found for this reviewed revision. Inspect changes and publication requirements."
+    : "PR status unavailable. Inspect the workflow and check GitHub.";
+  return <li className="text-sm">
+    <p className="mb-1 text-zinc-300">{status}</p>
+    <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className="text-blue-300 underline">Inspect {pipeline.name}</Link>
+    {sameRevision && diff?.prLookup === "found" && diff.pullRequest && <a href={diff.pullRequest.url} target="_blank" rel="noopener noreferrer" className="ml-3 text-blue-300 underline">Open PR #{diff.pullRequest.number}</a>}
   </li>;
 }
 
@@ -201,9 +217,9 @@ function RepositoryCard({ project }: { project: Project }) {
       <p className="text-zinc-300">Completed work: inspect PR status</p>
       <p className="mt-1 text-xs text-zinc-400">A completed workflow may or may not have a PR. Its diff reflects the current checkout; verify the branch before publishing.</p>
       <ul className="mt-2 space-y-2" aria-label={`Completed workflows for ${project.name}`}>
-        {completed.map(pipeline => <li key={pipeline.id}>
-          <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className="text-blue-300 underline">Inspect {pipeline.name}</Link>
-        </li>)}
+        {completed.map((pipeline, index) => index === 0
+          ? <LatestCompletedWorkflow key={pipeline.id} project={project} pipeline={pipeline} />
+          : <li key={pipeline.id}><Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className="text-blue-300 underline">Inspect {pipeline.name}</Link></li>)}
       </ul>
     </div>}
   </li>;

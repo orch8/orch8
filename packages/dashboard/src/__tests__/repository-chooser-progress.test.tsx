@@ -2,12 +2,12 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithProviders, screen, waitFor, within } from "../test-utils.js";
 import { fireEvent } from "@testing-library/react";
 
-const { useProjects, usePipelines, usePipeline, get, post } = vi.hoisted(() => ({
-  useProjects: vi.fn(), usePipelines: vi.fn(), usePipeline: vi.fn(), get: vi.fn(), post: vi.fn(),
+const { useProjects, usePipelines, usePipeline, usePipelineDiff, get, post } = vi.hoisted(() => ({
+  useProjects: vi.fn(), usePipelines: vi.fn(), usePipeline: vi.fn(), usePipelineDiff: vi.fn(), get: vi.fn(), post: vi.fn(),
 }));
 vi.mock("../api/client.js", () => ({ api: { get, post } }));
 vi.mock("../hooks/useProjects.js", () => ({ useProjects }));
-vi.mock("../hooks/usePipelines.js", () => ({ usePipelines, usePipeline }));
+vi.mock("../hooks/usePipelines.js", () => ({ usePipelines, usePipeline, usePipelineDiff }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: unknown) => options,
   Link: ({ to, params, hash, children, ...props }: { to: string; params?: Record<string, string>; hash?: string; children: React.ReactNode }) =>
@@ -25,6 +25,7 @@ beforeEach(() => {
   useProjects.mockReturnValue({ data: [project], isLoading: false, isError: false });
   usePipelines.mockReturnValue({ data: [], isError: false });
   usePipeline.mockReturnValue({ data: undefined });
+  usePipelineDiff.mockReturnValue({ data: undefined, isLoading: true, isError: false });
   get.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
 });
 
@@ -282,6 +283,30 @@ describe("repository chooser progress", () => {
     expect(screen.getByText("Completed work: inspect PR status")).toBeInTheDocument();
     expect(screen.getByText(/verify the branch before publishing/)).toBeInTheDocument();
     expect(usePipeline).not.toHaveBeenCalled();
+    expect(usePipelineDiff).toHaveBeenCalledExactlyOnceWith("newer-done");
+  });
+
+  it.each([
+    ["found", { available: true, prLookup: "found", pullRequest: { number: 42, url: "https://github.com/example/repo/pull/42" }, branch: "feat/a", commit: "abc", approvedRevision: { branch: "feat/a", commit: "abc" } }, "PR #42 for this reviewed revision. Inspect its diff and checks."],
+    ["none", { available: true, prLookup: "none", branch: "feat/a", commit: "abc", approvedRevision: { branch: "feat/a", commit: "abc" } }, "No PR found for this reviewed revision. Inspect changes and publication requirements."],
+    ["changed", { available: true, prLookup: "found", pullRequest: { number: 99 }, branch: "feat/b", commit: "abc", approvedRevision: { branch: "feat/a", commit: "abc" } }, "Checkout differs from this review. Inspect the workflow before publishing or attributing a PR."],
+    ["unavailable", { available: true, prLookup: "unavailable", branch: "feat/a", commit: "abc", approvedRevision: { branch: "feat/a", commit: "abc" } }, "PR status unavailable. Inspect the workflow and check GitHub."],
+    ["legacy", { available: true, prLookup: "none", branch: "feat/a", commit: "abc", approvedRevision: null }, "Checkout differs from this review. Inspect the workflow before publishing or attributing a PR."],
+  ])("gives an honest next step for the latest completed run when PR is %s", (_case, diff, message) => {
+    usePipelines.mockReturnValue({ data: [{ ...pipeline("done", "completed", "2026-11-08T01:00:00Z"), updatedAt: "2026-11-08T01:00:00Z" }], isError: false });
+    usePipelineDiff.mockReturnValue({ data: diff, isLoading: false, isError: false });
+    renderWithProviders(<RepositoryChooser />);
+    expect(screen.getByText(message)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Inspect done" })).toHaveAttribute("href", "/projects/my-repo/pipelines/done");
+    if (_case === "found") expect(screen.getByRole("link", { name: "Open PR #42" })).toHaveAttribute("href", "https://github.com/example/repo/pull/42");
+    else expect(screen.queryByRole("link", { name: /Open PR #/ })).not.toBeInTheDocument();
+  });
+
+  it("does not recommend publishing when checkout has uncommitted edits", () => {
+    usePipelines.mockReturnValue({ data: [{ ...pipeline("done", "completed", "2026-11-08T01:00:00Z"), updatedAt: "2026-11-08T01:00:00Z" }], isError: false });
+    usePipelineDiff.mockReturnValue({ data: { available: true, prLookup: "none", branch: "feat/a", commit: "abc", approvedRevision: { branch: "feat/a", commit: "abc" }, committedDiff: "diff", workingDiff: "edit" }, isLoading: false, isError: false });
+    renderWithProviders(<RepositoryChooser />);
+    expect(screen.getByText("No PR found for this reviewed revision. Inspect changes and publication requirements.")).toBeInTheDocument();
   });
 
   it("shows implementation rework instead of a prior rejected review", () => {
