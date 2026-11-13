@@ -30,6 +30,35 @@ beforeEach(() => {
 });
 
 describe("repository chooser progress", () => {
+  it("opens a plan decision in another repository even when the repository search excludes it", async () => {
+    const other = { id: "proj-2", name: "Other repo", slug: "other-repo", homeDir: "/tmp/other-repo", active: true };
+    useProjects.mockReturnValue({ data: [project, other], isLoading: false, isError: false });
+    usePipelines.mockImplementation((id: string) => ({ data: id === other.id
+      ? [{ id: "other-plan", projectId: other.id, name: "Add login", status: "running", createdAt: "2026-11-13T00:00:00Z", updatedAt: "2026-11-13T00:00:00Z" }]
+      : [], isError: false }));
+    usePipeline.mockReturnValue({ data: { steps: [{ id: "plan-step", label: "Plan", status: "awaiting_verification" }] } });
+    get.mockImplementation((path: string, query?: { projectId: string }) => path === "/pipelines"
+      ? Promise.resolve(query?.projectId === other.id ? [{ id: "other-plan", projectId: other.id, name: "Add login", status: "running", createdAt: "2026-11-13T00:00:00Z", updatedAt: "2026-11-13T00:00:00Z" }] : [])
+      : Promise.resolve({ ready: true, branch: "main", baseBranch: "main" }));
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    await user.type(screen.getByRole("searchbox", { name: "Find a repository" }), "My repo");
+    await user.click(screen.getByText("Continue feature work across repositories"));
+    const activity = screen.getByRole("group", { name: "Feature work across repositories" });
+    expect(await within(activity).findByText("Other repo")).toBeVisible();
+    expect(within(activity).getByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/other-repo/pipelines/other-plan#workflow-step-plan-step");
+  });
+  it("keeps an older plan visible after recent cancelled attempts", async () => {
+    const attempts = ["cancel-a", "cancel-b", "cancel-c", "cancel-d"].map((id, index) => ({ id, projectId: project.id, name: id, status: "cancelled", updatedAt: `2026-11-13T04:00:0${index}Z` }));
+    get.mockImplementation((path: string) => Promise.resolve(path === "/pipelines"
+      ? [...attempts, { id: "pending-plan", projectId: project.id, name: "Build the feature", status: "running", updatedAt: "2026-11-12T00:00:00Z" }]
+      : { ready: true, branch: "main", baseBranch: "main" }));
+    usePipeline.mockReturnValue({ data: { steps: [{ id: "plan-step", label: "Plan", status: "awaiting_verification" }] } });
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    await user.click(screen.getByText("Continue feature work across repositories"));
+    const activity = screen.getByRole("group", { name: "Feature work across repositories" });
+    expect(await within(activity).findByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/my-repo/pipelines/pending-plan#workflow-step-plan-step");
+    expect(within(activity).getAllByText("Cancelled attempt:")).toHaveLength(3);
+  });
   it("carries a feature request into the selected repository without starting an agent", async () => {
     localStorage.setItem("orch8:feature-draft:my-repo", JSON.stringify({ feature: "Old request", planner: "feature-planner", branchName: "feat/old", filePaths: ["old.ts"] }));
     const { user } = renderWithProviders(<RepositoryChooser />);
