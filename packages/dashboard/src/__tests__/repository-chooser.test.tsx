@@ -6,7 +6,8 @@ const useProjects = vi.fn();
 const usePipelines = vi.fn(() => ({ data: [] as Array<{ id: string; name: string; status: string; createdAt: string; updatedAt: string }>, isError: false }));
 vi.mock("../hooks/useProjects.js", () => ({ useProjects: () => useProjects() }));
 const branchGet = vi.hoisted(() => vi.fn());
-vi.mock("../api/client.js", () => ({ api: { get: (path: string) => path === "/pipelines" ? Promise.resolve([]) : branchGet(path) } }));
+const pipelineGet = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+vi.mock("../api/client.js", () => ({ api: { get: (path: string, options?: { projectId?: string }) => path === "/pipelines" ? pipelineGet(options?.projectId) : branchGet(path) } }));
 vi.mock("../hooks/usePipelines.js", () => ({
   usePipelines: () => usePipelines(),
   usePipeline: () => ({ data: undefined, isError: false }),
@@ -28,6 +29,7 @@ beforeEach(() => {
   localStorage.clear();
   usePipelines.mockReset().mockReturnValue({ data: [], isError: false });
   branchGet.mockReset().mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
+  pipelineGet.mockReset().mockResolvedValue([]);
 });
 
 describe("repository chooser", () => {
@@ -156,6 +158,36 @@ describe("repository chooser", () => {
     expect(runtime.getElementsByTagName("button")).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Continue Current task" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Continue Older task" })).toBeVisible();
+  });
+
+  it("shows checkout readiness for each repository before selection", async () => {
+    useProjects.mockReturnValue({ data: [
+      { id: "ready", name: "Ready repo", slug: "ready", homeDir: "/tmp/ready", active: true },
+      { id: "blocked", name: "Blocked repo", slug: "blocked", homeDir: "/tmp/blocked", active: true },
+    ], isLoading: false, isError: false });
+    branchGet.mockImplementation((path: string) => Promise.resolve(path.includes("/blocked/")
+      ? { ready: false, branch: "feature/work", baseBranch: "main", reason: "Finish existing work" }
+      : { ready: true, branch: "main", baseBranch: "main" }));
+    renderWithProviders(<Chooser />);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Ready repo.*Checkout ready/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Blocked repo.*Checkout needs attention/ })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Blocked repo.*Checkout needs attention/ }));
+    expect(screen.getByRole("textbox", { name: "Describe a new feature for Blocked repo" })).toBeInTheDocument();
+    expect(await screen.findByText(/On feature\/work · Finish existing work/)).toBeInTheDocument();
+  });
+
+  it("prioritizes active feature work over older failures regardless of API order", async () => {
+    useProjects.mockReturnValue({ data: [
+      { id: "repo", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true },
+    ], isLoading: false, isError: false });
+    pipelineGet.mockResolvedValue([
+      { id: "old", name: "Old feature", status: "failed", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+      { id: "current", name: "Current feature", status: "running", createdAt: "2026-01-02", updatedAt: "2026-01-02" },
+    ]);
+    renderWithProviders(<Chooser />);
+    expect(await screen.findByRole("button", { name: /Demo.*Continue feature work/ })).toBeInTheDocument();
   });
 
   it("offers recovery if repositories cannot load", () => {
