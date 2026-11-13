@@ -87,7 +87,7 @@ describe("repository chooser", () => {
     ], isLoading: false, isError: false });
     renderWithProviders(<Chooser />);
     expect(screen.queryByRole("region", { name: "Repository changes" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("Repository tools: checkout diff, manual tests, and runtime diagnostics"));
+    fireEvent.click(screen.getByText("Repository tools: checkout diff and manual tests"));
     const summary = screen.getByText("Inspect checkout diff and PR");
     fireEvent.click(summary);
     expect(await screen.findByRole("region", { name: "Repository changes" })).toHaveTextContent("Changes for 1");
@@ -102,12 +102,12 @@ describe("repository chooser", () => {
     ], isLoading: false, isError: false });
     renderWithProviders(<Chooser />);
     expect(screen.queryByRole("region", { name: "Repository test runner" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("Repository tools: checkout diff, manual tests, and runtime diagnostics"));
+    fireEvent.click(screen.getByText("Repository tools: checkout diff and manual tests"));
     fireEvent.click(screen.getByText("Run repository tests"));
     expect(await screen.findByRole("region", { name: "Repository test runner" })).toHaveTextContent("Tests for 1");
     fireEvent.click(screen.getByRole("button", { name: /Demo \/tmp\/demo/ }));
     expect(screen.queryByRole("region", { name: "Repository test runner" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("Repository tools: checkout diff, manual tests, and runtime diagnostics"));
+    fireEvent.click(screen.getByText("Repository tools: checkout diff and manual tests"));
     fireEvent.click(screen.getByText("Run repository tests"));
     expect(await screen.findByRole("region", { name: "Repository test runner" })).toHaveTextContent("Tests for 2");
   });
@@ -151,8 +151,8 @@ describe("repository chooser", () => {
     ], isError: false });
     renderWithProviders(<Chooser />);
     const entry = screen.getByRole("region", { name: "New feature for Demo" });
-    fireEvent.click(screen.getByText("Repository tools: checkout diff, manual tests, and runtime diagnostics"));
     const runtime = screen.getByRole("region", { name: "Runtime readiness for Demo" });
+    expect(screen.getByRole("group", { name: "Repository tools for Demo" })).not.toHaveAttribute("open");
     const active = screen.getByRole("region", { name: "Unfinished workflow for Demo" });
     const older = screen.getByRole("region", { name: "Other unfinished workflows for Demo" });
     expect(active.compareDocumentPosition(entry) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

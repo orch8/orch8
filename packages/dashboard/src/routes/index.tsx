@@ -238,17 +238,7 @@ function RepositoryCard({ project }: { project: Project }) {
       <p className="mt-1">Only a clean, idle checkout can switch branches. This does not reset or delete feature work.</p>
     </div>}
     {returnError && <p role="alert" className="mt-2 text-xs text-amber-300">{returnError}</p>}
-    <details className="mt-4 rounded border border-zinc-700 p-3" aria-label={`Repository tools for ${project.name}`}>
-      <summary className="cursor-pointer text-sm font-medium text-zinc-200">Repository tools: checkout diff, manual tests, and runtime diagnostics</summary>
-      <details className="mt-3 border-t border-zinc-700 pt-3" onToggle={event => setInspectingChanges(event.currentTarget.open)}>
-        <summary className="cursor-pointer text-sm font-medium text-blue-300">Inspect checkout diff and PR</summary>
-        {inspectingChanges && <div className="mt-3"><RepositoryChanges projectId={project.id} /></div>}
-      </details>
-      <details className="mt-3 border-t border-zinc-700 pt-3" onToggle={event => setInspectingTests(event.currentTarget.open)}>
-        <summary className="cursor-pointer text-sm font-medium text-blue-300">Run repository tests</summary>
-        {inspectingTests && <div className="mt-3"><TestInstructions projectId={project.id} /></div>}
-      </details>
-      <section className="mt-3 border-t border-zinc-700 pt-3 text-sm" aria-label={`Runtime readiness for ${project.name}`}>
+      <section className="mt-4 rounded border border-zinc-700 bg-zinc-950/40 p-3 text-sm" aria-label={`Runtime readiness for ${project.name}`}>
         <h2 className="font-medium text-zinc-200">Check your agent runtime</h2>
         <p className="mt-1 text-xs text-zinc-400">Check before starting a workflow or preparing a branch. These checks do not start a workflow or approve the selected agents.</p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -261,7 +251,6 @@ function RepositoryCard({ project }: { project: Project }) {
         {claudeResult && <p role="status" className={`mt-2 text-xs ${claudeResult.ok ? "text-emerald-300" : "text-amber-300"}`}>Claude: {claudeResult.message}</p>}
         {claudeResult && !claudeResult.ok && <SandboxRecoveryGuidance adapterType="claude_local" message={claudeResult.message} />}
       </section>
-    </details>
       {request.trim() && ((codexResult && !codexResult.ok) || (claudeResult && !claudeResult.ok)) &&
         <section aria-label={`Manual feature handoff for ${project.name}`} className="mt-3 rounded border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-100">
           <h3 className="font-semibold">Continue your feature outside Orch8</h3>
@@ -273,6 +262,17 @@ function RepositoryCard({ project }: { project: Project }) {
             <textarea id={`manual-feature-handoff-${project.id}`} aria-label="Feature handoff for manual copy" readOnly value={featureHandoff(project.homeDir, request, [], "")} rows={10} onFocus={event => event.currentTarget.select()} className="mt-1 w-full rounded border border-zinc-600 bg-zinc-950 p-2 font-mono text-xs text-zinc-100" />
           </div>}
         </section>}
+    <details className="mt-4 rounded border border-zinc-700 p-3" aria-label={`Repository tools for ${project.name}`}>
+      <summary className="cursor-pointer text-sm font-medium text-zinc-200">Repository tools: checkout diff and manual tests</summary>
+      <details className="mt-3 border-t border-zinc-700 pt-3" onToggle={event => setInspectingChanges(event.currentTarget.open)}>
+        <summary className="cursor-pointer text-sm font-medium text-blue-300">Inspect checkout diff and PR</summary>
+        {inspectingChanges && <div className="mt-3"><RepositoryChanges projectId={project.id} /></div>}
+      </details>
+      <details className="mt-3 border-t border-zinc-700 pt-3" onToggle={event => setInspectingTests(event.currentTarget.open)}>
+        <summary className="cursor-pointer text-sm font-medium text-blue-300">Run repository tests</summary>
+        {inspectingTests && <div className="mt-3"><TestInstructions projectId={project.id} /></div>}
+      </details>
+    </details>
 
     {unfinished && unfinished.length > 1 && <section id="remaining-workflows" className="mt-3 scroll-mt-6 border-t border-zinc-700 pt-3" aria-label={`Other unfinished workflows for ${project.name}`}>
       <h2 className="text-sm font-medium text-zinc-200">Other unfinished work</h2>
