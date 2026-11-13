@@ -31,6 +31,13 @@ beforeEach(() => {
 });
 
 describe("repository chooser progress", () => {
+  it("puts the selected repository and feature entry before cross-repository history", () => {
+    renderWithProviders(<RepositoryChooser />);
+    const featureEntry = screen.getByRole("region", { name: "New feature for My repo" });
+    const activity = screen.getByRole("region", { name: "Feature work across repositories" });
+    expect(featureEntry.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(featureEntry).getByRole("textbox", { name: "Describe a new feature for My repo" })).toBeVisible();
+  });
   it("opens a plan decision in another repository even when the repository search excludes it", async () => {
     const other = { id: "proj-2", name: "Other repo", slug: "other-repo", homeDir: "/tmp/other-repo", active: true };
     useProjects.mockReturnValue({ data: [project, other], isLoading: false, isError: false });
@@ -44,6 +51,9 @@ describe("repository chooser progress", () => {
     await user.type(screen.getByRole("searchbox", { name: "Find a repository" }), "My repo");
     const activity = screen.getByRole("region", { name: "Feature work across repositories" });
     expect(await within(activity).findByText("Other repo")).toBeVisible();
+    const featureEntry = screen.getByRole("region", { name: "New feature for My repo" });
+    expect(featureEntry.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Feature work needs attention/ })).toHaveAttribute("href", "#feature-work-across-repositories");
     expect(within(activity).getByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/other-repo/pipelines/other-plan#workflow-step-plan-step");
   });
   it("keeps an older plan visible after recent cancelled attempts", async () => {
@@ -51,8 +61,8 @@ describe("repository chooser progress", () => {
     listPipelines.mockResolvedValue([...attempts, { id: "pending-plan", projectId: project.id, name: "Build the feature", status: "running", updatedAt: "2026-11-12T00:00:00Z" }]);
     usePipeline.mockReturnValue({ data: { steps: [{ id: "plan-step", label: "Plan", status: "awaiting_verification" }] } });
     renderWithProviders(<RepositoryChooser />);
+    expect(await screen.findByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/my-repo/pipelines/pending-plan#workflow-step-plan-step");
     const activity = screen.getByRole("region", { name: "Feature work across repositories" });
-    expect(await within(activity).findByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/my-repo/pipelines/pending-plan#workflow-step-plan-step");
     expect(within(activity).getByText("Recent cancelled attempts in My repo")).toBeInTheDocument();
     expect(within(activity).getByRole("group", { name: "Cancelled attempts in My repo" })).not.toHaveAttribute("open");
     expect(within(activity).getAllByText("Cancelled attempt:")).toHaveLength(3);
