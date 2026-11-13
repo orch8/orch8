@@ -93,6 +93,23 @@ describe("feature intake", () => {
   expect(screen.getByLabelText("Claude authentication recovery")).toHaveTextContent("claude auth login");
   expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
  });
+ it("offers an immediate, honest manual handoff when the selected runtime fails", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  mockClipboard(writeText);
+  state.probe.mockResolvedValue({ ok: false, message: "Sandbox could not start" });
+  render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
+  select();
+  await check();
+  const handoff = screen.getByLabelText("Manual feature handoff");
+  expect(handoff).toHaveAttribute("open");
+  expect(handoff.closest("form")).not.toBeNull();
+  expect(handoff).toHaveTextContent("does not prepare a branch, run agents, approve a plan, or publish a PR");
+  expect(screen.getByLabelText("Optional feature tools").querySelector('[aria-label="Manual feature handoff"]')).toBeNull();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy feature handoff" })); });
+  expect(writeText.mock.calls[0][0]).toContain("Add usage");
+  expect(state.create).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+ });
  it("recovers a previous slug-keyed request once under the project id", () => {
   localStorage.setItem("orch8:feature-draft:demo", JSON.stringify({ feature: "Restore legacy request" }));
   render(<FeatureIntake projectId="canonical-id" legacySlug="demo" onCreated={vi.fn()} />);
