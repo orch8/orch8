@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type MouseEvent } from "react";
+import { useRef, useState, type MouseEvent } from "react";
 import { api } from "../api/client.js";
 import { useProjects } from "../hooks/useProjects.js";
 import { usePipeline, usePipelineDiff, usePipelines } from "../hooks/usePipelines.js";
@@ -8,6 +8,7 @@ import type { Pipeline, Project } from "../types.js";
 import { SandboxRecoveryGuidance } from "../components/pipeline/SandboxRecoveryGuidance.js";
 import { RepositoryChanges } from "../components/pipeline/RepositoryChanges.js";
 import { TestInstructions } from "../components/pipeline/TestInstructions.js";
+import { featureHandoff } from "../components/pipeline/feature-handoff.js";
 
 function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline: Pipeline }) {
   const { data: detail, isError: detailError } = usePipeline(pipeline.id, true);
@@ -85,6 +86,8 @@ function RepositoryCard({ project }: { project: Project }) {
   const [claudeResult, setClaudeResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [checkingCodex, setCheckingCodex] = useState(false);
   const [codexResult, setCodexResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [handoffStatus, setHandoffStatus] = useState<"copied" | "manual" | null>(null);
+  const [copyingHandoff, setCopyingHandoff] = useState(false);
   const [inspectingChanges, setInspectingChanges] = useState(false);
   const [inspectingTests, setInspectingTests] = useState(false);
   // FeatureIntake reads drafts by project id; the URL slug is only for navigation.
@@ -95,8 +98,11 @@ function RepositoryCard({ project }: { project: Project }) {
       return typeof saved?.feature === "string" ? saved.feature : "";
     } catch { return ""; }
   });
+  const currentRequest = useRef(request);
   const [draftError, setDraftError] = useState(false);
   function saveRequest(nextRequest: string) {
+    currentRequest.current = nextRequest;
+    setHandoffStatus(null);
     try {
       const saved = JSON.parse((localStorage.getItem(draftKey) ?? localStorage.getItem(`orch8:feature-draft:${project.slug}`)) ?? "null");
       const previous = saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
@@ -174,6 +180,19 @@ function RepositoryCard({ project }: { project: Project }) {
       catch { setCodexResult({ ok: false, message }); }
     } finally { setCheckingCodex(false); }
   }
+  async function copyHandoff() {
+    if (!request.trim() || copyingHandoff) return;
+    setCopyingHandoff(true);
+    const copiedRequest = request;
+    try {
+      await navigator.clipboard.writeText(featureHandoff(project.homeDir, copiedRequest, [], ""));
+      if (currentRequest.current === copiedRequest) setHandoffStatus("copied");
+    } catch {
+      if (currentRequest.current === copiedRequest) setHandoffStatus("manual");
+    } finally {
+      setCopyingHandoff(false);
+    }
+  }
   const canStartFeature = !!checkout?.ready && !checkoutError && !checkingCheckout && !isError && !!pipelines && !unfinished?.length;
   const featureEntry = <section className="border-t border-zinc-700 pt-3 text-sm text-zinc-300" aria-label={`New feature for ${project.name}`}>
       <label htmlFor={`quick-feature-${project.id}`} className="block font-medium text-zinc-200">Describe a new feature for {project.name}</label>
@@ -237,6 +256,17 @@ function RepositoryCard({ project }: { project: Project }) {
       {codexResult && !codexResult.ok && <SandboxRecoveryGuidance adapterType="codex_local" message={codexResult.message} />}
       {claudeResult && <p role="status" className={`mt-2 text-xs ${claudeResult.ok ? "text-emerald-300" : "text-amber-300"}`}>Claude: {claudeResult.message}</p>}
       {claudeResult && !claudeResult.ok && <SandboxRecoveryGuidance adapterType="claude_local" message={claudeResult.message} />}
+      {request.trim() && ((codexResult && !codexResult.ok) || (claudeResult && !claudeResult.ok)) &&
+        <section aria-label={`Manual feature handoff for ${project.name}`} className="mt-3 rounded border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-100">
+          <h3 className="font-semibold">Continue your feature outside Orch8</h3>
+          <p className="mt-1">The runtime check failed. Copy your request and repository path for a trusted agent session or manual work. This action does not prepare a branch, run an agent, approve a plan or publish a PR. Review the plan and verify real tests and an independent review before publishing.</p>
+          <button type="button" disabled={copyingHandoff} onClick={() => void copyHandoff()} className="mt-2 rounded border border-amber-500 px-3 py-2 text-amber-100 disabled:opacity-40">{copyingHandoff ? "Copying..." : "Copy feature handoff"}</button>
+          {handoffStatus === "copied" && <p role="status" className="mt-2 text-emerald-300">Handoff copied to clipboard.</p>}
+          {handoffStatus === "manual" && <div className="mt-2">
+            <label htmlFor={`manual-feature-handoff-${project.id}`} className="block">Clipboard unavailable. Select and copy the handoff below.</label>
+            <textarea id={`manual-feature-handoff-${project.id}`} aria-label="Feature handoff for manual copy" readOnly value={featureHandoff(project.homeDir, request, [], "")} rows={10} onFocus={event => event.currentTarget.select()} className="mt-1 w-full rounded border border-zinc-600 bg-zinc-950 p-2 font-mono text-xs text-zinc-100" />
+          </div>}
+        </section>}
     </section>
     {unfinished && unfinished.length > 1 && <section id="remaining-workflows" className="mt-3 scroll-mt-6 border-t border-zinc-700 pt-3" aria-label={`Other unfinished workflows for ${project.name}`}>
       <h2 className="text-sm font-medium text-zinc-200">Other unfinished work</h2>

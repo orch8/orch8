@@ -6,26 +6,11 @@ import { useCreatePipeline } from "../../hooks/usePipelines.js";
 import { api } from "../../api/client.js";
 import { SandboxRecoveryGuidance } from "./SandboxRecoveryGuidance.js";
 import { RepositoryExplorer } from "./RepositoryExplorer.js";
+import { featureHandoff } from "./feature-handoff.js";
 
 type FeatureDraft = { feature: string; branchName: string; planner: string; implementer: string; reviewer: string; filePaths: string[] };
 const validPath = (path: unknown): path is string => typeof path === "string" && path.length > 0 && path.length <= 240 && !/[\r\n]/.test(path);
 const draftKey = (projectId: string) => `orch8:feature-draft:${projectId}`;
-function featureHandoff(repository: string | undefined, request: string, filePaths: string[], branchName: string): string {
-  return [
-    "Feature handoff (manual; does not run agents)",
-    `Repository path: ${repository ?? "Not loaded; confirm the repository path before proceeding"}`,
-    "Feature request (verbatim):",
-    request,
-    "",
-    "Starting file paths (inspect these; they may not be the only files to change):",
-    ...(filePaths.length ? filePaths.map(path => `- ${path}`) : ["None selected"]),
-    ...(branchName.trim() ? [`Proposed branch name (not prepared): ${branchName.trim()}`] : []),
-    "",
-    "Inspect the repository and relevant files before making changes. Write a scoped plan and review it before implementation.",
-    "Implement only after the plan is reviewed. Run relevant tests and record the actual results. Obtain an independent review of the diff and test evidence before publishing.",
-    "This handoff only copies text. No agents have run as part of this handoff and no branch has been prepared by this action.",
-  ].join("\n");
-}
 function readDraft(projectId: string, legacySlug?: string): FeatureDraft {
   const empty = { feature: "", branchName: "", planner: "", implementer: "", reviewer: "", filePaths: [] as string[] };
   try {
