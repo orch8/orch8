@@ -268,6 +268,16 @@ function RepositoryChooser() {
     queryFn: () => api.get<Pipeline[]>("/pipelines", { projectId: project.id }),
     refetchInterval: 10000,
   })) });
+  // Reuse the selected card's checkout query when a repository is opened.
+  const checkoutResults = useQueries({ queries: active.map(project => ({
+    queryKey: ["feature-branch", project.id],
+    queryFn: () => api.get<{ ready: boolean; branch: string; baseBranch: string; reason?: string }>(
+      `/projects/${encodeURIComponent(project.id)}/feature-branch`,
+    ),
+    retry: false,
+    refetchInterval: 10000,
+    refetchOnWindowFocus: true,
+  })) });
   const needsAttention = activityResults.some(result => result.isError || result.data?.some(pipeline => ["pending", "running", "failed"].includes(pipeline.status)));
   const matching = active.filter(project =>
     `${project.name} ${project.homeDir}`.toLowerCase().includes(search.trim().toLowerCase()),
@@ -295,7 +305,21 @@ function RepositoryChooser() {
       {matching.length === 0 ? <p role="status" className="text-sm text-zinc-400">No repositories match your search.</p> : <>
         <div key="selection" className="grid min-w-0 items-start gap-4 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]" aria-label="Repository selection and feature entry">
           <ul className="grid min-w-0 max-h-32 grid-cols-[minmax(0,1fr)] gap-2 overflow-y-auto overflow-x-hidden pr-1 sm:sticky sm:top-4 sm:max-h-[calc(100vh-15rem)]" aria-label="Available repositories">
-            {matching.map(project => <li key={project.id} className="min-w-0">
+            {matching.map(project => {
+              const index = active.findIndex(item => item.id === project.id);
+              const workflow = activityResults[index];
+              const checkout = checkoutResults[index];
+              const unfinished = workflow?.data?.filter(item => ["pending", "running", "failed"].includes(item.status))
+                .sort((a, b) => (a.status === "failed" ? 1 : 0) - (b.status === "failed" ? 1 : 0)
+                  || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+              const status = workflow?.isError ? "Workflow status unavailable"
+                : workflow?.isLoading || workflow?.isFetching ? "Checking feature work"
+                : unfinished ? unfinished.status === "failed" ? "Inspect failed feature" : "Continue feature work"
+                : checkout?.isError ? "Checkout status unavailable"
+                : checkout?.isFetching ? "Checking checkout"
+                : checkout?.data ? checkout.data.ready ? "Checkout ready" : "Checkout needs attention"
+                : "Checking checkout";
+              return <li key={project.id} className="min-w-0">
               <button type="button" onClick={() => {
                 setSelectedId(project.id);
                 try { localStorage.setItem("orch8:selected-repository", project.id); } catch { /* Selection still works without storage. */ }
@@ -303,8 +327,10 @@ function RepositoryChooser() {
                 className={`w-full rounded border p-3 text-left text-sm hover:border-blue-500 ${selected.id === project.id ? "border-blue-500 bg-blue-950/40 text-white" : "border-zinc-700 bg-zinc-900 text-zinc-300"}`}>
                 <span className="block font-medium">{project.name}</span>
                 <span className="mt-1 block truncate font-mono text-xs text-zinc-400" title={project.homeDir}>{project.homeDir}</span>
+                <span className={`mt-2 block text-xs ${unfinished || checkout?.data && !checkout.data.ready || workflow?.isError || checkout?.isError ? "text-amber-300" : "text-zinc-400"}`}>{status}</span>
               </button>
-            </li>)}
+            </li>;
+            })}
           </ul>
           <ul className="min-w-0" aria-label="Selected repository details"><RepositoryCard key={selected.id} project={selected} /></ul>
         </div>
