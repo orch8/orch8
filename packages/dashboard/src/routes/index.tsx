@@ -10,7 +10,7 @@ import { RepositoryChanges } from "../components/pipeline/RepositoryChanges.js";
 import { TestInstructions } from "../components/pipeline/TestInstructions.js";
 import { featureHandoff } from "../components/pipeline/feature-handoff.js";
 
-function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline: Pipeline }) {
+function UnfinishedWorkflow({ project, pipeline, primary = false }: { project: Project; pipeline: Pipeline; primary?: boolean }) {
   const { data: detail, isError: detailError } = usePipeline(pipeline.id, true);
   const step = (pipeline.status === "failed" ? detail?.steps.find(item => item.status === "failed") : undefined)
     ?? detail?.steps.find(item => item.status === "awaiting_verification")
@@ -24,9 +24,9 @@ function UnfinishedWorkflow({ project, pipeline }: { project: Project; pipeline:
   const workflowUrl = `/projects/${encodeURIComponent(project.slug)}/pipelines/${encodeURIComponent(pipeline.id)}`;
   return <li className="border-t border-zinc-700 pt-3 text-sm">
     <p className={detailError || step?.status === "awaiting_verification" || pipeline.status === "failed" ? "text-amber-300" : "text-zinc-300"}>{action}</p>
-    <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className="mt-1 line-clamp-2 break-words text-blue-300 underline">Continue {pipeline.name}</Link>
+    <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className={primary && !(step?.id && (step.status === "awaiting_verification" || step.status === "failed")) ? "mt-3 inline-block max-w-full break-all rounded bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-600" : "mt-1 line-clamp-2 break-words text-blue-300 underline"}>Continue {pipeline.name}</Link>
     {step?.id && (step.status === "awaiting_verification" || step.status === "failed") &&
-      <a href={`${workflowUrl}#workflow-step-${encodeURIComponent(step.id)}`} className="ml-3 inline-block rounded border border-amber-700 px-2 py-1 text-amber-200 hover:bg-amber-950/50">
+      <a href={`${workflowUrl}#workflow-step-${encodeURIComponent(step.id)}`} className={primary ? "mt-3 inline-block rounded bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-600" : "ml-3 inline-block rounded border border-amber-700 px-2 py-1 text-amber-200 hover:bg-amber-950/50"}>
         {step.status === "awaiting_verification" ? `Review ${step.label.toLowerCase()} now` : `Inspect failed ${step.label.toLowerCase()}`}
       </a>}
   </li>;
@@ -195,8 +195,8 @@ function RepositoryCard({ project }: { project: Project }) {
   }
   const canStartFeature = !!checkout?.ready && !checkoutError && !checkingCheckout && !isError && !!pipelines && !unfinished?.length;
   const featureEntry = <section className="border-t border-zinc-700 pt-3 text-sm text-zinc-300" aria-label={`New feature for ${project.name}`}>
-      <label htmlFor={`quick-feature-${project.id}`} className="block font-medium text-zinc-200">Describe a new feature for {project.name}</label>
-      <textarea id={`quick-feature-${project.id}`} value={request} maxLength={2000} rows={3} onChange={event => { setRequest(event.target.value); saveRequest(event.target.value); }} placeholder="What should change in this repository?" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
+      <label htmlFor={`quick-feature-${project.id}`} className="block text-lg font-medium text-zinc-200">Describe a new feature for {project.name}</label>
+      <textarea id={`quick-feature-${project.id}`} value={request} maxLength={2000} rows={4} onChange={event => { setRequest(event.target.value); saveRequest(event.target.value); }} placeholder="What should change in this repository?" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
       <p className="mt-1 text-xs text-zinc-400">Your request stays in this browser. Next you will choose agents, check the runtime, and review the plan before implementation.</p>
       {checkout && !checkout.ready && !checkoutError && !checkingCheckout ? <div role="status" className="mt-2 space-y-2 rounded border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-200">
         <p>New feature setup is paused while this checkout is not ready. {draftError ? "Copy your request before leaving this page." : "Your request is saved here."}</p>
@@ -209,15 +209,8 @@ function RepositoryCard({ project }: { project: Project }) {
       {draftError && <p role="alert" className="mt-2 text-amber-300">Browser storage is unavailable. Copy your request into the feature form after opening the repository.</p>}
     </section>;
   return <li className="rounded border border-zinc-700 bg-zinc-900 p-4">
-    {isError && <p role="status" className="mb-3 text-xs text-amber-300">Workflow status unavailable. Open the repository to check it.</p>}
-    {unfinished?.length ? <section className="border-t border-zinc-700 pt-3" aria-label={`Unfinished workflow for ${project.name}`}>
-      <h2 className="text-sm font-medium text-zinc-200">Continue unfinished work in {project.name}</h2>
-      <ul><UnfinishedWorkflow project={project} pipeline={unfinished[0]} /></ul>
-      {unfinished.length > 1 && <a href="#remaining-workflows" className="mt-2 inline-block text-xs text-blue-300 underline">See {unfinished.length - 1} other unfinished {unfinished.length === 2 ? "workflow" : "workflows"}</a>}
-    </section> : null}
-    {featureEntry}
     <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} className="block hover:text-blue-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400">
-      <span className="block font-medium text-zinc-100">{project.name}</span>
+      <span className="block break-words text-xl font-semibold text-zinc-100">{project.name}</span>
       <span className="mt-1 block break-all font-mono text-xs text-zinc-400">{project.homeDir}</span>
       {checkout && !checkoutError && !checkingCheckout && <span className={`mt-2 block text-xs ${checkout.ready ? "text-emerald-300" : "text-amber-300"}`}>
         {checkout.ready ? `${checkout.note ? "Ready on base (Orch8 ignore change pending)" : "Checkout clean on base"} · ${checkout.branch}` :
@@ -229,6 +222,15 @@ function RepositoryCard({ project }: { project: Project }) {
       {checkoutError && <span className="mt-2 block text-xs text-amber-300">Checkout status unavailable. Inspect the repository before starting.</span>}
       <span className="mt-2 block text-xs text-blue-300">Open feature workflows →</span>
     </Link>
+    <div className="mt-4 space-y-4">
+      {isError && <p role="status" className="mb-3 text-xs text-amber-300">Workflow status unavailable. Open the repository to check it.</p>}
+      {unfinished?.length ? <section className="border-t border-zinc-700 pt-3" aria-label={`Unfinished workflow for ${project.name}`}>
+        <h2 className="text-lg font-medium text-zinc-200">Continue unfinished work in {project.name}</h2>
+        <ul><UnfinishedWorkflow project={project} pipeline={unfinished[0]} primary /></ul>
+        {unfinished.length > 1 && <a href="#remaining-workflows" className="mt-2 inline-block text-xs text-blue-300 underline">See {unfinished.length - 1} other unfinished {unfinished.length === 2 ? "workflow" : "workflows"}</a>}
+      </section> : null}
+      {featureEntry}
+    </div>
     <button type="button" onClick={() => void refreshCheckout()} className="mt-2 text-xs text-blue-300 underline">Refresh checkout status</button>
     {checkout?.branch && checkout.branch !== checkout.baseBranch && !checkoutError && <div className="mt-2 text-xs text-zinc-400">
       <button type="button" onClick={() => void returnToBase()} disabled={returning || checkingCheckout || !!pipelines?.some(pipeline => pipeline.status === "running" || pipeline.status === "pending")}
@@ -236,26 +238,30 @@ function RepositoryCard({ project }: { project: Project }) {
       <p className="mt-1">Only a clean, idle checkout can switch branches. This does not reset or delete feature work.</p>
     </div>}
     {returnError && <p role="alert" className="mt-2 text-xs text-amber-300">{returnError}</p>}
-    <details className="mt-3 border-t border-zinc-700 pt-3" onToggle={event => setInspectingChanges(event.currentTarget.open)}>
-      <summary className="cursor-pointer text-sm font-medium text-blue-300">Inspect checkout diff and PR</summary>
-      {inspectingChanges && <div className="mt-3"><RepositoryChanges projectId={project.id} /></div>}
+    <details className="mt-4 rounded border border-zinc-700 p-3" aria-label={`Repository tools for ${project.name}`}>
+      <summary className="cursor-pointer text-sm font-medium text-zinc-200">Repository tools: checkout diff, manual tests, and runtime diagnostics</summary>
+      <details className="mt-3 border-t border-zinc-700 pt-3" onToggle={event => setInspectingChanges(event.currentTarget.open)}>
+        <summary className="cursor-pointer text-sm font-medium text-blue-300">Inspect checkout diff and PR</summary>
+        {inspectingChanges && <div className="mt-3"><RepositoryChanges projectId={project.id} /></div>}
+      </details>
+      <details className="mt-3 border-t border-zinc-700 pt-3" onToggle={event => setInspectingTests(event.currentTarget.open)}>
+        <summary className="cursor-pointer text-sm font-medium text-blue-300">Run repository tests</summary>
+        {inspectingTests && <div className="mt-3"><TestInstructions projectId={project.id} /></div>}
+      </details>
+      <section className="mt-3 border-t border-zinc-700 pt-3 text-sm" aria-label={`Runtime readiness for ${project.name}`}>
+        <h2 className="font-medium text-zinc-200">Check your agent runtime</h2>
+        <p className="mt-1 text-xs text-zinc-400">Check before starting a workflow or preparing a branch. These checks do not start a workflow or approve the selected agents.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={() => void checkCodex()} disabled={checkingCodex} className="rounded border border-zinc-600 px-3 py-2 text-blue-300 disabled:opacity-40">{checkingCodex ? "Checking Codex..." : "Check Codex sandbox (free)"}</button>
+          <button type="button" onClick={() => void checkClaude()} disabled={checkingClaude} className="rounded border border-zinc-600 px-3 py-2 text-blue-300 disabled:opacity-40">{checkingClaude ? "Checking Claude..." : "Check Claude in this repository (may cost)"}</button>
+        </div>
+        <p className="mt-2 text-xs text-zinc-400">Codex runs a sandbox command in a disposable directory without a model call. Claude invokes its model and tests a temporary write in this checkout using existing permissions, against the project budget. You will check all selected agents again before starting.</p>
+        {codexResult && <p role="status" className={`mt-2 text-xs ${codexResult.ok ? "text-emerald-300" : "text-amber-300"}`}>Codex: {codexResult.message}</p>}
+        {codexResult && !codexResult.ok && <SandboxRecoveryGuidance adapterType="codex_local" message={codexResult.message} />}
+        {claudeResult && <p role="status" className={`mt-2 text-xs ${claudeResult.ok ? "text-emerald-300" : "text-amber-300"}`}>Claude: {claudeResult.message}</p>}
+        {claudeResult && !claudeResult.ok && <SandboxRecoveryGuidance adapterType="claude_local" message={claudeResult.message} />}
+      </section>
     </details>
-    <details className="mt-3 border-t border-zinc-700 pt-3" onToggle={event => setInspectingTests(event.currentTarget.open)}>
-      <summary className="cursor-pointer text-sm font-medium text-blue-300">Run repository tests</summary>
-      {inspectingTests && <div className="mt-3"><TestInstructions projectId={project.id} /></div>}
-    </details>
-    <section className="mt-3 border-t border-zinc-700 pt-3 text-sm" aria-label={`Runtime readiness for ${project.name}`}>
-      <h2 className="font-medium text-zinc-200">Check your agent runtime</h2>
-      <p className="mt-1 text-xs text-zinc-400">Check before starting a workflow or preparing a branch. These checks do not start a workflow or approve the selected agents.</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={() => void checkCodex()} disabled={checkingCodex} className="rounded border border-zinc-600 px-3 py-2 text-blue-300 disabled:opacity-40">{checkingCodex ? "Checking Codex..." : "Check Codex sandbox (free)"}</button>
-        <button type="button" onClick={() => void checkClaude()} disabled={checkingClaude} className="rounded border border-zinc-600 px-3 py-2 text-blue-300 disabled:opacity-40">{checkingClaude ? "Checking Claude..." : "Check Claude in this repository (may cost)"}</button>
-      </div>
-      <p className="mt-2 text-xs text-zinc-400">Codex runs a sandbox command in a disposable directory without a model call. Claude invokes its model and tests a temporary write in this checkout using existing permissions, against the project budget. You will check all selected agents again before starting.</p>
-      {codexResult && <p role="status" className={`mt-2 text-xs ${codexResult.ok ? "text-emerald-300" : "text-amber-300"}`}>Codex: {codexResult.message}</p>}
-      {codexResult && !codexResult.ok && <SandboxRecoveryGuidance adapterType="codex_local" message={codexResult.message} />}
-      {claudeResult && <p role="status" className={`mt-2 text-xs ${claudeResult.ok ? "text-emerald-300" : "text-amber-300"}`}>Claude: {claudeResult.message}</p>}
-      {claudeResult && !claudeResult.ok && <SandboxRecoveryGuidance adapterType="claude_local" message={claudeResult.message} />}
       {request.trim() && ((codexResult && !codexResult.ok) || (claudeResult && !claudeResult.ok)) &&
         <section aria-label={`Manual feature handoff for ${project.name}`} className="mt-3 rounded border border-amber-700/60 bg-amber-950/20 p-3 text-xs text-amber-100">
           <h3 className="font-semibold">Continue your feature outside Orch8</h3>
@@ -267,7 +273,7 @@ function RepositoryCard({ project }: { project: Project }) {
             <textarea id={`manual-feature-handoff-${project.id}`} aria-label="Feature handoff for manual copy" readOnly value={featureHandoff(project.homeDir, request, [], "")} rows={10} onFocus={event => event.currentTarget.select()} className="mt-1 w-full rounded border border-zinc-600 bg-zinc-950 p-2 font-mono text-xs text-zinc-100" />
           </div>}
         </section>}
-    </section>
+
     {unfinished && unfinished.length > 1 && <section id="remaining-workflows" className="mt-3 scroll-mt-6 border-t border-zinc-700 pt-3" aria-label={`Other unfinished workflows for ${project.name}`}>
       <h2 className="text-sm font-medium text-zinc-200">Other unfinished work</h2>
       <ul className="space-y-3">
@@ -314,7 +320,7 @@ function RepositoryChooser() {
   );
   const selected = matching.find(project => project.id === selectedId) ?? matching[0];
 
-  return <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
+  return <div className="mx-auto w-full max-w-6xl space-y-4 p-4 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
         <h1 className="text-2xl font-semibold text-zinc-100">Open a repository</h1>
@@ -350,12 +356,13 @@ function RepositoryChooser() {
                 : checkout?.data ? checkout.data.ready ? "Checkout ready" : "Checkout needs attention"
                 : "Checking checkout";
               return <li key={project.id} className="min-w-0">
+
               <button type="button" onClick={() => {
                 setSelectedId(project.id);
                 try { localStorage.setItem("orch8:selected-repository", project.id); } catch { /* Selection still works without storage. */ }
               }} aria-pressed={selected.id === project.id}
                 className={`w-full rounded border p-3 text-left text-sm hover:border-blue-500 ${selected.id === project.id ? "border-blue-500 bg-blue-950/40 text-white" : "border-zinc-700 bg-zinc-900 text-zinc-300"}`}>
-                <span className="block font-medium">{project.name}</span>
+                <span className="block break-words font-medium">{project.name}</span>
                 <span className="mt-1 block truncate font-mono text-xs text-zinc-400" title={project.homeDir}>{project.homeDir}</span>
                 <span className={`mt-2 block text-xs ${unfinished || checkout?.data && !checkout.data.ready || workflow?.isError || checkout?.isError ? "text-amber-300" : "text-zinc-400"}`}>{status}</span>
               </button>

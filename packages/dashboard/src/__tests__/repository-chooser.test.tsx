@@ -87,6 +87,7 @@ describe("repository chooser", () => {
     ], isLoading: false, isError: false });
     renderWithProviders(<Chooser />);
     expect(screen.queryByRole("region", { name: "Repository changes" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Repository tools: checkout diff, manual tests, and runtime diagnostics"));
     const summary = screen.getByText("Inspect checkout diff and PR");
     fireEvent.click(summary);
     expect(await screen.findByRole("region", { name: "Repository changes" })).toHaveTextContent("Changes for 1");
@@ -101,10 +102,12 @@ describe("repository chooser", () => {
     ], isLoading: false, isError: false });
     renderWithProviders(<Chooser />);
     expect(screen.queryByRole("region", { name: "Repository test runner" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Repository tools: checkout diff, manual tests, and runtime diagnostics"));
     fireEvent.click(screen.getByText("Run repository tests"));
     expect(await screen.findByRole("region", { name: "Repository test runner" })).toHaveTextContent("Tests for 1");
     fireEvent.click(screen.getByRole("button", { name: /Demo \/tmp\/demo/ }));
     expect(screen.queryByRole("region", { name: "Repository test runner" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Repository tools: checkout diff, manual tests, and runtime diagnostics"));
     fireEvent.click(screen.getByText("Run repository tests"));
     expect(await screen.findByRole("region", { name: "Repository test runner" })).toHaveTextContent("Tests for 2");
   });
@@ -148,6 +151,7 @@ describe("repository chooser", () => {
     ], isError: false });
     renderWithProviders(<Chooser />);
     const entry = screen.getByRole("region", { name: "New feature for Demo" });
+    fireEvent.click(screen.getByText("Repository tools: checkout diff, manual tests, and runtime diagnostics"));
     const runtime = screen.getByRole("region", { name: "Runtime readiness for Demo" });
     const active = screen.getByRole("region", { name: "Unfinished workflow for Demo" });
     const older = screen.getByRole("region", { name: "Other unfinished workflows for Demo" });
@@ -157,6 +161,7 @@ describe("repository chooser", () => {
     expect(runtime).toHaveTextContent("Check before starting a workflow");
     expect(runtime.getElementsByTagName("button")).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Continue Current task" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Continue Current task" })).toHaveClass("max-w-full", "break-all");
     expect(screen.getByRole("link", { name: "Continue Older task" })).toBeVisible();
   });
 
@@ -188,6 +193,32 @@ describe("repository chooser", () => {
     ]);
     renderWithProviders(<Chooser />);
     expect(await screen.findByRole("button", { name: /Demo.*Continue feature work/ })).toBeInTheDocument();
+  });
+
+  it("keeps repository tools collapsed, labeled, focusable, and scoped to the selected checkout", async () => {
+    useProjects.mockReturnValue({ data: [
+      { id: "1", name: "Factory", slug: "factory", homeDir: "/tmp/factory", active: true },
+      { id: "2", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true },
+    ], isLoading: false, isError: false });
+    const { user } = renderWithProviders(<Chooser />);
+    const tools = screen.getByRole("group", { name: "Repository tools for Factory" });
+    const summary = tools.querySelector("summary")!;
+    expect(tools).not.toHaveAttribute("open");
+    expect(screen.getByRole("textbox", { name: "Describe a new feature for Factory" })).toBeVisible();
+    // Check native disclosure semantics and focus. Happy DOM does not emulate
+    // browser keyboard activation or tab order for summary elements.
+    summary.focus();
+    expect(summary).toHaveFocus();
+    await user.click(summary);
+    expect(tools).toHaveAttribute("open");
+    expect(screen.getByRole("button", { name: "Check Codex sandbox (free)" })).toBeVisible();
+    await user.click(screen.getByText("Inspect checkout diff and PR"));
+    expect(await screen.findByRole("region", { name: "Repository changes" })).toHaveTextContent("Changes for 1");
+    await user.click(screen.getByRole("button", { name: /Demo \/tmp\/demo/ }));
+    expect(screen.getByRole("group", { name: "Repository tools for Demo" })).not.toHaveAttribute("open");
+    expect(screen.queryByRole("region", { name: "Repository changes" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Demo \/tmp\/demo/ })).toHaveAttribute("aria-pressed", "true");
+
   });
 
   it("offers recovery if repositories cannot load", () => {
