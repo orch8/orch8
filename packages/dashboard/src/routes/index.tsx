@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type MouseEvent } from "react";
 import { api } from "../api/client.js";
 import { useProjects } from "../hooks/useProjects.js";
@@ -46,6 +46,35 @@ function LatestCompletedWorkflow({ project, pipeline, checkoutBranch }: { projec
     <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className="text-blue-300 underline">Inspect {pipeline.name}</Link>
     {sameRevision && diff?.prLookup === "found" && diff.pullRequest && <a href={diff.pullRequest.url} target="_blank" rel="noopener noreferrer" className="ml-3 text-blue-300 underline">Open PR #{diff.pullRequest.number}</a>}
   </li>;
+}
+
+function RepositoryWork({ project, pipelines, isError }: { project: Project; pipelines?: Pipeline[]; isError: boolean }) {
+  const unfinished = pipelines?.filter(pipeline => ["pending", "running", "failed"].includes(pipeline.status))
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()) ?? [];
+  const cancelled = pipelines?.filter(pipeline => pipeline.status === "cancelled")
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 3) ?? [];
+  if (!isError && unfinished.length === 0 && cancelled.length === 0) return null;
+  return <li className="rounded border border-zinc-700 bg-zinc-900 p-3">
+    <p className="font-medium text-zinc-100">{project.name}</p>
+    {isError && <p className="mt-1 text-xs text-amber-300">Could not check workflow status. Open the repository to inspect it.</p>}
+    <ul className="space-y-3">{unfinished.map(pipeline => <UnfinishedWorkflow key={pipeline.id} project={project} pipeline={pipeline} />)}
+      {cancelled.map(pipeline => <li key={pipeline.id} className="border-t border-zinc-700 pt-2 text-xs text-zinc-400">Cancelled attempt: <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className="break-words text-blue-300 underline">{pipeline.name}</Link></li>)}</ul>
+    {isError && <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} className="mt-2 inline-block text-blue-300 underline">Open feature workflows</Link>}
+  </li>;
+}
+
+function RepositoryActivity({ projects }: { projects: Project[] }) {
+  const results = useQueries({ queries: projects.map(project => ({
+    queryKey: ["pipelines", project.id],
+    queryFn: () => api.get<Pipeline[]>("/pipelines", { projectId: project.id }),
+    refetchInterval: 10000,
+  })) });
+  const anyActivity = results.some(result => result.isError || result.data?.some(pipeline => ["pending", "running", "failed", "cancelled"].includes(pipeline.status)));
+  return <>
+    {results.some(result => result.isLoading) && <p role="status" className="mt-2 text-xs text-zinc-400">Checking feature work...</p>}
+    {!anyActivity && results.every(result => !result.isLoading) && <p role="status" className="mt-2 text-sm text-zinc-400">No unfinished or cancelled feature attempts across these repositories.</p>}
+    <ul className="mt-3 space-y-2 text-sm">{projects.map((project, index) => <RepositoryWork key={project.id} project={project} pipelines={results[index]?.data} isError={results[index]?.isError ?? false} />)}</ul>
+  </>;
 }
 
 function RepositoryCard({ project }: { project: Project }) {
@@ -230,6 +259,7 @@ function RepositoryCard({ project }: { project: Project }) {
 function RepositoryChooser() {
   const { data: projects, isLoading, isError, refetch } = useProjects();
   const [search, setSearch] = useState("");
+  const [showActivity, setShowActivity] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     try { return localStorage.getItem("orch8:selected-repository"); } catch { return null; }
   });
@@ -251,6 +281,13 @@ function RepositoryChooser() {
     {isError && <div role="alert" className="rounded border border-amber-700 p-4 text-amber-200">Could not load repositories. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></div>}
     {!isLoading && !isError && active.length === 0 && <p className="rounded border border-zinc-700 p-5 text-zinc-300">No active repositories yet. Add a local checkout to start a feature.</p>}
     {active.length > 0 && <>
+      <details className="rounded border border-zinc-700 bg-zinc-900/50 p-4" aria-label="Feature work across repositories" onToggle={event => setShowActivity(event.currentTarget.open)}>
+        <summary className="cursor-pointer font-medium text-zinc-100">Continue feature work across repositories</summary>
+        {showActivity && <>
+          <p className="mt-2 text-xs text-zinc-400">Open an unfinished workflow directly, including plans and reviews waiting for your decision. Recent cancelled attempts are available for inspection. This list includes all active repositories, regardless of the search below.</p>
+          <RepositoryActivity projects={active} />
+        </>}
+      </details>
       <div>
         <label htmlFor="repository-search" className="block text-sm font-medium text-zinc-200">Find a repository</label>
         <input id="repository-search" type="search" value={search} onChange={event => setSearch(event.target.value)}
