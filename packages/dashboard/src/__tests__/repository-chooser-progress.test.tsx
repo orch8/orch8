@@ -209,6 +209,51 @@ describe("repository chooser progress", () => {
     expect(post).toHaveBeenCalledTimes(1);
   });
 
+  it("lets a blocked feature request leave the chooser as an honest manual handoff", async () => {
+    post.mockResolvedValue({ ok: false, message: "Claude authentication expired. Re-authenticate with the Claude CLI before retrying the runtime check." });
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    await user.type(screen.getByRole("textbox", { name: "Describe a new feature for My repo" }), "Add a setup guide");
+    await user.click(screen.getByRole("button", { name: "Check Claude in this repository (may cost)" }));
+    const handoff = await screen.findByRole("region", { name: "Manual feature handoff for My repo" });
+    await user.click(within(handoff).getByRole("button", { name: "Copy feature handoff" }));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("Feature request (verbatim):\nAdd a setup guide"));
+    expect(writeText.mock.calls[0][0]).toContain("Repository path: /tmp/my-repo");
+    expect(writeText.mock.calls[0][0]).toContain("No agents have run");
+    expect(within(handoff).getByRole("status")).toHaveTextContent("copied");
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(localStorage.getItem("orch8:feature-draft:proj-1")!)).toMatchObject({ feature: "Add a setup guide" });
+  });
+
+  it("offers selectable handoff text if the chooser clipboard is unavailable", async () => {
+    post.mockResolvedValue({ ok: false, message: "Codex sandbox cannot run commands: bubblewrap Failed RTM_NEWADDR" });
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(new Error("blocked"));
+    await user.type(screen.getByRole("textbox", { name: "Describe a new feature for My repo" }), "Add a CLI example");
+    await user.click(screen.getByRole("button", { name: "Check Codex sandbox (free)" }));
+    const handoff = await screen.findByRole("region", { name: "Manual feature handoff for My repo" });
+    await user.click(within(handoff).getByRole("button", { name: "Copy feature handoff" }));
+    expect((await within(handoff).findByRole("textbox", { name: "Feature handoff for manual copy" }) as HTMLTextAreaElement).value).toContain("Add a CLI example");
+  });
+
+  it("does not claim a stale copy after the request changes during a pending clipboard write", async () => {
+    post.mockResolvedValue({ ok: false, message: "Codex sandbox failed: bubblewrap Failed RTM_NEWADDR" });
+    const { user } = renderWithProviders(<RepositoryChooser />);
+    let finishCopy!: () => void;
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockImplementation(() => new Promise(resolve => { finishCopy = resolve; }));
+    const input = screen.getByRole("textbox", { name: "Describe a new feature for My repo" });
+    await user.type(input, "Original request");
+    await user.click(screen.getByRole("button", { name: "Check Codex sandbox (free)" }));
+    const handoff = await screen.findByRole("region", { name: "Manual feature handoff for My repo" });
+    await user.click(within(handoff).getByRole("button", { name: "Copy feature handoff" }));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("Original request"));
+    await user.clear(input);
+    await user.type(input, "New request");
+    finishCopy();
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Manual feature handoff for My repo" })).getByRole("button", { name: "Copy feature handoff" })).toBeEnabled());
+    expect(within(screen.getByRole("region", { name: "Manual feature handoff for My repo" })).queryByText("Handoff copied to clipboard.")).not.toBeInTheDocument();
+  });
+
   it("warns when existing feature work occupies the checkout", async () => {
     get.mockResolvedValue({ ready: false, branch: "feat/work", baseBranch: "main", reason: "Check out the configured default branch 'main' before preparing a feature branch." });
     renderWithProviders(<RepositoryChooser />);
