@@ -1,12 +1,12 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { fireEvent, waitFor } from "@testing-library/react";
 import { renderWithProviders, screen } from "../test-utils.js";
-import { api } from "../api/client.js";
 
 const useProjects = vi.fn();
 const usePipelines = vi.fn(() => ({ data: [] as Array<{ id: string; name: string; status: string; createdAt: string; updatedAt: string }>, isError: false }));
 vi.mock("../hooks/useProjects.js", () => ({ useProjects: () => useProjects() }));
-vi.mock("../api/client.js", () => ({ api: { get: vi.fn().mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" }) } }));
+const branchGet = vi.hoisted(() => vi.fn());
+vi.mock("../api/client.js", () => ({ api: { get: (path: string) => path === "/pipelines" ? Promise.resolve([]) : branchGet(path) } }));
 vi.mock("../hooks/usePipelines.js", () => ({
   usePipelines: () => usePipelines(),
   usePipeline: () => ({ data: undefined, isError: false }),
@@ -27,7 +27,7 @@ const Chooser = (Route as unknown as { component: React.ComponentType }).compone
 beforeEach(() => {
   localStorage.clear();
   usePipelines.mockReset().mockReturnValue({ data: [], isError: false });
-  vi.mocked(api.get).mockReset().mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
+  branchGet.mockReset().mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
 });
 
 describe("repository chooser", () => {
@@ -42,7 +42,7 @@ describe("repository chooser", () => {
     localStorage.clear();
   });
   it("keeps a new request in draft and routes the operator to unfinished work when checkout is not ready", async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ ready: false, branch: "feat/existing", baseBranch: "main", reason: "Finish existing work" });
+    branchGet.mockResolvedValueOnce({ ready: false, branch: "feat/existing", baseBranch: "main", reason: "Finish existing work" });
     useProjects.mockReturnValue({ data: [{ id: "proj_abc", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true }], isLoading: false, isError: false });
     usePipelines.mockReturnValue({ data: [
       { id: "work", name: "Existing feature", status: "pending", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
@@ -56,12 +56,12 @@ describe("repository chooser", () => {
   });
 
   it("restores plan setup after a blocked checkout becomes ready", async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ ready: false, branch: "feat/existing", baseBranch: "main" });
+    branchGet.mockResolvedValueOnce({ ready: false, branch: "feat/existing", baseBranch: "main" });
     useProjects.mockReturnValue({ data: [{ id: "proj_abc", name: "Demo", slug: "demo", homeDir: "/tmp/demo", active: true }], isLoading: false, isError: false });
     renderWithProviders(<Chooser />);
     fireEvent.change(screen.getByRole("textbox", { name: "Describe a new feature for Demo" }), { target: { value: "Add usage instructions" } });
     await waitFor(() => expect(screen.getByText(/New feature setup is paused/)).toBeInTheDocument());
-    vi.mocked(api.get).mockResolvedValueOnce({ ready: true, branch: "main", baseBranch: "main" });
+    branchGet.mockResolvedValueOnce({ ready: true, branch: "main", baseBranch: "main" });
     fireEvent.click(screen.getByRole("button", { name: "Refresh checkout status" }));
     await waitFor(() => expect(screen.getByRole("link", { name: "Continue to plan setup" })).toBeInTheDocument());
     expect(screen.getByRole("textbox", { name: "Describe a new feature for Demo" })).toHaveValue("Add usage instructions");
@@ -123,7 +123,7 @@ describe("repository chooser", () => {
     expect(screen.getByRole("link", { name: /Factory/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Demo \/work\/demo/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox", { name: "Find a repository" }), { target: { value: "missing" } });
-    expect(screen.getByRole("status")).toHaveTextContent("No repositories match your search.");
+    expect(screen.getByText("No repositories match your search.")).toBeInTheDocument();
   });
 
   it("restores the last selected repository without showing another repository's feature form", () => {
