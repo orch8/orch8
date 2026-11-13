@@ -35,10 +35,10 @@ describe("feature intake", () => {
  it("puts the repository request ahead of runtime and PR setup while retaining the plan gate", () => {
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   const request = screen.getByLabelText("What should change?");
-  const runtime = screen.getByRole("button", { name: "Check Claude before setup" });
+  const runtime = screen.getByRole("button", { name: "Check agent runtime" });
   const prSetup = screen.getByLabelText("Pull request readiness");
   expect(screen.getByText("Repository: /repo")).toBeInTheDocument();
-  expect(request.compareDocumentPosition(runtime) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(document.body.innerHTML.indexOf('id="feature-request"')).toBeLessThan(document.body.innerHTML.indexOf('id="feature-runtime-check"'));
   expect(request.compareDocumentPosition(prSetup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(request.closest("form")).toBeNull();
   expect(prSetup.closest("form")).toBeNull();
@@ -51,6 +51,23 @@ describe("feature intake", () => {
   expect(document.body.innerHTML.indexOf('aria-label="Next feature step"')).toBeLessThan(document.body.innerHTML.indexOf('id="feature-runtime-check"'));
   fireEvent.change(request, { target: { value: "Add a visible usage note" } });
   expect(screen.getByRole("button", { name: "Start with a plan" })).toBeDisabled();
+  const start = screen.getByRole("button", { name: "Start with a plan" });
+  const optional = screen.getByLabelText("Optional feature tools");
+  expect(document.body.innerHTML.indexOf('id="feature-start-plan"')).toBeLessThan(document.body.innerHTML.indexOf('aria-label="Optional feature tools"'));
+  expect(runtime.compareDocumentPosition(screen.getByLabelText("Prepare feature branch")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByLabelText("Prepare feature branch").compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByLabelText("What should change?")).toHaveAttribute("rows", "3");
+  expect(optional).not.toHaveAttribute("open");
+  expect(screen.getByText("Repository overview")).not.toBeVisible();
+  fireEvent.click(optional.querySelector("summary")!);
+  expect(optional).toHaveAttribute("open");
+  expect(screen.getByText("Repository overview")).toBeVisible();
+  for (const details of optional.querySelectorAll("details")) expect(details.open).toBe(false);
+  const explorer = screen.getByLabelText("Explore repository files");
+  fireEvent.click(explorer.querySelector("summary")!);
+  expect(explorer).toHaveAttribute("open");
+  fireEvent.click(prSetup.querySelector("summary")!);
+  expect(prSetup).toHaveAttribute("open");
   expect(state.create).not.toHaveBeenCalled();
  });
  it("does not unlock planning when the early Claude check passes", async () => {
@@ -128,6 +145,7 @@ describe("feature intake", () => {
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   expect(await screen.findByText(/GitHub PR setup .*origin check failed/)).toBeInTheDocument();
   expect(screen.getByRole("group", { name: "Pull request readiness" })).not.toHaveAttribute("open");
+  fireEvent.click(screen.getByText("Context and publishing tools"));
   fireEvent.click(screen.getByText(/GitHub PR setup .*origin check failed/));
   expect(screen.getByText(/Could not check this checkout's origin/)).toBeVisible();
  });
@@ -440,6 +458,7 @@ describe("feature intake", () => {
   render(<FeatureIntake projectId="one" onCreated={vi.fn()} />);
   const readme = await screen.findByText(/# Project A/);
   expect(readme).not.toBeVisible();
+  fireEvent.click(screen.getByText("Context and publishing tools"));
   fireEvent.click(screen.getByText("Read root README"));
   expect(readme).toBeVisible();
   expect(readme).toHaveTextContent("<img src=x onerror=alert(1)>");
