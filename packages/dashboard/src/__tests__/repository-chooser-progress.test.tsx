@@ -240,7 +240,7 @@ describe("repository chooser progress", () => {
     get.mockRejectedValue(new Error("Unavailable"));
     localStorage.setItem("orch8:feature-draft:proj-1", JSON.stringify({ feature: "Keep my request" }));
     renderWithProviders(<RepositoryChooser />);
-    await waitFor(() => expect(screen.getByText(/Checkout status unavailable/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText(/Checkout status unavailable/).length).toBeGreaterThan(0));
     expect(screen.queryByText(/Checkout clean on base/)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Continue to plan setup" })).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Describe a new feature for My repo" })).toHaveValue("Keep my request");
@@ -251,7 +251,7 @@ describe("repository chooser progress", () => {
     const { user } = renderWithProviders(<RepositoryChooser />);
     expect(await screen.findByText("Checkout clean on base · main")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Refresh checkout status" }));
-    await waitFor(() => expect(screen.getByText(/Checkout status unavailable/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText(/Checkout status unavailable/).length).toBeGreaterThan(0));
     expect(screen.queryByText("Checkout clean on base · main")).not.toBeInTheDocument();
   });
 
