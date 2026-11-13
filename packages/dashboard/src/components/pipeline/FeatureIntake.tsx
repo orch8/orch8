@@ -255,6 +255,18 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
   const validSelection = selected.every(Boolean) && reviewer !== implementer;
   const onFeatureBranch = !!branchState?.branch && branchState.branch !== branchState.baseBranch;
   const ready = !activeWorkflow && !!project?.id && feature.trim().length > 0 && validSelection && onFeatureBranch && checkedKey === selectionKey && !checking && !create.isPending;
+  const runtimeBlocked = failedSelectionKey === selectionKey && !!checkMessage;
+  const manualHandoff = feature.trim() && <details open={runtimeBlocked || undefined} className="rounded border border-amber-700/60 bg-amber-950/20 p-3 text-sm text-zinc-300" aria-label="Manual feature handoff">
+    <summary className="cursor-pointer font-medium text-amber-200">{runtimeBlocked ? "Runtime blocked: continue manually with your feature request" : "Copy request for manual use (optional)"}</summary>
+    <p className="mt-2 text-xs text-zinc-300">{runtimeBlocked ? "Orch8 cannot run the selected agents right now. " : ""}Copy this request into a trusted agent session or use it yourself. This does not prepare a branch, run agents, approve a plan, or publish a PR. Review the plan before implementation and verify the actual diff, tests and independent review yourself.</p>
+    <button type="button" onClick={() => { void copyHandoff(); }} disabled={!project?.homeDir || copying} className="mt-2 rounded border border-amber-500 px-3 py-2 text-amber-100 disabled:cursor-not-allowed disabled:opacity-40">{copying ? "Copying..." : "Copy feature handoff"}</button>
+    {!project?.homeDir && <p className="mt-2 text-amber-300">Load the repository path before copying the handoff.</p>}
+    {handoffFeedback === "copied" && <p role="status" className="mt-2 text-emerald-300">Handoff copied to clipboard.</p>}
+    {handoffFeedback === "manual" && <div className="mt-2">
+      <label htmlFor="manual-feature-handoff" className="block text-amber-300">Clipboard unavailable. Select and copy the handoff below.</label>
+      <textarea id="manual-feature-handoff" aria-label="Feature handoff for manual copy" readOnly value={handoff} rows={12} onFocus={event => event.currentTarget.select()} className="mt-2 w-full rounded border border-zinc-600 bg-zinc-950 p-2 font-mono text-xs text-zinc-100" />
+    </div>}
+  </details>;
   const nextStep = activeWorkflow ? { label: "Inspect existing workflows", target: "active-feature-workflows" }
     : !feature.trim() ? { label: "Describe your feature", target: "feature-request" }
     : !validSelection ? available.length < 2
@@ -421,6 +433,7 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
       {checkMessage && failedSelectionKey === selectionKey && <p role="status" className="text-sm text-amber-300">{checkMessage}</p>}
       {checkMessage && checkedKey === selectionKey && <p role="status" className="text-sm text-emerald-300">{checkMessage}</p>}
       <SandboxRecoveryGuidance message={failedSelectionKey === selectionKey ? checkMessage : ""} adapterType={failedAdapter} />
+      {runtimeBlocked && manualHandoff}
       {validSelection && checkedKey !== selectionKey && <p className="text-xs text-amber-300">Runtime check required for this agent selection.</p>}
       <div className="space-y-2 rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Prepare feature branch">
         <h3 className="font-medium">4. Prepare a feature branch (required)</h3>
@@ -466,17 +479,7 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
         <ul className="mt-2 space-y-1">{filePaths.map(path => <li key={path} className="flex items-center gap-2"><span className="min-w-0 break-all font-mono text-xs">{path}</span><button type="button" aria-label={`Remove ${path}`} onClick={() => setFilePaths(current => current.filter(value => value !== path))} className="shrink-0 text-blue-300 underline">Remove</button></li>)}</ul>
       </div>}
 
-      {feature.trim() && <details className="rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Manual feature handoff">
-        <summary className="cursor-pointer text-blue-200">Copy request for manual use (optional)</summary>
-        <p className="mt-2 text-xs text-zinc-400">This does not prepare a branch, check agents, or start a workflow.</p>
-        <button type="button" onClick={() => { void copyHandoff(); }} disabled={!project?.homeDir || copying} className="mt-2 rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">Copy feature handoff</button>
-        {!project?.homeDir && <p className="mt-2 text-amber-300">Load the repository path before copying the handoff.</p>}
-        {handoffFeedback === "copied" && <p role="status" className="mt-2 text-emerald-300">Handoff copied to clipboard.</p>}
-        {handoffFeedback === "manual" && <div className="mt-2">
-          <label htmlFor="manual-feature-handoff" className="block text-amber-300">Clipboard unavailable. Select and copy the handoff below.</label>
-          <textarea id="manual-feature-handoff" aria-label="Feature handoff for manual copy" readOnly value={handoff} rows={12} onFocus={event => event.currentTarget.select()} className="mt-2 w-full rounded border border-zinc-600 bg-zinc-950 p-2 font-mono text-xs text-zinc-100" />
-        </div>}
-      </details>}
+      {!runtimeBlocked && manualHandoff}
     <details aria-label="Check Claude before setup" className="mt-4 rounded border border-zinc-700 bg-zinc-950/60 p-3 text-sm text-zinc-300">
       <summary className="cursor-pointer font-medium text-blue-200">Check Claude Code early (optional)</summary>
       <div className="mt-2 space-y-2">
