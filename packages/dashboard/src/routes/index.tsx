@@ -57,8 +57,11 @@ function RepositoryWork({ project, pipelines, isError }: { project: Project; pip
   return <li className="rounded border border-zinc-700 bg-zinc-900 p-3">
     <p className="font-medium text-zinc-100">{project.name}</p>
     {isError && <p className="mt-1 text-xs text-amber-300">Could not check workflow status. Open the repository to inspect it.</p>}
-    <ul className="space-y-3">{unfinished.map(pipeline => <UnfinishedWorkflow key={pipeline.id} project={project} pipeline={pipeline} />)}
-      {cancelled.map(pipeline => <li key={pipeline.id} className="border-t border-zinc-700 pt-2 text-xs text-zinc-400">Cancelled attempt: <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className="break-words text-blue-300 underline">{pipeline.name}</Link></li>)}</ul>
+    <ul className="space-y-3">{unfinished.map(pipeline => <UnfinishedWorkflow key={pipeline.id} project={project} pipeline={pipeline} />)}</ul>
+    {!!cancelled.length && <details className="mt-3 border-t border-zinc-700 pt-2" aria-label={`Cancelled attempts in ${project.name}`}>
+      <summary className="cursor-pointer text-xs text-zinc-400">Recent cancelled attempts in {project.name}</summary>
+      <ul className="mt-2 space-y-2">{cancelled.map(pipeline => <li key={pipeline.id} className="text-xs text-zinc-400">Cancelled attempt: <Link to="/projects/$projectSlug/pipelines/$pipelineId" params={{ projectSlug: project.slug, pipelineId: pipeline.id }} className="break-words text-blue-300 underline">{pipeline.name}</Link></li>)}</ul>
+    </details>}
     {isError && <Link to="/projects/$projectSlug/pipelines" params={{ projectSlug: project.slug }} className="mt-2 inline-block text-blue-300 underline">Open feature workflows</Link>}
   </li>;
 }
@@ -259,7 +262,6 @@ function RepositoryCard({ project }: { project: Project }) {
 function RepositoryChooser() {
   const { data: projects, isLoading, isError, refetch } = useProjects();
   const [search, setSearch] = useState("");
-  const [showActivity, setShowActivity] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     try { return localStorage.getItem("orch8:selected-repository"); } catch { return null; }
   });
@@ -281,13 +283,11 @@ function RepositoryChooser() {
     {isError && <div role="alert" className="rounded border border-amber-700 p-4 text-amber-200">Could not load repositories. <button type="button" onClick={() => void refetch()} className="underline">Retry</button></div>}
     {!isLoading && !isError && active.length === 0 && <p className="rounded border border-zinc-700 p-5 text-zinc-300">No active repositories yet. Add a local checkout to start a feature.</p>}
     {active.length > 0 && <>
-      <details className="rounded border border-zinc-700 bg-zinc-900/50 p-4" aria-label="Feature work across repositories" onToggle={event => setShowActivity(event.currentTarget.open)}>
-        <summary className="cursor-pointer font-medium text-zinc-100">Continue feature work across repositories</summary>
-        {showActivity && <>
-          <p className="mt-2 text-xs text-zinc-400">Open an unfinished workflow directly, including plans and reviews waiting for your decision. Recent cancelled attempts are available for inspection. This list includes all active repositories, regardless of the search below.</p>
-          <RepositoryActivity projects={active} />
-        </>}
-      </details>
+      <section className="rounded border border-zinc-700 bg-zinc-900/50 p-4" aria-label="Feature work across repositories">
+        <h2 className="font-medium text-zinc-100">Continue feature work across repositories</h2>
+        <p className="mt-2 text-xs text-zinc-400">Plans and reviews waiting for a decision stay visible here even when another repository is selected or the search below excludes them.</p>
+        <RepositoryActivity projects={active} />
+      </section>
       <div>
         <label htmlFor="repository-search" className="block text-sm font-medium text-zinc-200">Find a repository</label>
         <input id="repository-search" type="search" value={search} onChange={event => setSearch(event.target.value)}

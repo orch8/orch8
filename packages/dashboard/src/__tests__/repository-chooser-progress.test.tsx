@@ -2,10 +2,10 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithProviders, screen, waitFor, within } from "../test-utils.js";
 import { fireEvent } from "@testing-library/react";
 
-const { useProjects, usePipelines, usePipeline, usePipelineDiff, get, post } = vi.hoisted(() => ({
-  useProjects: vi.fn(), usePipelines: vi.fn(), usePipeline: vi.fn(), usePipelineDiff: vi.fn(), get: vi.fn(), post: vi.fn(),
+const { useProjects, usePipelines, usePipeline, usePipelineDiff, get, listPipelines, post } = vi.hoisted(() => ({
+  useProjects: vi.fn(), usePipelines: vi.fn(), usePipeline: vi.fn(), usePipelineDiff: vi.fn(), get: vi.fn(), listPipelines: vi.fn(), post: vi.fn(),
 }));
-vi.mock("../api/client.js", () => ({ api: { get, post } }));
+vi.mock("../api/client.js", () => ({ api: { get: (path: string, query?: { projectId: string }) => path === "/pipelines" ? listPipelines(query) : get(path, query), post } }));
 vi.mock("../hooks/useProjects.js", () => ({ useProjects }));
 vi.mock("../hooks/usePipelines.js", () => ({ usePipelines, usePipeline, usePipelineDiff }));
 vi.mock("@tanstack/react-router", () => ({
@@ -26,6 +26,7 @@ beforeEach(() => {
   usePipelines.mockReturnValue({ data: [], isError: false });
   usePipeline.mockReturnValue({ data: undefined });
   usePipelineDiff.mockReturnValue({ data: undefined, isLoading: true, isError: false });
+  listPipelines.mockResolvedValue([]);
   get.mockResolvedValue({ ready: true, branch: "main", baseBranch: "main" });
 });
 
@@ -37,26 +38,23 @@ describe("repository chooser progress", () => {
       ? [{ id: "other-plan", projectId: other.id, name: "Add login", status: "running", createdAt: "2026-11-13T00:00:00Z", updatedAt: "2026-11-13T00:00:00Z" }]
       : [], isError: false }));
     usePipeline.mockReturnValue({ data: { steps: [{ id: "plan-step", label: "Plan", status: "awaiting_verification" }] } });
-    get.mockImplementation((path: string, query?: { projectId: string }) => path === "/pipelines"
-      ? Promise.resolve(query?.projectId === other.id ? [{ id: "other-plan", projectId: other.id, name: "Add login", status: "running", createdAt: "2026-11-13T00:00:00Z", updatedAt: "2026-11-13T00:00:00Z" }] : [])
-      : Promise.resolve({ ready: true, branch: "main", baseBranch: "main" }));
+    listPipelines.mockImplementation((query?: { projectId: string }) => Promise.resolve(query?.projectId === other.id
+      ? [{ id: "other-plan", projectId: other.id, name: "Add login", status: "running", createdAt: "2026-11-13T00:00:00Z", updatedAt: "2026-11-13T00:00:00Z" }] : []));
     const { user } = renderWithProviders(<RepositoryChooser />);
     await user.type(screen.getByRole("searchbox", { name: "Find a repository" }), "My repo");
-    await user.click(screen.getByText("Continue feature work across repositories"));
-    const activity = screen.getByRole("group", { name: "Feature work across repositories" });
+    const activity = screen.getByRole("region", { name: "Feature work across repositories" });
     expect(await within(activity).findByText("Other repo")).toBeVisible();
     expect(within(activity).getByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/other-repo/pipelines/other-plan#workflow-step-plan-step");
   });
   it("keeps an older plan visible after recent cancelled attempts", async () => {
     const attempts = ["cancel-a", "cancel-b", "cancel-c", "cancel-d"].map((id, index) => ({ id, projectId: project.id, name: id, status: "cancelled", updatedAt: `2026-11-13T04:00:0${index}Z` }));
-    get.mockImplementation((path: string) => Promise.resolve(path === "/pipelines"
-      ? [...attempts, { id: "pending-plan", projectId: project.id, name: "Build the feature", status: "running", updatedAt: "2026-11-12T00:00:00Z" }]
-      : { ready: true, branch: "main", baseBranch: "main" }));
+    listPipelines.mockResolvedValue([...attempts, { id: "pending-plan", projectId: project.id, name: "Build the feature", status: "running", updatedAt: "2026-11-12T00:00:00Z" }]);
     usePipeline.mockReturnValue({ data: { steps: [{ id: "plan-step", label: "Plan", status: "awaiting_verification" }] } });
-    const { user } = renderWithProviders(<RepositoryChooser />);
-    await user.click(screen.getByText("Continue feature work across repositories"));
-    const activity = screen.getByRole("group", { name: "Feature work across repositories" });
+    renderWithProviders(<RepositoryChooser />);
+    const activity = screen.getByRole("region", { name: "Feature work across repositories" });
     expect(await within(activity).findByRole("link", { name: "Review plan now" })).toHaveAttribute("href", "/projects/my-repo/pipelines/pending-plan#workflow-step-plan-step");
+    expect(within(activity).getByText("Recent cancelled attempts in My repo")).toBeInTheDocument();
+    expect(within(activity).getByRole("group", { name: "Cancelled attempts in My repo" })).not.toHaveAttribute("open");
     expect(within(activity).getAllByText("Cancelled attempt:")).toHaveLength(3);
   });
   it("carries a feature request into the selected repository without starting an agent", async () => {
@@ -72,7 +70,7 @@ describe("repository chooser progress", () => {
     expect(link).toHaveAttribute("href", "/projects/my-repo/pipelines#new-feature");
     await user.click(link);
     expect(JSON.parse(localStorage.getItem("orch8:feature-draft:proj-1")!)).toMatchObject({ feature: "Add a useful usage example", planner: "feature-planner" });
-    expect(get).toHaveBeenCalledWith("/projects/proj-1/feature-branch");
+    expect(get).toHaveBeenCalledWith("/projects/proj-1/feature-branch", undefined);
   });
 
   it("keeps the request when leaving via the repository link rather than the continue button", async () => {
@@ -163,7 +161,7 @@ describe("repository chooser progress", () => {
   it("shows live checkout readiness before opening a repository", async () => {
     renderWithProviders(<RepositoryChooser />);
     expect(await screen.findByText("Checkout clean on base · main")).toBeInTheDocument();
-    expect(get).toHaveBeenCalledWith("/projects/proj-1/feature-branch");
+    expect(get).toHaveBeenCalledWith("/projects/proj-1/feature-branch", undefined);
   });
 
   it("warns about Orch8's pending ignore change instead of calling that checkout clean", async () => {
@@ -182,7 +180,7 @@ describe("repository chooser progress", () => {
     expect(post).toHaveBeenCalledWith("/adapter/codex_local/test-environment", {
       config: { sandbox: "workspace-write", dangerouslyBypassApprovalsAndSandbox: false, sandboxOnly: true },
     });
-    expect(await screen.findByRole("status")).toHaveTextContent("Codex sandbox cannot run commands");
+    expect(await readiness.findByRole("status")).toHaveTextContent("Codex sandbox cannot run commands");
     expect(screen.getByRole("complementary", { name: /Codex.*recovery/ })).toBeInTheDocument();
     expect(post).toHaveBeenCalledTimes(1);
   });
@@ -196,7 +194,7 @@ describe("repository chooser progress", () => {
     expect(post).toHaveBeenCalledWith("/adapter/claude_local/test-environment", {
       projectId: project.id, config: { dangerouslySkipPermissions: false },
     });
-    expect(await screen.findByRole("status")).toHaveTextContent("Claude authentication expired");
+    expect(await readiness.findByRole("status")).toHaveTextContent("Claude authentication expired");
     expect(screen.getByRole("complementary", { name: "Claude authentication recovery" })).toHaveTextContent("claude auth login");
     expect(post).toHaveBeenCalledTimes(1);
   });
