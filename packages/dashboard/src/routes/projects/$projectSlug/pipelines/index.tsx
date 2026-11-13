@@ -81,8 +81,14 @@ function PipelinesActivePage() {
       </section>}
       {project && <FeatureIntake key={project.id} projectId={project.id} legacySlug={project.slug} activeWorkflow={isLoading || isError || activePipelines.length > 0} onCreated={id => void navigate({ to: "/projects/$projectSlug/pipelines/$pipelineId", params: { projectSlug: projectId, pipelineId: id } })} />}
       {projectError && <p role="alert" className="text-sm text-amber-300">Could not load this repository. Refresh before planning a feature.</p>}
-      {project && <TestInstructions key={`repository-tests-${project.id}`} projectId={project.id} />}
-      <RepositoryChanges projectId={project?.id} projectError={projectError} />
+      <details className="rounded border border-zinc-700 p-3" aria-label="Repository test controls">
+        <summary className="cursor-pointer text-sm font-medium text-blue-200">Test instructions and manual test runs</summary>
+        {project && <TestInstructions key={`repository-tests-${project.id}`} projectId={project.id} />}
+      </details>
+      <details className="rounded border border-zinc-700 p-3" aria-label="Inspect repository diff">
+        <summary className="cursor-pointer text-sm font-medium text-blue-200">Repository changes and raw diff</summary>
+        <RepositoryChanges projectId={project?.id} projectError={projectError} />
+      </details>
     </div>
   );
 }

@@ -264,6 +264,7 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
         : !onFeatureBranch ? { label: "Prepare a feature branch", target: "feature-branch-name" }
           : { label: "Start with a plan", target: "feature-start-plan" };
   function goToNextStep() {
+    if (nextStep.target === "feature-agent-setup") setSetupExpanded(true);
     const target = document.getElementById(nextStep.target);
     target?.scrollIntoView({ behavior: "smooth", block: "center" });
     target?.focus({ preventScroll: true });
@@ -355,24 +356,15 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
     <p className="mt-1 text-sm text-zinc-400">Describe a change, approve the plan, then inspect the implementation, tests, independent review and diff before publishing a draft PR.</p>
     <div className="mt-4 space-y-3">
       <p className="text-xs text-zinc-400">Repository: {project?.homeDir ?? "Loading repository..."}</p>
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+      <div className="min-w-0">
         <div className="min-w-0">
+          <h3 className="mb-2 text-sm font-semibold text-zinc-100">1. Describe the feature</h3>
           <label className="block text-sm text-zinc-300" htmlFor="feature-request">What should change?</label>
-          <textarea id="feature-request" rows={8} maxLength={2000} value={feature} onChange={e => setFeature(e.target.value)} placeholder="Describe the behavior users should gain and how to verify it" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-3 text-sm text-zinc-100" />
+          <textarea id="feature-request" rows={3} maxLength={2000} value={feature} onChange={e => setFeature(e.target.value)} placeholder="Describe the behavior users should gain and how to verify it" className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 p-3 text-sm text-zinc-100" />
         </div>
-        <aside className="min-w-0 rounded border border-zinc-700 bg-zinc-950 p-3 self-start" aria-label="Repository overview">
-          <h3 className="text-sm font-medium text-zinc-100">Repository overview</h3>
-          <details>
-            <summary className="mt-2 cursor-pointer text-sm text-blue-200">Read root README</summary>
-            <p className="mt-2 text-xs text-zinc-400">Root README{overview?.filename ? ` · ${overview.filename}` : ""} · plain-text preview, up to 64 KiB</p>
-            {overviewError ? <p className="mt-3 text-sm text-amber-300">Could not load repository overview. You can still draft a feature.</p>
-              : !overview ? <p className="mt-3 text-sm text-zinc-400">Loading README...</p>
-                : overview.content === null ? <p className="mt-3 text-sm text-zinc-400">No root README available. You can still draft a feature.</p>
-                  : <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-300">{overview.content}</pre>}
-          </details>
-          <p className="mt-2 text-xs text-zinc-400">Open for context without leaving your feature request.</p>
-        </aside>
+
       </div>
+      <h3 className="text-sm font-semibold text-zinc-100">2. Choose your agents</h3>
       {!isLoading && <details open={setupExpanded ?? available.length < 3} className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
         <summary id="feature-agent-setup" className="cursor-pointer font-medium text-blue-200" onClick={event => {
           event.preventDefault();
@@ -419,6 +411,61 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
       {(feature || branchName || planner || implementer || reviewer || filePaths.length > 0) && <button type="button" onClick={clearDraft} className="shrink-0 text-blue-300 underline">Clear draft</button>}
     </div>
 
+    </div>
+    {activeWorkflow && <p role="status" className="mt-3 rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200">Existing workflow work may still need attention. <a href="#active-feature-workflows" className="underline">Inspect existing workflows</a> and finish, retry or cancel them before starting another plan. Your draft stays here.</p>}
+    <form onSubmit={submit} className="mt-4 space-y-3">
+      {!isLoading && !available.length && <p role="status" className="text-sm text-amber-300">No eligible feature agents yet. Set up feature agents above or configure active agents in Agents.</p>}
+      {reviewer && implementer && reviewer === implementer && <p role="alert" className="text-sm text-amber-300">Choose a different agent for independent review.</p>}
+      <h3 className="text-sm font-semibold text-zinc-100">3. Check runtime</h3>
+      <button id="feature-runtime-check" type="button" onClick={() => { void checkRuntime(); }} disabled={!validSelection || checking} className="rounded border border-zinc-600 px-4 py-2 text-sm text-zinc-200 disabled:opacity-40">{checking ? "Checking agents..." : "Check agent runtime"}</button>
+      {checkMessage && failedSelectionKey === selectionKey && <p role="status" className="text-sm text-amber-300">{checkMessage}</p>}
+      {checkMessage && checkedKey === selectionKey && <p role="status" className="text-sm text-emerald-300">{checkMessage}</p>}
+      <SandboxRecoveryGuidance message={failedSelectionKey === selectionKey ? checkMessage : ""} adapterType={failedAdapter} />
+      {validSelection && checkedKey !== selectionKey && <p className="text-xs text-amber-300">Runtime check required for this agent selection.</p>}
+      <div className="space-y-2 rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Prepare feature branch">
+        <h3 className="font-medium">4. Prepare a feature branch (required)</h3>
+        <p>Current branch: {branchState?.branch || "Checking..."} · Configured base: {branchState?.baseBranch ?? project?.defaultBranch ?? "Checking..."}</p>
+        {onFeatureBranch && <div className="space-y-1">
+          <p className="text-xs text-zinc-400">Finished the previous feature? Return to the existing local base branch before preparing another. The repository must be clean except for Orch8's unchanged generated .gitignore addition, which stays uncommitted. This does not reset, delete, commit, push, edit the base branch, or run agents.</p>
+          <button type="button" onClick={() => { void returnToBase(); }} disabled={activeWorkflow || returning || preparing} className="rounded border border-zinc-600 px-3 py-2 text-zinc-200 disabled:opacity-40">{returning ? "Returning..." : "Return to base branch"}</button>
+        </div>}
+        <p className="text-xs text-zinc-400">Check the agent runtime first, so an unavailable sandbox does not leave an unused branch behind. This creates and checks out a new local branch; it does not commit, push, or start agents.</p>
+        <label className="block" htmlFor="feature-branch-name">New feature branch name</label>
+        <div className="flex flex-wrap gap-2">
+          <input id="feature-branch-name" value={branchName} onChange={e => setBranchName(e.target.value)} placeholder="feat/my-feature" className="min-w-48 flex-1 rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
+          <button type="button" onClick={() => { void prepareBranch(); }} disabled={activeWorkflow || !branchState?.ready || !branchName.trim() || preparing || returning || checkedKey !== selectionKey} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">{preparing ? "Preparing..." : "Prepare feature branch"}</button>
+        </div>
+        {branchState?.reason && <p role="status" className="text-amber-300">{branchState.reason}</p>}
+        {branchState?.note && <p role="status" className="text-amber-300">{branchState.note} Include it in the feature commit if you want the ignore rule in the PR.</p>}
+        {branchError && <p role="alert" className="text-red-300">{branchError}</p>}
+      </div>
+      {branchState && !onFeatureBranch && <p role="status" className="text-xs text-amber-300">Start is unavailable on the base branch. Check the agents above, then prepare a feature branch.</p>}
+      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+      <h3 className="text-sm font-semibold text-zinc-100">5. Plan and approve</h3>
+      <p className="text-xs text-zinc-400">Starting runs the planning agent. Review and approve its plan before implementation can begin.</p>
+      <button id="feature-start-plan" type="submit" disabled={!ready} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Start with a plan</button>
+    </form>
+    <details className="mt-5 border-t border-zinc-700 pt-4" aria-label="Optional feature tools">
+      <summary className="cursor-pointer text-sm font-medium text-blue-200">Context and publishing tools{filePaths.length ? ` · ${filePaths.length} starting files selected` : ""}</summary>
+      <div className="mt-3 space-y-3">
+        <aside className="min-w-0 rounded border border-zinc-700 bg-zinc-950 p-3 self-start" aria-label="Repository overview">
+          <h3 className="text-sm font-medium text-zinc-100">Repository overview</h3>
+          <details>
+            <summary className="mt-2 cursor-pointer text-sm text-blue-200">Read root README</summary>
+            <p className="mt-2 text-xs text-zinc-400">Root README{overview?.filename ? ` · ${overview.filename}` : ""} · plain-text preview, up to 64 KiB</p>
+            {overviewError ? <p className="mt-3 text-sm text-amber-300">Could not load repository overview. You can still draft a feature.</p>
+              : !overview ? <p className="mt-3 text-sm text-zinc-400">Loading README...</p>
+                : overview.content === null ? <p className="mt-3 text-sm text-zinc-400">No root README available. You can still draft a feature.</p>
+                  : <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-300">{overview.content}</pre>}
+          </details>
+          <p className="mt-2 text-xs text-zinc-400">Open for context without leaving your feature request.</p>
+        </aside>
+      {project?.id && <RepositoryExplorer key={`${project.id}:${branchState?.branch ?? "checking"}`} projectId={project.id} addedPaths={filePaths} onAddFile={path => { if (validPath(path)) setFilePaths(current => current.includes(path) || current.length >= 5 ? current : [...current, path]); }} />}
+      {filePaths.length > 0 && <div aria-label="Selected feature files" className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
+        <p>Starting files for the plan ({filePaths.length}/5). Only paths are sent to the planning agent; inspect the approved plan before implementation.</p>
+        <ul className="mt-2 space-y-1">{filePaths.map(path => <li key={path} className="flex items-center gap-2"><span className="min-w-0 break-all font-mono text-xs">{path}</span><button type="button" aria-label={`Remove ${path}`} onClick={() => setFilePaths(current => current.filter(value => value !== path))} className="shrink-0 text-blue-300 underline">Remove</button></li>)}</ul>
+      </div>}
+
       {feature.trim() && <details className="rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Manual feature handoff">
         <summary className="cursor-pointer text-blue-200">Copy request for manual use (optional)</summary>
         <p className="mt-2 text-xs text-zinc-400">This does not prepare a branch, check agents, or start a workflow.</p>
@@ -439,7 +486,7 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
       {earlyResult && !earlyResult.ok && <SandboxRecoveryGuidance message={earlyResult.message} adapterType="claude_local" />}
       </div>
     </details>
-    {activeWorkflow && <p role="status" className="mt-3 rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200">Existing workflow work may still need attention. <a href="#active-feature-workflows" className="underline">Inspect existing workflows</a> and finish, retry or cancel them before starting another plan. Your draft stays here.</p>}
+
     <details className="mt-2 rounded border border-zinc-700 p-3 text-xs text-zinc-300" aria-label="Pull request readiness">
       <summary className="cursor-pointer font-medium text-blue-200">GitHub PR setup (optional until publishing){originError ? " · origin check failed" : repositoryOrigin && !repositoryOrigin.origin ? repositoryOrigin.originAvailable ? " · unsupported origin" : " · no origin connected" : repositoryOrigin && (!repositoryOrigin.configuredRepository || !repositoryOrigin.originMatchesProject || !repositoryOrigin.pushMatchesProject) ? " · needs attention" : ""}</summary>
       <div className="mt-2">
@@ -471,41 +518,7 @@ export function FeatureIntake({ projectId, legacySlug, onCreated, activeWorkflow
         <p>Claude print mode cannot ask interactively. If the existing Claude permission settings deny Bash or Write, the check blocks the workflow; configure permissions deliberately in Claude settings, never via bypass flags.</p>
       </div>
     </details>
-    </div>
-    <form onSubmit={submit} className="mt-4 space-y-3">
-      {project?.id && <RepositoryExplorer key={`${project.id}:${branchState?.branch ?? "checking"}`} projectId={project.id} addedPaths={filePaths} onAddFile={path => { if (validPath(path)) setFilePaths(current => current.includes(path) || current.length >= 5 ? current : [...current, path]); }} />}
-      {filePaths.length > 0 && <div aria-label="Selected feature files" className="rounded border border-zinc-700 p-3 text-sm text-zinc-300">
-        <p>Starting files for the plan ({filePaths.length}/5). Only paths are sent to the planning agent; inspect the approved plan before implementation.</p>
-        <ul className="mt-2 space-y-1">{filePaths.map(path => <li key={path} className="flex items-center gap-2"><span className="min-w-0 break-all font-mono text-xs">{path}</span><button type="button" aria-label={`Remove ${path}`} onClick={() => setFilePaths(current => current.filter(value => value !== path))} className="shrink-0 text-blue-300 underline">Remove</button></li>)}</ul>
-      </div>}
-
-      {!isLoading && !available.length && <p role="status" className="text-sm text-amber-300">No eligible feature agents yet. Set up feature agents above or configure active agents in Agents.</p>}
-      {reviewer && implementer && reviewer === implementer && <p role="alert" className="text-sm text-amber-300">Choose a different agent for independent review.</p>}
-      <button id="feature-runtime-check" type="button" onClick={() => { void checkRuntime(); }} disabled={!validSelection || checking} className="rounded border border-zinc-600 px-4 py-2 text-sm text-zinc-200 disabled:opacity-40">{checking ? "Checking agents..." : "Check agent runtime"}</button>
-      {checkMessage && failedSelectionKey === selectionKey && <p role="status" className="text-sm text-amber-300">{checkMessage}</p>}
-      {checkMessage && checkedKey === selectionKey && <p role="status" className="text-sm text-emerald-300">{checkMessage}</p>}
-      <SandboxRecoveryGuidance message={failedSelectionKey === selectionKey ? checkMessage : ""} adapterType={failedAdapter} />
-      {validSelection && checkedKey !== selectionKey && <p className="text-xs text-amber-300">Runtime check required for this agent selection.</p>}
-      <div className="space-y-2 rounded border border-zinc-700 p-3 text-sm text-zinc-300" aria-label="Prepare feature branch">
-        <h3 className="font-medium">Prepare a feature branch (required)</h3>
-        <p>Current branch: {branchState?.branch || "Checking..."} · Configured base: {branchState?.baseBranch ?? project?.defaultBranch ?? "Checking..."}</p>
-        {onFeatureBranch && <div className="space-y-1">
-          <p className="text-xs text-zinc-400">Finished the previous feature? Return to the existing local base branch before preparing another. The repository must be clean except for Orch8's unchanged generated .gitignore addition, which stays uncommitted. This does not reset, delete, commit, push, edit the base branch, or run agents.</p>
-          <button type="button" onClick={() => { void returnToBase(); }} disabled={activeWorkflow || returning || preparing} className="rounded border border-zinc-600 px-3 py-2 text-zinc-200 disabled:opacity-40">{returning ? "Returning..." : "Return to base branch"}</button>
-        </div>}
-        <p className="text-xs text-zinc-400">Check the agent runtime first, so an unavailable sandbox does not leave an unused branch behind. This creates and checks out a new local branch; it does not commit, push, or start agents.</p>
-        <label className="block" htmlFor="feature-branch-name">New feature branch name</label>
-        <div className="flex flex-wrap gap-2">
-          <input id="feature-branch-name" value={branchName} onChange={e => setBranchName(e.target.value)} placeholder="feat/my-feature" className="min-w-48 flex-1 rounded border border-zinc-700 bg-zinc-950 p-2 text-zinc-100" />
-          <button type="button" onClick={() => { void prepareBranch(); }} disabled={activeWorkflow || !branchState?.ready || !branchName.trim() || preparing || returning || checkedKey !== selectionKey} className="rounded border border-blue-500 px-3 py-2 text-blue-200 disabled:cursor-not-allowed disabled:opacity-40">{preparing ? "Preparing..." : "Prepare feature branch"}</button>
-        </div>
-        {branchState?.reason && <p role="status" className="text-amber-300">{branchState.reason}</p>}
-        {branchState?.note && <p role="status" className="text-amber-300">{branchState.note} Include it in the feature commit if you want the ignore rule in the PR.</p>}
-        {branchError && <p role="alert" className="text-red-300">{branchError}</p>}
       </div>
-      {branchState && !onFeatureBranch && <p role="status" className="text-xs text-amber-300">Start is unavailable on the base branch. Check the agents above, then prepare a feature branch.</p>}
-      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-      <button id="feature-start-plan" type="submit" disabled={!ready} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Start with a plan</button>
-    </form>
+    </details>
   </section>;
 }
